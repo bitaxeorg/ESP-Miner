@@ -105,12 +105,15 @@ export class HomeComponent implements OnInit, OnDestroy {
   public activePoolProtocol!: string;
   public responseTime!: number;
 
-  public flashShare: boolean = false;
-  public flashJob: boolean = false;
-  private shareTimeout: any;
-  private jobTimeout: any;
-  private lastSharesCount: number = -1;
-  private lastScriptsig: string = '';
+  public flashShareAccepted: boolean = false;
+  public flashShareRejected: boolean = false;
+  public flashWorkReceived: boolean = false;
+  private shareAcceptedTimeout: any;
+  private shareRejectedTimeout: any;
+  private workReceivedTimeout: any;
+  private lastSharesAcceptedCount: number = -1;
+  private lastSharesRejectedCount: number = -1;
+  private lastWorkReceived: number = -1;
 
   public systemInfoError$ = new BehaviorSubject<ISystemInfoError>({
     duration: 0,
@@ -918,20 +921,29 @@ export class HomeComponent implements OnInit, OnDestroy {
           }
         }
 
-        const currentShares = info.sharesAccepted + info.sharesRejected;
-        if (this.lastSharesCount !== -1 && currentShares > this.lastSharesCount) {
-          this.flashShare = true;
-          clearTimeout(this.shareTimeout);
-          this.shareTimeout = setTimeout(() => this.flashShare = false, 500);
+        const currentSharesAccepted = info.sharesAccepted;
+        if (this.lastSharesAcceptedCount !== -1 && currentSharesAccepted > this.lastSharesAcceptedCount) {
+          this.flashShareAccepted = true;
+          clearTimeout(this.shareAcceptedTimeout);
+          this.shareAcceptedTimeout = setTimeout(() => this.flashShareAccepted = false, 500);
         }
-        this.lastSharesCount = currentShares;
+        this.lastSharesAcceptedCount = currentSharesAccepted;
 
-        if (this.lastScriptsig !== '' && info.scriptsig !== this.lastScriptsig) {
-          this.flashJob = true;
-          clearTimeout(this.jobTimeout);
-          this.jobTimeout = setTimeout(() => this.flashJob = false, 500);
+        const currentSharesRejected = info.sharesRejected;
+        if (this.lastSharesRejectedCount !== -1 && currentSharesRejected > this.lastSharesRejectedCount) {
+          this.flashShareRejected = true;
+          clearTimeout(this.shareRejectedTimeout);
+          this.shareRejectedTimeout = setTimeout(() => this.flashShareRejected = false, 500);
         }
-        this.lastScriptsig = info.scriptsig || '';
+        this.lastSharesRejectedCount = currentSharesRejected;
+
+        const currentWorkReceived = info.workReceived ?? 0;
+        if (this.lastWorkReceived !== -1 && currentWorkReceived > this.lastWorkReceived) {
+          this.flashWorkReceived = true;
+          clearTimeout(this.workReceivedTimeout);
+          this.workReceivedTimeout = setTimeout(() => this.flashWorkReceived = false, 500);
+        }
+        this.lastWorkReceived = currentWorkReceived;
       }),
       map(info => {
         const formatted = { ...info };

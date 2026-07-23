@@ -139,7 +139,8 @@
                     <div class="flex justify-between mb-4">
                         <div>
                             <span class="block text-lg font-medium mb-4">Shares
-                                <i class="pi pi-arrow-up transition-opacity duration-500 ml-2" [ngClass]="{'opacity-100 text-green-500': flashShare, 'opacity-0': !flashShare}" appTooltip="Share Sent" tooltipPosition="top"></i>
+                                <i class="pi pi-arrow-up transition-opacity duration-500 ml-2 text-sm align-middle text-green-500" [ngClass]="{'opacity-100': flashShareAccepted, 'opacity-0': !flashShareAccepted}" appTooltip="Share Accepted" tooltipPosition="top"></i>
+                                <i class="pi pi-times transition-opacity duration-500 ml-1 text-sm align-middle text-red-500" [ngClass]="{'opacity-100': flashShareRejected, 'opacity-0': !flashShareRejected}" appTooltip="Share Rejected" tooltipPosition="top"></i>
                             </span>
                             <div class="font-medium text-2xl">
                                 {{info.sharesAccepted | number: '1.0-0'}}
@@ -490,7 +491,7 @@
                 <div class="card">
                     <h4 class="whitespace-nowrap overflow-hidden text-ellipsis font-medium">
                         Block Header
-                        <i class="pi pi-arrow-down transition-opacity duration-500 ml-2 text-sm align-middle" [ngClass]="{'opacity-100 text-blue-500': flashJob, 'opacity-0': !flashJob}" appTooltip="New Job Received" tooltipPosition="top"></i>
+                        <i class="pi pi-arrow-down transition-opacity duration-500 ml-2 text-sm align-middle text-blue-500" [ngClass]="{'opacity-100': flashWorkReceived, 'opacity-0': !flashWorkReceived}" appTooltip="Work Received" tooltipPosition="top"></i>
                         <span *ngIf="info.blockSignals && info.blockSignals.length > 0" class="align-bottom ml-2">
                             <span *ngFor="let signal of info.blockSignals" class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-green-500 text-white ml-1">{{ signal }}</span>
                         </span>

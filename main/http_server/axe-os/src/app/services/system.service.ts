@@ -202,6 +202,7 @@ export class SystemApiService {
         coinbaseValueTotalSatoshis: 50,
         coinbaseValueUserSatoshis: 50,
         miningPaused: false,
+        workReceived: 42,
       }
     ).pipe(delay(1000));
   }
