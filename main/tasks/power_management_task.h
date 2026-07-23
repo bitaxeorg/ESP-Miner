@@ -1,6 +1,8 @@
 #ifndef POWER_MANAGEMENT_TASK_H_
 #define POWER_MANAGEMENT_TASK_H_
 
+typedef struct GlobalState GlobalState;
+
 typedef struct
 {
     float fan_perc;
@@ -18,7 +20,7 @@ typedef struct
     float core_voltage;
 } PowerManagementModule;
 
-void POWER_MANAGEMENT_init_frequency(void * pvParameters);
+void POWER_MANAGEMENT_init_frequency(GlobalState * GLOBAL_STATE);
 
 void POWER_MANAGEMENT_task(void * pvParameters);
 

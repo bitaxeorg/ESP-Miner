@@ -92,10 +92,8 @@ static float expected_hashrate(GlobalState * GLOBAL_STATE)
     return GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value * GLOBAL_STATE->DEVICE_CONFIG.family.asic.small_core_count * GLOBAL_STATE->DEVICE_CONFIG.family.asic_count / 1000.0;
 }
 
-void POWER_MANAGEMENT_init_frequency(void * pvParameters)
+void POWER_MANAGEMENT_init_frequency(GlobalState * GLOBAL_STATE)
 {
-    GlobalState * GLOBAL_STATE = (GlobalState *) pvParameters;
-
     float frequency = nvs_config_get_float(NVS_CONFIG_ASIC_FREQUENCY);
 
     GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value = frequency;

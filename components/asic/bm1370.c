@@ -2,6 +2,7 @@
 
 #include "crc.h"
 #include "global_state.h"
+#include "mining.h"
 #include "serial.h"
 #include "utils.h"
 
@@ -183,10 +184,8 @@ float BM1370_send_hash_frequency(float target_freq)
     return frequency;
 }
 
-uint8_t BM1370_init(void * pvParameters)
+uint8_t BM1370_init(GlobalState * GLOBAL_STATE)
 {
-    GlobalState * GLOBAL_STATE = (GlobalState *)pvParameters;
-
     // set version mask
     for (int i = 0; i < 3; i++) {
         BM1370_set_version_mask(STRATUM_DEFAULT_VERSION_MASK);
@@ -323,10 +322,8 @@ int BM1370_set_max_baud(void)
 
 static uint8_t id = 0;
 
-void BM1370_send_work(void * pvParameters, bm_job * next_bm_job)
+void BM1370_send_work(GlobalState * GLOBAL_STATE, bm_job * next_bm_job)
 {
-    GlobalState * GLOBAL_STATE = (GlobalState *) pvParameters;
-
     BM1370_job job;
     id = (id + 24) % 128;
     job.job_id = id;
@@ -358,7 +355,7 @@ void BM1370_send_work(void * pvParameters, bm_job * next_bm_job)
     _send_BM1370((TYPE_JOB | GROUP_SINGLE | CMD_WRITE), (uint8_t *)&job, sizeof(BM1370_job), BM1370_DEBUG_WORK);
 }
 
-task_result * BM1370_process_work(void * pvParameters)
+task_result * BM1370_process_work(GlobalState * GLOBAL_STATE)
 {
     bm1370_asic_result_t asic_result = {0};
 
@@ -386,8 +383,6 @@ task_result * BM1370_process_work(void * pvParameters)
     uint8_t core_id = (uint8_t)((nonce_h >> 25) & 0x7f); // BM1370 has 80 cores, so it should be coded on 7 bits
     uint8_t small_core_id = asic_result.job.id & 0x0f; // BM1370 has 16 small cores, so it should be coded on 4 bits
     uint32_t version_bits = (ntohs(asic_result.job.version) << 13); // shift the 16 bit value left 13
-
-    GlobalState * GLOBAL_STATE = (GlobalState *) pvParameters;
 
     // Read active_jobs[job_id] under the lock
     pthread_mutex_lock(&GLOBAL_STATE->valid_jobs_lock);

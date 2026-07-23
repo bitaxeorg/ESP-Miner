@@ -12,14 +12,13 @@
 #include "sv2_protocol.h"
 #include "sv2_noise.h"
 #include "mining.h"
-#include "nvs_config.h"
+#include "stratum_api.h"
 #include "work_queue.h"
 #include "utils.h"
 #include "libbase58.h"
 #include "device_config.h"
 #include "coinbase_decoder.h"
 #include "esp_heap_caps.h"
-#include "esp_psram.h"
 
 #include <string.h>
 #include <stdlib.h>

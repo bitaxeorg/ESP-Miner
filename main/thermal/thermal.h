@@ -2,8 +2,10 @@
 #define THERMAL_H
 
 #include <esp_err.h>
+#include <stdint.h>
 
-#include "global_state.h"
+typedef struct GlobalState GlobalState;
+typedef struct DeviceConfig DeviceConfig;
 
 esp_err_t Thermal_init(DeviceConfig * DEVICE_CONFIG);
 esp_err_t Thermal_set_fan_percent(DeviceConfig * DEVICE_CONFIG, float percent);

@@ -10,9 +10,8 @@
 
 static const char * TAG = "frequency_transition";
 
-void do_frequency_transition(void * pvParameters, set_hash_frequency_fn set_frequency_fn)
+void do_frequency_transition(GlobalState * GLOBAL_STATE, set_hash_frequency_fn set_frequency_fn)
 {
-    GlobalState * GLOBAL_STATE = (GlobalState *)pvParameters;
     float target_frequency = GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value;
     float current_frequency = GLOBAL_STATE->POWER_MANAGEMENT_MODULE.actual_frequency;
 

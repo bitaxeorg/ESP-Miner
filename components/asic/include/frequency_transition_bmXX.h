@@ -3,6 +3,8 @@
 
 #include <stdbool.h>
 
+typedef struct GlobalState GlobalState;
+
 extern const char *FREQUENCY_TRANSITION_TAG;
 
 /**
@@ -21,9 +23,9 @@ typedef float (*set_hash_frequency_fn)(float frequency);
  * This function gradually adjusts the ASIC frequency to reach the target value,
  * stepping up or down in increments to ensure stability.
  * 
- * @param pvParameters Pointer to the GlobalState structure
+ * @param GLOBAL_STATE Pointer to the GlobalState structure
  * @param set_frequency_fn Function pointer to the appropriate ASIC's set_hash_frequency function
  */
-void do_frequency_transition(void * pvParameters, set_hash_frequency_fn set_frequency_fn);
+void do_frequency_transition(GlobalState * GLOBAL_STATE, set_hash_frequency_fn set_frequency_fn);
 
 #endif // FREQUENCY_TRANSITION_H

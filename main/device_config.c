@@ -8,10 +8,8 @@
 
 static const char * TAG = "device_config";
 
-esp_err_t device_config_init(void * pvParameters)
+esp_err_t device_config_init(GlobalState * GLOBAL_STATE)
 {
-    GlobalState * GLOBAL_STATE = (GlobalState *) pvParameters;
-
     // TODO: Read board version from eFuse
 
     char * board_version = nvs_config_get_string(NVS_CONFIG_BOARD_VERSION);

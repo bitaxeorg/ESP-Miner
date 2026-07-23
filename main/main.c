@@ -11,9 +11,9 @@
 #include "hashrate_monitor_task.h"
 #include "fan_controller_task.h"
 #include "statistics_task.h"
+#include "global_state.h"
 #include "system.h"
 #include "http_server.h"
-#include "serial.h"
 #include "protocol_coordinator.h"
 #include "i2c_bitaxe.h"
 #include "adc.h"
@@ -27,7 +27,6 @@
 #include "asic_init.h"
 #include "task_monitor.h"
 #include "filesystem.h"
-#include "input.h"
 #include "log_buffer.h"
 
 static GlobalState GLOBAL_STATE;
@@ -149,7 +148,7 @@ void app_main(void)
     
     if (!GLOBAL_STATE.SELF_TEST_MODULE.is_active) {
         // start the API for AxeOS
-        start_rest_server((void *) &GLOBAL_STATE);
+        start_rest_server(&GLOBAL_STATE);
     }
 
     // After mounting SPIFFS

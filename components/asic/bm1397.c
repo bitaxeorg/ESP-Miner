@@ -178,10 +178,8 @@ float BM1397_send_hash_frequency(float target_freq)
     return frequency;
 }
 
-uint8_t BM1397_init(void * pvParameters)
+uint8_t BM1397_init(GlobalState * GLOBAL_STATE)
 {
-    GlobalState * GLOBAL_STATE = (GlobalState *)pvParameters;
-
     // send the init command
     _send_read_address();
 
@@ -257,10 +255,8 @@ int BM1397_set_max_baud(void)
 
 static uint8_t id = 0;
 
-void BM1397_send_work(void *pvParameters, bm_job *next_bm_job)
+void BM1397_send_work(GlobalState * GLOBAL_STATE, bm_job * next_bm_job)
 {
-    GlobalState *GLOBAL_STATE = (GlobalState *)pvParameters;
-
     job_packet job;
     // max job number is 128
     // there is still some really weird logic with the job id bits for the asic to sort out
@@ -302,7 +298,7 @@ void BM1397_send_work(void *pvParameters, bm_job *next_bm_job)
     _send_BM1397((TYPE_JOB | GROUP_SINGLE | CMD_WRITE), (uint8_t *)&job, sizeof(job_packet), BM1397_DEBUG_WORK);
 }
 
-task_result *BM1397_process_work(void *pvParameters)
+task_result *BM1397_process_work(GlobalState * GLOBAL_STATE)
 {
     bm1397_asic_result_t asic_result = {0};
 
@@ -329,8 +325,6 @@ task_result *BM1397_process_work(void *pvParameters)
 
     uint8_t rx_job_id = asic_result.job.id & 0xfc;
     uint8_t rx_midstate_index = asic_result.job.id & 0x03;
-
-    GlobalState *GLOBAL_STATE = (GlobalState *)pvParameters;
 
     // Read active_jobs[rx_job_id] under the lock: BM1397_send_work() can free and
     // replace this slot from the create-jobs task, so dereferencing ->version /

@@ -7,11 +7,11 @@
 
 #include <string.h>
 #include <stdio.h>
-#include <ctype.h>
 #include <stdlib.h>
 #include "esp_log.h"
 #include "esp_timer.h"
 #include "nvs_config.h"
+#include "global_state.h"
 #include "bap_handlers.h"
 #include "bap_protocol.h"
 #include "bap_uart.h"

@@ -1,8 +1,9 @@
 #ifndef ASIC_INIT_H_
 #define ASIC_INIT_H_
 
-#include "global_state.h"
 #include <stdint.h>
+
+typedef struct GlobalState GlobalState;
 
 typedef enum {
     ASIC_INIT_COLD_BOOT,    // Fresh system startup - calls SERIAL_init()

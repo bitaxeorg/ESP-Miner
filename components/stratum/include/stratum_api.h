@@ -37,7 +37,7 @@ typedef enum
     CUSTOM_CRT = 2,
 } tls_mode;
 
-typedef struct
+typedef struct mining_notify
 {
     char *job_id;
     char *prev_block_hash;
@@ -51,7 +51,7 @@ typedef struct
     bool clean_jobs;
 } mining_notify;
 
-typedef struct
+typedef struct StratumApiV1Message
 {
     char *extranonce_str;
     int extranonce_2_len;
@@ -73,7 +73,8 @@ typedef struct
     char *version_string;
 } StratumApiV1Message;
 
-typedef struct {
+typedef struct RequestTiming
+{
     int64_t timestamp_us;
     bool tracking;
 } RequestTiming;
@@ -90,7 +91,7 @@ bool STRATUM_V1_parse(StratumApiV1Message *message, const char *stratum_json);
 
 void STRATUM_V1_reset_message(StratumApiV1Message *message);
 
-void STRATUM_V1_free_mining_notify(mining_notify *params);
+void STRATUM_V1_free_mining_notify(mining_notify *mining_notify);
 
 int STRATUM_V1_authorize(esp_transport_handle_t transport, int send_uid, const char *username, const char *pass);
 

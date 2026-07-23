@@ -5,7 +5,8 @@
 #include <stddef.h>
 #include <stdbool.h>
 #include "esp_err.h"
-#include "stratum_api.h"
+
+typedef struct mining_notify mining_notify;
 
 #define MAX_ADDRESS_STRING_LEN 128
 #define MAX_COINBASE_TX_OUTPUTS 6
