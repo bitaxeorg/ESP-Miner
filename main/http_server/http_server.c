@@ -617,6 +617,165 @@ static esp_err_t handle_options_request(httpd_req_t * req)
     return ESP_OK;
 }
 
+static bool validate_string_field(const cJSON *item, const char *field, size_t max_len, int i) {
+    if (item) {
+        if (!cJSON_IsString(item)) {
+            ESP_LOGW(TAG, "Pool %d: %s must be string", i, field);
+            return false;
+        }
+        if (strlen(item->valuestring) > max_len) {
+            ESP_LOGW(TAG, "Pool %d: %s too long", i, field);
+            return false;
+        }
+    }
+    return true;
+}
+
+static bool validate_number_range(const cJSON *item, const char *field, double min, double max, int i) {
+    if (item) {
+        if (!cJSON_IsNumber(item)) {
+            ESP_LOGW(TAG, "Pool %d: %s must be number", i, field);
+            return false;
+        }
+        if (item->valuedouble < min || item->valuedouble > max) {
+            ESP_LOGW(TAG, "Pool %d: %s out of range: %.0f", i, field, item->valuedouble);
+            return false;
+        }
+    }
+    return true;
+}
+
+static bool validate_bool_or_num(const cJSON *item, const char *field, int i) {
+    if (item && !cJSON_IsBool(item) && !cJSON_IsNumber(item)) {
+        ESP_LOGW(TAG, "Pool %d: %s must be bool or number", i, field);
+        return false;
+    }
+    return true;
+}
+
+static void add_string_field_default(cJSON *obj, const cJSON *pool_item, const char *field, const char *default_val) {
+    cJSON *item = cJSON_GetObjectItem(pool_item, field);
+    cJSON_AddStringToObject(obj, field, item && cJSON_IsString(item) ? item->valuestring : default_val);
+}
+
+static void add_number_field_default(cJSON *obj, const cJSON *pool_item, const char *field, double default_val) {
+    cJSON *item = cJSON_GetObjectItem(pool_item, field);
+    cJSON_AddNumberToObject(obj, field, item && cJSON_IsNumber(item) ? item->valuedouble : default_val);
+}
+
+static void add_bool_field_default(cJSON *obj, const cJSON *pool_item, const char *field, bool default_val) {
+    cJSON *item = cJSON_GetObjectItem(pool_item, field);
+    cJSON_AddBoolToObject(obj, field, item ? (cJSON_IsTrue(item) || (cJSON_IsNumber(item) && item->valueint != 0)) : default_val);
+}
+
+static bool validate_pool_json(const cJSON *pool_item, int i) {
+    if (!cJSON_IsObject(pool_item)) {
+        ESP_LOGW(TAG, "Pool index %d is not an object", i);
+        return false;
+    }
+
+    cJSON *url = cJSON_GetObjectItem(pool_item, "stratumURL");
+    if (!url || !cJSON_IsString(url) || strlen(url->valuestring) == 0) {
+        ESP_LOGW(TAG, "Pool %d: stratumURL is required and cannot be empty", i);
+        return false;
+    }
+
+    cJSON *port = cJSON_GetObjectItem(pool_item, "stratumPort");
+    if (!port || !cJSON_IsNumber(port)) {
+        ESP_LOGW(TAG, "Pool %d: stratumPort is required", i);
+        return false;
+    }
+
+    cJSON *user = cJSON_GetObjectItem(pool_item, "stratumUser");
+    if (!user || !cJSON_IsString(user) || strlen(user->valuestring) == 0) {
+        ESP_LOGW(TAG, "Pool %d: stratumUser is required and cannot be empty", i);
+        return false;
+    }
+
+    cJSON *proto = cJSON_GetObjectItem(pool_item, "stratumProtocol");
+    if (proto) {
+        if (!validate_string_field(proto, "stratumProtocol", 255, i)) return false;
+        if (stratum_protocol_from_string(proto->valuestring) == STRATUM_PROTOCOL_UNKNOWN) {
+            ESP_LOGW(TAG, "Pool %d: invalid stratumProtocol: '%s'", i, proto->valuestring);
+            return false;
+        }
+    }
+
+    if (!validate_string_field(url, "stratumURL", 255, i)) return false;
+    if (!validate_number_range(port, "stratumPort", 1, 65535, i)) return false;
+    if (!validate_string_field(user, "stratumUser", 255, i)) return false;
+    if (!validate_string_field(cJSON_GetObjectItem(pool_item, "stratumPassword"), "stratumPassword", 255, i)) return false;
+    if (!validate_number_range(cJSON_GetObjectItem(pool_item, "stratumSuggestedDifficulty"), "stratumSuggestedDifficulty", 0, 1e18, i)) return false;
+    if (!validate_bool_or_num(cJSON_GetObjectItem(pool_item, "stratumExtranonceSubscribe"), "stratumExtranonceSubscribe", i)) return false;
+    if (!validate_number_range(cJSON_GetObjectItem(pool_item, "stratumTLS"), "stratumTLS", 0, 2, i)) return false;
+    if (!validate_string_field(cJSON_GetObjectItem(pool_item, "stratumCert"), "stratumCert", 3000, i)) return false;
+    if (!validate_bool_or_num(cJSON_GetObjectItem(pool_item, "stratumDecodeCoinbase"), "stratumDecodeCoinbase", i)) return false;
+
+    cJSON *v2chan = cJSON_GetObjectItem(pool_item, "stratumV2ChannelType");
+    if (v2chan) {
+        if (!validate_string_field(v2chan, "stratumV2ChannelType", 255, i)) return false;
+        if (sv2_channel_type_from_string(v2chan->valuestring) == SV2_CHANNEL_UNKNOWN) {
+            ESP_LOGW(TAG, "Pool %d: invalid stratumV2ChannelType: '%s'", i, v2chan->valuestring);
+            return false;
+        }
+    }
+
+    if (!validate_string_field(cJSON_GetObjectItem(pool_item, "stratumV2AuthorityPubkey"), "stratumV2AuthorityPubkey", 128, i)) return false;
+
+    return true;
+}
+
+static void update_pool_nvs(const cJSON *pool_item, int i) {
+    cJSON *p_obj = cJSON_CreateObject();
+    
+    cJSON *new_pass = cJSON_GetObjectItem(pool_item, "stratumPassword");
+    const char *pass_to_save = NULL;
+    char *old_pass = NULL;
+    
+    if (new_pass && cJSON_IsString(new_pass) && strcmp(new_pass->valuestring, "*****") == 0) {
+        char *old_json_str = nvs_config_get_string_indexed(NVS_CONFIG_POOL, i);
+        if (old_json_str && strlen(old_json_str) > 0) {
+            cJSON *old_json = cJSON_Parse(old_json_str);
+            if (old_json) {
+                cJSON *old_pass_item = cJSON_GetObjectItem(old_json, "stratumPassword");
+                if (old_pass_item && cJSON_IsString(old_pass_item)) {
+                    old_pass = strdup(old_pass_item->valuestring);
+                }
+                cJSON_Delete(old_json);
+            }
+        }
+        free(old_json_str);
+        pass_to_save = old_pass ? old_pass : "x";
+    } else if (new_pass && cJSON_IsString(new_pass)) {
+        pass_to_save = new_pass->valuestring;
+    } else {
+        pass_to_save = "x";
+    }
+
+    add_string_field_default(p_obj, pool_item, "stratumProtocol", STRATUM_V1);
+    add_string_field_default(p_obj, pool_item, "stratumURL", "");
+    add_number_field_default(p_obj, pool_item, "stratumPort", 3333);
+    add_string_field_default(p_obj, pool_item, "stratumUser", "");
+    cJSON_AddStringToObject(p_obj, "stratumPassword", pass_to_save);
+    add_number_field_default(p_obj, pool_item, "stratumSuggestedDifficulty", 0);
+    add_bool_field_default(p_obj, pool_item, "stratumExtranonceSubscribe", false);
+    add_number_field_default(p_obj, pool_item, "stratumTLS", 0);
+    add_string_field_default(p_obj, pool_item, "stratumCert", "");
+    add_bool_field_default(p_obj, pool_item, "stratumDecodeCoinbase", true);
+    add_string_field_default(p_obj, pool_item, "stratumV2ChannelType", SV2_CHANNEL_TYPE_EXTENDED);
+    add_string_field_default(p_obj, pool_item, "stratumV2AuthorityPubkey", "");
+
+    char *json_str = cJSON_PrintUnformatted(p_obj);
+    if (json_str) {
+        nvs_config_set_string_indexed(NVS_CONFIG_POOL, i, json_str);
+        free(json_str);
+    }
+    cJSON_Delete(p_obj);
+    if (old_pass) free(old_pass);
+
+    SYSTEM_load_pool_from_nvs(GLOBAL_STATE, i);
+}
+
 bool check_settings_and_update(const cJSON * const root, char **redirect_url)
 {
     bool result = true;
@@ -639,6 +798,7 @@ bool check_settings_and_update(const cJSON * const root, char **redirect_url)
     for (NvsConfigKey key = 0; key < NVS_CONFIG_COUNT; key++) {
         Settings *setting = nvs_config_get_settings(key);
         if (!setting->rest_name) continue;
+        if (key == NVS_CONFIG_POOL) continue;
 
         cJSON * item = cJSON_GetObjectItem(root, setting->rest_name);
         if (!item) continue;
@@ -708,16 +868,34 @@ bool check_settings_and_update(const cJSON * const root, char **redirect_url)
             ESP_LOGW(TAG, "Invalid display rotation: '%d'", item->valueint);
             result = false;
         }
-        if ((key == NVS_CONFIG_STRATUM_PROTOCOL || key == NVS_CONFIG_FALLBACK_STRATUM_PROTOCOL) && cJSON_IsString(item)) {
-            if (stratum_protocol_from_string(item->valuestring) == STRATUM_PROTOCOL_UNKNOWN) {
-                ESP_LOGW(TAG, "Invalid stratum protocol: '%s'", item->valuestring);
-                result = false;
-            }
-        }
-        if ((key == NVS_CONFIG_SV2_CHANNEL_TYPE || key == NVS_CONFIG_FALLBACK_SV2_CHANNEL_TYPE) && cJSON_IsString(item)) {
-            if (sv2_channel_type_from_string(item->valuestring) == SV2_CHANNEL_UNKNOWN) {
-                ESP_LOGW(TAG, "Invalid SV2 channel type: '%s'", item->valuestring);
-                result = false;
+    }
+
+    // Validate pools array separately
+    cJSON *pools_item = cJSON_GetObjectItem(root, "pools");
+    if (pools_item) {
+        if (!cJSON_IsArray(pools_item)) {
+            ESP_LOGW(TAG, "Invalid type for 'pools', expected array");
+            result = false;
+        } else {
+            int size = cJSON_GetArraySize(pools_item);
+            for (int i = 0; i < size; i++) {
+                cJSON *pool_item = cJSON_GetArrayItem(pools_item, i);
+                cJSON *id_item = cJSON_GetObjectItem(pool_item, "id");
+                if (!id_item || !cJSON_IsNumber(id_item)) {
+                    ESP_LOGW(TAG, "Pool item at index %d is missing required 'id' number", i);
+                    result = false;
+                    break;
+                }
+                int idx = id_item->valueint;
+                if (idx < 0 || idx >= MAX_POOLS) {
+                    ESP_LOGW(TAG, "Pool item has invalid 'id': %d", idx);
+                    result = false;
+                    break;
+                }
+                if (!validate_pool_json(pool_item, idx)) {
+                    result = false;
+                    break;
+                }
             }
         }
     }
@@ -727,6 +905,7 @@ bool check_settings_and_update(const cJSON * const root, char **redirect_url)
         for (NvsConfigKey key = 0; key < NVS_CONFIG_COUNT; key++) {
             Settings *setting = nvs_config_get_settings(key);
             if (!setting || !setting->rest_name) continue;
+            if (key == NVS_CONFIG_POOL) continue;
 
             cJSON * item = cJSON_GetObjectItem(root, setting->rest_name);
             if (!item) continue;
@@ -764,6 +943,21 @@ bool check_settings_and_update(const cJSON * const root, char **redirect_url)
                 case TYPE_FLOAT:
                     nvs_config_set_float(key, (float)item->valuedouble);
                     break;
+            }
+        }
+
+        // Save pools array to NVS
+        if (pools_item && cJSON_IsArray(pools_item)) {
+            int size = cJSON_GetArraySize(pools_item);
+            for (int i = 0; i < size; i++) {
+                cJSON *pool_item = cJSON_GetArrayItem(pools_item, i);
+                cJSON *id_item = cJSON_GetObjectItem(pool_item, "id");
+                if (id_item && cJSON_IsNumber(id_item)) {
+                    int idx = id_item->valueint;
+                    if (idx >= 0 && idx < MAX_POOLS) {
+                        update_pool_nvs(pool_item, idx);
+                    }
+                }
             }
         }
     }
@@ -981,6 +1175,102 @@ static esp_err_t POST_dismiss_block_found(httpd_req_t * req)
     cJSON_Delete(root);
 
     return res;
+}
+
+static esp_err_t PUT_system_pool(httpd_req_t *req)
+{
+    if (is_network_allowed(req) != ESP_OK) {
+        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+    }
+
+    if (set_cors_headers(req) != ESP_OK) {
+        httpd_resp_send_500(req);
+        return ESP_OK;
+    }
+
+    const char *last_slash = strrchr(req->uri, '/');
+    if (!last_slash) {
+        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Missing pool index");
+    }
+    int idx = atoi(last_slash + 1);
+    if (idx < 0 || idx >= MAX_POOLS) {
+        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid pool index");
+    }
+
+    int total_len = req->content_len;
+    if (total_len <= 0 || total_len >= SCRATCH_BUFSIZE) {
+        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid request length");
+    }
+
+    char *buf = ((rest_server_context_t *)(req->user_ctx))->scratch;
+    int received = httpd_req_recv(req, buf, total_len);
+    if (received <= 0) {
+        return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to receive request data");
+    }
+    buf[received] = '\0';
+
+    cJSON *root = cJSON_Parse(buf);
+    if (!root) {
+        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid JSON");
+    }
+
+    if (!validate_pool_json(root, idx)) {
+        cJSON_Delete(root);
+        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid pool configuration payload");
+    }
+
+    update_pool_nvs(root, idx);
+    cJSON_Delete(root);
+
+    cJSON *resp = cJSON_CreateObject();
+    cJSON_AddStringToObject(resp, "message", "Pool updated successfully");
+    httpd_resp_set_type(req, "application/json");
+    esp_err_t send_res = HTTP_send_json(req, resp, &api_common_prebuffer_len);
+    cJSON_Delete(resp);
+
+    return send_res;
+}
+
+static esp_err_t DELETE_system_pool(httpd_req_t *req)
+{
+    if (is_network_allowed(req) != ESP_OK) {
+        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+    }
+
+    if (set_cors_headers(req) != ESP_OK) {
+        httpd_resp_send_500(req);
+        return ESP_OK;
+    }
+
+    const char *last_slash = strrchr(req->uri, '/');
+    if (!last_slash) {
+        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Missing pool index");
+    }
+    int idx = atoi(last_slash + 1);
+    if (idx < 0 || idx >= MAX_POOLS) {
+        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid pool index");
+    }
+
+    // Check if the index is selected as primary or fallback
+    uint16_t prim = nvs_config_get_u16(NVS_CONFIG_PRIMARY_POOL_INDEX);
+    uint16_t sec = nvs_config_get_u16(NVS_CONFIG_SECONDARY_POOL_INDEX);
+    if (idx == prim || idx == sec) {
+        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Cannot delete a pool that is currently selected as primary or fallback");
+    }
+
+    // Clear the slot in NVS
+    nvs_config_set_string_indexed(NVS_CONFIG_POOL, idx, "");
+
+    // Reload in global state memory
+    SYSTEM_load_pool_from_nvs(GLOBAL_STATE, idx);
+
+    cJSON *resp = cJSON_CreateObject();
+    cJSON_AddStringToObject(resp, "message", "Pool cleared successfully");
+    httpd_resp_set_type(req, "application/json");
+    esp_err_t send_res = HTTP_send_json(req, resp, &api_common_prebuffer_len);
+    cJSON_Delete(resp);
+
+    return send_res;
 }
 
 static esp_err_t POST_mining_pause(httpd_req_t * req)
@@ -1556,6 +1846,22 @@ esp_err_t start_rest_server(void * pvParameters)
         .user_ctx = rest_context
     };
     httpd_register_uri_handler(server, &update_system_settings_uri);
+
+    httpd_uri_t system_pool_put_uri = {
+        .uri = "/api/system/pools/*",
+        .method = HTTP_PUT,
+        .handler = PUT_system_pool,
+        .user_ctx = rest_context
+    };
+    httpd_register_uri_handler(server, &system_pool_put_uri);
+
+    httpd_uri_t system_pool_delete_uri = {
+        .uri = "/api/system/pools/*",
+        .method = HTTP_DELETE,
+        .handler = DELETE_system_pool,
+        .user_ctx = rest_context
+    };
+    httpd_register_uri_handler(server, &system_pool_delete_uri);
 
     httpd_uri_t update_post_ota_firmware = {
         .uri = "/api/system/OTA", 

@@ -6,9 +6,7 @@ import { LocalStorageService } from '../../local-storage.service';
 const STATIC_MENU_DESKTOP_INACTIVE = 'STATIC_MENU_DESKTOP_INACTIVE'
 
 export interface AppConfig {
-    inputStyle: string;
     colorScheme: string;
-    ripple: boolean;
     menuMode: string;
     scale: number;
 }
@@ -26,33 +24,7 @@ interface LayoutState {
     providedIn: 'root',
 })
 export class LayoutService {
-    private darkTheme = {
-        '--p-content-background': '#070D17',  // Very dark navy
-        '--p-card-background': '#0B1219',     // Darker navy
-        '--p-content-border-color': '#454d59', // Unified separator border
-        '--card-border': '#1A2632',           // Darker card border
-        '--p-text-color': 'rgba(255, 255, 255, 0.87)',
-        '--p-text-muted-color': 'rgba(255, 255, 255, 0.6)',
-        '--p-mask-background': 'rgba(0, 0, 0, 0.4)',
-        '--p-overlay-select-background': '#0B1219',
-        '--p-overlay-select-border-color': '#1A2632'
-    };
-
-    private lightTheme = {
-        '--p-content-background': '#243447',  // Medium navy
-        '--p-card-background': '#1a2632',     // Lighter navy
-        '--p-content-border-color': '#454d59',
-        '--card-border': '#2f4562',
-        '--p-text-color': 'rgba(255, 255, 255, 0.9)',
-        '--p-text-muted-color': 'rgba(255, 255, 255, 0.7)',
-        '--p-mask-background': 'rgba(0, 0, 0, 0.2)',
-        '--p-overlay-select-background': '#1a2632',
-        '--p-overlay-select-border-color': '#2f4562'
-    };
-
     _config: AppConfig = {
-        ripple: false,
-        inputStyle: 'outlined',
         menuMode: 'static',
         colorScheme: 'dark',
         scale: 14,
@@ -88,40 +60,17 @@ export class LayoutService {
                         ...this._config,
                         colorScheme: settings.colorScheme,
                     };
-                    // Apply accent colors if they exist
-                    if (settings.accentColors) {
-                        Object.entries(settings.accentColors).forEach(([key, value]) => {
-                            document.documentElement.style.setProperty(key, value);
-                        });
-                    }
+
+                    document.documentElement.style.setProperty('--color-primary', settings.primaryColor);
                 } else {
                     // Save default red dark theme if no settings exist
+                    const defaultPrimary = '#F80421';
                     this.themeService.saveThemeSettings({
                         colorScheme: 'dark',
-                        accentColors: {
-                            '--primary-color': '#F80421',
-                            '--primary-color-text': '#ffffff',
-                            '--highlight-bg': '#F80421',
-                            '--highlight-text-color': '#ffffff',
-                            '--focus-ring': '0 0 0 0.2rem rgba(248,4,33,0.2)',
-                            '--slider-bg': '#dee2e6',
-                            '--slider-range-bg': '#F80421',
-                            '--slider-handle-bg': '#F80421',
-                            '--progressbar-bg': '#dee2e6',
-                            '--progressbar-value-bg': '#F80421',
-                            '--checkbox-border': '#F80421',
-                            '--checkbox-bg': '#F80421',
-                            '--checkbox-hover-bg': '#df031d',
-                            '--button-bg': '#F80421',
-                            '--button-hover-bg': '#df031d',
-                            '--button-focus-shadow': '0 0 0 2px #ffffff, 0 0 0 4px #F80421',
-                            '--togglebutton-bg': '#F80421',
-                            '--togglebutton-border': '1px solid #F80421',
-                            '--togglebutton-hover-bg': '#df031d',
-                            '--togglebutton-hover-border': '1px solid #df031d',
-                            '--togglebutton-text-color': '#ffffff'
-                        }
+                        primaryColor: defaultPrimary
                     }).subscribe();
+                    
+                    document.documentElement.style.setProperty('--color-primary', defaultPrimary);
                 }
                 // Update signal with config
                 this.config.set(this._config);
@@ -193,20 +142,24 @@ export class LayoutService {
 
     changeTheme() {
         const config = this.config();
+        const root = document.documentElement;
 
-        // Apply light/dark theme variables
-        const themeVars = config.colorScheme === 'light' ? this.lightTheme : this.darkTheme;
-        Object.entries(themeVars).forEach(([key, value]) => {
-            document.documentElement.style.setProperty(key, value);
-        });
+        // Toggle theme CSS classes
+        root.classList.remove('theme-dark', 'theme-light', 'theme-white');
+        root.classList.add(`theme-${config.colorScheme}`);
+
+        // Toggle dark-mode class for theme switching
+        if (config.colorScheme === 'white') {
+            root.classList.remove('dark-mode');
+        } else {
+            root.classList.add('dark-mode');
+        }
 
         // Load theme settings from NVS
         this.themeService.getThemeSettings().subscribe(
             settings => {
-                if (settings && settings.accentColors) {
-                    Object.entries(settings.accentColors).forEach(([key, value]) => {
-                        document.documentElement.style.setProperty(key, value);
-                    });
+                if (settings && settings.primaryColor) {
+                    root.style.setProperty('--color-primary', settings.primaryColor);
                 }
             },
             error => console.error('Error loading accent colors:', error)

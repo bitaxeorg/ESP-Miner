@@ -23,7 +23,6 @@
 
 /////Test Constants/////
 // Test Fan Speed
-#define FAN_SPEED_TARGET_MIN 1000 // RPM
 #define SELF_TEST_MIN_FAN_PERCENT 10.0f
 #define SELF_TEST_MAX_FAN_PERCENT 100.0f
 #define SELF_TEST_PID_SAMPLE_TIME_MS 100
@@ -351,7 +350,7 @@ void self_test_show_message(void * pvParameters, const char * msg)
 static esp_err_t test_fan_sense(GlobalState * GLOBAL_STATE)
 {
     uint16_t fan_speed = Thermal_get_fan_speed(&GLOBAL_STATE->DEVICE_CONFIG);
-    uint16_t target_speed = FAN_SPEED_TARGET_MIN;
+    uint16_t target_speed = nvs_config_get_u16(NVS_CONFIG_SELF_TEST_FAN_SPEED);
 
     ESP_LOGI(TAG, "fanSpeed: %d RPM", fan_speed);
     if (GLOBAL_STATE->DEVICE_CONFIG.family.id == GAMMA_TURBO) {

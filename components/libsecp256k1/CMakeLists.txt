@@ -12,4 +12,4 @@ target_compile_definitions(${COMPONENT_LIB} PRIVATE
     ENABLE_MODULE_SCHNORRSIG=1
     ENABLE_MODULE_EXTRAKEYS=1
 )
-target_compile_options(${COMPONENT_LIB} PRIVATE -Wno-unused-parameter)
+target_compile_options(${COMPONENT_LIB} PRIVATE -Wno-unused-parameter -Wno-unused-function)

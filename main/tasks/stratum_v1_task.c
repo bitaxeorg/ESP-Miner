@@ -87,8 +87,9 @@ static void decode_mining_notification(GlobalState * GLOBAL_STATE, const mining_
     }
     memset(result, 0, sizeof(mining_notification_result_t));
 
-    const char *user = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback ? GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_user : GLOBAL_STATE->SYSTEM_MODULE.pool_user;
-    bool decode_coinbase_tx = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback ? GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_decode_coinbase_tx : GLOBAL_STATE->SYSTEM_MODULE.pool_decode_coinbase_tx;
+    uint16_t pool_idx = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback ? GLOBAL_STATE->SYSTEM_MODULE.secondary_pool_index : GLOBAL_STATE->SYSTEM_MODULE.primary_pool_index;
+    const char *user = GLOBAL_STATE->SYSTEM_MODULE.pools[pool_idx].user;
+    bool decode_coinbase_tx = GLOBAL_STATE->SYSTEM_MODULE.pools[pool_idx].decode_coinbase_tx;
 
     if (coinbase_process_notification(mining_notification,
                                      GLOBAL_STATE->extranonce_str,
@@ -171,9 +172,9 @@ void stratum_v1_task(void *pvParameters)
 {
     GlobalState *GLOBAL_STATE = (GlobalState *)pvParameters;
 
-    bool use_fallback = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback;
-    char *stratum_url = use_fallback ? GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_url : GLOBAL_STATE->SYSTEM_MODULE.pool_url;
-    uint16_t port = use_fallback ? GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_port : GLOBAL_STATE->SYSTEM_MODULE.pool_port;
+    uint16_t pool_idx = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback ? GLOBAL_STATE->SYSTEM_MODULE.secondary_pool_index : GLOBAL_STATE->SYSTEM_MODULE.primary_pool_index;
+    char *stratum_url = GLOBAL_STATE->SYSTEM_MODULE.pools[pool_idx].url;
+    uint16_t port = GLOBAL_STATE->SYSTEM_MODULE.pools[pool_idx].port;
 
     // Set V1-specific free function for the work queue
     GLOBAL_STATE->stratum_queue.free_fn = (void (*)(void *))STRATUM_V1_free_mining_notify;
@@ -214,8 +215,9 @@ void stratum_v1_task(void *pvParameters)
             return;
         }
 
-        stratum_url = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback ? GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_url : GLOBAL_STATE->SYSTEM_MODULE.pool_url;
-        port = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback ? GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_port : GLOBAL_STATE->SYSTEM_MODULE.pool_port;
+        pool_idx = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback ? GLOBAL_STATE->SYSTEM_MODULE.secondary_pool_index : GLOBAL_STATE->SYSTEM_MODULE.primary_pool_index;
+        stratum_url = GLOBAL_STATE->SYSTEM_MODULE.pools[pool_idx].url;
+        port = GLOBAL_STATE->SYSTEM_MODULE.pools[pool_idx].port;
 
         stratum_connection_info_t conn_info;
         if (stratum_socket_resolve(stratum_url, port, &conn_info) != ESP_OK) {
@@ -227,8 +229,8 @@ void stratum_v1_task(void *pvParameters)
 
         ESP_LOGI(TAG, "Connecting to: stratum+tcp://%s:%d (%s)", stratum_url, port, conn_info.host_ip);
 
-        tls_mode tls = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback ? GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_tls : GLOBAL_STATE->SYSTEM_MODULE.pool_tls;
-        char * cert = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback ? GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_cert : GLOBAL_STATE->SYSTEM_MODULE.pool_cert;
+        tls_mode tls = GLOBAL_STATE->SYSTEM_MODULE.pools[pool_idx].tls;
+        char * cert = GLOBAL_STATE->SYSTEM_MODULE.pools[pool_idx].cert;
         retry_critical_attempts = 0;
 
         GLOBAL_STATE->transport = STRATUM_V1_transport_init(tls, cert);
@@ -290,8 +292,8 @@ void stratum_v1_task(void *pvParameters)
         // mining.subscribe - ID: 2
         STRATUM_V1_subscribe(GLOBAL_STATE->transport, stratum_get_next_uid(GLOBAL_STATE), GLOBAL_STATE->DEVICE_CONFIG.family.asic.name);
 
-        char *username = use_fallback ? GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_user : GLOBAL_STATE->SYSTEM_MODULE.pool_user;
-        char *password = use_fallback ? GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_pass : GLOBAL_STATE->SYSTEM_MODULE.pool_pass;
+        char *username = GLOBAL_STATE->SYSTEM_MODULE.pools[pool_idx].user;
+        char *password = GLOBAL_STATE->SYSTEM_MODULE.pools[pool_idx].pass;
 
         int authorize_message_id = stratum_get_next_uid(GLOBAL_STATE);
 
@@ -433,11 +435,11 @@ void stratum_v1_task(void *pvParameters)
                             if (stratum_api_v1_message.response_success) {
                                 ESP_LOGI(TAG, "setup message accepted");
                                 if (stratum_api_v1_message.message_id == authorize_message_id) {
-                                    uint16_t difficulty = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback ? GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_difficulty : GLOBAL_STATE->SYSTEM_MODULE.pool_difficulty;
+                                    uint16_t difficulty = GLOBAL_STATE->SYSTEM_MODULE.pools[pool_idx].difficulty;
                                     if (difficulty > 0) {
                                         STRATUM_V1_suggest_difficulty(GLOBAL_STATE->transport, stratum_get_next_uid(GLOBAL_STATE), difficulty);
                                     }
-                                    bool extranonce_subscribe = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback ? GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_extranonce_subscribe : GLOBAL_STATE->SYSTEM_MODULE.pool_extranonce_subscribe;
+                                    bool extranonce_subscribe = GLOBAL_STATE->SYSTEM_MODULE.pools[pool_idx].extranonce_subscribe;
                                     if (extranonce_subscribe) {
                                         STRATUM_V1_extranonce_subscribe(GLOBAL_STATE->transport, stratum_get_next_uid(GLOBAL_STATE));
                                     }

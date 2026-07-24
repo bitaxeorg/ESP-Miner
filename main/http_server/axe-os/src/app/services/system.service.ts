@@ -31,11 +31,11 @@ export class SystemApiService {
   ) { }
 
   public downloadLogs(uri: string = ''): Observable<Blob> {
-    if (environment.production && this.api && !uri) {
+    if (!environment.mock && this.api && !uri) {
       return from(this.api.invoke(functions.downloadSystemLogs, {}) as Promise<Blob>);
     }
 
-    if (environment.production && uri) {
+    if (!environment.mock && uri) {
       return this.httpClient.get(`${uri}/api/system/logs`, { responseType: 'blob' });
     }
 
@@ -43,11 +43,11 @@ export class SystemApiService {
   }
 
   public getInfo(uri: string = ''): Observable<ISystemInfo> {
-    if (environment.production && this.api && !uri) {
+    if (!environment.mock && this.api && !uri) {
       return from(this.api.invoke(functions.getSystemInfo, {})).pipe(timeout(API_TIMEOUT));
     }
 
-    if (environment.production && uri) {
+    if (!environment.mock && uri) {
       return this.httpClient.get<ISystemInfo>(`${uri}/api/system/info`).pipe(timeout(API_TIMEOUT));
     }
 
@@ -95,6 +95,40 @@ export class SystemApiService {
         uptimeSeconds: 38,
         smallCoreCount: 672,
         ASICModel: "BM1370" as any,
+        primaryPoolIndex: 0,
+        secondaryPoolIndex: 1,
+        pools: [
+          {
+            id: 0,
+            stratumProtocol: "SV1" as const,
+            stratumURL: "public-pool.io",
+            stratumPort: 21496,
+            stratumUser: "bc1q99n3pu025yyu0jlywpmwzalyhm36tg5u37w20d.bitaxe-U1",
+            stratumPassword: "x",
+            stratumSuggestedDifficulty: 1000,
+            stratumExtranonceSubscribe: false,
+            stratumTLS: 0,
+            stratumCert: "",
+            stratumDecodeCoinbase: true,
+            stratumV2ChannelType: "extended" as const,
+            stratumV2AuthorityPubkey: ""
+          },
+          {
+            id: 1,
+            stratumProtocol: "SV1" as const,
+            stratumURL: "test.public-pool.io",
+            stratumPort: 21497,
+            stratumUser: "bc1q99n3pu025yyu0jlywpmwzalyhm36tg5u37w20d.bitaxe-U1",
+            stratumPassword: "x",
+            stratumSuggestedDifficulty: 1000,
+            stratumExtranonceSubscribe: false,
+            stratumTLS: 0,
+            stratumCert: "",
+            stratumDecodeCoinbase: true,
+            stratumV2ChannelType: "extended" as const,
+            stratumV2AuthorityPubkey: ""
+          }
+        ],
         stratumProtocol: "SV1" as const,
         stratumURL: "public-pool.io",
         stratumPort: 21496,
@@ -182,7 +216,7 @@ export class SystemApiService {
       columnList.push(y2);
     }
 
-    if (environment.production && this.api) {
+    if (!environment.mock && this.api) {
       return from(this.api.invoke(functions.getSystemStatistics, { columns: columnList })).pipe(timeout(API_TIMEOUT));
     }
 
@@ -243,7 +277,7 @@ export class SystemApiService {
   }
 
   public getScoreboard(uri: string = ''): Observable<ISystemScoreboardEntry[]> {
-    if (environment.production) {
+    if (!environment.mock) {
       return this.httpClient.get<ISystemScoreboardEntry[]>(`${uri}/api/system/scoreboard`).pipe(timeout(5000));
     }
 
@@ -272,11 +306,11 @@ export class SystemApiService {
   }
 
   public restart(uri: string = ''): Observable<GenericResponse> {
-    if (environment.production && this.api && !uri) {
+    if (!environment.mock && this.api && !uri) {
       return from(this.api.invoke(functions.restartSystem, {}) as Promise<GenericResponse>);
     }
 
-    if (environment.production && uri) {
+    if (!environment.mock && uri) {
       return this.httpClient.post<GenericResponse>(`${uri}/api/system/restart`, {});
     }
 
@@ -284,11 +318,11 @@ export class SystemApiService {
   }
 
   public dismissBlockFound(uri: string = ''): Observable<GenericResponse> {
-    if (environment.production && this.api && !uri) {
+    if (!environment.mock && this.api && !uri) {
       return from(this.api.invoke(functions.dismissBlockFound, {}) as Promise<GenericResponse>);
     }
 
-    if (environment.production && uri) {
+    if (!environment.mock && uri) {
       return this.httpClient.post<GenericResponse>(`${uri}/api/system/blockFound/dismiss`, {});
     }
 
@@ -296,11 +330,11 @@ export class SystemApiService {
   }
 
   public pauseMining(uri: string = ''): Observable<GenericResponse> {
-    if (environment.production && this.api && !uri) {
+    if (!environment.mock && this.api && !uri) {
       return from(this.api.invoke(functions.pauseMining, {}) as Promise<GenericResponse>);
     }
 
-    if (environment.production && uri) {
+    if (!environment.mock && uri) {
       return this.httpClient.post<GenericResponse>(`${uri}/api/system/pause`, {});
     }
 
@@ -308,11 +342,11 @@ export class SystemApiService {
   }
 
   public resumeMining(uri: string = ''): Observable<GenericResponse> {
-    if (environment.production && this.api && !uri) {
+    if (!environment.mock && this.api && !uri) {
       return from(this.api.invoke(functions.resumeMining, {}) as Promise<GenericResponse>);
     }
 
-    if (environment.production && uri) {
+    if (!environment.mock && uri) {
       return this.httpClient.post<GenericResponse>(`${uri}/api/system/resume`, {});
     }
 
@@ -320,11 +354,11 @@ export class SystemApiService {
   }
 
   public identify(uri: string = ''): Observable<GenericResponse> {
-    if (environment.production && this.api && !uri) {
+    if (!environment.mock && this.api && !uri) {
       return from(this.api.invoke(functions.identifySystem, {}) as Promise<GenericResponse>);
     }
 
-    if (environment.production && uri) {
+    if (!environment.mock && uri) {
       return this.httpClient.post<GenericResponse>(`${uri}/api/system/identify`, {});
     }
 
@@ -332,11 +366,11 @@ export class SystemApiService {
   }
 
   public updateSystem(uri: string = '', update: any): Observable<any | ISystemUpdateResponse> {
-    if (environment.production && this.api && !uri) {
+    if (!environment.mock && this.api && !uri) {
       return from(this.api.invoke(functions.updateSystemSettings, { body: update as Settings }));
     }
 
-    if (environment.production && uri) {
+    if (!environment.mock && uri) {
       return this.httpClient.patch(`${uri}/api/system`, update);
     }
 
@@ -351,6 +385,14 @@ export class SystemApiService {
       } as ISystemUpdateResponse);
     }
     return of(undefined);
+  }
+
+  public deletePool(uri: string = '', id: number): Observable<any> {
+    if (environment.production) {
+      const targetUri = uri ? `${uri}/api/system/pools/${id}` : `/api/system/pools/${id}`;
+      return this.httpClient.delete<any>(targetUri);
+    }
+    return of({ message: 'Pool deleted successfully (mock)' }).pipe(delay(500));
   }
 
   private otaUpdate(file: File | Blob, url: string): Observable<HttpEvent<string>> {
@@ -392,11 +434,11 @@ export class SystemApiService {
   }
 
   public getAsicSettings(uri: string = ''): Observable<ISystemASIC> {
-    if (environment.production && this.api && !uri) {
+    if (!environment.mock && this.api && !uri) {
       return from(this.api.invoke(functions.getAsicSettings, {})).pipe(timeout(API_TIMEOUT));
     }
 
-    if (environment.production && uri) {
+    if (!environment.mock && uri) {
       return this.httpClient.get<ISystemASIC>(`${uri}/api/system/asic`).pipe(timeout(API_TIMEOUT));
     }
 
