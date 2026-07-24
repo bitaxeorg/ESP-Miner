@@ -1,6 +1,7 @@
 #include "esp_log.h"
 #include "esp_transport.h"
 #include "esp_transport_tcp.h"
+#include "esp_system.h"
 #include <lwip/sockets.h>
 #include "esp_timer.h"
 #include "system.h"
@@ -915,6 +916,10 @@ void stratum_v2_task(void *pvParameters)
                      elapsed_ms, stratum_url, port);
         }
 
+        // Fresh connection: restart the flatline watchdog clock so time
+        // spent disconnected is never counted against the ASIC.
+        GLOBAL_STATE->last_accepted_share_time = esp_timer_get_time();
+
         // --- Main receive loop ---
         while (1) {
             if (sv2_noise_recv(noise_ctx, transport, hdr_buf, recv_buf,
@@ -926,6 +931,13 @@ void stratum_v2_task(void *pvParameters)
             }
 
             sv2_parse_frame_header(hdr_buf, &hdr);
+
+            // Flatline of Death detection (#1053): we just received a frame,
+            // so the pool link is alive - restart if no share has been
+            // accepted for a difficulty-scaled timeout (a wedged ASIC may go
+            // silent or babble garbage; garbage never passes pool
+            // validation).
+            SYSTEM_check_flatline_watchdog(GLOBAL_STATE);
 
             switch (hdr.msg_type) {
                 case SV2_MSG_NEW_MINING_JOB:

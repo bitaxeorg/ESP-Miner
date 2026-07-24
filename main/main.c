@@ -4,6 +4,7 @@
 #include "esp_log.h"
 #include "esp_psram.h"
 #include "esp_heap_caps.h"
+#include "esp_system.h"
 #include "cJSON.h"
 
 #include "asic_result_task.h"
@@ -171,7 +172,15 @@ void app_main(void)
     if (system_init_ret == ESP_OK) {
         if (asic_initialize(&GLOBAL_STATE, ASIC_INIT_COLD_BOOT, 0) == 0) {
             if (!GLOBAL_STATE.SELF_TEST_MODULE.is_active) {
-                return;
+                // A flaky ASIC serial link can fail chip detection on one
+                // boot and succeed on the next; returning here leaves a
+                // web-UI zombie that never mines until someone notices
+                // (#1053 family; field-observed on the test unit: 2.2 h
+                // dead, recovered by the very next soft reset). Keep the UI
+                // reachable for a while for debugging, then retry.
+                ESP_LOGE(TAG, "ASIC init failed - restarting in 5 minutes to retry");
+                vTaskDelay(5 * 60 * 1000 / portTICK_PERIOD_MS);
+                esp_restart();
             }
 
             self_test_show_message(&GLOBAL_STATE, GLOBAL_STATE.SYSTEM_MODULE.asic_status);

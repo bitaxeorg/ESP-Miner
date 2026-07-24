@@ -195,6 +195,20 @@ typedef struct
     char network_diff_string[DIFF_STRING_SIZE];
     char block_signals[MAX_BLOCK_SIGNALS][MAX_BLOCK_SIGNAL_LEN];
     int block_signals_count;
+
+    // Timestamp (esp_timer_get_time) of the last share the pool accepted.
+    // Watched from the stratum tasks to detect a wedged ASIC (issue #1053).
+    // A wedged chip may go silent or babble garbage nonces; garbage can fool
+    // local counters but never passes pool validation, so accepted shares
+    // are the ground truth for "actually mining".
+    int64_t last_accepted_share_time;
 } GlobalState;
+
+// Minimum time without a pool-accepted share - while the pool link is
+// demonstrably alive - before we conclude the ASIC is wedged ("Flatline of
+// Death", issue #1053) and restart. The effective timeout scales up with
+// pool difficulty (see SYSTEM_check_flatline_watchdog) so vardiff cannot
+// cause false restarts; this floor applies at typical difficulties.
+#define FLATLINE_RESTART_TIMEOUT_US (10LL * 60 * 1000000)
 
 #endif /* GLOBAL_STATE_H_ */

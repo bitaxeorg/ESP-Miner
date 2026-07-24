@@ -15,6 +15,7 @@
 
 #include "driver/gpio.h"
 #include "esp_app_desc.h"
+#include "esp_system.h"
 #include "esp_timer.h"
 #include "esp_wifi.h"
 #include "lwip/inet.h"
@@ -358,6 +359,40 @@ void SYSTEM_notify_accepted_share(GlobalState * GLOBAL_STATE)
     SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
 
     module->shares_accepted++;
+    GLOBAL_STATE->last_accepted_share_time = esp_timer_get_time();
+}
+
+void SYSTEM_check_flatline_watchdog(GlobalState * GLOBAL_STATE)
+{
+    // Called from the stratum tasks right after pool traffic is received, so
+    // the pool link is known-alive. Judge mining health by pool-ACCEPTED
+    // shares: a wedged ASIC may go silent or babble garbage nonces, and
+    // garbage can fool local counters but never passes pool validation. The
+    // timeout scales with pool difficulty (25x the expected share interval,
+    // floored at FLATLINE_RESTART_TIMEOUT_US) so vardiff cannot cause false
+    // restarts, and a pool outage cannot cause a restart loop because no
+    // traffic arrives while the pool is down.
+    if (GLOBAL_STATE->SYSTEM_MODULE.overheat_mode || !GLOBAL_STATE->ASIC_initalized ||
+        GLOBAL_STATE->last_accepted_share_time <= 0) {
+        return;
+    }
+
+    int64_t timeout_us = FLATLINE_RESTART_TIMEOUT_US;
+    double expected_hs = (double) GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value * 1.0e6
+                       * GLOBAL_STATE->DEVICE_CONFIG.family.asic.small_core_count;
+    if (expected_hs > 0) {
+        int64_t scaled_us = (int64_t) (25.0 * GLOBAL_STATE->pool_difficulty * 4294967296.0 / expected_hs * 1.0e6);
+        if (scaled_us > timeout_us) {
+            timeout_us = scaled_us;
+        }
+    }
+
+    if (esp_timer_get_time() - GLOBAL_STATE->last_accepted_share_time > timeout_us) {
+        ESP_LOGE(TAG, "No pool-accepted shares for %lld minutes despite a healthy pool connection - "
+                 "restarting to recover from wedged ASIC (#1053)",
+                 (long long) (timeout_us / 60000000));
+        esp_restart();
+    }
 }
 
 static int compare_rejected_reason_stats(const void *a, const void *b) {
