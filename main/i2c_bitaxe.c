@@ -16,6 +16,7 @@
 #define I2C_MASTER_TIMEOUT_MS 500
 #define I2C_RETRY_COUNT 3
 #define I2C_RETRY_DELAY_MS 10
+#define I2C_SCL_WAIT_US 20000
 
 static i2c_master_bus_handle_t i2c_bus_handle;
 
@@ -31,6 +32,17 @@ typedef struct {
 static i2c_dev_map_entry_t i2c_device_map[MAX_DEVICES];
 static int i2c_device_count = 0;
 
+static const i2c_dev_map_entry_t *i2c_bitaxe_find_device(i2c_master_dev_handle_t dev_handle)
+{
+    for (int i = 0; i < i2c_device_count; i++) {
+        if (i2c_device_map[i].handle == dev_handle) {
+            return &i2c_device_map[i];
+        }
+    }
+
+    return NULL;
+}
+
 static esp_err_t i2c_transfer_with_retries(i2c_master_dev_handle_t dev_handle, 
                                            const uint8_t *write_buf, size_t write_len, 
                                            uint8_t *read_buf, size_t read_len)
@@ -38,6 +50,7 @@ static esp_err_t i2c_transfer_with_retries(i2c_master_dev_handle_t dev_handle,
     esp_err_t err = ESP_FAIL;
 
     for (int i = 0; i < I2C_RETRY_COUNT; i++) {
+        const i2c_dev_map_entry_t *device = i2c_bitaxe_find_device(dev_handle);
         if (read_buf && read_len > 0) {
             err = i2c_master_transmit_receive(dev_handle, write_buf, write_len, read_buf, read_len, I2C_MASTER_TIMEOUT_MS);
         } else {
@@ -46,14 +59,39 @@ static esp_err_t i2c_transfer_with_retries(i2c_master_dev_handle_t dev_handle,
 
         if (err == ESP_OK) return ESP_OK;
 
+        if (device) {
+            ESP_LOGW(TAG, "I2C retry %d/%d failed: [%s] addr=0x%02X cmd=0x%02X write_len=%u read_len=%u err=%s",
+                     i + 1,
+                     I2C_RETRY_COUNT,
+                     device->device_tag,
+                     device->device_address,
+                     write_len > 0 ? write_buf[0] : 0,
+                     (unsigned)write_len,
+                     (unsigned)read_len,
+                     esp_err_to_name(err));
+        } else {
+            ESP_LOGW(TAG, "I2C retry %d/%d failed: [unknown] cmd=0x%02X write_len=%u read_len=%u err=%s",
+                     i + 1,
+                     I2C_RETRY_COUNT,
+                     write_len > 0 ? write_buf[0] : 0,
+                     (unsigned)write_len,
+                     (unsigned)read_len,
+                     esp_err_to_name(err));
+        }
+
         vTaskDelay(pdMS_TO_TICKS(I2C_RETRY_DELAY_MS));
     }
 
-    for (int i = 0; i < i2c_device_count; i++) {
-        if (i2c_device_map[i].handle == dev_handle) {
-            ESP_LOGE(TAG, "FATAL: [%s] (0x%02x) failed all %d retries.", i2c_device_map[i].device_tag, i2c_device_map[i].device_address, I2C_RETRY_COUNT);
-            return err;
-        }
+    const i2c_dev_map_entry_t *device = i2c_bitaxe_find_device(dev_handle);
+    if (device) {
+        ESP_LOGE(TAG, "FATAL: [%s] (0x%02x) cmd=0x%02X write_len=%u read_len=%u failed all %d retries.",
+                 device->device_tag,
+                 device->device_address,
+                 write_len > 0 ? write_buf[0] : 0,
+                 (unsigned)write_len,
+                 (unsigned)read_len,
+                 I2C_RETRY_COUNT);
+        return err;
     }
     
     ESP_LOGE(TAG, "Unknown device");
@@ -63,16 +101,18 @@ static esp_err_t i2c_transfer_with_retries(i2c_master_dev_handle_t dev_handle,
 /**
  * @brief i2c master initialization
  */
-esp_err_t i2c_bitaxe_init(void)
+esp_err_t i2c_bitaxe_init(int sda_gpio, int scl_gpio)
 {
     i2c_master_bus_config_t i2c_bus_config = {
         .clk_source = I2C_CLK_SRC_DEFAULT,
         .i2c_port = I2C_MASTER_NUM,
-        .scl_io_num = GPIO_I2C_SCL,
-        .sda_io_num = GPIO_I2C_SDA,
+        .scl_io_num = scl_gpio,
+        .sda_io_num = sda_gpio,
         .glitch_ignore_cnt = 7,
         .flags.enable_internal_pullup = true,
     };
+
+    ESP_LOGI(TAG, "Initializing I2C bus on SDA=%d SCL=%d", sda_gpio, scl_gpio);
 
     return i2c_new_master_bus(&i2c_bus_config, &i2c_bus_handle);
 }
@@ -93,6 +133,7 @@ esp_err_t i2c_bitaxe_add_device(uint8_t device_address, i2c_master_dev_handle_t 
         .dev_addr_length = I2C_ADDR_BIT_LEN_7,
         .device_address = device_address,
         .scl_speed_hz = I2C_BUS_SPEED_HZ,
+        .scl_wait_us = I2C_SCL_WAIT_US,
     };
 
     ESP_RETURN_ON_ERROR(i2c_master_bus_add_device(i2c_bus_handle, &dev_cfg, dev_handle), TAG, "Device 0x%02x", device_address);
@@ -110,6 +151,24 @@ esp_err_t i2c_bitaxe_get_master_bus_handle(i2c_master_bus_handle_t * dev_handle)
 {
     *dev_handle = i2c_bus_handle;
     return ESP_OK;
+}
+
+size_t i2c_bitaxe_scan_bus(uint8_t start_address, uint8_t end_address, const char *requester_tag)
+{
+    size_t found_devices = 0;
+
+    for (uint8_t address = start_address; address <= end_address; address++) {
+        if (i2c_master_probe(i2c_bus_handle, address, 20) == ESP_OK) {
+            ESP_LOGI(requester_tag, "I2C device responded at 0x%02X", address);
+            found_devices++;
+        }
+    }
+
+    if (found_devices == 0) {
+        ESP_LOGW(requester_tag, "No I2C devices responded on 0x%02X-0x%02X", start_address, end_address);
+    }
+
+    return found_devices;
 }
 
 /**

@@ -182,7 +182,7 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
           coreVoltage: [info.coreVoltage, [Validators.required]],
           frequency: [info.frequency, [Validators.required]],
           autofanspeed: [info.autofanspeed == 1, [Validators.required]],
-          minfanspeed: [info.minFanSpeed, [Validators.required]],
+          minFanSpeed: [info.minFanSpeed, [Validators.required]],
           manualFanSpeed: [info.manualFanSpeed, [Validators.required]],
           temptarget: [info.temptarget, [Validators.required]],
           overheat_mode: [info.overheat_mode, [Validators.required]],
@@ -321,6 +321,10 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
     return this.displays.map(display => ({ name: display, value: display }));
   }
 
+  get isDisplayConfigurable(): boolean {
+    return this.displays.includes(this.form?.controls['display'].value);
+  }
+
   get rotationOptions(): SelectOption[] {
     return this.rotations.map(rotation => ({ name: `${rotation}°`, value: rotation }));
   }
@@ -376,6 +380,7 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
       'coreVoltage',
       'frequency',
       'autofanspeed',
+      'minFanSpeed',
       'manualFanSpeed',
       'temptarget',
       'overheat_mode',

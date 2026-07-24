@@ -320,7 +320,7 @@ esp_err_t SYSTEM_init_peripherals(GlobalState * GLOBAL_STATE) {
     if (GLOBAL_STATE->SELF_TEST_MODULE.is_active) {
         vTaskDelay(500 / portTICK_PERIOD_MS);
 
-        ret = VCORE_set_voltage(GLOBAL_STATE, (float)GLOBAL_STATE->DEVICE_CONFIG.family.asic.default_voltage_mv / 1000.0f);
+        ret = VCORE_set_voltage(GLOBAL_STATE, (float)nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE) / 1000.0f);
         if (ret != ESP_OK) {
             self_test_show_message(GLOBAL_STATE, "VCORE:FAIL");
             ESP_LOGE(TAG, "VCORE set failed");

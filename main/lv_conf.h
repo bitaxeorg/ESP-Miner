@@ -4,25 +4,28 @@
 #define LV_USE_LOG 1
 #define LV_LOG_LEVEL LV_LOG_LEVEL_WARN
 
-#define LV_COLOR_DEPTH 1
+#define LV_COLOR_DEPTH 16
 
 #define LV_USE_OS LV_OS_FREERTOS
 
+#define LV_DRAW_SW_SUPPORT_RGB565                 1
 #define LV_DRAW_SW_SUPPORT_RGB565_SWAPPED         0
-#define LV_DRAW_SW_SUPPORT_RGB565A8               0
+#define LV_DRAW_SW_SUPPORT_RGB565A8               1
 #define LV_DRAW_SW_SUPPORT_RGB888                 0
 #define LV_DRAW_SW_SUPPORT_XRGB8888               0
 #define LV_DRAW_SW_SUPPORT_ARGB8888               1
 #define LV_DRAW_SW_SUPPORT_ARGB8888_PREMULTIPLIED 0
 #define LV_DRAW_SW_SUPPORT_L8                     0
 #define LV_DRAW_SW_SUPPORT_AL88                   0
-#define LV_DRAW_SW_SUPPORT_A8                     0
+#define LV_DRAW_SW_SUPPORT_A8                     1
+#define LV_DRAW_SW_SUPPORT_I1                     1
 
 #define LV_DRAW_SW_COMPLEX 1
 
 #define LV_USE_FLOAT 1
 
 #define LV_FONT_MONTSERRAT_14 0
+#define LV_FONT_UNSCII_16     1
 
 #define LV_FONT_CUSTOM_DECLARE LV_FONT_DECLARE(lv_font_portfolio_6x8)
 #define LV_FONT_DEFAULT        &lv_font_portfolio_6x8

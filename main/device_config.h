@@ -6,6 +6,7 @@
 #include "esp_err.h"
 
 #define THERMAL_MAX_SENSORS 2
+#define GAMMA_HEX_VOLTAGE_DOMAINS 2
 
 typedef enum
 {
@@ -42,6 +43,7 @@ typedef enum
     GAMMA,
     GAMMA_DUO,
     SUPRA_HEX,
+    GAMMA_HEX,
     GAMMA_TURBO,
 } Family;
 
@@ -50,6 +52,8 @@ typedef struct {
     const char * name;
     AsicConfig asic;
     uint8_t asic_count;
+    uint16_t default_frequency_mhz;
+    uint16_t default_voltage_mv;
     uint16_t max_power;
     uint16_t power_offset;
     uint16_t nominal_voltage;
@@ -62,6 +66,10 @@ typedef struct {
     FamilyConfig family;
     bool plug_sense;
     bool asic_enable;
+    bool asic_enable_active_high;
+    bool disable_bap : 1;
+    uint8_t i2c_sda;
+    uint8_t i2c_scl;
     bool EMC2101 : 1;
     bool EMC2103 : 1;
     bool EMC2302 : 1;
@@ -81,7 +89,7 @@ typedef struct {
 static const uint16_t BM1397_FREQUENCY_OPTIONS[]   = {400, 425, 450, 475, 485, 500, 525, 550, 575, 600, 0};
 static const uint16_t BM1366_FREQUENCY_OPTIONS[]   = {400, 425, 450, 475, 485, 500, 525, 550, 575,      0};
 static const uint16_t BM1368_FREQUENCY_OPTIONS[]   = {400, 425, 450, 475, 485, 490, 500, 525, 550, 575, 0};
-static const uint16_t BM1370_FREQUENCY_OPTIONS[]   = {400, 490, 525, 550, 600, 625,                     0};
+static const uint16_t BM1370_FREQUENCY_OPTIONS[]   = {400, 490, 525, 550, 600, 625, 690,                0};
 static const uint16_t BM1370_FRQUENCY_XP_OPTIONS[] = {350, 375, 380, 400, 410,                        0};
 
 static const uint16_t BM1397_VOLTAGE_OPTIONS[] = {1100, 1150, 1200, 1250, 1300, 1350, 1400, 1450, 1500, 0};
@@ -103,14 +111,15 @@ static const AsicConfig default_asic_configs[] = {
     ASIC_BM1370XP
 };
 
-static const FamilyConfig FAMILY_MAX         = { .id = MAX,         .name = "Max",        .asic = ASIC_BM1397,   .asic_count = 1, .max_power =  25, .power_offset = 5,  .nominal_voltage = 5,  .voltage_domains = 1, .swarm_color = "red",      };
-static const FamilyConfig FAMILY_ULTRA       = { .id = ULTRA,       .name = "Ultra",      .asic = ASIC_BM1366,   .asic_count = 1, .max_power =  25, .power_offset = 5,  .nominal_voltage = 5,  .voltage_domains = 1, .swarm_color = "purple",   };
-static const FamilyConfig FAMILY_HEX         = { .id = HEX,         .name = "Hex",        .asic = ASIC_BM1366,   .asic_count = 6, .max_power =  90, .power_offset = 12, .nominal_voltage = 12, .voltage_domains = 3, .swarm_color = "orange",   };
-static const FamilyConfig FAMILY_SUPRA       = { .id = SUPRA,       .name = "Supra",      .asic = ASIC_BM1368,   .asic_count = 1, .max_power =  40, .power_offset = 5,  .nominal_voltage = 5,  .voltage_domains = 1, .swarm_color = "blue",     };
-static const FamilyConfig FAMILY_GAMMA       = { .id = GAMMA,       .name = "Gamma",      .asic = ASIC_BM1370,   .asic_count = 1, .max_power =  40, .power_offset = 5,  .nominal_voltage = 5,  .voltage_domains = 1, .swarm_color = "green",    };
-static const FamilyConfig FAMILY_GAMMA_DUO   = { .id = GAMMA_DUO,   .name = "GammaDuo",   .asic = ASIC_BM1370XP, .asic_count = 2, .max_power =  40, .power_offset = 5,  .nominal_voltage = 5,  .voltage_domains = 1, .swarm_color = "green",    };
-static const FamilyConfig FAMILY_SUPRA_HEX   = { .id = SUPRA_HEX,   .name = "SupraHex",   .asic = ASIC_BM1368,   .asic_count = 6, .max_power = 120, .power_offset = 25, .nominal_voltage = 12, .voltage_domains = 3, .swarm_color = "darkblue", };
-static const FamilyConfig FAMILY_GAMMA_TURBO = { .id = GAMMA_TURBO, .name = "GammaTurbo", .asic = ASIC_BM1370,   .asic_count = 2, .max_power =  60, .power_offset = 10, .nominal_voltage = 12, .voltage_domains = 1, .swarm_color = "cyan",     };
+static const FamilyConfig FAMILY_MAX         = { .id = MAX,         .name = "Max",        .asic = ASIC_BM1397,   .asic_count = 1, .default_frequency_mhz = 425, .default_voltage_mv = 1400, .max_power =  25, .power_offset = 5,  .nominal_voltage = 5,  .voltage_domains = 1, .swarm_color = "red",      };
+static const FamilyConfig FAMILY_ULTRA       = { .id = ULTRA,       .name = "Ultra",      .asic = ASIC_BM1366,   .asic_count = 1, .default_frequency_mhz = 485, .default_voltage_mv = 1200, .max_power =  25, .power_offset = 5,  .nominal_voltage = 5,  .voltage_domains = 1, .swarm_color = "purple",   };
+static const FamilyConfig FAMILY_HEX         = { .id = HEX,         .name = "Hex",        .asic = ASIC_BM1366,   .asic_count = 6, .default_frequency_mhz = 485, .default_voltage_mv = 1200, .max_power =  90, .power_offset = 12, .nominal_voltage = 12, .voltage_domains = 3, .swarm_color = "orange",   };
+static const FamilyConfig FAMILY_SUPRA       = { .id = SUPRA,       .name = "Supra",      .asic = ASIC_BM1368,   .asic_count = 1, .default_frequency_mhz = 490, .default_voltage_mv = 1166, .max_power =  40, .power_offset = 5,  .nominal_voltage = 5,  .voltage_domains = 1, .swarm_color = "blue",     };
+static const FamilyConfig FAMILY_GAMMA       = { .id = GAMMA,       .name = "Gamma",      .asic = ASIC_BM1370,   .asic_count = 1, .default_frequency_mhz = 525, .default_voltage_mv = 1150, .max_power =  40, .power_offset = 5,  .nominal_voltage = 5,  .voltage_domains = 1, .swarm_color = "green",    };
+static const FamilyConfig FAMILY_GAMMA_DUO   = { .id = GAMMA_DUO,   .name = "GammaDuo",   .asic = ASIC_BM1370XP, .asic_count = 2, .default_frequency_mhz = 400, .default_voltage_mv = 1150, .max_power =  40, .power_offset = 5,  .nominal_voltage = 5,  .voltage_domains = 1, .swarm_color = "green",    };
+static const FamilyConfig FAMILY_SUPRA_HEX   = { .id = SUPRA_HEX,   .name = "SupraHex",   .asic = ASIC_BM1368,   .asic_count = 6, .default_frequency_mhz = 490, .default_voltage_mv = 1166, .max_power = 120, .power_offset = 25, .nominal_voltage = 12, .voltage_domains = 3, .swarm_color = "darkblue", };
+static const FamilyConfig FAMILY_GAMMA_HEX   = { .id = GAMMA_HEX,   .name = "GammaHex",   .asic = ASIC_BM1370,   .asic_count = 6, .default_frequency_mhz = 690, .default_voltage_mv = 1200, .max_power = 180, .power_offset = 25, .nominal_voltage = 12, .voltage_domains = GAMMA_HEX_VOLTAGE_DOMAINS, .swarm_color = "cyan",     };
+static const FamilyConfig FAMILY_GAMMA_TURBO = { .id = GAMMA_TURBO, .name = "GammaTurbo", .asic = ASIC_BM1370,   .asic_count = 2, .default_frequency_mhz = 525, .default_voltage_mv = 1150, .max_power =  60, .power_offset = 10, .nominal_voltage = 12, .voltage_domains = 1, .swarm_color = "cyan",     };
 
 static const FamilyConfig default_families[] = {
     FAMILY_MAX,
@@ -119,6 +128,7 @@ static const FamilyConfig default_families[] = {
     FAMILY_SUPRA,
     FAMILY_GAMMA,
     FAMILY_SUPRA_HEX,
+    FAMILY_GAMMA_HEX,
     FAMILY_GAMMA_TURBO,
 };
 
@@ -146,6 +156,7 @@ static const DeviceConfig default_configs[] = {
     { .board_version = "701",  .family = FAMILY_SUPRA_HEX,   .EMC2302 = true, .TMP1075 = true,                                            .temp_offset = 10,  .TPS546 = true,                                                           .power_consumption_target = 90, },
     { .board_version = "702",  .family = FAMILY_SUPRA_HEX,   .EMC2302 = true, .TMP1075 = true,                                            .temp_offset = 10,  .TPS546 = true,                                                           .power_consumption_target = 90, },
     { .board_version = "801",  .family = FAMILY_GAMMA_TURBO, .EMC2103 = true,                                          .temp_flip = true, .temp_offset = 0,   .TPS546 = true,                                                           .power_consumption_target = 36, },
+    { .board_version = "1300", .family = FAMILY_GAMMA_HEX,   .asic_enable = true, .asic_enable_active_high = true, .disable_bap = true, .i2c_sda = 44, .i2c_scl = 43, .EMC2103 = true, .temp_flip = true, .temp_offset = 0, .TPS546 = true, .power_consumption_target = 135, },
 };
 
 esp_err_t device_config_init(void * pvParameters);

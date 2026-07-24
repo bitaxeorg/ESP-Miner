@@ -11,6 +11,7 @@
 #include "thermal.h"
 #include "vcore.h"
 #include "power.h"
+#include "TPS546.h"
 #include "nvs_config.h"
 #include "global_state.h"
 #include "asic_reset.h"
@@ -35,7 +36,8 @@
 #define SELF_TEST_CORE_VOLTAGE_TOLERANCE 0.10f
 
 // Test Power Consumption
-#define POWER_CONSUMPTION_MARGIN 3 //+/- watts
+#define POWER_CONSUMPTION_MARGIN_PERCENT 15.0f
+#define MULTIPHASE_BUCK_MIN_CURRENT_A 1.0f
 
 // Test Input Voltage
 #define INPUT_VOLTAGE_MARGIN 0.10f // +/- 10%
@@ -353,7 +355,8 @@ static esp_err_t test_fan_sense(GlobalState * GLOBAL_STATE)
     uint16_t target_speed = nvs_config_get_u16(NVS_CONFIG_SELF_TEST_FAN_SPEED);
 
     ESP_LOGI(TAG, "fanSpeed: %d RPM", fan_speed);
-    if (GLOBAL_STATE->DEVICE_CONFIG.family.id == GAMMA_TURBO) {
+    if (GLOBAL_STATE->DEVICE_CONFIG.family.id == GAMMA_TURBO ||
+        GLOBAL_STATE->DEVICE_CONFIG.family.id == GAMMA_HEX) {
         target_speed = 500;
     }
     if (fan_speed > target_speed) {
@@ -369,11 +372,25 @@ static esp_err_t test_fan_sense(GlobalState * GLOBAL_STATE)
 static esp_err_t test_power_consumption(GlobalState * GLOBAL_STATE)
 {
     float target_power = (float) GLOBAL_STATE->DEVICE_CONFIG.power_consumption_target;
-    float margin = (float) POWER_CONSUMPTION_MARGIN;
+    float margin = target_power * (POWER_CONSUMPTION_MARGIN_PERCENT / 100.0f);
 
     float power = 0;
     float current = 0;
-    
+
+    uint8_t phase_count = 0;
+    if (GLOBAL_STATE->DEVICE_CONFIG.family.id == GAMMA_TURBO) {
+        phase_count = 2;
+    } else if (GLOBAL_STATE->DEVICE_CONFIG.family.id == GAMMA_HEX) {
+        phase_count = 4;
+    }
+
+    if (phase_count > 0 &&
+        TPS546_check_phase_currents(phase_count, MULTIPHASE_BUCK_MIN_CURRENT_A) != ESP_OK) {
+        ESP_LOGE(TAG, "MULTIPHASE BUCK test failed!");
+        self_test_show_message(GLOBAL_STATE, "BUCK:FAIL");
+        return ESP_FAIL;
+    }
+
     Power_get_output(GLOBAL_STATE, &power, &current);
     ESP_LOGI(TAG, "Power: %.2f W", power);
 
@@ -381,7 +398,11 @@ static esp_err_t test_power_consumption(GlobalState * GLOBAL_STATE)
         return ESP_OK;
     }
 
-    ESP_LOGE(TAG, "POWER test failed! measured %.2f W, target %.2f W +/- %.2f W", power, target_power, margin);
+    ESP_LOGE(TAG, "POWER test failed! measured %.2f W, target %.2f W +%.0f%% (%.2f W)",
+             power,
+             target_power,
+             POWER_CONSUMPTION_MARGIN_PERCENT,
+             margin);
     self_test_show_message(GLOBAL_STATE, "POWER:FAIL");
     return ESP_FAIL;
 }
@@ -389,7 +410,10 @@ static esp_err_t test_power_consumption(GlobalState * GLOBAL_STATE)
 static esp_err_t test_core_voltage(GlobalState * GLOBAL_STATE)
 {
     uint16_t core_voltage = VCORE_get_voltage_mv(GLOBAL_STATE);
-    uint16_t target_voltage = GLOBAL_STATE->DEVICE_CONFIG.family.asic.default_voltage_mv;
+    uint16_t target_voltage = GLOBAL_STATE->DEVICE_CONFIG.family.default_voltage_mv;
+    if (target_voltage == 0) {
+        target_voltage = GLOBAL_STATE->DEVICE_CONFIG.family.asic.default_voltage_mv;
+    }
     float margin = target_voltage * SELF_TEST_CORE_VOLTAGE_TOLERANCE;
     ESP_LOGI(TAG, "Core voltage: %u mV (target: %u mV +/- %.0f mV)", core_voltage, target_voltage, margin);
 
@@ -606,7 +630,10 @@ void self_test_task(void * pvParameters)
         }
 
         uint32_t remaining = elapsed_us < hashtest_us ? (hashtest_us - elapsed_us) / 1000000 : 0;
-        snprintf(logString, sizeof(logString), "%.0f Gh/s %.1f°C %" PRIu32 "s", hashrate, asic_temp, remaining);
+        float display_hashrate = GLOBAL_STATE->SYSTEM_MODULE.current_hashrate > 0
+            ? GLOBAL_STATE->SYSTEM_MODULE.current_hashrate
+            : hashrate;
+        snprintf(logString, sizeof(logString), "%.0f Gh/s %.1f°C %" PRIu32 "s", display_hashrate, asic_temp, remaining);
         ESP_LOGI(TAG, "%s", logString);
 
         self_test_show_message(GLOBAL_STATE, logString);

@@ -44,7 +44,7 @@ esp_err_t GET_system_asic(httpd_req_t *req)
     cJSON_AddNumberToObject(root, "asicCount", GLOBAL_STATE->DEVICE_CONFIG.family.asic_count);
     cJSON_AddNumberToObject(root, "hashDomains", GLOBAL_STATE->DEVICE_CONFIG.family.asic.hash_domains);
 
-    cJSON_AddNumberToObject(root, "defaultFrequency", GLOBAL_STATE->DEVICE_CONFIG.family.asic.default_frequency_mhz);
+    cJSON_AddNumberToObject(root, "defaultFrequency", GLOBAL_STATE->DEVICE_CONFIG.family.default_frequency_mhz);
 
     // Create arrays for frequency and voltage options based on ASIC model
     cJSON *freqOptions = cJSON_CreateArray();
@@ -55,7 +55,7 @@ esp_err_t GET_system_asic(httpd_req_t *req)
     }
     cJSON_AddItemToObject(root, "frequencyOptions", freqOptions);
 
-    cJSON_AddNumberToObject(root, "defaultVoltage", GLOBAL_STATE->DEVICE_CONFIG.family.asic.default_voltage_mv);
+    cJSON_AddNumberToObject(root, "defaultVoltage", GLOBAL_STATE->DEVICE_CONFIG.family.default_voltage_mv);
 
     cJSON *voltageOptions = cJSON_CreateArray();
     count = 0;

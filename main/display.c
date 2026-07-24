@@ -5,9 +5,12 @@
 #include "esp_timer.h"
 #include "esp_lcd_panel_io.h"
 #include "esp_lcd_panel_ops.h"
+#include "esp_lcd_panel_vendor.h"
+#include "esp_lcd_io_i80.h"
 #include "esp_err.h"
 #include "esp_log.h"
 #include "esp_check.h"
+#include "driver/gpio.h"
 #include "lvgl.h"
 #include "lvgl__lvgl/src/themes/lv_theme_private.h"
 #include "esp_lvgl_port.h"
@@ -26,18 +29,71 @@
 #define LCD_CMD_BITS           8
 #define LCD_PARAM_BITS         8
 
+#define LCD_I80_PIXEL_CLOCK_HZ  4000000
+#define LCD_I80_BUF_LINES       40
+#define LCD_I80_H_RES           320
+#define LCD_I80_V_RES           170
+#define LCD_I80_GAP_X           0
+#define LCD_I80_GAP_Y           35
+
+#define LCD_BK_LIGHT_ON_LEVEL   1
+#define LCD_BK_LIGHT_OFF_LEVEL  0
+#define LCD_PWR_ON_LEVEL        1
+#define LCD_PWR_OFF_LEVEL       0
+typedef struct {
+    gpio_num_t data[8];
+    gpio_num_t rd;
+    gpio_num_t pwr;
+    gpio_num_t wr;
+    gpio_num_t cs;
+    gpio_num_t dc;
+    gpio_num_t rst;
+    gpio_num_t bk_light;
+} St7789I80Pins;
+
+static const St7789I80Pins ST7789_GAMMA_HEX_PINS = {
+    .data = { GPIO_NUM_39, GPIO_NUM_40, GPIO_NUM_41, GPIO_NUM_42, GPIO_NUM_45, GPIO_NUM_46, GPIO_NUM_47, GPIO_NUM_48 },
+    .rd = GPIO_NUM_9,
+    .pwr = GPIO_NUM_15,
+    .wr = GPIO_NUM_8,
+    .cs = GPIO_NUM_6,
+    .dc = GPIO_NUM_7,
+    .rst = GPIO_NUM_5,
+    .bk_light = GPIO_NUM_38,
+};
+
 static const char * TAG = "display";
 static const char * LVGL_TAG = "lvgl";
 
 static esp_lcd_panel_handle_t panel_handle = NULL;
+static const St7789I80Pins *current_st7789_pins = NULL;
 static bool display_state_on = false;
+static bool display_has_backlight = false;
 
 static lv_theme_t theme;
 static lv_style_t scr_style;
+static lv_font_t lcd_font_unscii_16;
 
 extern const lv_font_t lv_font_portfolio_6x8;
+LV_FONT_DECLARE(lv_font_unscii_16);
 
 esp_err_t display_on(bool display_on);
+static void my_log_cb(lv_log_level_t level, const char * buf);
+
+static bool family_has_i80_st7789_display(Family family)
+{
+    return family == GAMMA_HEX;
+}
+
+static const St7789I80Pins *get_st7789_i80_pins(Family family)
+{
+    switch (family) {
+        case GAMMA_HEX:
+            return &ST7789_GAMMA_HEX_PINS;
+        default:
+            return NULL;
+    }
+}
 
 static void theme_apply(lv_theme_t *theme, lv_obj_t *obj) {
     if (lv_obj_get_parent(obj) == NULL) {
@@ -47,6 +103,13 @@ static void theme_apply(lv_theme_t *theme, lv_obj_t *obj) {
 
 static esp_err_t read_display_config(GlobalState * GLOBAL_STATE)
 {
+    if (family_has_i80_st7789_display(GLOBAL_STATE->DEVICE_CONFIG.family.id)) {
+        const DisplayConfig * display_config = get_display_config("ST7789 (320x170)");
+        GLOBAL_STATE->DISPLAY_CONFIG = *display_config;
+        ESP_LOGI(TAG, "%s", GLOBAL_STATE->DISPLAY_CONFIG.name);
+        return ESP_OK;
+    }
+
     char * display_config_name = nvs_config_get_string(NVS_CONFIG_DISPLAY);
     const DisplayConfig * display_config = get_display_config(display_config_name);
 
@@ -60,6 +123,139 @@ static esp_err_t read_display_config(GlobalState * GLOBAL_STATE)
 
     free(display_config_name);
     return ESP_FAIL;
+}
+
+static esp_err_t init_i80_st7789_display(GlobalState * GLOBAL_STATE, const lvgl_port_cfg_t *lvgl_cfg)
+{
+    const St7789I80Pins *pins = get_st7789_i80_pins(GLOBAL_STATE->DEVICE_CONFIG.family.id);
+    ESP_RETURN_ON_FALSE(pins, ESP_ERR_INVALID_ARG, TAG, "No ST7789 pin map for %s", GLOBAL_STATE->DEVICE_CONFIG.family.name);
+    current_st7789_pins = pins;
+
+    ESP_LOGI(TAG, "Configure ST7789 GPIOs");
+    gpio_config_t output_config = {
+        .pin_bit_mask = (1ULL << pins->bk_light) | (1ULL << pins->rd) | (1ULL << pins->pwr),
+        .mode = GPIO_MODE_OUTPUT,
+    };
+    ESP_RETURN_ON_ERROR(gpio_config(&output_config), TAG, "Failed to configure LCD GPIOs");
+    gpio_set_level(pins->rd, 1);
+    gpio_set_level(pins->pwr, LCD_PWR_ON_LEVEL);
+    gpio_set_level(pins->bk_light, LCD_BK_LIGHT_OFF_LEVEL);
+
+    ESP_LOGI(TAG, "Initialize ST7789 Intel 8080 bus");
+    esp_lcd_i80_bus_handle_t i80_bus = NULL;
+    esp_lcd_i80_bus_config_t bus_config = {
+        .dc_gpio_num = pins->dc,
+        .wr_gpio_num = pins->wr,
+        .clk_src = LCD_CLK_SRC_DEFAULT,
+        .data_gpio_nums = {
+            pins->data[0],
+            pins->data[1],
+            pins->data[2],
+            pins->data[3],
+            pins->data[4],
+            pins->data[5],
+            pins->data[6],
+            pins->data[7],
+        },
+        .bus_width = 8,
+        .max_transfer_bytes = LCD_I80_H_RES * LCD_I80_BUF_LINES * sizeof(uint16_t),
+        .psram_trans_align = 64,
+        .sram_trans_align = 4,
+    };
+    ESP_RETURN_ON_ERROR(esp_lcd_new_i80_bus(&bus_config, &i80_bus), TAG, "Failed to initialize i80 bus");
+
+    esp_lcd_panel_io_handle_t io_handle = NULL;
+    esp_lcd_panel_io_i80_config_t io_config = {
+        .cs_gpio_num = pins->cs,
+        .pclk_hz = LCD_I80_PIXEL_CLOCK_HZ,
+        .trans_queue_depth = 20,
+        .lcd_cmd_bits = LCD_CMD_BITS,
+        .lcd_param_bits = LCD_PARAM_BITS,
+        .dc_levels = {
+            .dc_idle_level = 0,
+            .dc_cmd_level = 0,
+            .dc_dummy_level = 0,
+            .dc_data_level = 1,
+        },
+    };
+    ESP_RETURN_ON_ERROR(esp_lcd_new_panel_io_i80(i80_bus, &io_config, &io_handle), TAG, "Failed to initialize i80 panel IO");
+
+    ESP_LOGI(TAG, "Install ST7789 panel driver");
+    esp_lcd_panel_dev_config_t panel_config = {
+        .reset_gpio_num = pins->rst,
+        .rgb_ele_order = LCD_RGB_ELEMENT_ORDER_RGB,
+        .bits_per_pixel = 16,
+    };
+    ESP_RETURN_ON_ERROR(esp_lcd_new_panel_st7789(io_handle, &panel_config, &panel_handle), TAG, "No ST7789 display found");
+    ESP_RETURN_ON_ERROR(esp_lcd_panel_reset(panel_handle), TAG, "Panel reset failed");
+    ESP_RETURN_ON_ERROR(esp_lcd_panel_init(panel_handle), TAG, "Panel init failed");
+    ESP_RETURN_ON_ERROR(esp_lcd_panel_invert_color(panel_handle, true), TAG, "Panel invert failed");
+    ESP_RETURN_ON_ERROR(esp_lcd_panel_swap_xy(panel_handle, true), TAG, "Panel swap XY failed");
+    ESP_RETURN_ON_ERROR(esp_lcd_panel_mirror(panel_handle, true, false), TAG, "Panel mirror failed");
+    ESP_RETURN_ON_ERROR(esp_lcd_panel_set_gap(panel_handle, LCD_I80_GAP_X, LCD_I80_GAP_Y), TAG, "Panel gap failed");
+    display_has_backlight = true;
+
+    ESP_LOGI(TAG, "Initialize LVGL");
+    ESP_RETURN_ON_ERROR(lvgl_port_init(lvgl_cfg), TAG, "LVGL init failed");
+    lv_log_register_print_cb(my_log_cb);
+
+    const lvgl_port_display_cfg_t disp_cfg = {
+        .io_handle = io_handle,
+        .panel_handle = panel_handle,
+        .buffer_size = LCD_I80_H_RES * LCD_I80_BUF_LINES,
+        .double_buffer = true,
+        .hres = GLOBAL_STATE->DISPLAY_CONFIG.h_res,
+        .vres = GLOBAL_STATE->DISPLAY_CONFIG.v_res,
+        .monochrome = false,
+        .rotation = {
+            .swap_xy = true,
+            .mirror_x = true,
+            .mirror_y = false,
+        },
+        .color_format = LV_COLOR_FORMAT_RGB565,
+        .flags = {
+            .buff_dma = true,
+            .swap_bytes = false,
+            .sw_rotate = false,
+        }
+    };
+
+    lv_disp_t * disp = lvgl_port_add_disp(&disp_cfg);
+    ESP_RETURN_ON_FALSE(disp, ESP_FAIL, TAG, "lvgl_port_add_disp failed");
+
+    if (lvgl_port_lock(0)) {
+        uint16_t rotation = nvs_config_get_u16(NVS_CONFIG_ROTATION);
+        ESP_LOGI(TAG, "Rotation: %d", rotation);
+        switch(rotation) {
+            case 90:
+                lv_display_set_rotation(disp, LV_DISPLAY_ROTATION_90);
+                break;
+            case 180:
+                lv_display_set_rotation(disp, LV_DISPLAY_ROTATION_180);
+                break;
+            case 270:
+                lv_display_set_rotation(disp, LV_DISPLAY_ROTATION_270);
+                break;
+        }
+
+        lv_style_init(&scr_style);
+        lcd_font_unscii_16 = lv_font_unscii_16;
+        lcd_font_unscii_16.fallback = &lv_font_portfolio_6x8;
+        lv_style_set_text_font(&scr_style, &lcd_font_unscii_16);
+        lv_style_set_bg_opa(&scr_style, LV_OPA_COVER);
+        lv_style_set_bg_color(&scr_style, lv_color_black());
+        lv_style_set_text_color(&scr_style, lv_color_white());
+
+        lv_theme_set_apply_cb(&theme, theme_apply);
+        lv_display_set_theme(disp, &theme);
+        lvgl_port_unlock();
+    }
+
+    ESP_RETURN_ON_ERROR(display_on(true), TAG, "Display on failed");
+    GLOBAL_STATE->SYSTEM_MODULE.is_screen_active = true;
+
+    ESP_LOGI(TAG, "ST7789 display init success!");
+    return ESP_OK;
 }
 
 static void my_log_cb(lv_log_level_t level, const char * buf)
@@ -105,6 +301,10 @@ esp_err_t display_init(void * pvParameters)
         return ESP_OK;
     }
 
+    if (GLOBAL_STATE->DISPLAY_CONFIG.display == ST7789_I80) {
+        return init_i80_st7789_display(GLOBAL_STATE, &lvgl_cfg);
+    }
+
     i2c_master_bus_handle_t i2c_master_bus_handle;
     ESP_RETURN_ON_ERROR(i2c_bitaxe_get_master_bus_handle(&i2c_master_bus_handle), TAG, "Failed to get i2c master bus handle");
 
@@ -126,6 +326,8 @@ esp_err_t display_init(void * pvParameters)
             io_config.dc_bit_offset = 0;
             io_config.flags.disable_control_phase = 1;
             break;
+        case ST7789_I80:
+            return ESP_FAIL;
         default:
             return ESP_FAIL;
     }
@@ -151,6 +353,8 @@ esp_err_t display_init(void * pvParameters)
         case SH1107:
             ESP_RETURN_ON_ERROR(esp_lcd_new_panel_sh1107(io_handle, &panel_config, &panel_handle), TAG, "No display found");
             break;
+        case ST7789_I80:
+            return ESP_FAIL;
         default:
             return ESP_FAIL;
     }
@@ -252,11 +456,20 @@ esp_err_t display_on(bool display_on)
 {
     if (NULL != panel_handle) {
         if (display_on && !display_state_on) {
+            if (display_has_backlight) {
+                gpio_set_level(current_st7789_pins->pwr, LCD_PWR_ON_LEVEL);
+            }
             ESP_RETURN_ON_ERROR(esp_lcd_panel_disp_on_off(panel_handle, true), TAG, "Panel display on failed");
+            if (display_has_backlight) {
+                gpio_set_level(current_st7789_pins->bk_light, LCD_BK_LIGHT_ON_LEVEL);
+            }
             display_state_on = true;
         }
         else if (!display_on && display_state_on)
         {
+            if (display_has_backlight) {
+                gpio_set_level(current_st7789_pins->bk_light, LCD_BK_LIGHT_OFF_LEVEL);
+            }
             ESP_RETURN_ON_ERROR(esp_lcd_panel_disp_on_off(panel_handle, false), TAG, "Panel display off failed");
             display_state_on = false;
         }

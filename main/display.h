@@ -12,6 +12,7 @@ typedef enum
     SSD1306,
     SSD1309,
     SH1107,
+    ST7789_I80,
 } Display;
 
 typedef struct {
@@ -27,6 +28,7 @@ static const DisplayConfig display_configs[] = {
     { .name = "SSD1309 (128x64)", .display = SSD1309, .h_res = 128, .v_res = 64,  },
     { .name = "SH1107 (64x128)",  .display = SH1107,  .h_res = 64,  .v_res = 128, },
     { .name = "SH1107 (128x128)", .display = SH1107,  .h_res = 128, .v_res = 128, },
+    { .name = "ST7789 (320x170)", .display = ST7789_I80, .h_res = 320, .v_res = 170, },
 };
 
 esp_err_t display_init(void * pvParameters);
