@@ -1,6 +1,7 @@
 import { Component, OnInit, ViewChild, Input, OnDestroy, ElementRef, HostListener, effect } from '@angular/core';
 import { map, Observable, shareReplay, Subscription, switchMap, tap, first, Subject, takeUntil, BehaviorSubject, filter, combineLatest } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
+import { getHttpErrorMessage } from 'src/app/utils/error-handler';
 import { FormBuilder, FormGroup } from '@angular/forms';
 import { ToastrService } from 'ngx-toastr';
 import { DateAgoPipe } from 'src/app/pipes/date-ago.pipe';
@@ -35,7 +36,6 @@ type MessageType =
   | 'POWER_FAULT'
   | 'FREQUENCY_LOW'
   | 'FALLBACK_STRATUM'
-  | 'VERSION_MISMATCH'
   | 'NOT_SOLO_MINING'
   | 'NO_MINING_REWARD'
   | 'HARDWARE_FAULT';
@@ -526,7 +526,7 @@ export class HomeComponent implements OnInit, OnDestroy {
           this.loadPreviousData();
         },
         error: (err: HttpErrorResponse) => {
-          this.toastr.error('Error.', `Could not save chart source. ${err.message}`);
+          this.toastr.error('Error.', `Could not save chart source. ${getHttpErrorMessage(err, this.uri)}`);
         }
       });
   }
@@ -999,7 +999,7 @@ export class HomeComponent implements OnInit, OnDestroy {
           this.toastr.success('Pool changed and device restarted');
         },
         error: (err: HttpErrorResponse) => {
-          this.toastr.error(`Error during pool change or device restart: ${err.message}`);
+          this.toastr.error(`Error during pool change or device restart: ${getHttpErrorMessage(err, this.uri)}`);
         }
       });
   }
@@ -1014,7 +1014,7 @@ export class HomeComponent implements OnInit, OnDestroy {
           this.toastr.success('Block found notification dismissed');
         },
         error: (err: HttpErrorResponse) => {
-          this.toastr.error(`Error dismissing notification: ${err.message}`);
+          this.toastr.error(`Error dismissing notification: ${getHttpErrorMessage(err, this.uri)}`);
         }
       });
   }
@@ -1106,7 +1106,6 @@ export class HomeComponent implements OnInit, OnDestroy {
     updateMessage(!!info.hardware_fault, 'HARDWARE_FAULT', 'error', `${info.hardware_fault}`);
     updateMessage(!info.frequency || info.frequency < 400, 'FREQUENCY_LOW', 'warn', 'Device frequency is set low - See settings');
     updateMessage(!!info.isUsingFallbackStratum, 'FALLBACK_STRATUM', 'warn', 'Using fallback pool - Share stats reset. Check Pool Settings and / or reboot Device.');
-    updateMessage(info.version !== info.axeOSVersion, 'VERSION_MISMATCH', 'warn', `Firmware (${info.version}) and AxeOS (${info.axeOSVersion}) versions do not match. Please make sure to update both www.bin and esp-miner.bin.`);
     if (info.coinbaseOutputs && info.coinbaseOutputs.length > 0) {
       let percentage = this.getPayoutPercentage(info);
       updateMessage(percentage > 0 && percentage < 95, 'NOT_SOLO_MINING', 'warn', `Your share of the mining reward is only ${percentage.toFixed(1)}%`);

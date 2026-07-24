@@ -1,4 +1,5 @@
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
+import { getHttpErrorMessage } from 'src/app/utils/error-handler';
 import { Component, Input, OnInit } from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { ToastrService } from 'ngx-toastr';
@@ -109,7 +110,7 @@ export class NetworkEditComponent implements OnInit {
           this.form.markAsPristine();
         },
         error: (err: HttpErrorResponse) => {
-          this.toastr.error(`Could not save. ${err.message}`);
+          this.toastr.error(`Could not save. ${getHttpErrorMessage(err, this.uri)}`);
           this.savedChanges = restartAlreadyPending;
         }
       });
@@ -176,7 +177,7 @@ export class NetworkEditComponent implements OnInit {
           this.savedChanges = false;
         },
         error: (err: HttpErrorResponse) => {
-          this.toastr.error(`Could not restart. ${err.message}`);
+          this.toastr.error(`Could not restart. ${getHttpErrorMessage(err, this.uri)}`);
         }
       });
   }
