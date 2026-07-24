@@ -173,38 +173,44 @@ void websocket_init(httpd_handle_t server)
     }
 }
 
-esp_err_t websocket_handler(httpd_req_t *req)
+esp_err_t websocket_pre_handshake(httpd_req_t *req)
 {
-    // Detect handshake by checking for the "Upgrade" header
-    char upgrade_hdr[16];
-    if (httpd_req_get_hdr_value_str(req, "Upgrade", upgrade_hdr, sizeof(upgrade_hdr)) == ESP_OK &&
-        strcasecmp(upgrade_hdr, "websocket") == 0) {
-
-        if (is_network_allowed(req) != ESP_OK) {
-            return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
-        }
-
-        int active_clients = 0;
-        for (int i = 0; i < WS_TYPE_MAX; i++) active_clients += type_counts[i];
-        if (active_clients >= MAX_WEBSOCKET_CLIENTS) {
-            ESP_LOGE(TAG, "Max WebSocket clients reached, rejecting new connection");
-            return httpd_resp_send_custom_err(req, "429 Too Many Requests", "Max WebSocket clients reached");
-        }
-
-        uint32_t type = (uint32_t)(uintptr_t)req->user_ctx;
-        int fd = httpd_req_to_sockfd(req);
-        if (websocket_add_client(fd, type) != ESP_OK) {
-            ESP_LOGE(TAG, "Unexpected failure adding client, fd: %d", fd);
-            return ESP_FAIL;
-        }
-
-        if (type == WS_TYPE_API) {
-            websocket_api_on_connect(fd);
-        }
-
-        return ESP_OK;
+    if (is_network_allowed(req) != ESP_OK) {
+        httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+        return ESP_FAIL;
     }
 
+    int active_clients = 0;
+    for (int i = 0; i < WS_TYPE_MAX; i++) {
+        active_clients += type_counts[i];
+    }
+    if (active_clients >= MAX_WEBSOCKET_CLIENTS) {
+        ESP_LOGE(TAG, "Max WebSocket clients reached, rejecting new connection");
+        httpd_resp_send_custom_err(req, "429 Too Many Requests", "Max WebSocket clients reached");
+        return ESP_FAIL;
+    }
+
+    return ESP_OK;
+}
+
+esp_err_t websocket_post_handshake(httpd_req_t *req)
+{
+    WebSocketClientType type = (WebSocketClientType)(uintptr_t)req->user_ctx;
+    int fd = httpd_req_to_sockfd(req);
+    if (websocket_add_client(fd, type) != ESP_OK) {
+        ESP_LOGE(TAG, "Unexpected failure adding client, fd: %d", fd);
+        return ESP_FAIL;
+    }
+
+    if (type == WS_TYPE_API) {
+        websocket_api_on_connect(fd);
+    }
+
+    return ESP_OK;
+}
+
+esp_err_t websocket_handler(httpd_req_t *req)
+{
     // Handle WebSocket frame
     httpd_ws_frame_t ws_pkt;
     memset(&ws_pkt, 0, sizeof(httpd_ws_frame_t));

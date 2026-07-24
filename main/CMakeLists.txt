@@ -74,20 +74,20 @@ REQUIRES
 
 PRIV_REQUIRES
     "app_update"
-    "driver"
     "esp_adc"
     "esp_app_format"
+    "esp_driver_gpio"
     "esp_event"
     "esp_http_server"
     "esp_netif"
     "esp_psram"
     "esp_timer"
     "esp_wifi"
-    "json"
     "nvs_flash"
     "spiffs"
     "vfs"
     "esp_driver_i2c"
+    "esp_driver_uart"
     "tcp_transport"
     "esp_mm"
 

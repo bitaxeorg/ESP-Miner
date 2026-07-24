@@ -20,7 +20,7 @@ PRIV_INCLUDE_DIRS
 
 REQUIRES 
     "freertos"
-    "driver"
+    "esp_driver_uart"
     "stratum"
     "stratum_v2"
     "tcp_transport"

@@ -540,7 +540,7 @@ esp_netif_t * wifi_init_softap(GlobalState * GLOBAL_STATE)
     esp_netif_t * esp_netif_ap = esp_netif_create_default_wifi_ap();
 
     uint8_t mac[6];
-    esp_wifi_get_mac(ESP_IF_WIFI_AP, mac);
+    esp_wifi_get_mac(WIFI_IF_AP, mac);
     // Format the last 4 bytes of the MAC address as a hexadecimal string
     snprintf(GLOBAL_STATE->SYSTEM_MODULE.ap_ssid, sizeof(GLOBAL_STATE->SYSTEM_MODULE.ap_ssid), "Bitaxe_%02X%02X", mac[4], mac[5]);
 

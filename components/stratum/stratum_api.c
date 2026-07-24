@@ -91,7 +91,7 @@ esp_transport_handle_t STRATUM_V1_transport_init(tls_mode tls, char * cert)
     return transport;
 }
 
-void STRATUM_V1_initialize_buffer()
+void STRATUM_V1_initialize_buffer(void)
 {
     // Free any existing buffer (may be non-NULL if a previous V1 task was running)
     free(json_rpc_buffer);

@@ -7,14 +7,13 @@
 #include <string.h>
 #include <stdlib.h>
 #include <ctype.h>
-#include "mbedtls/sha256.h"
 
 #define BIP110_SIGNAL_BIT 4
 #define BIP110_SIGNAL_EXPIRY_BLOCK 965664
 
 // Wrapper for SHA256 to match libbase58's expected signature
 static bool my_sha256(void *digest, const void *data, size_t datasz) {
-    mbedtls_sha256(data, datasz, digest, 0);
+    sha256_bin(data, datasz, digest);
     return true;
 }
 
