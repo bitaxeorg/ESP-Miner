@@ -118,14 +118,14 @@ void websocket_send_to_client(int fd, httpd_ws_frame_t *pkt)
 
         websocket_remove_client(fd);
 
-	esp_err_t close_err = httpd_sess_trigger_close(server_handle, fd);
-	if (close_err != ESP_OK) {
-    	    ESP_LOGW(TAG,
-            	"Failed to trigger HTTP session close for fd=%d: %s (%d)",
-            	fd,
-            	esp_err_to_name(close_err),
-            	close_err);
-	}
+        esp_err_t close_err = httpd_sess_trigger_close(server_handle, fd);
+        if (close_err != ESP_OK) {
+            ESP_LOGW(TAG,
+                "Failed to trigger HTTP session close for fd=%d: %s (%d)",
+                fd,
+                esp_err_to_name(close_err),
+                close_err);
+        }
     }
 }
 
