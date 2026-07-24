@@ -530,8 +530,7 @@ void TPS546_write_entire_config(void)
     ESP_LOGI(TAG, "---Writing new config values to TPS546---");
 
         // ON_OFF_CONFIG
-    //u8_value = (ON_OFF_CONFIG_DELAY | ON_OFF_CONFIG_POLARITY | ON_OFF_CONFIG_CP | ON_OFF_CONFIG_CMD | ON_OFF_CONFIG_PU);
-    uint8_t u8_value = (ON_OFF_CONFIG_DELAY | ON_OFF_CONFIG_POLARITY | ON_OFF_CONFIG_CMD | ON_OFF_CONFIG_PU);
+    uint8_t u8_value = tps546_config.TPS546_INIT_ON_OFF_CONFIG;
     ESP_LOGI(TAG, "Setting ON_OFF_CONFIG: %02X", u8_value);
     smb_write_byte(PMBUS_ON_OFF_CONFIG, u8_value);
 

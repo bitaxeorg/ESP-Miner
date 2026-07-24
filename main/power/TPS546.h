@@ -38,6 +38,7 @@ typedef struct {
 
 typedef struct
 {
+  uint8_t TPS546_INIT_ON_OFF_CONFIG; /* on/off control behavior */
   /* Phase readout configuration */
   uint8_t TPS546_INIT_PHASE; /* phase register configuration */
   /* vin voltage */

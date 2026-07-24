@@ -20,7 +20,31 @@ static TPS546_CONFIG get_tps546_config(const FamilyConfig * family)
 
     // Set family-specific parameters
     switch (family->id) {
+    case NAJA:
+        config.TPS546_INIT_ON_OFF_CONFIG = ON_OFF_CONFIG_DELAY | ON_OFF_CONFIG_POLARITY | ON_OFF_CONFIG_CP | ON_OFF_CONFIG_CMD | ON_OFF_CONFIG_PU;
+        config.TPS546_INIT_PHASE = TPS546_INIT_PHASE_MULTI;
+        config.TPS546_INIT_VIN_ON = 11.0;
+        config.TPS546_INIT_VIN_OFF = 10.5;
+        config.TPS546_INIT_VIN_UV_WARN_LIMIT = 11.0;
+        config.TPS546_INIT_VIN_OV_FAULT_LIMIT = 14.0;
+        config.TPS546_INIT_SCALE_LOOP = 0.25;
+        config.TPS546_INIT_VOUT_MIN = 1;
+        config.TPS546_INIT_VOUT_MAX = 3;
+        config.TPS546_INIT_VOUT_COMMAND = 1.2;
+        config.TPS546_INIT_IOUT_OC_WARN_LIMIT = 50.00;
+        config.TPS546_INIT_IOUT_OC_FAULT_LIMIT = 55.00;
+        // Multi-phase stacking configuration for 2 TPS modules
+        config.TPS546_INIT_STACK_CONFIG = 0x0001; // 2 modules (One-Slave, 2-phase)
+        config.TPS546_INIT_SYNC_CONFIG = 0xD0;    // Enable Auto Detect SYNC
+        config.TPS546_INIT_COMPENSATION_CONFIG[0] = 0x12;
+        config.TPS546_INIT_COMPENSATION_CONFIG[1] = 0x34;
+        config.TPS546_INIT_COMPENSATION_CONFIG[2] = 0x42;
+        config.TPS546_INIT_COMPENSATION_CONFIG[3] = 0x21;
+        config.TPS546_INIT_COMPENSATION_CONFIG[4] = 0x04;
+        break;
+
     case GAMMA_TURBO:
+        config.TPS546_INIT_ON_OFF_CONFIG = ON_OFF_CONFIG_DELAY | ON_OFF_CONFIG_POLARITY | ON_OFF_CONFIG_CMD | ON_OFF_CONFIG_PU;
         config.TPS546_INIT_PHASE = TPS546_INIT_PHASE_MULTI;
         config.TPS546_INIT_VIN_ON = 11.0;
         config.TPS546_INIT_VIN_OFF = 10.5;
@@ -44,6 +68,7 @@ static TPS546_CONFIG get_tps546_config(const FamilyConfig * family)
 
     case HEX:
     case SUPRA_HEX:
+        config.TPS546_INIT_ON_OFF_CONFIG = ON_OFF_CONFIG_DELAY | ON_OFF_CONFIG_POLARITY | ON_OFF_CONFIG_CMD | ON_OFF_CONFIG_PU;
         config.TPS546_INIT_PHASE = TPS546_INIT_PHASE_SINGLE;
         config.TPS546_INIT_VIN_ON = 11.5;
         config.TPS546_INIT_VIN_OFF = 11.0;
@@ -61,6 +86,7 @@ static TPS546_CONFIG get_tps546_config(const FamilyConfig * family)
         break;
 
     default: // MAX, ULTRA, SUPRA, GAMMA
+        config.TPS546_INIT_ON_OFF_CONFIG = ON_OFF_CONFIG_DELAY | ON_OFF_CONFIG_POLARITY | ON_OFF_CONFIG_CMD | ON_OFF_CONFIG_PU;
         config.TPS546_INIT_PHASE = TPS546_INIT_PHASE_SINGLE;
         config.TPS546_INIT_VIN_ON = 4.8;
         config.TPS546_INIT_VIN_OFF = 4.5;
