@@ -180,13 +180,6 @@
                                     {{info.bestDiff | diffSuffix}}
                                 </span>
                                 <span class="text-secondary text-lg">all-time best</span>
-                                <span class="text-sm font-medium mb-4" *ngIf="info.networkDifficulty">
-                                    <tooltip-text-icon
-                                        [text]="'(' + networkDifficultyPercentage + '%)'"
-                                        tooltip="Chance to find a Block"
-                                        [split]="false"
-                                    />
-                                </span>
                             </div>
                         </div>
                     </div>
