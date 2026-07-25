@@ -286,7 +286,7 @@ void BAP_send_subscription_update(GlobalState *state) {
                     case BAP_PARAM_SHARES:
                         {
                             char shares_ar_str[64];
-                            snprintf(shares_ar_str, sizeof(shares_ar_str), "%" PRIu64 "/%" PRIu64, state->SYSTEM_MODULE.shares_accepted, state->SYSTEM_MODULE.shares_rejected);
+                            snprintf(shares_ar_str, sizeof(shares_ar_str), "%" PRIu32 "/%" PRIu32, state->SYSTEM_MODULE.shares_accepted, state->SYSTEM_MODULE.shares_rejected);
                             BAP_send_if_changed("shares", shares_ar_str, last_values.shares, sizeof(last_values.shares), &last_values_valid.shares);
                             
                         }
