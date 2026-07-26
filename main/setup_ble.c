@@ -7,6 +7,7 @@
 #include <string.h>
 #include <strings.h>
 
+#include "cJSON.h"
 #include "esp_log.h"
 #include "esp_system.h"
 #include "freertos/FreeRTOS.h"
@@ -100,8 +101,9 @@ static void setup_ble_copy_string(char *dest, size_t dest_size, const char *src)
         dest[0] = '\0';
         return;
     }
-    strncpy(dest, src, dest_size - 1);
-    dest[dest_size - 1] = '\0';
+    size_t len = strnlen(src, dest_size - 1);
+    memcpy(dest, src, len);
+    dest[len] = '\0';
 }
 
 static bool setup_ble_parse_port(const char *value, uint16_t *port)
@@ -137,6 +139,37 @@ static void setup_ble_set_status(const char *status)
 #endif
 }
 
+static uint16_t setup_ble_primary_pool_index(void)
+{
+    return nvs_config_get_u16(NVS_CONFIG_PRIMARY_POOL_INDEX);
+}
+
+static void setup_ble_json_set_string(cJSON *root, const char *key, const char *value)
+{
+    cJSON *item = cJSON_CreateString(value);
+    if (item == NULL) {
+        return;
+    }
+    if (cJSON_GetObjectItem(root, key) != NULL) {
+        cJSON_ReplaceItemInObject(root, key, item);
+    } else {
+        cJSON_AddItemToObject(root, key, item);
+    }
+}
+
+static void setup_ble_json_set_number(cJSON *root, const char *key, double value)
+{
+    cJSON *item = cJSON_CreateNumber(value);
+    if (item == NULL) {
+        return;
+    }
+    if (cJSON_GetObjectItem(root, key) != NULL) {
+        cJSON_ReplaceItemInObject(root, key, item);
+    } else {
+        cJSON_AddItemToObject(root, key, item);
+    }
+}
+
 static void setup_ble_load_current_config(void)
 {
     char *value = nvs_config_get_string(NVS_CONFIG_WIFI_SSID);
@@ -144,17 +177,31 @@ static void setup_ble_load_current_config(void)
     free(value);
 
     setup_ble_state.wifi_password[0] = '\0';
+    setup_ble_state.pool_url[0] = '\0';
+    setup_ble_state.pool_port[0] = '\0';
+    setup_ble_state.pool_user[0] = '\0';
 
-    value = nvs_config_get_string(NVS_CONFIG_STRATUM_URL);
-    setup_ble_copy_string(setup_ble_state.pool_url, sizeof(setup_ble_state.pool_url), value);
-    free(value);
-
-    snprintf(setup_ble_state.pool_port, sizeof(setup_ble_state.pool_port), "%u",
-             nvs_config_get_u16(NVS_CONFIG_STRATUM_PORT));
-
-    value = nvs_config_get_string(NVS_CONFIG_STRATUM_USER);
-    setup_ble_copy_string(setup_ble_state.pool_user, sizeof(setup_ble_state.pool_user), value);
-    free(value);
+    char *pool_json = nvs_config_get_string_indexed(NVS_CONFIG_POOL, setup_ble_primary_pool_index());
+    if (pool_json != NULL) {
+        cJSON *root = cJSON_Parse(pool_json);
+        if (root != NULL) {
+            cJSON *item = cJSON_GetObjectItem(root, "stratumURL");
+            if (item != NULL && cJSON_IsString(item)) {
+                setup_ble_copy_string(setup_ble_state.pool_url, sizeof(setup_ble_state.pool_url), item->valuestring);
+            }
+            item = cJSON_GetObjectItem(root, "stratumPort");
+            if (item != NULL && cJSON_IsNumber(item)) {
+                snprintf(setup_ble_state.pool_port, sizeof(setup_ble_state.pool_port), "%u",
+                         (unsigned)item->valueint);
+            }
+            item = cJSON_GetObjectItem(root, "stratumUser");
+            if (item != NULL && cJSON_IsString(item)) {
+                setup_ble_copy_string(setup_ble_state.pool_user, sizeof(setup_ble_state.pool_user), item->valuestring);
+            }
+            cJSON_Delete(root);
+        }
+    }
+    free(pool_json);
 
     setup_ble_state.pool_password[0] = '\0';
     setup_ble_state.command[0] = '\0';
@@ -162,7 +209,7 @@ static void setup_ble_load_current_config(void)
     setup_ble_set_status("READY");
 }
 
-static void setup_ble_save_pool_url(const char *value)
+static void setup_ble_apply_pool_url(cJSON *root, const char *value)
 {
     const char *tcp_prefix = "stratum+tcp://";
     const char *tls_prefix = "stratum+tls://";
@@ -171,13 +218,13 @@ static void setup_ble_save_pool_url(const char *value)
 
     if (strncasecmp(host, tcp_prefix, strlen(tcp_prefix)) == 0) {
         host += strlen(tcp_prefix);
-        nvs_config_set_u16(NVS_CONFIG_STRATUM_TLS, DISABLED);
+        setup_ble_json_set_number(root, "stratumTLS", DISABLED);
     } else if (strncasecmp(host, tls_prefix, strlen(tls_prefix)) == 0) {
         host += strlen(tls_prefix);
-        nvs_config_set_u16(NVS_CONFIG_STRATUM_TLS, BUNDLED_CRT);
+        setup_ble_json_set_number(root, "stratumTLS", BUNDLED_CRT);
     } else if (strncasecmp(host, ssl_prefix, strlen(ssl_prefix)) == 0) {
         host += strlen(ssl_prefix);
-        nvs_config_set_u16(NVS_CONFIG_STRATUM_TLS, BUNDLED_CRT);
+        setup_ble_json_set_number(root, "stratumTLS", BUNDLED_CRT);
     }
 
     char normalized[SETUP_BLE_MAX_POOL_URL_LEN + 1];
@@ -194,12 +241,12 @@ static void setup_ble_save_pool_url(const char *value)
         if (setup_ble_parse_port(port_start + 1, &port)) {
             *port_start = '\0';
             if (!setup_ble_state.written[SETUP_BLE_FIELD_POOL_PORT]) {
-                nvs_config_set_u16(NVS_CONFIG_STRATUM_PORT, port);
+                setup_ble_json_set_number(root, "stratumPort", port);
             }
         }
     }
 
-    nvs_config_set_string(NVS_CONFIG_STRATUM_URL, normalized);
+    setup_ble_json_set_string(root, "stratumURL", normalized);
 }
 
 static esp_err_t setup_ble_apply_config(void)
@@ -218,17 +265,49 @@ static esp_err_t setup_ble_apply_config(void)
     if (setup_ble_state.written[SETUP_BLE_FIELD_WIFI_PASSWORD]) {
         nvs_config_set_string(NVS_CONFIG_WIFI_PASS, setup_ble_state.wifi_password);
     }
-    if (setup_ble_state.written[SETUP_BLE_FIELD_POOL_URL]) {
-        setup_ble_save_pool_url(setup_ble_state.pool_url);
-    }
-    if (setup_ble_state.written[SETUP_BLE_FIELD_POOL_PORT]) {
-        nvs_config_set_u16(NVS_CONFIG_STRATUM_PORT, port);
-    }
-    if (setup_ble_state.written[SETUP_BLE_FIELD_POOL_USER]) {
-        nvs_config_set_string(NVS_CONFIG_STRATUM_USER, setup_ble_state.pool_user);
-    }
-    if (setup_ble_state.written[SETUP_BLE_FIELD_POOL_PASSWORD]) {
-        nvs_config_set_string(NVS_CONFIG_STRATUM_PASS, setup_ble_state.pool_password);
+
+    bool pool_changed = setup_ble_state.written[SETUP_BLE_FIELD_POOL_URL] ||
+                        setup_ble_state.written[SETUP_BLE_FIELD_POOL_PORT] ||
+                        setup_ble_state.written[SETUP_BLE_FIELD_POOL_USER] ||
+                        setup_ble_state.written[SETUP_BLE_FIELD_POOL_PASSWORD];
+
+    if (pool_changed) {
+        uint16_t pool_index = setup_ble_primary_pool_index();
+        char *pool_json = nvs_config_get_string_indexed(NVS_CONFIG_POOL, pool_index);
+        cJSON *root = NULL;
+        if (pool_json != NULL && strlen(pool_json) > 0) {
+            root = cJSON_Parse(pool_json);
+        }
+        free(pool_json);
+        if (root == NULL) {
+            root = cJSON_CreateObject();
+        }
+        if (root == NULL) {
+            setup_ble_set_status("ERROR_POOL_ALLOC");
+            return ESP_ERR_NO_MEM;
+        }
+
+        if (setup_ble_state.written[SETUP_BLE_FIELD_POOL_URL]) {
+            setup_ble_apply_pool_url(root, setup_ble_state.pool_url);
+        }
+        if (setup_ble_state.written[SETUP_BLE_FIELD_POOL_PORT]) {
+            setup_ble_json_set_number(root, "stratumPort", port);
+        }
+        if (setup_ble_state.written[SETUP_BLE_FIELD_POOL_USER]) {
+            setup_ble_json_set_string(root, "stratumUser", setup_ble_state.pool_user);
+        }
+        if (setup_ble_state.written[SETUP_BLE_FIELD_POOL_PASSWORD]) {
+            setup_ble_json_set_string(root, "stratumPassword", setup_ble_state.pool_password);
+        }
+
+        char *json_str = cJSON_PrintUnformatted(root);
+        cJSON_Delete(root);
+        if (json_str == NULL) {
+            setup_ble_set_status("ERROR_POOL_ALLOC");
+            return ESP_ERR_NO_MEM;
+        }
+        nvs_config_set_string_indexed(NVS_CONFIG_POOL, pool_index, json_str);
+        free(json_str);
     }
 
     setup_ble_set_status("APPLIED_RESTART_REQUIRED");
