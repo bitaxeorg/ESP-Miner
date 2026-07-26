@@ -1,4 +1,5 @@
 import { HttpErrorResponse } from '@angular/common/http';
+import { getHttpErrorMessage } from 'src/app/utils/error-handler';
 import { Component, Input, OnInit } from '@angular/core';
 import { FormBuilder, FormGroup, FormArray, Validators, ValidatorFn, ValidationErrors, AbstractControl } from '@angular/forms';
 import { ToastrService } from 'ngx-toastr';
@@ -346,8 +347,7 @@ export class PoolComponent implements OnInit {
           }
         },
         error: (err: HttpErrorResponse) => {
-          const errorMessage = this.uri ? `Could not save pool settings for ${this.uri}. ${err.message}` : `Could not save pool settings. ${err.message}`;
-          this.toastr.error(errorMessage);
+          this.toastr.error(`Could not save pool settings. ${getHttpErrorMessage(err, this.uri)}`);
           this.savedChanges = restartAlreadyPending;
         }
       });
@@ -372,8 +372,7 @@ export class PoolComponent implements OnInit {
           this.savedChanges = false;
         },
         error: (err: HttpErrorResponse) => {
-          const errorMessage = this.uri ? `Failed to restart device at ${this.uri}. ${err.message}` : `Failed to restart device. ${err.message}`;
-          this.toastr.error(errorMessage);
+          this.toastr.error(`Failed to restart device. ${getHttpErrorMessage(err, this.uri)}`);
         }
       });
   }

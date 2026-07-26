@@ -37,6 +37,7 @@
 #include "display.h"
 #include "mdns.h"
 #include "http_server.h"
+#include "embedded_web_ui.h"
 #include "websocket.h"
 #include "websocket_log.h"
 #include "websocket_api.h"
@@ -482,6 +483,24 @@ esp_err_t set_cors_headers(httpd_req_t * req)
     return ESP_OK;
 }
 
+esp_err_t HTTP_send_json_error(httpd_req_t * req, const char * status, const char * message)
+{
+    httpd_resp_set_status(req, status);
+    httpd_resp_set_type(req, "application/json");
+    set_cors_headers(req);
+
+    cJSON * root = cJSON_CreateObject();
+    if (root == NULL) {
+        return ESP_ERR_NO_MEM;
+    }
+    cJSON_AddStringToObject(root, "message", message);
+
+    int prebuffer_len = 128;
+    esp_err_t res = HTTP_send_json(req, root, &prebuffer_len);
+    cJSON_Delete(root);
+    return res;
+}
+
 /* Recovery handler */
 static esp_err_t rest_recovery_handler(httpd_req_t * req)
 {
@@ -530,7 +549,7 @@ static bool file_exists(const char *path) {
 }
 
 /* Send HTTP response with the contents of the requested file */
-static esp_err_t rest_common_get_handler(httpd_req_t * req)
+static esp_err_t rest_common_get_handler_spiffs(httpd_req_t * req)
 {
     char filepath[FILE_PATH_MAX];
     char gz_file[FILE_PATH_MAX];
@@ -596,6 +615,36 @@ static esp_err_t rest_common_get_handler(httpd_req_t * req)
     ESP_LOGI(TAG, "File sending complete");
     /* Respond with an empty chunk to signal HTTP response completion */
     httpd_resp_send_chunk(req, NULL, 0);
+    return ESP_OK;   
+}
+
+static esp_err_t rest_common_get_handler_embedded(httpd_req_t * req)
+{
+    char rel_path[FILE_PATH_MAX];
+    if (req->uri[strlen(req->uri) - 1] == '/') {
+        strlcpy(rel_path, "/index.html", sizeof(rel_path));
+    } else {
+        strlcpy(rel_path, req->uri, sizeof(rel_path));
+    }
+
+    const EmbeddedFile *ef = get_embedded_file(rel_path);
+    if (ef != NULL) {
+        set_content_type_from_file(req, rel_path);
+        if (req->uri[strlen(req->uri) - 1] != '/') {
+            httpd_resp_set_hdr(req, "Cache-Control", "max-age=2592000");
+        }
+        if (ef->is_gzipped) {
+            httpd_resp_set_hdr(req, "Content-Encoding", "gzip");
+        }
+        return httpd_resp_send(req, (const char *)ef->data, ef->size);
+    }
+
+    // Redirect to the "/" root directory if not found in embedded
+    httpd_resp_set_status(req, "302 Temporary Redirect");
+    httpd_resp_set_hdr(req, "Location", "/");
+    httpd_resp_send(req, "Redirect to the captive portal", HTTPD_RESP_USE_STRLEN);
+
+    ESP_LOGI(TAG, "Redirecting to root");
     return ESP_OK;
 }
 
@@ -1367,6 +1416,81 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     return res;
 }
 
+static esp_err_t POST_system_boot(httpd_req_t *req)
+{
+    if (is_network_allowed(req) != ESP_OK) {
+        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+    }
+
+    // Set CORS headers
+    if (set_cors_headers(req) != ESP_OK) {
+        httpd_resp_send_500(req);
+        return ESP_OK;
+    }
+
+    size_t total_len = req->content_len;
+    if (total_len == 0) {
+        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Empty request body");
+    }
+
+    char *buf = malloc(total_len + 1);
+    if (!buf) {
+        return httpd_resp_send_500(req);
+    }
+
+    int ret = httpd_req_recv(req, buf, total_len);
+    if (ret <= 0) {
+        free(buf);
+        return httpd_resp_send_500(req);
+    }
+    buf[ret] = '\0';
+
+    cJSON *root = cJSON_Parse(buf);
+    free(buf);
+    if (!root) {
+        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid JSON");
+    }
+
+    cJSON *p_label = cJSON_GetObjectItem(root, "partition");
+    if (!cJSON_IsString(p_label)) {
+        cJSON_Delete(root);
+        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Missing partition label");
+    }
+
+    const esp_partition_t *p = esp_partition_find_first(ESP_PARTITION_TYPE_APP, ESP_PARTITION_SUBTYPE_ANY, p_label->valuestring);
+    if (p == NULL) {
+        cJSON_Delete(root);
+        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Partition not found");
+    }
+
+    esp_app_desc_t app_desc;
+    if (esp_ota_get_partition_description(p, &app_desc) != ESP_OK) {
+        cJSON_Delete(root);
+        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "No valid firmware found on partition");
+    }
+
+    esp_err_t err = esp_ota_set_boot_partition(p);
+    cJSON_Delete(root);
+
+    if (err != ESP_OK) {
+        return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to set boot partition");
+    }
+
+    cJSON *resp = cJSON_CreateObject();
+    cJSON_AddStringToObject(resp, "message", "Next boot partition set successfully. Rebooting...");
+    httpd_resp_set_type(req, "application/json");
+    esp_err_t send_res = HTTP_send_json(req, resp, &api_common_prebuffer_len);
+    cJSON_Delete(resp);
+
+    // Delay to ensure the response is sent
+    vTaskDelay(1000 / portTICK_PERIOD_MS);
+
+    // Restart the system
+    esp_restart();
+
+    return send_res;
+}
+
 static esp_err_t GET_system_statistics(httpd_req_t * req)
 {
     if (is_network_allowed(req) != ESP_OK) {
@@ -1536,7 +1660,7 @@ esp_err_t POST_WWW_update(httpd_req_t * req)
     esp_wifi_get_mode(&mode);
     if (mode == WIFI_MODE_AP || mode == WIFI_MODE_APSTA)
     {
-        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Not allowed in AP mode");
+        HTTP_send_json_error(req, "500 Internal Server Error", "Not allowed in AP mode");
         return ESP_OK;
     }
 
@@ -1550,13 +1674,13 @@ esp_err_t POST_WWW_update(httpd_req_t * req)
     const esp_partition_t * www_partition =
         esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_SPIFFS, "www");
     if (www_partition == NULL) {
-        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "WWW partition not found");
+        HTTP_send_json_error(req, "500 Internal Server Error", "WWW partition not found");
         return ESP_OK;
     }
 
     // Don't attempt to write more than what can be stored in the partition
     if (remaining > www_partition->size) {
-        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "File provided is too large for device");
+        HTTP_send_json_error(req, "400 Bad Request", "File provided is too large for device");
         return ESP_OK;
     }
 
@@ -1576,14 +1700,14 @@ esp_err_t POST_WWW_update(httpd_req_t * req)
             continue;
         } else if (recv_len <= 0) {
             snprintf(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_status, 20, "Protocol Error");
-            httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Protocol Error");
-            return ESP_OK;
+            HTTP_send_json_error(req, "500 Internal Server Error", "Protocol Error");
+            return ESP_FAIL;
         }
 
         if (esp_partition_write(www_partition, www_partition->size - remaining, (const void *) buf, recv_len) != ESP_OK) {
             snprintf(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_status, 20, "Write Error");
-            httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Write Error");
-            return ESP_OK;
+            HTTP_send_json_error(req, "500 Internal Server Error", "Write Error");
+            return ESP_FAIL;
         }
 
 
@@ -1598,11 +1722,13 @@ esp_err_t POST_WWW_update(httpd_req_t * req)
         }
     }
     httpd_resp_set_type(req, "text/plain");
-    httpd_resp_sendstr(req, "WWW update complete\n");
+    httpd_resp_sendstr(req, "WWW update complete, rebooting now!\n");
+    nvs_config_set_bool(NVS_CONFIG_USE_CUSTOM_WWW, true);
 
-    snprintf(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_status, 20, "Finished...");
+    snprintf(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_status, 20, "Rebooting...");
     vTaskDelay(1000 / portTICK_PERIOD_MS);
     GLOBAL_STATE->SYSTEM_MODULE.is_firmware_update = false;
+    esp_restart();
 
     return ESP_OK;
 }
@@ -1620,7 +1746,7 @@ esp_err_t POST_OTA_update(httpd_req_t * req)
     esp_wifi_get_mode(&mode);
     if (mode == WIFI_MODE_AP || mode == WIFI_MODE_APSTA)
     {
-        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Not allowed in AP mode");
+        HTTP_send_json_error(req, "500 Internal Server Error", "Not allowed in AP mode");
         return ESP_OK;
     }
     
@@ -1646,16 +1772,16 @@ esp_err_t POST_OTA_update(httpd_req_t * req)
             // Serious Error: Abort OTA
         } else if (recv_len <= 0) {
             snprintf(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_status, 20, "Protocol Error");
-            httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Protocol Error");
-            return ESP_OK;
+            HTTP_send_json_error(req, "500 Internal Server Error", "Protocol Error");
+            return ESP_FAIL;
         }
 
         // Successful Upload: Flash firmware chunk
         if (esp_ota_write(ota_handle, (const void *) buf, recv_len) != ESP_OK) {
             esp_ota_abort(ota_handle);
             snprintf(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_status, 20, "Write Error");
-            httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Write Error");
-            return ESP_OK;
+            HTTP_send_json_error(req, "500 Internal Server Error", "Write Error");
+            return ESP_FAIL;
         }
 
         uint8_t percentage = 100 - ((remaining * 100 / req->content_len));
@@ -1673,7 +1799,7 @@ esp_err_t POST_OTA_update(httpd_req_t * req)
     // Validate and switch to new OTA image and reboot
     if (esp_ota_end(ota_handle) != ESP_OK || esp_ota_set_boot_partition(ota_partition) != ESP_OK) {
         snprintf(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_status, 20, "Validation Error");
-        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Validation / Activation Error");
+        HTTP_send_json_error(req, "500 Internal Server Error", "Validation / Activation Error");
         return ESP_OK;
     }
 
@@ -1756,6 +1882,15 @@ esp_err_t start_rest_server(void * pvParameters)
         .user_ctx = rest_context
     };
     httpd_register_uri_handler(server, &system_info_get_uri);
+
+    /* URI handler for setting boot partition */
+    httpd_uri_t system_boot_post_uri = {
+        .uri = "/api/system/boot", 
+        .method = HTTP_POST, 
+        .handler = POST_system_boot, 
+        .user_ctx = rest_context
+    };
+    httpd_register_uri_handler(server, &system_boot_post_uri);
 
     /* URI handler for fetching system asic values */
     httpd_uri_t system_asic_get_uri = {
@@ -1897,31 +2032,22 @@ esp_err_t start_rest_server(void * pvParameters)
     };
     httpd_register_uri_handler(server, &ws_live);
 
-    if (!GLOBAL_STATE->filesystem_is_available) {
-        /* Make default route serve Recovery */
-        httpd_uri_t recovery_implicit_get_uri = {
-            .uri = "/*", .method = HTTP_GET, 
-            .handler = rest_recovery_handler, 
-            .user_ctx = rest_context
-        };
-        httpd_register_uri_handler(server, &recovery_implicit_get_uri);
-    } else {
-        httpd_uri_t api_common_uri = {
-            .uri = "/api/*",
-            .method = HTTP_ANY,
-            .handler = rest_api_common_handler,
-            .user_ctx = rest_context
-        };
-        httpd_register_uri_handler(server, &api_common_uri);
-        /* URI handler for getting web server files */
-        httpd_uri_t common_get_uri = {
-            .uri = "/*", 
-            .method = HTTP_GET, 
-            .handler = rest_common_get_handler, 
-            .user_ctx = rest_context
-        };
-        httpd_register_uri_handler(server, &common_get_uri);
-    }
+    httpd_uri_t api_common_uri = {
+        .uri = "/api/*",
+        .method = HTTP_ANY,
+        .handler = rest_api_common_handler,
+        .user_ctx = rest_context
+    };
+    httpd_register_uri_handler(server, &api_common_uri);
+    /* URI handler for getting web server files */
+    bool use_custom = nvs_config_get_bool(NVS_CONFIG_USE_CUSTOM_WWW) && GLOBAL_STATE->filesystem_is_available;
+    httpd_uri_t common_get_uri = {
+        .uri = "/*", 
+        .method = HTTP_GET, 
+        .handler = use_custom ? rest_common_get_handler_spiffs : rest_common_get_handler_embedded, 
+        .user_ctx = rest_context
+    };
+    httpd_register_uri_handler(server, &common_get_uri);
 
     httpd_register_err_handler(server, HTTPD_404_NOT_FOUND, http_404_error_handler);
 

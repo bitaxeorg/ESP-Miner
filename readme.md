@@ -122,7 +122,7 @@ curl -X POST \
      --data-binary "@esp-miner.bin" \
      http://YOUR-BITAXE-IP/api/system/OTA
 
-# Update AxeOS
+# Update with a custom AxeOS Web UI partition (www.bin)
 curl -X POST \
      -H "Content-Type: application/octet-stream" \
      --data-binary "@www.bin" \
@@ -239,11 +239,24 @@ The firmware hosts a small web server on port 80 for administrative purposes. On
 
 ### Recovery
 
-In the event that the admin web front end is inaccessible, for example because of an unsuccessful firmware update (`www.bin`), a recovery page can be accessed at `http://<IP>/recovery`.
+In the event that the admin web front end is inaccessible, for example because of an unsuccessful custom Web UI update, a recovery page can be accessed at `http://<IP>/recovery`.
 
 ### Unlock Settings
 
 In order to unlock the Input fields for ASIC Frequency and ASIC Core Voltage you need to append `?oc` to the end of the settings tab URL in your browser. Be aware that without additional cooling overclocking can overheat and/or damage your Bitaxe.
+
+## Unified Firmware & Rollbacks
+
+Starting with the unified firmware releases, ESP-Miner uses a unified architecture where the AxeOS frontend is compiled, gzipped, and embedded directly into the firmware application binary (`esp-miner.bin`). 
+
+A separate Web UI image (`www.bin`) is no longer required for standard usage since the web interface is served directly from the firmware. If you want to use a custom or modified AxeOS frontend, you can still enable the **custom web UI** option in the settings. This allows you to upload and serve a separate `www.bin` from the SPIFFS partition, which takes priority over the built-in assets.
+
+### Rollback to Pre-Unified Firmware
+
+If you roll back the firmware from a unified version to an older, pre-unified version (which expects a separate web partition):
+
+- **www partition persistence**: The `www` (SPIFFS) partition on the flash chip will remain untouched during the rollback, keeping whatever latest non-unified Web UI version was last active on the device.
+- **Potential UI Version Mismatch**: Since older firmware relies entirely on the separate `www` partition to serve the web interface, the device will load whatever files exist in that partition. If you experience layout errors or missing features after rolling back, you will need to manually flash or upload a compatible `www.bin` version that matches the older firmware version.
 
 ## Development using esp-miner/devcontainer
 

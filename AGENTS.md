@@ -40,7 +40,7 @@ idf.py build
 # Flash to device
 idf.py build flash
 ```
-*Note: The Axe-OS frontend is automatically built and compressed into `www.bin` as part of the main `idf.py build` process.*
+*Note: The Axe-OS frontend is automatically built, gzipped, and embedded directly into the firmware (`esp-miner.bin`) as static C arrays as part of the main `idf.py build` process. The default build no longer generates a separate `www.bin` file.*
 
 ### 2. Axe-OS (Frontend)
 The frontend is a standalone Angular application located in `main/http_server/axe-os`.

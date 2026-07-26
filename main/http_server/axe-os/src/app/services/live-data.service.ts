@@ -12,10 +12,14 @@ import { environment } from 'src/environments/environment';
 export class LiveDataService {
   private socket$: WebSocketSubject<any> | null = null;
   private updates$ = new Subject<Partial<ISystemInfo>>();
-  
+
+  // Connection diagnostics, read only by the close log below.
+  private openedAt = 0;
+  private lastMessageAt = 0;
+
   // Shared info stream for the whole app
   public readonly info$: Observable<ISystemInfo>;
-  
+
   // Connection status for the UI
   private connectedSubject = new BehaviorSubject<boolean>(false);
   public connected$ = this.connectedSubject.asObservable();
@@ -85,13 +89,19 @@ export class LiveDataService {
       url,
       openObserver: {
         next: () => {
+          this.openedAt = Date.now();
+          this.lastMessageAt = 0;
           console.log('Live WebSocket connected');
           this.connectedSubject.next(true);
         }
       },
       closeObserver: {
-        next: () => {
-          console.log('Live WebSocket disconnected');
+        next: (event: CloseEvent) => {
+          console.log(
+            `Live WebSocket disconnected (code=${event?.code} wasClean=${event?.wasClean}` +
+            ` afterMs=${this.openedAt ? Date.now() - this.openedAt : -1}` +
+            ` lastMsgAgoMs=${this.lastMessageAt ? Date.now() - this.lastMessageAt : -1})`
+          );
           this.connectedSubject.next(false);
           this.socket$ = null;
         }
@@ -99,14 +109,15 @@ export class LiveDataService {
     });
 
     return this.socket$.pipe(
-      timeout(5000),
+      timeout(30000),
       tap(msg => {
+        this.lastMessageAt = Date.now();
         if (msg.event === 'update' && msg.data) {
           this.updates$.next(msg.data);
         }
       }),
       retry({ delay: 5000 }),
-      share()
+      share({ resetOnRefCountZero: false })
     );
   }
 }
