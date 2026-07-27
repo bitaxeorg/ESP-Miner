@@ -31,7 +31,9 @@ DO NOT restart the device until response is received</p>
 <input type="file" id="wwwfile" name="wwwfile"><br>
 <button id="upload">Upload</button>
 <small id="status"></small>
-<br><button id="restart">Restart</button>
+<br>
+<button id="disable_custom">Disable Custom Web UI</button>
+<button id="restart">Restart</button>
 <br><br>Response:<br>
 <small id="response"></small>
 <script>
@@ -56,6 +58,20 @@ function handleUpload() {
   };
   statusMsg.innerHTML = 'uploading...';
   upload_xhr.send(file);
+}
+document.getElementById('disable_custom').addEventListener('click', handleDisableCustom);
+function handleDisableCustom() {
+  const updateUrl = '/api/system';
+  const update_xhr = new XMLHttpRequest();
+  update_xhr.open('PATCH', updateUrl, true);
+  update_xhr.setRequestHeader('Content-Type', 'application/json');
+  update_xhr.onload = function() {
+    const responseBody = update_xhr.responseText;
+    statusMsg.innerHTML = 'Custom Web UI disabled! Device will restart...';
+    responseMsg.innerHTML = responseBody;
+  };
+  statusMsg.innerHTML = 'disabling...';
+  update_xhr.send(JSON.stringify({ useCustomWWW: 0 }));
 }
 document.getElementById('restart').addEventListener('click', handleRestart);
 function handleRestart() {

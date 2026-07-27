@@ -18,6 +18,7 @@ typedef enum {
 
 void SYSTEM_init_system(GlobalState * GLOBAL_STATE);
 void SYSTEM_init_versions(GlobalState * GLOBAL_STATE);
+void SYSTEM_init_partitions(GlobalState * GLOBAL_STATE);
 esp_err_t SYSTEM_init_peripherals(GlobalState * GLOBAL_STATE);
 
 // Clear the stratum job queue and valid-job tracking on a clean-jobs event,

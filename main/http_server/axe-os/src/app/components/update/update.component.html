@@ -60,19 +60,6 @@
         </div>
         <div class="w-full lg:w-1/2 xl:w-1/3 px-2 mb-4 lg:mb-0">
             <div class="card h-full">
-                <h3>Update AxeOS</h3>
-
-                <label class="btn w-full text-center relative flex justify-center items-center gap-2 cursor-pointer my-2">
-                    <i class="pi pi-upload"></i>
-                    <span>Browse</span>
-                    <input #websiteUpload type="file" accept=".bin" (change)="onFileSelected($event, 'websiteUpload')" class="hidden">
-                </label>
-
-                <small>(www.bin)</small>
-            </div>
-        </div>
-        <div class="w-full lg:w-1/2 xl:w-1/3 px-2">
-            <div class="card h-full">
                 <h3>Update Firmware</h3>
                 <label class="btn w-full text-center relative flex justify-center items-center gap-2 cursor-pointer my-2">
                     <i class="pi pi-upload"></i>
@@ -82,7 +69,32 @@
 
                 <small>(esp-miner.bin)</small>
             </div>
+        </div>
+        <div class="w-full lg:w-1/2 xl:w-1/3 px-2">
+            <div class="card h-full">
+                <h3>Custom Frontend</h3>
 
+                <div class="flex items-center gap-2 mb-2">
+                    <app-checkbox 
+                        inputId="customWWWToggle"
+                        [binary]="true"
+                        [ngModel]="(info$ | async)?.useCustomWWW === 1"
+                        (onChange)="toggleCustomWWW($event.checked)">
+                    </app-checkbox>
+                    <label for="customWWWToggle" class="font-medium cursor-pointer">Enable custom web UI</label>
+                </div>
+                <small class="text-orange-500 block mb-4">* A device restart is required to apply this change.</small>
+
+                <div *ngIf="(info$ | async)?.useCustomWWW === 1" class="rounded p-3 bg-white/5 border border-white/10">
+                    <h5 class="mt-0 mb-3 text-main">Upload Custom UI</h5>
+                    <label class="btn w-full text-center relative flex justify-center items-center gap-2 cursor-pointer my-2">
+                        <i class="pi pi-upload"></i>
+                        <span>Browse</span>
+                        <input #websiteUpload type="file" accept=".bin" (change)="onFileSelected($event, 'websiteUpload')" class="hidden">
+                    </label>
+                    <small class="block mt-1 text-secondary">(www.bin)</small>
+                </div>
+            </div>
         </div>
     </div>
 </div>
@@ -127,3 +139,66 @@
     </div>
 </app-modal>
 
+<div class="card mt-4">
+    <h3 class="mb-4">Installed Firmware</h3>
+    
+    <div class="overflow-x-auto">
+        <table class="w-full">
+            <thead>
+                <tr>
+                    <th class="text-secondary font-medium pb-2 text-left w-1/4">Partition</th>
+                    <th class="text-secondary font-medium pb-2 text-left w-1/4">Version</th>
+                    <th class="text-secondary font-medium pb-2 text-left w-1/4">Build time</th>
+                    <th class="text-secondary font-medium pb-2 text-left w-1/4">Space</th>
+                    <th class="text-secondary font-medium pb-2 text-left">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr *ngFor="let partition of (info$ | async)?.partitions" [ngClass]="{'active': partition.isCurrent}">
+                    <td>
+                        <i class="pi pi-box mr-2"></i>
+                        {{ partition.label }}
+                        <span *ngIf="partition.isCurrent" class="ml-2 px-2 py-0.5 text-xs font-semibold rounded bg-blue-500/20 text-blue-400 border border-blue-500/30">Active</span>
+                    </td>
+                    <td class="font-mono">
+                        {{ partition.version || 'N/A' }}
+                    </td>
+                    <td>
+                        <div class="font-medium text-sm">{{ partition.compileDate || 'N/A' }}</div>
+                        <div class="text-xs text-secondary mt-0.5" *ngIf="partition.compileDate">{{ partition.compileTime }}</div>
+                    </td>
+                    <td>
+                        <div *ngIf="partition.usagePercent !== undefined && partition.usagePercent !== null" class="flex items-center gap-2" style="max-width: 9rem;">
+                            <span class="font-mono text-sm">{{ partition.usagePercent }}%</span>
+                            <div class="rounded overflow-hidden w-full h-[6px]" style="background-color: rgba(255,255,255,0.15);">
+                                <div class="bg-primary h-full rounded" [style.width.%]="partition.usagePercent"></div>
+                            </div>
+                        </div>
+                        <span *ngIf="partition.usagePercent === undefined || partition.usagePercent === null" class="text-secondary italic text-sm">
+                            -
+                        </span>
+                    </td>
+                    <td class="text-left">
+                        <div class="flex gap-2 justify-start items-center">
+                            <button 
+                                *ngIf="!partition.isCurrent && partition.version" 
+                                (click)="switchPartition(partition.label)"
+                                class="btn btn-secondary py-1 px-3 text-sm">
+                                Activate
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+    
+    <div class="flex justify-end mt-4">
+        <button 
+            (click)="restart()"
+            class="btn btn-danger py-1 px-3 text-sm flex items-center gap-1">
+            <i class="pi pi-refresh"></i>
+            <span>Restart Device</span>
+        </button>
+    </div>
+</div>

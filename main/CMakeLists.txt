@@ -52,6 +52,7 @@ SRCS
     "./power/vcore.c"
     "./power/asic_reset.c"
     "./power/asic_init.c"
+    "${CMAKE_CURRENT_BINARY_DIR}/embedded_web_ui.c"
 
 INCLUDE_DIRS
     "."
@@ -62,6 +63,7 @@ INCLUDE_DIRS
     "bap"
     "thermal"
     "power"
+    "${CMAKE_CURRENT_BINARY_DIR}"
 
 REQUIRES
     "asic"
@@ -100,7 +102,22 @@ set(WEB_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/http_server/axe-os")
 if("$ENV{GITHUB_ACTIONS}" STREQUAL "true")
     message(STATUS "Running on GitHub Actions. Web ui will be prebuilt.")
 
-    spiffs_create_partition_image(www ${WEB_SRC_DIR}/dist/axe-os FLASH_IN_PROJECT)
+    add_custom_command(
+        OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/embedded_web_ui.c" "${CMAKE_CURRENT_BINARY_DIR}/embedded_web_ui.h"
+        COMMAND ${PYTHON} "${CMAKE_SOURCE_DIR}/tools/embed_web_ui.py"
+                "${WEB_SRC_DIR}/dist/axe-os"
+                "${CMAKE_CURRENT_BINARY_DIR}/embedded_web_ui.c"
+                "${CMAKE_CURRENT_BINARY_DIR}/embedded_web_ui.h"
+        DEPENDS "${CMAKE_SOURCE_DIR}/tools/embed_web_ui.py"
+        COMMENT "Generating embedded Web UI source files (CI)"
+        VERBATIM
+    )
+
+    # Make the binary compile depend on the generated source file in CI
+    add_custom_target(web_ui_gen DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/embedded_web_ui.c")
+    add_dependencies(${COMPONENT_LIB} web_ui_gen)
+
+
 else()
     find_program(NPM_EXECUTABLE npm)
     if(NOT NPM_EXECUTABLE AND NOT EXISTS ${WEB_SRC_DIR}/dist)
@@ -123,10 +140,11 @@ else()
         USES_TERMINAL
     )
 
-    # Collect all frontend source files to track dependencies
+    # Collect all frontend source files to track dependencies (excluding auto-generated code)
     file(GLOB_RECURSE WEB_UI_SOURCES
         "${WEB_SRC_DIR}/src/*.*"
     )
+    list(FILTER WEB_UI_SOURCES EXCLUDE REGEX "/generated/")
 
     # Also track build configuration files
     list(APPEND WEB_UI_SOURCES
@@ -139,8 +157,8 @@ else()
 
     # Use a stamp file to track when the build was last done
     set(WEB_UI_STAMP "${CMAKE_BINARY_DIR}/web_ui_build.stamp")
-    # Track version.txt which is generated last and doesn't get deleted
-    set(WEB_UI_OUTPUT "${WEB_SRC_DIR}/dist/axe-os/version.txt")
+    # Track index.html.gz which is generated as part of the build
+    set(WEB_UI_OUTPUT "${WEB_SRC_DIR}/dist/axe-os/index.html.gz")
 
     # Custom command that only runs when source files change
     add_custom_command(
@@ -162,5 +180,21 @@ else()
 
     add_dependencies(${COMPONENT_LIB} web_ui_dist)
 
-    spiffs_create_partition_image(www ${WEB_SRC_DIR}/dist/axe-os FLASH_IN_PROJECT DEPENDS web_ui_dist)
+    # Generate embedded C files from the build output directory
+    add_custom_command(
+        OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/embedded_web_ui.c" "${CMAKE_CURRENT_BINARY_DIR}/embedded_web_ui.h"
+        COMMAND ${PYTHON} "${CMAKE_SOURCE_DIR}/tools/embed_web_ui.py"
+                "${WEB_SRC_DIR}/dist/axe-os"
+                "${CMAKE_CURRENT_BINARY_DIR}/embedded_web_ui.c"
+                "${CMAKE_CURRENT_BINARY_DIR}/embedded_web_ui.h"
+        DEPENDS ${WEB_UI_STAMP} "${CMAKE_SOURCE_DIR}/tools/embed_web_ui.py"
+        COMMENT "Generating embedded Web UI source files"
+        VERBATIM
+    )
+
+    # In local build, make the component depend on the generated file too
+    add_custom_target(web_ui_gen DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/embedded_web_ui.c")
+    add_dependencies(${COMPONENT_LIB} web_ui_gen)
+
+
 endif()

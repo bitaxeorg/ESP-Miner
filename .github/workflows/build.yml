@@ -43,8 +43,4 @@ jobs:
       with:
         name: esp-miner.bin
         path: ./build/esp-miner.bin
-    - name: upload www.bin
-      uses: actions/upload-artifact@v4
-      with:
-        name: www.bin
-        path: ./build/www.bin
+

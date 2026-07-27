@@ -1,6 +1,7 @@
 import { Component, OnInit, ViewChild, Input, OnDestroy, ElementRef, HostListener, effect } from '@angular/core';
 import { map, Observable, shareReplay, Subscription, switchMap, tap, first, Subject, takeUntil, BehaviorSubject, filter, combineLatest } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
+import { getHttpErrorMessage } from 'src/app/utils/error-handler';
 import { FormBuilder, FormGroup } from '@angular/forms';
 import { ToastrService } from 'ngx-toastr';
 import { DateAgoPipe } from 'src/app/pipes/date-ago.pipe';
@@ -35,7 +36,6 @@ type MessageType =
   | 'POWER_FAULT'
   | 'FREQUENCY_LOW'
   | 'FALLBACK_STRATUM'
-  | 'VERSION_MISMATCH'
   | 'NOT_SOLO_MINING'
   | 'NO_MINING_REWARD'
   | 'HARDWARE_FAULT';
@@ -67,6 +67,7 @@ const WIDGET_DEFAULTS: WidgetDef[] = [
   { id: 'pool',        label: 'Pool',                x: 0, y: 12,  w: 4,  h: 6,  minW: 2, minH: 3 },
   { id: 'blockheader', label: 'Block Header',        x: 4, y: 12,  w: 4,  h: 6,  minW: 2, minH: 3 },
   { id: 'registers',   label: 'Hashrate Registers',  x: 8, y: 12,  w: 4,  h: 6,  minW: 2, minH: 3 },
+  { id: 'misc',        label: 'Misc',                x: 0, y: 18,  w: 4,  h: 6,  minW: 2, minH: 3 },
 ];
 
 @Component({
@@ -105,12 +106,15 @@ export class HomeComponent implements OnInit, OnDestroy {
   public activePoolProtocol!: string;
   public responseTime!: number;
 
-  public flashShare: boolean = false;
-  public flashJob: boolean = false;
-  private shareTimeout: any;
-  private jobTimeout: any;
-  private lastSharesCount: number = -1;
-  private lastScriptsig: string = '';
+  public flashShareAccepted: boolean = false;
+  public flashShareRejected: boolean = false;
+  public flashWorkReceived: boolean = false;
+  private shareAcceptedTimeout: any;
+  private shareRejectedTimeout: any;
+  private workReceivedTimeout: any;
+  private lastSharesAcceptedCount: number = -1;
+  private lastSharesRejectedCount: number = -1;
+  private lastWorkReceived: number = -1;
 
   public systemInfoError$ = new BehaviorSubject<ISystemInfoError>({
     duration: 0,
@@ -526,7 +530,7 @@ export class HomeComponent implements OnInit, OnDestroy {
           this.loadPreviousData();
         },
         error: (err: HttpErrorResponse) => {
-          this.toastr.error('Error.', `Could not save chart source. ${err.message}`);
+          this.toastr.error('Error.', `Could not save chart source. ${getHttpErrorMessage(err, this.uri)}`);
         }
       });
   }
@@ -918,20 +922,29 @@ export class HomeComponent implements OnInit, OnDestroy {
           }
         }
 
-        const currentShares = info.sharesAccepted + info.sharesRejected;
-        if (this.lastSharesCount !== -1 && currentShares > this.lastSharesCount) {
-          this.flashShare = true;
-          clearTimeout(this.shareTimeout);
-          this.shareTimeout = setTimeout(() => this.flashShare = false, 500);
+        const currentSharesAccepted = info.sharesAccepted;
+        if (this.lastSharesAcceptedCount !== -1 && currentSharesAccepted > this.lastSharesAcceptedCount) {
+          this.flashShareAccepted = true;
+          clearTimeout(this.shareAcceptedTimeout);
+          this.shareAcceptedTimeout = setTimeout(() => this.flashShareAccepted = false, 500);
         }
-        this.lastSharesCount = currentShares;
+        this.lastSharesAcceptedCount = currentSharesAccepted;
 
-        if (this.lastScriptsig !== '' && info.scriptsig !== this.lastScriptsig) {
-          this.flashJob = true;
-          clearTimeout(this.jobTimeout);
-          this.jobTimeout = setTimeout(() => this.flashJob = false, 500);
+        const currentSharesRejected = info.sharesRejected;
+        if (this.lastSharesRejectedCount !== -1 && currentSharesRejected > this.lastSharesRejectedCount) {
+          this.flashShareRejected = true;
+          clearTimeout(this.shareRejectedTimeout);
+          this.shareRejectedTimeout = setTimeout(() => this.flashShareRejected = false, 500);
         }
-        this.lastScriptsig = info.scriptsig || '';
+        this.lastSharesRejectedCount = currentSharesRejected;
+
+        const currentWorkReceived = info.workReceived ?? 0;
+        if (this.lastWorkReceived !== -1 && currentWorkReceived > this.lastWorkReceived) {
+          this.flashWorkReceived = true;
+          clearTimeout(this.workReceivedTimeout);
+          this.workReceivedTimeout = setTimeout(() => this.flashWorkReceived = false, 500);
+        }
+        this.lastWorkReceived = currentWorkReceived;
       }),
       map(info => {
         const formatted = { ...info };
@@ -999,7 +1012,7 @@ export class HomeComponent implements OnInit, OnDestroy {
           this.toastr.success('Pool changed and device restarted');
         },
         error: (err: HttpErrorResponse) => {
-          this.toastr.error(`Error during pool change or device restart: ${err.message}`);
+          this.toastr.error(`Error during pool change or device restart: ${getHttpErrorMessage(err, this.uri)}`);
         }
       });
   }
@@ -1014,7 +1027,7 @@ export class HomeComponent implements OnInit, OnDestroy {
           this.toastr.success('Block found notification dismissed');
         },
         error: (err: HttpErrorResponse) => {
-          this.toastr.error(`Error dismissing notification: ${err.message}`);
+          this.toastr.error(`Error dismissing notification: ${getHttpErrorMessage(err, this.uri)}`);
         }
       });
   }
@@ -1106,7 +1119,6 @@ export class HomeComponent implements OnInit, OnDestroy {
     updateMessage(!!info.hardware_fault, 'HARDWARE_FAULT', 'error', `${info.hardware_fault}`);
     updateMessage(!info.frequency || info.frequency < 400, 'FREQUENCY_LOW', 'warn', 'Device frequency is set low - See settings');
     updateMessage(!!info.isUsingFallbackStratum, 'FALLBACK_STRATUM', 'warn', 'Using fallback pool - Share stats reset. Check Pool Settings and / or reboot Device.');
-    updateMessage(info.version !== info.axeOSVersion, 'VERSION_MISMATCH', 'warn', `Firmware (${info.version}) and AxeOS (${info.axeOSVersion}) versions do not match. Please make sure to update both www.bin and esp-miner.bin.`);
     if (info.coinbaseOutputs && info.coinbaseOutputs.length > 0) {
       let percentage = this.getPayoutPercentage(info);
       updateMessage(percentage > 0 && percentage < 95, 'NOT_SOLO_MINING', 'warn', `Your share of the mining reward is only ${percentage.toFixed(1)}%`);

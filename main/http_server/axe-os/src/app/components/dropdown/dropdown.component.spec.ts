@@ -94,4 +94,9 @@ describe('DropdownComponent', () => {
 
     expect(component.isOpen).toBeFalse();
   });
+
+  it('should return option value or index from trackByOption', () => {
+    expect(component.trackByOption(0, { label: 'Test', value: 42 })).toBe(42);
+    expect(component.trackByOption(3, { label: 'Test', value: undefined })).toBe(3);
+  });
 });
