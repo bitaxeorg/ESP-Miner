@@ -44,13 +44,26 @@
         }
     }
 
+    .grid-stack-item {
+        &:has(app-dropdown ul) {
+            z-index: 100;
+
+            .grid-stack-item-content,
+            .grid-stack-item-content > .card {
+                overflow: visible;
+            }
+        }
+    }
+
     // Chart widget: make the canvas fill the full card height
     .grid-stack-item[gs-id="chart"] {
         .grid-stack-item-content {
+            overflow: visible;
+
             > .card {
                 display: flex;
                 flex-direction: column;
-                overflow: hidden;
+                overflow: visible;
                 padding-bottom: 2rem;
 
                 form {
