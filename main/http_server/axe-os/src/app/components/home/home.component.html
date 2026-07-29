@@ -1,3 +1,7 @@
+<ng-template #powerFault>
+  <span class="text-red-500">Not available - Power fault</span>
+</ng-template>
+
 @if (info$ | async; as info) {
   @for (message of messages; track message.type) {
     <div class="flex items-center justify-center gap-2 p-4 rounded-lg border w-full mb-3 text-center"
@@ -84,6 +88,8 @@
                   </tr>
                 </tbody>
               </table>
+            } @else {
+              <ng-container *ngTemplateOutlet="powerFault" />
             }
           </div>
         </div>
@@ -128,6 +134,8 @@
                   Average
                 </span>
               </div>
+            } @else {
+              <ng-container *ngTemplateOutlet="powerFault" />
             }
           </div>
         </div>
@@ -319,6 +327,8 @@
               <span>
                 @if (info.temp > 0) {
                   {{info.temp}} &deg;C
+                } @else {
+                  --
                 }
               </span>
             </h6>
@@ -464,7 +474,12 @@
                 />
               </div>
               @if (info.responseTime > 0) {
-                {{ info.responseTime | number:'1.1-1' }} ms@if ((info.responseShareBatch ?? 0) > 1) {<span class="text-neutral-500" appTooltip="The pool acknowledged {{ info.responseShareBatch }} shares in one batch; the time reflects the most recent share, so it may include the pool's batching window" tooltipPosition="top">&nbsp;(batched ×{{ info.responseShareBatch }})</span>}
+                {{ info.responseTime | number:'1.1-1' }} ms
+                @if ((info.responseShareBatch ?? 0) > 1) {
+                  <span class="text-neutral-500" appTooltip="The pool acknowledged {{ info.responseShareBatch }} shares in one batch; the time reflects the most recent share, so it may include the pool's batching window" tooltipPosition="top">&nbsp;(batched ×{{ info.responseShareBatch }})</span>
+                }
+              } @else {
+                --
               }
             </div>
             @if (info.coinbaseOutputs.length > 0) {
@@ -485,6 +500,8 @@
                     <div [style.color]="'red'">
                       {{ percentage | number:'1.0-1' }}%
                     </div>
+                  } @else {
+                    --
                   }
                 }
               </div>
@@ -495,6 +512,8 @@
               </div>
               @if (info.poolDifficulty > 0) {
                 {{ info.poolDifficulty }}
+              } @else {
+                --
               }
             </div>
             <div class="flex flex-nowrap">
