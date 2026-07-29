@@ -458,7 +458,7 @@ void BM1370_read_registers(void)
         for (int reg = 0; reg < size; reg++) {
             if (REGISTER_MAP[reg] != REGISTER_INVALID) {
                 _send_BM1370((TYPE_CMD | GROUP_SINGLE | CMD_READ), (uint8_t[]){chip_addr, reg}, 2, BM1370_SERIALTX_DEBUG);
-                BM1370_init_core_register_delay();
+                vTaskDelay(pdMS_TO_TICKS(1));
             }
         }
     }
