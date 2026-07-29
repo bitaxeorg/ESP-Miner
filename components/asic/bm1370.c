@@ -112,7 +112,12 @@ static void _send_BM1370(uint8_t header, const uint8_t * data, uint8_t data_len,
     packet_type_t packet_type = (header & TYPE_JOB) ? JOB_PACKET : CMD_PACKET;
     const uint8_t total_length = (packet_type == JOB_PACKET) ? (data_len + 6) : (data_len + 5);
 
-    uint8_t buf[total_length];
+    if (total_length > 128) {
+        ESP_LOGE(TAG, "Packet length %d exceeds maximum buffer size", total_length);
+        return;
+    }
+
+    uint8_t buf[128];
 
     // add the preamble
     buf[0] = 0x55;
@@ -287,22 +292,19 @@ uint8_t BM1370_init(void * pvParameters)
     _send_BM1370((TYPE_CMD | GROUP_ALL | CMD_WRITE), (uint8_t[]){0x00, 0x68, 0x5A, 0xA5, 0x5A, 0xA5}, 6, BM1370_SERIALTX_DEBUG);
 
     for (uint8_t i = 0; i < chip_counter; i++) {
+        uint8_t chip_addr = i * address_interval;
         //TX: 55 AA 41 09 00 [A8 00 07 01 F0] 15    // Reg_A8
-        unsigned char set_a8_register[6] = {i * address_interval, 0xA8, 0x00, 0x07, 0x01, 0xF0};
-        _send_BM1370((TYPE_CMD | GROUP_SINGLE | CMD_WRITE), set_a8_register, 6, BM1370_SERIALTX_DEBUG);
+        _send_BM1370((TYPE_CMD | GROUP_SINGLE | CMD_WRITE), (uint8_t[]){chip_addr, 0xA8, 0x00, 0x07, 0x01, 0xF0}, 6, BM1370_SERIALTX_DEBUG);
         //TX: 55 AA 41 09 00 [18 F0 00 C1 00] 0C    // Misc Control
-        unsigned char set_18_register[6] = {i * address_interval, 0x18, 0xF0, 0x00, 0xC1, 0x00};
-        _send_BM1370((TYPE_CMD | GROUP_SINGLE | CMD_WRITE), set_18_register, 6, BM1370_SERIALTX_DEBUG);
+        _send_BM1370((TYPE_CMD | GROUP_SINGLE | CMD_WRITE), (uint8_t[]){chip_addr, 0x18, 0xF0, 0x00, 0xC1, 0x00}, 6, BM1370_SERIALTX_DEBUG);
         //TX: 55 AA 41 09 00 [3C 80 00 8B 00] 1A    // Core Register Control
-        unsigned char set_3c_register_first[6] = {i * address_interval, 0x3C, 0x80, 0x00, 0x8B, 0x00};
-        _send_BM1370((TYPE_CMD | GROUP_SINGLE | CMD_WRITE), set_3c_register_first, 6, BM1370_SERIALTX_DEBUG);
+        _send_BM1370((TYPE_CMD | GROUP_SINGLE | CMD_WRITE), (uint8_t[]){chip_addr, 0x3C, 0x80, 0x00, 0x8B, 0x00}, 6, BM1370_SERIALTX_DEBUG);
         BM1370_init_core_register_delay();
         //TX: 55 AA 41 09 00 [3C 80 00 80 XX] 09    // Core Register Control
-        BM1370_write_clock_delay_ctrl(i * address_interval, (TYPE_CMD | GROUP_SINGLE | CMD_WRITE));
+        BM1370_write_clock_delay_ctrl(chip_addr, (TYPE_CMD | GROUP_SINGLE | CMD_WRITE));
         BM1370_init_core_register_delay();
         //TX: 55 AA 41 09 00 [3C 80 00 82 AA] 05    // Core Register Control
-        unsigned char set_3c_register_third[6] = {i * address_interval, 0x3C, 0x80, 0x00, 0x82, 0xAA};
-        _send_BM1370((TYPE_CMD | GROUP_SINGLE | CMD_WRITE), set_3c_register_third, 6, BM1370_SERIALTX_DEBUG);
+        _send_BM1370((TYPE_CMD | GROUP_SINGLE | CMD_WRITE), (uint8_t[]){chip_addr, 0x3C, 0x80, 0x00, 0x82, 0xAA}, 6, BM1370_SERIALTX_DEBUG);
         BM1370_init_core_register_delay();
     }
 
@@ -456,7 +458,7 @@ void BM1370_read_registers(void)
         for (int reg = 0; reg < size; reg++) {
             if (REGISTER_MAP[reg] != REGISTER_INVALID) {
                 _send_BM1370((TYPE_CMD | GROUP_SINGLE | CMD_READ), (uint8_t[]){chip_addr, reg}, 2, BM1370_SERIALTX_DEBUG);
-                vTaskDelay(1 / portTICK_PERIOD_MS);
+                BM1370_init_core_register_delay();
             }
         }
     }
