@@ -77,7 +77,6 @@ static const char * TAG = "bm1370";
 static task_result result;
 
 static int address_interval;
-static int chip_count;
 
 static void _send_BM1370(uint8_t header, const uint8_t * data, uint8_t data_len, bool debug);
 
@@ -446,15 +445,17 @@ task_result * BM1370_process_work(void * pvParameters)
     return &result;
 }
 
-void BM1370_read_registers(void)
+void BM1370_read_registers(void * pvParameters)
 {
-    if (chip_count <= 0 || address_interval <= 0) {
+    GlobalState * GLOBAL_STATE = (GlobalState *) pvParameters;
+    uint16_t asic_count = GLOBAL_STATE->DEVICE_CONFIG.family.asic_count;
+    if (asic_count == 0 || address_interval <= 0) {
         return;
     }
 
     int size = sizeof(REGISTER_MAP) / sizeof(REGISTER_MAP[0]);
-    for (int chip = 0; chip < chip_count; chip++) {
-        uint8_t chip_addr = (uint8_t)(chip * address_interval);
+    for (uint8_t chip = 0; chip < asic_count; chip++) {
+        uint8_t chip_addr = chip * address_interval;
         for (int reg = 0; reg < size; reg++) {
             if (REGISTER_MAP[reg] != REGISTER_INVALID) {
                 _send_BM1370((TYPE_CMD | GROUP_SINGLE | CMD_READ), (uint8_t[]){chip_addr, reg}, 2, BM1370_SERIALTX_DEBUG);

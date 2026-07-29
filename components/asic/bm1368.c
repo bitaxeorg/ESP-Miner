@@ -345,13 +345,22 @@ task_result * BM1368_process_work(void * pvParameters)
     return &result;
 }
 
-void BM1368_read_registers(void)
+void BM1368_read_registers(void * pvParameters)
 {
+    GlobalState * GLOBAL_STATE = (GlobalState *) pvParameters;
+    uint16_t asic_count = GLOBAL_STATE->DEVICE_CONFIG.family.asic_count;
+    if (asic_count == 0 || address_interval <= 0) {
+        return;
+    }
+
     int size = sizeof(REGISTER_MAP) / sizeof(REGISTER_MAP[0]);
-    for (int reg = 0; reg < size; reg++) {
-        if (REGISTER_MAP[reg] != REGISTER_INVALID) {
-            _send_BM1368((TYPE_CMD | GROUP_ALL | CMD_READ), (uint8_t[]){0x00, reg}, 2, BM1368_SERIALTX_DEBUG);
-            vTaskDelay(pdMS_TO_TICKS(1));
+    for (uint8_t chip = 0; chip < asic_count; chip++) {
+        uint8_t chip_addr = chip * address_interval;
+        for (int reg = 0; reg < size; reg++) {
+            if (REGISTER_MAP[reg] != REGISTER_INVALID) {
+                _send_BM1368((TYPE_CMD | GROUP_SINGLE | CMD_READ), (uint8_t[]){chip_addr, reg}, 2, BM1368_SERIALTX_DEBUG);
+                vTaskDelay(pdMS_TO_TICKS(1));
+            }
         }
     }
 }
