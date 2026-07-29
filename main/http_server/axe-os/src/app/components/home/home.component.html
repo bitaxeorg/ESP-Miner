@@ -467,7 +467,7 @@
                 {{ info.responseTime | number:'1.1-1' }} ms@if ((info.responseShareBatch ?? 0) > 1) {<span class="text-neutral-500" appTooltip="The pool acknowledged {{ info.responseShareBatch }} shares in one batch; the time reflects the most recent share, so it may include the pool's batching window" tooltipPosition="top">&nbsp;(batched ×{{ info.responseShareBatch }})</span>}
               }
             </div>
-            @if ((info.coinbaseOutputs?.length ?? 0) > 0) {
+            @if (info.coinbaseOutputs.length > 0) {
               <div class="flex flex-nowrap">
                 @let percentage = payoutPercentage;
                 @if (percentage >= 95) {
@@ -552,7 +552,7 @@
               {{ info.scriptsig }}
             </div>
           </div>
-          @if ((info.coinbaseOutputs?.length ?? 0) > 0) {
+          @if (info.coinbaseOutputs.length > 0) {
             <div class="flex flex-nowrap justify-between">
               <div class="w-24 shrink-0 text-secondary">
                 <tooltip-text-icon text="Value" tooltip="Total value of transaction outputs in BTC. For non-bitcoin chains, disable 'Decode Coinbase Tx' in Advanced Pool Options." />
@@ -561,8 +561,6 @@
                 {{ info.coinbaseValueTotalSatoshis | sats }}
               }
             </div>
-          }
-          @if ((info.coinbaseOutputs?.length ?? 0) > 0) {
             <div class="flex flex-nowrap items-baseline">
               <div class="w-24 shrink-0 text-secondary">
                 <span>Outputs</span>
@@ -584,8 +582,7 @@
                 }
               </div>
             </div>
-          }
-          @if ((info.coinbaseOutputs?.length ?? 0) == 0) {
+          } @else {
             <div class="flex flex-nowrap items-baseline">
               <div class="w-24 shrink-0 text-secondary">
                 Amount
@@ -622,7 +619,7 @@
                 </tr>
               </thead>
               <tbody>
-                @for (asic of info.hashrateMonitor?.asics; track trackByIndex(i, asic); let i = $index) {
+                @for (asic of info.hashrateMonitor.asics; track trackByIndex(i, asic); let i = $index) {
                   <tr class="cursor-pointer"
                     [appTooltip]="(asicAmount > 1 ? 'ASIC ' + (i + 1) + ' - ' : '') + 'Error count: ' + asic.errorCount"
                     tooltipPosition="bottom">
@@ -631,7 +628,7 @@
                         {{ i + 1 }}
                       </td>
                     }
-                    @for (domain of asic?.domains; track trackByIndex($index, domain)) {
+                    @for (domain of asic.domains; track trackByIndex($index, domain)) {
                       <td
                         [style.--lightness]="getHeatmapLightness(domain, info.expectedHashrate)"
                         [style.height]="(asicAmount <= 2 ? '2rem' : null)"
