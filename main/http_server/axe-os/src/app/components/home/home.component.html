@@ -1,5 +1,5 @@
 @if (info$ | async; as info) {
-  @for (message of messages; track message) {
+  @for (message of messages; track message.type) {
     <div class="flex items-center justify-center gap-2 p-4 rounded-lg border w-full mb-3 text-center"
       [style.background-color]="'var(--color-message-' + message.severity + '-bg)'"
       [style.color]="'var(--color-message-' + message.severity + '-text)'"
@@ -157,8 +157,7 @@
               <span class="text-red-500 font-medium">0 </span>
               <span class="text-secondary">rejected</span>
             </div>
-          }
-          @if (info.sharesRejected > 0) {
+          } @else {
             @for (sharesRejectedReason of sortedRejectionReasons; track trackByReason($index, sharesRejectedReason)) {
               <div>
                 <span class="text-red-500 font-medium">
@@ -478,8 +477,7 @@
                   <div [style.color]="percentage < 100 ? 'inherit' : 'green'">
                     {{ 100 - percentage | number:'1.0-1' }}%
                   </div>
-                }
-                @if (percentage < 95) {
+                } @else {
                   <div class="w-24 shrink-0 text-secondary">
                     <tooltip-text-icon text="Share" tooltip="Percentage of the bitcoin block reward that will be paid out to your address if you find a block." />
                   </div>

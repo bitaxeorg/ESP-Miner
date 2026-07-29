@@ -13,8 +13,7 @@
           <div class="w-full md:w-10/12">
             <input class="input-text" id="frequency" formControlName="frequency" type="number" />
           </div>
-        }
-        @if (!settingsUnlocked) {
+        } @else {
           <label for="frequencySelect" class="w-full md:w-2/12 font-medium cursor-pointer">Frequency</label>
           <div class="w-full md:w-10/12">
             <app-dropdown
@@ -31,8 +30,7 @@
           <div class="w-full md:w-10/12">
             <input class="input-text" id="coreVoltage" formControlName="coreVoltage" type="number" />
           </div>
-        }
-        @if (!settingsUnlocked) {
+        } @else {
           <label for="voltageSelect" class="w-full md:w-2/12 font-medium cursor-pointer">Core Voltage</label>
           <div class="w-full md:w-10/12">
             <app-dropdown
@@ -69,8 +67,6 @@
             <app-slider [min]="35" [max]="66" formControlName="temptarget"></app-slider>
           </div>
         </div>
-      }
-      @if (form.controls['autofanspeed'].value) {
         <div class="flex flex-col md:flex-row md:items-center mb-4 gap-2">
           <label class="hidden md:flex w-full md:w-2/12 font-medium">Minimum Fan Speed</label>
           <div class="w-full md:w-10/12">
@@ -80,8 +76,7 @@
             <app-slider [min]="0" [max]="99" formControlName="minfanspeed"></app-slider>
           </div>
         </div>
-      }
-      @if (!form.controls['autofanspeed'].value) {
+      } @else {
         <div class="flex flex-col md:flex-row md:items-center mb-4 gap-2">
           <label class="hidden md:flex w-full md:w-2/12 font-medium">Fan Speed</label>
           <div class="w-full md:w-10/12">
@@ -133,11 +128,9 @@
           <label class="block mb-1">
             @if (this.form.controls['displayTimeout'].value == 0) {
               <span class="md:hidden mr-1">Display</span> Always Off
-            }
-            @if (this.form.controls['displayTimeout'].value > 0) {
+            } @else if (this.form.controls['displayTimeout'].value > 0) {
               <span class="md:hidden mr-1">Display</span> Timeout: {{this.form.controls['displayTimeout'].value * 60 | dateAgo}}
-            }
-            @if (this.form.controls['displayTimeout'].value == -1) {
+            } @else if (this.form.controls['displayTimeout'].value == -1) {
               <span class="md:hidden mr-1">Display</span> Always On
             }
           </label>
@@ -162,8 +155,7 @@
           <label class="block mb-2">
             @if (this.form.controls['statsFrequency'].value == 0) {
               <span class="md:hidden mr-1">Data Logging</span>Disabled
-            }
-            @if (this.form.controls['statsFrequency'].value > 0) {
+            } @else if (this.form.controls['statsFrequency'].value > 0) {
               <span class="md:hidden mr-1">Log Data</span>Every {{form.controls['statsFrequency'].value | dateAgo: {strict: true} }} for {{(form.controls['statsFrequency'].value * statsLimit) | dateAgo}}
             }
           </label>

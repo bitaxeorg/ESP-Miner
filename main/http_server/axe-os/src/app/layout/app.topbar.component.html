@@ -36,8 +36,6 @@
               <i class="pi pi-list-check text-2xl block"></i>
             </a>
           </li>
-        }
-        @if (dashboardEdit.editMode$ | async) {
           <li class="hidden md:block">
             <a class="block py-2 text-main cursor-pointer"
               tooltipPosition="bottom"
@@ -48,8 +46,6 @@
               [ngClass]="layoutService.isWideView() ? 'pi-window-minimize' : 'pi-window-maximize'"></i>
             </a>
           </li>
-        }
-        @if (dashboardEdit.editMode$ | async) {
           <li class="hidden md:block">
             <a class="block py-2 text-main cursor-pointer"
               tooltipPosition="bottom"
@@ -110,8 +106,6 @@
     }
     @if (isWidgetPanelOpen) {
       <div class="fixed inset-0 z-40" (click)="isWidgetPanelOpen = false"></div>
-    }
-    @if (isWidgetPanelOpen) {
       <div class="absolute right-4 top-topbar mt-2 z-50 bg-bg-card border border-surface shadow-2xl p-4 rounded min-w-[200px]">
         <div class="flex flex-col gap-2">
           @for (widget of dashboardEdit.widgetDefs; track widget) {

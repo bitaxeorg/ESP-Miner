@@ -33,11 +33,10 @@
             <tr>
               <td>
                 @if (entry.rank < 3) {
-<i class="pi pi-trophy" [ngStyle]="{
-                                'color': entry.rank === 0 ? 'gold' : entry.rank === 1 ? 'silver' : 'peru'
-                            }"></i>
-                }
-                @if (entry.rank >= 3) {
+                  <i class="pi pi-trophy" [ngStyle]="{
+                    'color': entry.rank === 0 ? 'gold' : entry.rank === 1 ? 'silver' : 'peru'
+                  }"></i>
+                } @else {
                   <span class="text-secondary text-xs">{{ entry.rank + 1 }}</span>
                 }
               </td>
