@@ -32,7 +32,10 @@
 #define BM_CHIP_ID 0x00
 #define MISC_CONTROL 0x18
 #define FAST_UART_CONFIGURATION 0x28
-#define BM1370_INIT_CORE_REGISTER_DELAY_MS 10
+#define CORE_REGISTER_CONTROL 0x3C
+#define ANALOG_MUX_CONTROL 0x54
+#define IO_DRIVER_STRENGTH 0x58
+#define PLL3_PARAMETER 0x68
 #define BM1370_CLOCK_DELAY_CTRL_VALUE 0x10
 
 static const register_type_t REGISTER_MAP[] = {
@@ -80,15 +83,10 @@ static int address_interval;
 
 static void _send_BM1370(uint8_t header, const uint8_t * data, uint8_t data_len, bool debug);
 
-static void BM1370_init_core_register_delay(void)
-{
-    vTaskDelay(pdMS_TO_TICKS(BM1370_INIT_CORE_REGISTER_DELAY_MS));
-}
-
 static void BM1370_write_clock_delay_ctrl(uint8_t chip_addr, uint8_t header)
 {
     _send_BM1370(header,
-                 (uint8_t[]){chip_addr, 0x3C, 0x80, 0x00, 0x80, BM1370_CLOCK_DELAY_CTRL_VALUE},
+                 (uint8_t[]){chip_addr, CORE_REGISTER_CONTROL, 0x80, 0x00, 0x80, BM1370_CLOCK_DELAY_CTRL_VALUE},
                  6,
                  BM1370_SERIALTX_DEBUG);
 }
@@ -96,7 +94,7 @@ static void BM1370_write_clock_delay_ctrl(uint8_t chip_addr, uint8_t header)
 static void BM1370_write_io_driver_strength(uint8_t chip_addr, uint8_t header, uint8_t value2)
 {
     _send_BM1370(header,
-                 (uint8_t[]){chip_addr, 0x58, 0x00, 0x01, value2, 0x11},
+                 (uint8_t[]){chip_addr, IO_DRIVER_STRENGTH, 0x00, 0x01, value2, 0x11},
                  6,
                  BM1370_SERIALTX_DEBUG);
 }
@@ -232,8 +230,6 @@ uint8_t BM1370_init(void * pvParameters)
         return 0;
     }
 
-    chip_count = chip_counter;
-
     // set version mask
     BM1370_set_version_mask(STRATUM_DEFAULT_VERSION_MASK);
 
@@ -261,16 +257,16 @@ uint8_t BM1370_init(void * pvParameters)
 
     //Core Register Control
     //unsigned char init9[11] = {0x55, 0xAA, 0x51, 0x09, 0x00, 0x3C, 0x80, 0x00, 0x8B, 0x00, 0x12};
-    _send_BM1370((TYPE_CMD | GROUP_ALL | CMD_WRITE), (uint8_t[]){0x00, 0x3C, 0x80, 0x00, 0x8B, 0x00}, 6, BM1370_SERIALTX_DEBUG);
-    BM1370_init_core_register_delay();
+    _send_BM1370((TYPE_CMD | GROUP_ALL | CMD_WRITE), (uint8_t[]){0x00, CORE_REGISTER_CONTROL, 0x80, 0x00, 0x8B, 0x00}, 6, BM1370_SERIALTX_DEBUG);
+    asic_init_core_register_delay();
 
     // Core Register Control, internal ClockDelayCtrlV2.
     BM1370_write_clock_delay_ctrl(0x00, (TYPE_CMD | GROUP_ALL | CMD_WRITE));
-    BM1370_init_core_register_delay();
+    asic_init_core_register_delay();
 
     // Present in the S21 XP init between core register control and analog mux.
     _send_BM1370((TYPE_CMD | GROUP_ALL | CMD_WRITE), (uint8_t[]){0x00, 0x14, 0x00, 0x00, 0x00, 0xFF}, 6, BM1370_SERIALTX_DEBUG);
-    BM1370_init_core_register_delay();
+    asic_init_core_register_delay();
 
     uint16_t difficulty = GLOBAL_STATE->DEVICE_CONFIG.family.asic.difficulty;
     
@@ -278,45 +274,45 @@ uint8_t BM1370_init(void * pvParameters)
     uint8_t difficulty_mask[6];
     get_difficulty_mask(difficulty, difficulty_mask);
     _send_BM1370((TYPE_CMD | GROUP_ALL | CMD_WRITE), difficulty_mask, 6, BM1370_SERIALTX_DEBUG);    
-    BM1370_init_core_register_delay();
+    asic_init_core_register_delay();
 
     //Analog Mux Control
-    _send_BM1370((TYPE_CMD | GROUP_ALL | CMD_WRITE), (uint8_t[]){0x00, 0x54, 0x00, 0x00, 0x00, 0x03}, 6, BM1370_SERIALTX_DEBUG);
+    _send_BM1370((TYPE_CMD | GROUP_ALL | CMD_WRITE), (uint8_t[]){0x00, ANALOG_MUX_CONTROL, 0x00, 0x00, 0x00, 0x03}, 6, BM1370_SERIALTX_DEBUG);
 
     //Set the IO Driver Strength
     BM1370_write_io_driver_strength(0x00, (TYPE_CMD | GROUP_ALL | CMD_WRITE), 0x11);
 
     // Present in the older BM1370 C++ init path. Keep this before per-chip core
     // register setup so all chips share the same internal counter/mux state.
-    _send_BM1370((TYPE_CMD | GROUP_ALL | CMD_WRITE), (uint8_t[]){0x00, 0x68, 0x5A, 0xA5, 0x5A, 0xA5}, 6, BM1370_SERIALTX_DEBUG);
+    _send_BM1370((TYPE_CMD | GROUP_ALL | CMD_WRITE), (uint8_t[]){0x00, PLL3_PARAMETER, 0x5A, 0xA5, 0x5A, 0xA5}, 6, BM1370_SERIALTX_DEBUG);
 
     for (uint8_t i = 0; i < chip_counter; i++) {
         uint8_t chip_addr = i * address_interval;
         //TX: 55 AA 41 09 00 [A8 00 07 01 F0] 15    // Reg_A8
         _send_BM1370((TYPE_CMD | GROUP_SINGLE | CMD_WRITE), (uint8_t[]){chip_addr, 0xA8, 0x00, 0x07, 0x01, 0xF0}, 6, BM1370_SERIALTX_DEBUG);
         //TX: 55 AA 41 09 00 [18 F0 00 C1 00] 0C    // Misc Control
-        _send_BM1370((TYPE_CMD | GROUP_SINGLE | CMD_WRITE), (uint8_t[]){chip_addr, 0x18, 0xF0, 0x00, 0xC1, 0x00}, 6, BM1370_SERIALTX_DEBUG);
+        _send_BM1370((TYPE_CMD | GROUP_SINGLE | CMD_WRITE), (uint8_t[]){chip_addr, MISC_CONTROL, 0xF0, 0x00, 0xC1, 0x00}, 6, BM1370_SERIALTX_DEBUG);
         //TX: 55 AA 41 09 00 [3C 80 00 8B 00] 1A    // Core Register Control
-        _send_BM1370((TYPE_CMD | GROUP_SINGLE | CMD_WRITE), (uint8_t[]){chip_addr, 0x3C, 0x80, 0x00, 0x8B, 0x00}, 6, BM1370_SERIALTX_DEBUG);
-        BM1370_init_core_register_delay();
+        _send_BM1370((TYPE_CMD | GROUP_SINGLE | CMD_WRITE), (uint8_t[]){chip_addr, CORE_REGISTER_CONTROL, 0x80, 0x00, 0x8B, 0x00}, 6, BM1370_SERIALTX_DEBUG);
+        asic_init_core_register_delay();
         //TX: 55 AA 41 09 00 [3C 80 00 80 XX] 09    // Core Register Control
         BM1370_write_clock_delay_ctrl(chip_addr, (TYPE_CMD | GROUP_SINGLE | CMD_WRITE));
-        BM1370_init_core_register_delay();
+        asic_init_core_register_delay();
         //TX: 55 AA 41 09 00 [3C 80 00 82 AA] 05    // Core Register Control
-        _send_BM1370((TYPE_CMD | GROUP_SINGLE | CMD_WRITE), (uint8_t[]){chip_addr, 0x3C, 0x80, 0x00, 0x82, 0xAA}, 6, BM1370_SERIALTX_DEBUG);
-        BM1370_init_core_register_delay();
+        _send_BM1370((TYPE_CMD | GROUP_SINGLE | CMD_WRITE), (uint8_t[]){chip_addr, CORE_REGISTER_CONTROL, 0x80, 0x00, 0x82, 0xAA}, 6, BM1370_SERIALTX_DEBUG);
+        asic_init_core_register_delay();
     }
 
     //Some misc settings?
     // TX: 55 AA 51 09 [00 B9 00 00 44 80] 0D    //command all chips, write chip address 00, register B9, data 00 00 44 80
     _send_BM1370((TYPE_CMD | GROUP_ALL | CMD_WRITE), (uint8_t[]){0x00, 0xB9, 0x00, 0x00, 0x44, 0x80}, 6, BM1370_SERIALTX_DEBUG);
     // TX: 55 AA 51 09 [00 54 00 00 00 02] 18    //command all chips, write chip address 00, register 54, data 00 00 00 02 - Analog Mux Control - rumored to control the temp diode
-    _send_BM1370((TYPE_CMD | GROUP_ALL | CMD_WRITE), (uint8_t[]){0x00, 0x54, 0x00, 0x00, 0x00, 0x02}, 6, BM1370_SERIALTX_DEBUG);
+    _send_BM1370((TYPE_CMD | GROUP_ALL | CMD_WRITE), (uint8_t[]){0x00, ANALOG_MUX_CONTROL, 0x00, 0x00, 0x00, 0x02}, 6, BM1370_SERIALTX_DEBUG);
     // TX: 55 AA 51 09 [00 B9 00 00 44 80] 0D    //command all chips, write chip address 00, register B9, data 00 00 44 80 -- duplicate of first command in series
     _send_BM1370((TYPE_CMD | GROUP_ALL | CMD_WRITE), (uint8_t[]){0x00, 0xB9, 0x00, 0x00, 0x44, 0x80}, 6, BM1370_SERIALTX_DEBUG);
     // TX: 55 AA 51 09 [00 3C 80 00 8D EE] 1B    //command all chips, write chip address 00, register 3C, data 80 00 8D EE
-    _send_BM1370((TYPE_CMD | GROUP_ALL | CMD_WRITE), (uint8_t[]){0x00, 0x3C, 0x80, 0x00, 0x8D, 0xEE}, 6, BM1370_SERIALTX_DEBUG);
-    BM1370_init_core_register_delay();
+    _send_BM1370((TYPE_CMD | GROUP_ALL | CMD_WRITE), (uint8_t[]){0x00, CORE_REGISTER_CONTROL, 0x80, 0x00, 0x8D, 0xEE}, 6, BM1370_SERIALTX_DEBUG);
+    asic_init_core_register_delay();
 
     //ramp up the hash frequency
     do_frequency_transition(GLOBAL_STATE, BM1370_send_hash_frequency);
