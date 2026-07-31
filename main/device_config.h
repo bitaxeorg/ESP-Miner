@@ -62,6 +62,7 @@ typedef struct {
     FamilyConfig family;
     bool plug_sense;
     bool asic_enable;
+    bool asic_enable_active_high;
     bool EMC2101 : 1;
     bool EMC2103 : 1;
     bool EMC2302 : 1;
