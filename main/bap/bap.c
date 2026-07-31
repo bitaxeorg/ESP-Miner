@@ -27,6 +27,11 @@ esp_err_t BAP_init(GlobalState *state) {
         ESP_LOGE(TAG, "Invalid global state pointer");
         return ESP_ERR_INVALID_ARG;
     }
+
+    if (state->DEVICE_CONFIG.bap_pins == NULL) {
+        ESP_LOGW(TAG, "BAP UART disabled on %s", state->DEVICE_CONFIG.family.name);
+        return ESP_OK;
+    }
     
     bap_global_state = state;
     
