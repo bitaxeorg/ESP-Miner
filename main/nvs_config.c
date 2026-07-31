@@ -108,6 +108,20 @@ static Settings settings[NVS_CONFIG_COUNT] = {
     [NVS_CONFIG_SELF_TEST_TEMP_WARMUP]                 = {.nvs_key_name = "selftest_warm",   .type = TYPE_U16,   .default_value = {.u16 = 55}},
     [NVS_CONFIG_SELF_TEST_TEMP_MAX]                    = {.nvs_key_name = "selftest_max",    .type = TYPE_U16,   .default_value = {.u16 = 70}},
     [NVS_CONFIG_SELF_TEST_FAN_SPEED]                   = {.nvs_key_name = "selftest_fan",    .type = TYPE_U16,   .default_value = {.u16 = 1000}},
+    [NVS_CONFIG_TPS546_PHASE]                          = {.nvs_key_name = "tps546_phase",    .type = TYPE_U16},
+    [NVS_CONFIG_TPS546_VIN_ON]                         = {.nvs_key_name = "tps546_vin_on",   .type = TYPE_FLOAT},
+    [NVS_CONFIG_TPS546_VIN_OFF]                        = {.nvs_key_name = "tps546_vin_off",  .type = TYPE_FLOAT},
+    [NVS_CONFIG_TPS546_VIN_UV_WARN]                    = {.nvs_key_name = "tps546_vin_uvw",  .type = TYPE_FLOAT},
+    [NVS_CONFIG_TPS546_VIN_OV_FAULT]                   = {.nvs_key_name = "tps546_vin_ovf",  .type = TYPE_FLOAT},
+    [NVS_CONFIG_TPS546_SCALE_LOOP]                     = {.nvs_key_name = "tps546_scale",    .type = TYPE_FLOAT},
+    [NVS_CONFIG_TPS546_VOUT_MIN]                       = {.nvs_key_name = "tps546_vout_min", .type = TYPE_FLOAT},
+    [NVS_CONFIG_TPS546_VOUT_MAX]                       = {.nvs_key_name = "tps546_vout_max", .type = TYPE_FLOAT},
+    [NVS_CONFIG_TPS546_VOUT_COMMAND]                   = {.nvs_key_name = "tps546_vout_cmd", .type = TYPE_FLOAT},
+    [NVS_CONFIG_TPS546_IOUT_OC_WARN]                   = {.nvs_key_name = "tps546_oc_warn",  .type = TYPE_FLOAT},
+    [NVS_CONFIG_TPS546_IOUT_OC_FAULT]                  = {.nvs_key_name = "tps546_oc_fault", .type = TYPE_FLOAT},
+    [NVS_CONFIG_TPS546_STACK_CONFIG]                   = {.nvs_key_name = "tps546_stack",   .type = TYPE_U16},
+    [NVS_CONFIG_TPS546_SYNC_CONFIG]                    = {.nvs_key_name = "tps546_sync",    .type = TYPE_U16},
+    [NVS_CONFIG_TPS546_FREQUENCY]                      = {.nvs_key_name = "tps546_freq",    .type = TYPE_U16},
 };
 
 Settings *nvs_config_get_settings(NvsConfigKey key)
@@ -331,6 +345,7 @@ static void nvs_task(void *pvParameters)
                 char *old_str = NULL;
                 char nvs_str_buf[32]; // for TYPE_FLOAT serialisation
                 xSemaphoreTake(nvs_cache_mutex, portMAX_DELAY);
+                setting->is_set = true;
                 switch (update.type) {
                     case TYPE_STR:
                         old_str = setting->value[update.index].str;
@@ -443,6 +458,7 @@ esp_err_t nvs_config_init(void)
                             ret = nvs_get_str(handle, nvs_key, buf, &len);
                             if (ret == ESP_OK) {
                                 setting->value[idx].str = buf;
+                                setting->is_set = true;
                                 break;
                             }
                             free(buf);
@@ -456,19 +472,34 @@ esp_err_t nvs_config_init(void)
                 case TYPE_U16: {
                     uint16_t val;
                     ret = nvs_get_u16(handle, nvs_key, &val);
-                    setting->value[idx].u16 = (ret == ESP_OK) ? val : setting->default_value.u16;
+                    if (ret == ESP_OK) {
+                        setting->value[idx].u16 = val;
+                        setting->is_set = true;
+                    } else {
+                        setting->value[idx].u16 = setting->default_value.u16;
+                    }
                     break;
                 }
                 case TYPE_I32: {
                     int32_t val;
                     ret = nvs_get_i32(handle, nvs_key, &val);
-                    setting->value[idx].i32 = (ret == ESP_OK) ? val : setting->default_value.i32;
+                    if (ret == ESP_OK) {
+                        setting->value[idx].i32 = val;
+                        setting->is_set = true;
+                    } else {
+                        setting->value[idx].i32 = setting->default_value.i32;
+                    }
                     break;
                 }
                 case TYPE_U64: {
                     uint64_t val;
                     ret = nvs_get_u64(handle, nvs_key, &val);
-                    setting->value[idx].u64 = (ret == ESP_OK) ? val : setting->default_value.u64;
+                    if (ret == ESP_OK) {
+                        setting->value[idx].u64 = val;
+                        setting->is_set = true;
+                    } else {
+                        setting->value[idx].u64 = setting->default_value.u64;
+                    }
                     break;
                 }
                 case TYPE_FLOAT: {
@@ -480,6 +511,7 @@ esp_err_t nvs_config_init(void)
                         float parsed = strtof(buf, &end);
                         if (end != buf && *end == '\0') {
                             setting->value[idx].f = parsed;
+                            setting->is_set = true;
                         } else {
                             ESP_LOGW(TAG, "Corrupt float in NVS for %s ('%s'), using default", setting->nvs_key_name, buf);
                             setting->value[idx].f = setting->default_value.f;
@@ -492,7 +524,12 @@ esp_err_t nvs_config_init(void)
                 case TYPE_BOOL: {
                     uint16_t val;
                     ret = nvs_get_u16(handle, nvs_key, &val);
-                    setting->value[idx].b = (ret == ESP_OK) ? (val != 0) : setting->default_value.b;
+                    if (ret == ESP_OK) {
+                        setting->value[idx].b = (val != 0);
+                        setting->is_set = true;
+                    } else {
+                        setting->value[idx].b = setting->default_value.b;
+                    }
                     break;
                 }
             }
@@ -708,3 +745,17 @@ void nvs_config_set_bool(NvsConfigKey key, bool value)
     ConfigUpdate update = { .key = key, .type = TYPE_BOOL, .value.b = value };
     xQueueSend(nvs_save_queue, &update, portMAX_DELAY);
 }
+
+bool nvs_config_has_key(NvsConfigKey key)
+{
+    Settings *setting = nvs_config_get_settings(key);
+    if (!setting) {
+        ESP_LOGE(TAG, "Invalid key enum %d", key);
+        return false;
+    }
+    xSemaphoreTake(nvs_cache_mutex, portMAX_DELAY);
+    bool result = setting->is_set;
+    xSemaphoreGive(nvs_cache_mutex);
+    return result;
+}
+

@@ -53,6 +53,35 @@ DS4432U,data,u16,0
 INA260,data,u16,0
 # TPS546 (0,1)
 TPS546,data,u16,1
+# TPS546 Regulator configuration overrides
+# tps546_phase (0=single, 255=multi)
+#tps546_phase,data,u16,0
+# tps546_vin_on (Volts)
+#tps546_vin_on,data,string,4.8
+# tps546_vin_off (Volts)
+#tps546_vin_off,data,string,4.5
+# tps546_vin_uvw (Volts)
+#tps546_vin_uvw,data,string,0.0
+# tps546_vin_ovf (Volts)
+#tps546_vin_ovf,data,string,6.5
+# tps546_scale (Voltage scale loop factor)
+#tps546_scale,data,string,0.25
+# tps546_vout_min (Volts)
+#tps546_vout_min,data,string,1.0
+# tps546_vout_max (Volts)
+#tps546_vout_max,data,string,2.0
+# tps546_vout_cmd (Volts)
+#tps546_vout_cmd,data,string,1.2
+# tps546_oc_warn (Amps)
+#tps546_oc_warn,data,string,25.0
+# tps546_oc_fault (Amps)
+#tps546_oc_fault,data,string,30.0
+# tps546_stack (Stack config)
+#tps546_stack,data,u16,0
+# tps546_sync (Sync config)
+#tps546_sync,data,u16,16
+# tps546_freq (Switching frequency in kHz)
+#tps546_freq,data,u16,650
 # TMP1075 (0,1)
 TMP1075,data,u16,1
 # Self-test Power Consumption Target (> 0)
@@ -64,3 +93,4 @@ selftest_warm,data,u16,55
 # Self-test Max Temperature
 selftest_max,data,u16,70
 selftest_fan,data,u16,1000
+

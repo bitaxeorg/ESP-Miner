@@ -64,6 +64,20 @@ typedef enum {
     NVS_CONFIG_SELF_TEST_TEMP_WARMUP,
     NVS_CONFIG_SELF_TEST_TEMP_MAX,
     NVS_CONFIG_SELF_TEST_FAN_SPEED,
+    NVS_CONFIG_TPS546_PHASE,
+    NVS_CONFIG_TPS546_VIN_ON,
+    NVS_CONFIG_TPS546_VIN_OFF,
+    NVS_CONFIG_TPS546_VIN_UV_WARN,
+    NVS_CONFIG_TPS546_VIN_OV_FAULT,
+    NVS_CONFIG_TPS546_SCALE_LOOP,
+    NVS_CONFIG_TPS546_VOUT_MIN,
+    NVS_CONFIG_TPS546_VOUT_MAX,
+    NVS_CONFIG_TPS546_VOUT_COMMAND,
+    NVS_CONFIG_TPS546_IOUT_OC_WARN,
+    NVS_CONFIG_TPS546_IOUT_OC_FAULT,
+    NVS_CONFIG_TPS546_STACK_CONFIG,
+    NVS_CONFIG_TPS546_SYNC_CONFIG,
+    NVS_CONFIG_TPS546_FREQUENCY,
     NVS_CONFIG_COUNT
 } NvsConfigKey;
 
@@ -94,6 +108,7 @@ typedef struct {
     const char *rest_name;
     int min;
     int max;
+    bool is_set;
 } Settings;
 
 esp_err_t nvs_config_init(void);
@@ -112,6 +127,7 @@ float nvs_config_get_float(NvsConfigKey key);
 void nvs_config_set_float(NvsConfigKey key, float value);
 bool nvs_config_get_bool(NvsConfigKey key);
 void nvs_config_set_bool(NvsConfigKey key, bool value);
+bool nvs_config_has_key(NvsConfigKey key);
 Settings *nvs_config_get_settings(NvsConfigKey key);
 
 #endif // MAIN_NVS_CONFIG_H

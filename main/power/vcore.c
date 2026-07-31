@@ -5,6 +5,7 @@
 #include "DS4432U.h"
 #include "INA260.h"
 #include "TPS546.h"
+#include "nvs_config.h"
 #include "adc.h"
 #include "driver/gpio.h"
 #include "vcore.h"
@@ -17,6 +18,7 @@ static const char *TAG = "vcore";
 static TPS546_CONFIG get_tps546_config(const FamilyConfig * family)
 {
     TPS546_CONFIG config = {0};
+    config.TPS546_INIT_FREQUENCY = TPS546_DEFAULT_FREQUENCY;
 
     // Set family-specific parameters
     switch (family->id) {
@@ -76,6 +78,49 @@ static TPS546_CONFIG get_tps546_config(const FamilyConfig * family)
         config.TPS546_INIT_STACK_CONFIG = 0x0000; // 1 module
         config.TPS546_INIT_SYNC_CONFIG = 0x10;    // Disable SYNC
         break;
+    }
+
+    if (nvs_config_has_key(NVS_CONFIG_TPS546_PHASE)) {
+        config.TPS546_INIT_PHASE = (uint8_t)nvs_config_get_u16(NVS_CONFIG_TPS546_PHASE);
+    }
+    if (nvs_config_has_key(NVS_CONFIG_TPS546_VIN_ON)) {
+        config.TPS546_INIT_VIN_ON = nvs_config_get_float(NVS_CONFIG_TPS546_VIN_ON);
+    }
+    if (nvs_config_has_key(NVS_CONFIG_TPS546_VIN_OFF)) {
+        config.TPS546_INIT_VIN_OFF = nvs_config_get_float(NVS_CONFIG_TPS546_VIN_OFF);
+    }
+    if (nvs_config_has_key(NVS_CONFIG_TPS546_VIN_UV_WARN)) {
+        config.TPS546_INIT_VIN_UV_WARN_LIMIT = nvs_config_get_float(NVS_CONFIG_TPS546_VIN_UV_WARN);
+    }
+    if (nvs_config_has_key(NVS_CONFIG_TPS546_VIN_OV_FAULT)) {
+        config.TPS546_INIT_VIN_OV_FAULT_LIMIT = nvs_config_get_float(NVS_CONFIG_TPS546_VIN_OV_FAULT);
+    }
+    if (nvs_config_has_key(NVS_CONFIG_TPS546_SCALE_LOOP)) {
+        config.TPS546_INIT_SCALE_LOOP = nvs_config_get_float(NVS_CONFIG_TPS546_SCALE_LOOP);
+    }
+    if (nvs_config_has_key(NVS_CONFIG_TPS546_VOUT_MIN)) {
+        config.TPS546_INIT_VOUT_MIN = nvs_config_get_float(NVS_CONFIG_TPS546_VOUT_MIN);
+    }
+    if (nvs_config_has_key(NVS_CONFIG_TPS546_VOUT_MAX)) {
+        config.TPS546_INIT_VOUT_MAX = nvs_config_get_float(NVS_CONFIG_TPS546_VOUT_MAX);
+    }
+    if (nvs_config_has_key(NVS_CONFIG_TPS546_VOUT_COMMAND)) {
+        config.TPS546_INIT_VOUT_COMMAND = nvs_config_get_float(NVS_CONFIG_TPS546_VOUT_COMMAND);
+    }
+    if (nvs_config_has_key(NVS_CONFIG_TPS546_IOUT_OC_WARN)) {
+        config.TPS546_INIT_IOUT_OC_WARN_LIMIT = nvs_config_get_float(NVS_CONFIG_TPS546_IOUT_OC_WARN);
+    }
+    if (nvs_config_has_key(NVS_CONFIG_TPS546_IOUT_OC_FAULT)) {
+        config.TPS546_INIT_IOUT_OC_FAULT_LIMIT = nvs_config_get_float(NVS_CONFIG_TPS546_IOUT_OC_FAULT);
+    }
+    if (nvs_config_has_key(NVS_CONFIG_TPS546_STACK_CONFIG)) {
+        config.TPS546_INIT_STACK_CONFIG = nvs_config_get_u16(NVS_CONFIG_TPS546_STACK_CONFIG);
+    }
+    if (nvs_config_has_key(NVS_CONFIG_TPS546_SYNC_CONFIG)) {
+        config.TPS546_INIT_SYNC_CONFIG = (uint8_t)nvs_config_get_u16(NVS_CONFIG_TPS546_SYNC_CONFIG);
+    }
+    if (nvs_config_has_key(NVS_CONFIG_TPS546_FREQUENCY)) {
+        config.TPS546_INIT_FREQUENCY = nvs_config_get_u16(NVS_CONFIG_TPS546_FREQUENCY);
     }
 
     return config;
