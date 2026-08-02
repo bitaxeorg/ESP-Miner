@@ -453,6 +453,21 @@ static int setup_ble_access_cb(uint16_t conn_handle, uint16_t attr_handle, struc
     return BLE_ATT_ERR_UNLIKELY;
 }
 
+static int setup_ble_dsc_access_cb(uint16_t conn_handle, uint16_t attr_handle, struct ble_gatt_access_ctxt *ctxt,
+                                   void *arg)
+{
+    (void)conn_handle;
+    (void)attr_handle;
+
+    if (ctxt->op != BLE_GATT_ACCESS_OP_READ_DSC) {
+        return BLE_ATT_ERR_UNLIKELY;
+    }
+
+    const char *label = (const char *)arg;
+    int rc = os_mbuf_append(ctxt->om, label, strlen(label));
+    return rc == 0 ? 0 : BLE_ATT_ERR_INSUFFICIENT_RES;
+}
+
 static int setup_ble_gap_event(struct ble_gap_event *event, void *arg)
 {
     (void)arg;
@@ -543,41 +558,62 @@ static void setup_ble_host_task(void *param)
     nimble_port_freertos_deinit();
 }
 
+/* Characteristic User Description (0x2901): generic BLE apps have no lookup
+ * entry for our custom 128-bit UUIDs, so without this they show every
+ * characteristic as "Unknown Characteristic". */
+#define SETUP_BLE_CUD_UUID16 0x2901
+#define SETUP_BLE_USER_DESC(label)                          \
+    ((struct ble_gatt_dsc_def[]){                           \
+        {                                                   \
+            .uuid = BLE_UUID16_DECLARE(SETUP_BLE_CUD_UUID16), \
+            .att_flags = BLE_ATT_F_READ,                    \
+            .access_cb = setup_ble_dsc_access_cb,           \
+            .arg = (void *)(label),                         \
+        },                                                  \
+        {0},                                                \
+    })
+
 static const struct ble_gatt_chr_def setup_ble_characteristics[] = {
     {
         .uuid = &setup_ble_wifi_ssid_uuid.u,
         .access_cb = setup_ble_access_cb,
         .arg = (void *)SETUP_BLE_FIELD_WIFI_SSID,
+        .descriptors = SETUP_BLE_USER_DESC("WiFi SSID"),
         .flags = BLE_GATT_CHR_F_READ | BLE_GATT_CHR_F_WRITE | BLE_GATT_CHR_F_WRITE_NO_RSP,
     },
     {
         .uuid = &setup_ble_wifi_password_uuid.u,
         .access_cb = setup_ble_access_cb,
         .arg = (void *)SETUP_BLE_FIELD_WIFI_PASSWORD,
+        .descriptors = SETUP_BLE_USER_DESC("WiFi Password"),
         .flags = BLE_GATT_CHR_F_READ | BLE_GATT_CHR_F_WRITE | BLE_GATT_CHR_F_WRITE_NO_RSP,
     },
     {
         .uuid = &setup_ble_pool_url_uuid.u,
         .access_cb = setup_ble_access_cb,
         .arg = (void *)SETUP_BLE_FIELD_POOL_URL,
+        .descriptors = SETUP_BLE_USER_DESC("Pool URL"),
         .flags = BLE_GATT_CHR_F_READ | BLE_GATT_CHR_F_WRITE | BLE_GATT_CHR_F_WRITE_NO_RSP,
     },
     {
         .uuid = &setup_ble_pool_port_uuid.u,
         .access_cb = setup_ble_access_cb,
         .arg = (void *)SETUP_BLE_FIELD_POOL_PORT,
+        .descriptors = SETUP_BLE_USER_DESC("Pool Port"),
         .flags = BLE_GATT_CHR_F_READ | BLE_GATT_CHR_F_WRITE | BLE_GATT_CHR_F_WRITE_NO_RSP,
     },
     {
         .uuid = &setup_ble_pool_user_uuid.u,
         .access_cb = setup_ble_access_cb,
         .arg = (void *)SETUP_BLE_FIELD_POOL_USER,
+        .descriptors = SETUP_BLE_USER_DESC("Pool User"),
         .flags = BLE_GATT_CHR_F_READ | BLE_GATT_CHR_F_WRITE | BLE_GATT_CHR_F_WRITE_NO_RSP,
     },
     {
         .uuid = &setup_ble_pool_password_uuid.u,
         .access_cb = setup_ble_access_cb,
         .arg = (void *)SETUP_BLE_FIELD_POOL_PASSWORD,
+        .descriptors = SETUP_BLE_USER_DESC("Pool Password"),
         .flags = BLE_GATT_CHR_F_READ | BLE_GATT_CHR_F_WRITE | BLE_GATT_CHR_F_WRITE_NO_RSP,
     },
     {
@@ -585,12 +621,14 @@ static const struct ble_gatt_chr_def setup_ble_characteristics[] = {
         .access_cb = setup_ble_access_cb,
         .arg = (void *)SETUP_BLE_FIELD_STATUS,
         .val_handle = &setup_ble_status_val_handle,
+        .descriptors = SETUP_BLE_USER_DESC("Setup Status"),
         .flags = BLE_GATT_CHR_F_READ | BLE_GATT_CHR_F_NOTIFY,
     },
     {
         .uuid = &setup_ble_command_uuid.u,
         .access_cb = setup_ble_access_cb,
         .arg = (void *)SETUP_BLE_FIELD_COMMAND,
+        .descriptors = SETUP_BLE_USER_DESC("Command"),
         .flags = BLE_GATT_CHR_F_READ | BLE_GATT_CHR_F_WRITE | BLE_GATT_CHR_F_WRITE_NO_RSP,
     },
     {0},
