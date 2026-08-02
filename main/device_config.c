@@ -2,7 +2,6 @@
 #include "device_config.h"
 #include "nvs_config.h"
 #include "global_state.h"
-#include "driver/gpio.h"
 #include "esp_log.h"
 
 #define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
