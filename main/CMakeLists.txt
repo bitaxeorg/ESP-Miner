@@ -18,6 +18,7 @@ SRCS
     "./bap/bap_uart.c"
     "./bap/bap_handlers.c"
     "./bap/bap_subscription.c"
+    "device_pins.c"
     "device_config.c"
     "task_monitor.c"
     "./http_server/http_server.c"

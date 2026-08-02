@@ -9,80 +9,6 @@
 
 static const char * TAG = "device_config";
 
-static inline esp_err_t check_pin(gpio_num_t gpio, const char * name, uint64_t * allocated_pins_mask)
-{
-    if (gpio == GPIO_NUM_NC) {
-        return ESP_OK;
-    }
-    if (!GPIO_IS_VALID_GPIO(gpio)) {
-        ESP_LOGE(TAG, "INVALID GPIO: %d for %s is out of range (0-%d)!", gpio, name, GPIO_NUM_MAX - 1);
-        return ESP_ERR_INVALID_ARG;
-    }
-    if (*allocated_pins_mask & (1ULL << gpio)) {
-        ESP_LOGE(TAG, "PIN CONFLICT: GPIO %d (%s) is already in use by another interface!", gpio, name);
-        return ESP_ERR_INVALID_STATE;
-    }
-    *allocated_pins_mask |= (1ULL << gpio);
-    return ESP_OK;
-}
-
-static esp_err_t device_config_validate_pins(const DeviceConfig * cfg)
-{
-    uint64_t allocated_pins_mask = 0;
-    esp_err_t status = ESP_OK;
-
-    if (cfg->bap_pins) {
-        if (check_pin(cfg->bap_pins->tx, "BAP TX", &allocated_pins_mask) != ESP_OK) status = ESP_ERR_INVALID_STATE;
-        if (check_pin(cfg->bap_pins->rx, "BAP RX", &allocated_pins_mask) != ESP_OK) status = ESP_ERR_INVALID_STATE;
-    }
-
-    if (cfg->i2c_pins) {
-        if (check_pin(cfg->i2c_pins->sda, "I2C SDA", &allocated_pins_mask) != ESP_OK) status = ESP_ERR_INVALID_STATE;
-        if (check_pin(cfg->i2c_pins->scl, "I2C SCL", &allocated_pins_mask) != ESP_OK) status = ESP_ERR_INVALID_STATE;
-    }
-
-    if (cfg->i80_pins) {
-        for (int i = 0; i < 8; i++) {
-            if (check_pin(cfg->i80_pins->data[i], "LCD Data", &allocated_pins_mask) != ESP_OK) status = ESP_ERR_INVALID_STATE;
-        }
-        if (check_pin(cfg->i80_pins->rd, "LCD RD", &allocated_pins_mask) != ESP_OK) status = ESP_ERR_INVALID_STATE;
-        if (check_pin(cfg->i80_pins->wr, "LCD WR", &allocated_pins_mask) != ESP_OK) status = ESP_ERR_INVALID_STATE;
-        if (check_pin(cfg->i80_pins->cs, "LCD CS", &allocated_pins_mask) != ESP_OK) status = ESP_ERR_INVALID_STATE;
-        if (check_pin(cfg->i80_pins->dc, "LCD DC", &allocated_pins_mask) != ESP_OK) status = ESP_ERR_INVALID_STATE;
-        if (check_pin(cfg->i80_pins->rst, "LCD RST", &allocated_pins_mask) != ESP_OK) status = ESP_ERR_INVALID_STATE;
-        if (check_pin(cfg->i80_pins->pwr, "LCD PWR", &allocated_pins_mask) != ESP_OK) status = ESP_ERR_INVALID_STATE;
-        if (check_pin(cfg->i80_pins->bk_light, "LCD BK_LIGHT", &allocated_pins_mask) != ESP_OK) status = ESP_ERR_INVALID_STATE;
-    }
-
-    return status;
-}
-
-static void apply_kconfig_pin_overrides(DeviceConfig * cfg)
-{
-#if defined(CONFIG_ENABLE_BAP) && !CONFIG_ENABLE_BAP
-    cfg->bap_pins = NULL;
-    ESP_LOGI(TAG, "BAP disabled via Kconfig (CONFIG_ENABLE_BAP=n)");
-#elif defined(CONFIG_GPIO_BAP_TX) && defined(CONFIG_GPIO_BAP_RX)
-    if (CONFIG_GPIO_BAP_TX >= 0 && CONFIG_GPIO_BAP_RX >= 0) {
-        static BapPins kconfig_bap_pins;
-        kconfig_bap_pins.tx = CONFIG_GPIO_BAP_TX;
-        kconfig_bap_pins.rx = CONFIG_GPIO_BAP_RX;
-        cfg->bap_pins = &kconfig_bap_pins;
-        ESP_LOGI(TAG, "Kconfig override applied for BAP pins: TX=%d RX=%d", CONFIG_GPIO_BAP_TX, CONFIG_GPIO_BAP_RX);
-    }
-#endif
-
-#if defined(CONFIG_GPIO_I2C_SDA) && defined(CONFIG_GPIO_I2C_SCL)
-    if (CONFIG_GPIO_I2C_SDA >= 0 && CONFIG_GPIO_I2C_SCL >= 0) {
-        static I2cPins kconfig_i2c_pins;
-        kconfig_i2c_pins.sda = CONFIG_GPIO_I2C_SDA;
-        kconfig_i2c_pins.scl = CONFIG_GPIO_I2C_SCL;
-        cfg->i2c_pins = &kconfig_i2c_pins;
-        ESP_LOGI(TAG, "Kconfig override applied for I2C pins: SDA=%d SCL=%d", CONFIG_GPIO_I2C_SDA, CONFIG_GPIO_I2C_SCL);
-    }
-#endif
-}
-
 esp_err_t device_config_init(void * pvParameters)
 {
     GlobalState * GLOBAL_STATE = (GlobalState *) pvParameters;
@@ -100,8 +26,7 @@ esp_err_t device_config_init(void * pvParameters)
             ESP_LOGI(TAG, "ASIC: %dx %s (%d cores)", GLOBAL_STATE->DEVICE_CONFIG.family.asic_count, GLOBAL_STATE->DEVICE_CONFIG.family.asic.name, GLOBAL_STATE->DEVICE_CONFIG.family.asic.core_count);
 
             free(board_version);
-            apply_kconfig_pin_overrides(&GLOBAL_STATE->DEVICE_CONFIG);
-            return device_config_validate_pins(&GLOBAL_STATE->DEVICE_CONFIG);
+            return device_pins_init(&GLOBAL_STATE->DEVICE_CONFIG.pins);
         }
     }
 
@@ -154,6 +79,5 @@ esp_err_t device_config_init(void * pvParameters)
     free(device_model);
     free(asic_model);
 
-    apply_kconfig_pin_overrides(&GLOBAL_STATE->DEVICE_CONFIG);
-    return device_config_validate_pins(&GLOBAL_STATE->DEVICE_CONFIG);
+    return device_pins_init(&GLOBAL_STATE->DEVICE_CONFIG.pins);
 }

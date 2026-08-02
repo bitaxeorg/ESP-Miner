@@ -240,8 +240,8 @@ esp_err_t BAP_uart_init(void) {
         return ret;
     }
     
-    gpio_num_t bap_tx = bap_global_state->DEVICE_CONFIG.bap_pins->tx;
-    gpio_num_t bap_rx = bap_global_state->DEVICE_CONFIG.bap_pins->rx;
+    gpio_num_t bap_tx = bap_global_state->DEVICE_CONFIG.pins.bap->tx;
+    gpio_num_t bap_rx = bap_global_state->DEVICE_CONFIG.pins.bap->rx;
 
     ret = uart_set_pin(BAP_UART_NUM, bap_tx, bap_rx, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
     if (ret != ESP_OK) {

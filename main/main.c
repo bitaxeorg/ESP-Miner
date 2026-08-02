@@ -123,8 +123,8 @@ void app_main(void)
     }
 
     // Init I2C
-    if (GLOBAL_STATE.DEVICE_CONFIG.i2c_pins != NULL) {
-        ESP_ERROR_CHECK(i2c_bitaxe_init(GLOBAL_STATE.DEVICE_CONFIG.i2c_pins->sda, GLOBAL_STATE.DEVICE_CONFIG.i2c_pins->scl));
+    if (GLOBAL_STATE.DEVICE_CONFIG.pins.i2c != NULL) {
+        ESP_ERROR_CHECK(i2c_bitaxe_init(GLOBAL_STATE.DEVICE_CONFIG.pins.i2c->sda, GLOBAL_STATE.DEVICE_CONFIG.pins.i2c->scl));
         ESP_LOGI(TAG, "I2C initialized successfully");
     } else {
         ESP_LOGI(TAG, "I2C pins not configured for board; skipping I2C initialization");
