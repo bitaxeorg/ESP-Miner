@@ -688,8 +688,9 @@ static void uptime_update_cb(lv_timer_t * timer)
     }
 }
 
-esp_err_t screen_start(GlobalState * GLOBAL_STATE)
+esp_err_t screen_start(GlobalState * global_state)
 {
+    GLOBAL_STATE = global_state;
     if (lvgl_port_lock(0)) {
         // screen_chars = lv_display_get_horizontal_resolution(NULL) / 6;
         screen_lines = lv_display_get_vertical_resolution(NULL) / 8;
