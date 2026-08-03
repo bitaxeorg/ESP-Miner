@@ -2,6 +2,7 @@
 
 #include "crc.h"
 #include "global_state.h"
+#include "mining.h"
 #include "serial.h"
 #include "utils.h"
 
@@ -170,10 +171,8 @@ float BM1368_send_hash_frequency(float target_freq)
     return new_freq;
 }
 
-uint8_t BM1368_init(void * pvParameters)
+uint8_t BM1368_init(GlobalState * GLOBAL_STATE)
 {
-    GlobalState * GLOBAL_STATE = (GlobalState *)pvParameters;
-
     // set version mask
     for (int i = 0; i < 4; i++) {
         BM1368_set_version_mask(STRATUM_DEFAULT_VERSION_MASK);
@@ -260,10 +259,8 @@ int BM1368_set_max_baud(void)
 
 static uint8_t id = 0;
 
-void BM1368_send_work(void * pvParameters, bm_job * next_bm_job)
+void BM1368_send_work(GlobalState * GLOBAL_STATE, bm_job * next_bm_job)
 {
-    GlobalState * GLOBAL_STATE = (GlobalState *) pvParameters;
-
     BM1368_job job;
     id = (id + 24) % 128;
     job.job_id = id;
@@ -294,7 +291,7 @@ void BM1368_send_work(void * pvParameters, bm_job * next_bm_job)
     _send_BM1368((TYPE_JOB | GROUP_SINGLE | CMD_WRITE), (uint8_t *)&job, sizeof(BM1368_job), BM1368_DEBUG_WORK);
 }
 
-task_result * BM1368_process_work(void * pvParameters)
+task_result * BM1368_process_work(GlobalState * GLOBAL_STATE)
 {
     bm1368_asic_result_t asic_result = {0};
 
@@ -323,8 +320,6 @@ task_result * BM1368_process_work(void * pvParameters)
     uint8_t small_core_id = asic_result.job.id & 0x0f;
     uint32_t version_bits = (ntohs(asic_result.job.version) << 13);
 
-    GlobalState * GLOBAL_STATE = (GlobalState *) pvParameters;
-
     // Read active_jobs[job_id] under the lock
     pthread_mutex_lock(&GLOBAL_STATE->valid_jobs_lock);
     if (GLOBAL_STATE->valid_jobs[job_id] == 0 || GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[job_id] == NULL) {
@@ -345,9 +340,8 @@ task_result * BM1368_process_work(void * pvParameters)
     return &result;
 }
 
-void BM1368_read_registers(void * pvParameters)
+void BM1368_read_registers(GlobalState * GLOBAL_STATE)
 {
-    GlobalState * GLOBAL_STATE = (GlobalState *) pvParameters;
     uint16_t asic_count = GLOBAL_STATE->DEVICE_CONFIG.family.asic_count;
     if (asic_count == 0 || address_interval <= 0) {
         return;

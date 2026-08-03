@@ -9,31 +9,23 @@
 #include "freertos/portmacro.h"
 #include "power_management_task.h"
 #include "hashrate_monitor_task.h"
-#include "mining.h"
 #include "coinbase_decoder.h"
 #include "work_queue.h"
 #include "device_config.h"
 #include "display.h"
 #include "scoreboard.h"
 #include "esp_transport.h"
+#include "system.h"
 
-typedef enum {
-    STRATUM_PROTOCOL_UNKNOWN = 0,
-    STRATUM_PROTOCOL_V1 = 1,
-    STRATUM_PROTOCOL_V2 = 2,
-} stratum_protocol_t;
-
-#define STRATUM_V1 "SV1"
-#define STRATUM_V2 "SV2"
-
-// Forward declarations
-struct sv2_conn;
-struct sv2_noise_ctx;
+typedef struct bm_job bm_job;
+typedef struct sv2_conn sv2_conn;
+typedef struct sv2_noise_ctx sv2_noise_ctx;
 
 #define STRATUM_USER CONFIG_STRATUM_USER
 #define FALLBACK_STRATUM_USER CONFIG_FALLBACK_STRATUM_USER
 
-typedef struct {
+typedef struct PoolConfig
+{
     char * url;
     uint16_t port;
     char * user;
@@ -54,7 +46,8 @@ typedef struct {
 #define MAX_BLOCK_SIGNAL_LEN 16
 #define MAX_POOLS 8
 
-typedef struct {
+typedef struct RejectedReasonStat
+{
     char message[64];
     uint32_t count;
 } RejectedReasonStat;
@@ -68,7 +61,7 @@ typedef struct {
     bool isCurrent;
 } cached_partition_t;
 
-typedef struct
+typedef struct SystemModule
 {
     float current_hashrate;
     float hashrate_1m;
@@ -128,7 +121,7 @@ typedef struct
     char full_hostname[70];
 } SystemModule;
 
-typedef struct
+typedef struct SelfTestNonceMeasurement
 {
     bool is_active;
     uint64_t accepted_count;
@@ -137,7 +130,7 @@ typedef struct
     pthread_mutex_t lock;
 } SelfTestNonceMeasurement;
 
-typedef struct
+typedef struct SelfTestModule
 {
     bool is_active;
     bool is_finished;
@@ -148,7 +141,7 @@ typedef struct
     esp_err_t system_init_ret;
 } SelfTestModule;
 
-typedef struct
+typedef struct AsicTaskModule
 {
     // ASIC may not return the nonce in the same order as the jobs were sent
     // it also may return a previous nonce under some circumstances
@@ -160,7 +153,7 @@ typedef struct
     SemaphoreHandle_t semaphore;
 } AsicTaskModule;
 
-typedef struct
+typedef struct GlobalState
 {
     work_queue stratum_queue;
 
