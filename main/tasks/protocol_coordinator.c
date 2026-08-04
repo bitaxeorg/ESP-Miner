@@ -6,12 +6,13 @@
 #include "freertos/queue.h"
 #include "esp_heap_caps.h"
 
+#include "global_state.h"
 #include "protocol_coordinator.h"
 #include "stratum_v1_task.h"
+#include "stratum_api.h"
 #include "stratum_v2_task.h"
 #include "connect.h"
 #include "system.h"
-#include "nvs_config.h"
 
 #include <string.h>
 

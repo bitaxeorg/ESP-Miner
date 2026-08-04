@@ -21,6 +21,7 @@ build/config/*
 
 # Test folder
 test/build/*
+test-ci/
 
 # HTML documentation
 html_doc/

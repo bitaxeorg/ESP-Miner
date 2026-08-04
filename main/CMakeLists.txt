@@ -62,13 +62,16 @@ INCLUDE_DIRS
     "http_server/axe-os/api/system"
     "self_test"
     "bap"
-    "../components/asic/include"
-    "../components/connect/include"
-    "../components/dns_server/include"
-    "../components/stratum/include"
     "thermal"
     "power"
     "${CMAKE_CURRENT_BINARY_DIR}"
+
+REQUIRES
+    "asic"
+    "connect"
+    "dns_server"
+    "stratum"
+    "stratum_v2"
 
 PRIV_REQUIRES
     "app_update"
@@ -87,7 +90,6 @@ PRIV_REQUIRES
     "vfs"
     "esp_driver_i2c"
     "tcp_transport"
-    "stratum_v2"
     "esp_mm"
     "bt"
 

@@ -18,6 +18,7 @@
 #include "esp_app_desc.h"
 #include "esp_timer.h"
 
+#include "global_state.h"
 #include "system.h"
 #include "connect.h"
 #include "nvs_config.h"
