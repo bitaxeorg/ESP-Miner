@@ -1,7 +1,9 @@
-#include <arpa/inet.h>
 #include <ctype.h>
 #include <string.h>
 #include <strings.h>
+
+#include "lwip/inet.h"
+#include "lwip/sockets.h"
 
 #include "api_rx.h"
 
