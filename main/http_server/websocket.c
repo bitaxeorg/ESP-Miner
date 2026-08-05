@@ -13,6 +13,7 @@
 #include "api_rx.h"
 
 #define WS_LOG_SCRATCH_SIZE 2048
+#define WS_HANDSHAKE_HEADER_SIZE 256
 
 static const char * TAG = "websocket";
 
@@ -26,6 +27,57 @@ static int type_counts[WS_TYPE_MAX] = {0};
 static SemaphoreHandle_t clients_mutex = NULL;
 static httpd_handle_t server_handle = NULL;
 static TaskHandle_t s_websocket_log_task_handle = NULL;
+
+static bool websocket_has_free_slot(void)
+{
+    if (clients_mutex == NULL ||
+        xSemaphoreTake(clients_mutex, pdMS_TO_TICKS(100)) != pdTRUE) {
+        ESP_LOGE(TAG, "Failed to acquire mutex while checking client capacity");
+        return false;
+    }
+
+    bool has_free_slot = false;
+    for (int i = 0; i < MAX_WEBSOCKET_CLIENTS; i++) {
+        if (clients[i].fd == -1) {
+            has_free_slot = true;
+            break;
+        }
+    }
+
+    xSemaphoreGive(clients_mutex);
+    return has_free_slot;
+}
+
+static esp_err_t websocket_origin_is_allowed(httpd_req_t *req)
+{
+    size_t origin_len = httpd_req_get_hdr_value_len(req, "Origin");
+    if (origin_len == 0) {
+        // Non-browser clients such as websocat do not necessarily send Origin.
+        return ESP_OK;
+    }
+
+    size_t host_len = httpd_req_get_hdr_value_len(req, "Host");
+    if (origin_len >= WS_HANDSHAKE_HEADER_SIZE || host_len == 0 ||
+        host_len >= WS_HANDSHAKE_HEADER_SIZE) {
+        ESP_LOGW(TAG, "Rejecting WebSocket handshake with invalid Origin/Host length");
+        return ESP_FAIL;
+    }
+
+    char origin[WS_HANDSHAKE_HEADER_SIZE];
+    char host[WS_HANDSHAKE_HEADER_SIZE];
+    if (httpd_req_get_hdr_value_str(req, "Origin", origin, sizeof(origin)) != ESP_OK ||
+        httpd_req_get_hdr_value_str(req, "Host", host, sizeof(host)) != ESP_OK) {
+        ESP_LOGW(TAG, "Rejecting WebSocket handshake with unreadable Origin/Host");
+        return ESP_FAIL;
+    }
+
+    if (!api_rx_websocket_origin_matches_host(origin, host)) {
+        ESP_LOGW(TAG, "Rejecting cross-origin WebSocket handshake");
+        return ESP_FAIL;
+    }
+
+    return ESP_OK;
+}
 
 void websocket_set_log_task_handle(TaskHandle_t task_handle)
 {
@@ -176,17 +228,28 @@ void websocket_init(httpd_handle_t server)
 
 esp_err_t websocket_pre_handshake(httpd_req_t *req)
 {
+    if (websocket_origin_is_allowed(req) != ESP_OK) {
+        httpd_resp_send_err(req, HTTPD_403_FORBIDDEN,
+                            "Forbidden WebSocket origin");
+        return ESP_FAIL;
+    }
+
     if (is_network_allowed(req) != ESP_OK) {
         httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
         return ESP_FAIL;
     }
 
-    int active_clients = 0;
-    for (int i = 0; i < WS_TYPE_MAX; i++) {
-        active_clients += type_counts[i];
+    WebSocketClientType type = (WebSocketClientType)(uintptr_t)req->user_ctx;
+    if (type < 0 || type >= WS_TYPE_MAX) {
+        ESP_LOGE(TAG, "Rejecting WebSocket connection with invalid client type: %d",
+                 type);
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR,
+                            "Invalid WebSocket endpoint");
+        return ESP_FAIL;
     }
-    if (active_clients >= MAX_WEBSOCKET_CLIENTS) {
-        ESP_LOGE(TAG, "Max WebSocket clients reached, rejecting new connection");
+
+    if (!websocket_has_free_slot()) {
+        ESP_LOGW(TAG, "Max WebSocket clients reached, rejecting handshake");
         httpd_resp_send_custom_err(req, "429 Too Many Requests", "Max WebSocket clients reached");
         return ESP_FAIL;
     }
