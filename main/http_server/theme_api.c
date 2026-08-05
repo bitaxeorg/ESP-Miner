@@ -45,16 +45,12 @@ static esp_err_t theme_post_handler(httpd_req_t *req)
 
     set_cors_headers(req);
 
-    // Read POST data
     char content[1024];
-    int ret = httpd_req_recv(req, content, sizeof(content) - 1);
-    if (ret <= 0) {
-        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to read request");
+    if (HTTP_receive_request_body(req, content, sizeof(content)) != ESP_OK) {
         return ESP_FAIL;
     }
-    content[ret] = '\0';
 
-    cJSON *root = cJSON_Parse(content);
+    cJSON *root = cJSON_ParseWithOpts(content, NULL, true);
     if (!root) {
         httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid JSON");
         return ESP_FAIL;
