@@ -1,6 +1,10 @@
 #include <string.h>
 #include <stdio.h>
 #include <limits.h>
+#include <ctype.h>
+#include <stdlib.h>
+#include "esp_heap_caps.h"
+#include "esp_psram.h"
 #include "mining.h"
 #include "stratum_api.h"
 #include "utils.h"
@@ -12,16 +16,70 @@ void free_bm_job(bm_job *job)
     free(job);
 }
 
-void calculate_coinbase_tx_hash(const char *coinbase_1, const char *coinbase_2, const char *extranonce, const char *extranonce_2, uint8_t dest[32])
+#define MAX_EXTRANONCE_2_BYTES 32U
+
+static bool hex_string_is_valid(const char *hex)
 {
+    if (hex == NULL) {
+        return false;
+    }
+
+    size_t length = strlen(hex);
+    if ((length & 1U) != 0) {
+        return false;
+    }
+
+    for (size_t i = 0; i < length; i++) {
+        if (!isxdigit((unsigned char)hex[i])) {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool calculate_coinbase_tx_hash(const char *coinbase_1, const char *coinbase_2,
+                                const char *extranonce, const char *extranonce_2,
+                                uint8_t dest[32])
+{
+    if (dest == NULL || !hex_string_is_valid(coinbase_1) ||
+        !hex_string_is_valid(coinbase_2) || !hex_string_is_valid(extranonce) ||
+        !hex_string_is_valid(extranonce_2)) {
+        return false;
+    }
+
     size_t len1 = strlen(coinbase_1);
     size_t len2 = strlen(extranonce);
     size_t len3 = strlen(extranonce_2);
     size_t len4 = strlen(coinbase_2);
 
-    size_t coinbase_tx_bin_len = (len1 + len2 + len3 + len4) / 2;
+    if (len1 > SIZE_MAX - len2 || len1 + len2 > SIZE_MAX - len3 ||
+        len1 + len2 + len3 > SIZE_MAX - len4) {
+        return false;
+    }
 
-    uint8_t coinbase_tx_bin[coinbase_tx_bin_len];
+    size_t coinbase_tx_hex_len = len1 + len2 + len3 + len4;
+    if (coinbase_tx_hex_len > STRATUM_V1_MAX_JSON_LINE_SIZE) {
+        return false;
+    }
+
+    size_t coinbase_tx_bin_len = coinbase_tx_hex_len / 2U;
+    if (coinbase_tx_bin_len == 0) {
+        return false;
+    }
+
+    uint8_t *coinbase_tx_bin = NULL;
+#ifdef CONFIG_SPIRAM
+    if (esp_psram_is_initialized()) {
+        coinbase_tx_bin = heap_caps_malloc(coinbase_tx_bin_len,
+                                           MALLOC_CAP_SPIRAM);
+    }
+#endif
+    if (coinbase_tx_bin == NULL) {
+        coinbase_tx_bin = malloc(coinbase_tx_bin_len);
+    }
+    if (coinbase_tx_bin == NULL) {
+        return false;
+    }
 
     size_t bin_offset = 0;
     bin_offset += hex2bin(coinbase_1, coinbase_tx_bin + bin_offset, coinbase_tx_bin_len - bin_offset);
@@ -29,7 +87,14 @@ void calculate_coinbase_tx_hash(const char *coinbase_1, const char *coinbase_2, 
     bin_offset += hex2bin(extranonce_2, coinbase_tx_bin + bin_offset, coinbase_tx_bin_len - bin_offset);
     bin_offset += hex2bin(coinbase_2, coinbase_tx_bin + bin_offset, coinbase_tx_bin_len - bin_offset);
 
-    double_sha256_bin(coinbase_tx_bin, coinbase_tx_bin_len, dest);
+    if (bin_offset != coinbase_tx_bin_len) {
+        free(coinbase_tx_bin);
+        return false;
+    }
+
+    double_sha256_bin(coinbase_tx_bin, bin_offset, dest);
+    free(coinbase_tx_bin);
+    return true;
 }
 
 void calculate_coinbase_tx_hash_bin(const uint8_t *prefix, size_t prefix_len,
@@ -115,10 +180,15 @@ void construct_bm_job(mining_notify *params, const uint8_t merkle_root[32], cons
     }
 }
 
-void extranonce_2_generate(uint64_t extranonce_2, uint32_t length, char dest[static length * 2 + 1])
+bool extranonce_2_generate(uint64_t extranonce_2, uint32_t length,
+                           char *dest, size_t dest_len)
 {
-    // Allocate buffer to hold the extranonce_2 value in bytes
-    uint8_t extranonce_2_bytes[length];
+    if (dest == NULL || length > MAX_EXTRANONCE_2_BYTES ||
+        dest_len < (size_t)length * 2U + 1U) {
+        return false;
+    }
+
+    uint8_t extranonce_2_bytes[MAX_EXTRANONCE_2_BYTES];
     memset(extranonce_2_bytes, 0, length);
     
     // Copy the extranonce_2 value into the buffer, handling endianness
@@ -127,7 +197,8 @@ void extranonce_2_generate(uint64_t extranonce_2, uint32_t length, char dest[sta
     memcpy(extranonce_2_bytes, &extranonce_2, copy_len);
     
     // Convert the bytes to hex string
-    bin2hex(extranonce_2_bytes, length, dest, length * 2 + 1);
+    return bin2hex(extranonce_2_bytes, length, dest, dest_len) ==
+           (size_t)length * 2U;
 }
 
 double hash_to_pdiff(const uint8_t hash[32])

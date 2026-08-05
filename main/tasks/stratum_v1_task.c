@@ -211,7 +211,12 @@ void stratum_v1_task(void *pvParameters)
     // Set V1-specific free function for the work queue
     GLOBAL_STATE->stratum_queue.free_fn = (void (*)(void *))STRATUM_V1_free_mining_notify;
 
-    STRATUM_V1_initialize_buffer();
+    if (!STRATUM_V1_initialize_buffer()) {
+        ESP_LOGE(TAG, "Failed to initialize Stratum V1 receive state");
+        protocol_coordinator_notify_failure();
+        vTaskDelete(NULL);
+        return;
+    }
     int retry_attempts = 0;
     int retry_critical_attempts = 0;
 
