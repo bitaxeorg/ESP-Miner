@@ -7,37 +7,89 @@
 TEST_CASE("Varint decode single byte", "[coinbase_decoder]")
 {
     uint8_t data[] = {0x42};
-    int offset = 0;
-    uint64_t result = coinbase_decode_varint(data, &offset);
+    size_t offset = 0;
+    uint64_t result = 0;
+    TEST_ASSERT_TRUE(coinbase_decode_varint(data, sizeof(data), &offset, &result));
     TEST_ASSERT_TRUE(0x42 == result);
-    TEST_ASSERT_EQUAL_INT(1, offset);
+    TEST_ASSERT_EQUAL_UINT32(1, offset);
 }
 
 TEST_CASE("Varint decode FD format", "[coinbase_decoder]")
 {
     uint8_t data[] = {0xFD, 0x34, 0x12};  // 0x1234 in little-endian
-    int offset = 0;
-    uint64_t result = coinbase_decode_varint(data, &offset);
+    size_t offset = 0;
+    uint64_t result = 0;
+    TEST_ASSERT_TRUE(coinbase_decode_varint(data, sizeof(data), &offset, &result));
     TEST_ASSERT_TRUE(0x1234 == result);
-    TEST_ASSERT_EQUAL_INT(3, offset);
+    TEST_ASSERT_EQUAL_UINT32(3, offset);
 }
 
 TEST_CASE("Varint decode FE format", "[coinbase_decoder]")
 {
     uint8_t data[] = {0xFE, 0x78, 0x56, 0x34, 0x12};  // 0x12345678 in little-endian
-    int offset = 0;
-    uint64_t result = coinbase_decode_varint(data, &offset);
+    size_t offset = 0;
+    uint64_t result = 0;
+    TEST_ASSERT_TRUE(coinbase_decode_varint(data, sizeof(data), &offset, &result));
     TEST_ASSERT_TRUE(0x12345678 == result);
-    TEST_ASSERT_EQUAL_INT(5, offset);
+    TEST_ASSERT_EQUAL_UINT32(5, offset);
 }
 
 TEST_CASE("Varint decode FF format", "[coinbase_decoder]")
 {
     uint8_t data[] = {0xFF, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08};
-    int offset = 0;
-    uint64_t result = coinbase_decode_varint(data, &offset);
+    size_t offset = 0;
+    uint64_t result = 0;
+    TEST_ASSERT_TRUE(coinbase_decode_varint(data, sizeof(data), &offset, &result));
     TEST_ASSERT_TRUE(0x0807060504030201ULL == result);
-    TEST_ASSERT_EQUAL_INT(9, offset);
+    TEST_ASSERT_EQUAL_UINT32(9, offset);
+}
+
+TEST_CASE("Varint decoder rejects every truncated extended encoding", "[coinbase_decoder]")
+{
+    static const struct {
+        uint8_t marker;
+        size_t complete_size;
+    } cases[] = {
+        {0xFD, 3},
+        {0xFE, 5},
+        {0xFF, 9},
+    };
+
+    for (size_t case_index = 0; case_index < sizeof(cases) / sizeof(cases[0]); case_index++) {
+        uint8_t data[9] = {cases[case_index].marker};
+        for (size_t truncated_size = 1; truncated_size < cases[case_index].complete_size; truncated_size++) {
+            size_t offset = 0;
+            uint64_t result = UINT64_MAX;
+            TEST_ASSERT_FALSE(coinbase_decode_varint(data, truncated_size, &offset, &result));
+            TEST_ASSERT_EQUAL_UINT32(0, offset);
+            TEST_ASSERT_TRUE(UINT64_MAX == result);
+        }
+    }
+}
+
+TEST_CASE("Coinbase notification rejects truncated output data and varints", "[coinbase_decoder]")
+{
+    static const char minimal_coinbase_1[] =
+        "00000000" "01"
+        "0000000000000000000000000000000000000000000000000000000000000000"
+        "ffffffff" "020100";
+    static const char *truncated_coinbase_2[] = {
+        "fffffffffd",
+        "ffffffff01",
+        "ffffffff010000000000000000fd00",
+    };
+
+    for (size_t i = 0; i < sizeof(truncated_coinbase_2) / sizeof(truncated_coinbase_2[0]); i++) {
+        mining_notify notification = {
+            .coinbase_1 = (char *)minimal_coinbase_1,
+            .coinbase_2 = (char *)truncated_coinbase_2[i],
+            .target = 0x1d00ffff,
+        };
+        mining_notification_result_t result = {};
+
+        TEST_ASSERT_EQUAL(ESP_ERR_INVALID_ARG,
+                          coinbase_process_notification(&notification, "", 0, NULL, false, &result));
+    }
 }
 
 TEST_CASE("Decode P2PKH address", "[coinbase_decoder]")
@@ -214,7 +266,7 @@ TEST_CASE("BIP-110 signaling not detected", "[coinbase_decoder]")
     mining_notify notify = { 0 };
     notify.version = 0x20000000;  // No BIP-110 signaling
     notify.job_id = "test_job";
-    notify.coinbase_1 = "01000000010000000000000000000000000000000000000000000000000000000000000000ffffffff4b03a5020cfabe6d6d379ae882651f6469f2ed6b8b40a4f9a4b41fd838a3ad6de8cba775f4e8f1d3080100000000000000";
+    notify.coinbase_1 = "01000000010000000000000000000000000000000000000000000000000000000000000000ffffffff4803a5020cfabe6d6d379ae882651f6469f2ed6b8b40a4f9a4b41fd838a3ad6de8cba775f4e8f1d3080100000000000000";
     notify.coinbase_2 = "41903d4c1b2f736c7573682f0000000003ca890d27000000001976a9147c154ed1dc59609e3d26abb2df2ea3d587cd8c4188ac00000000000000002c6a4c2952534b424c4f434b3a4cb4cb2ddfc37c41baf5ef6b6b4899e3253a8f1dfc7e5dd68a5b5b27005014ef0000000000000000266a24aa21a9ed5caa249f1af9fbf71c986fea8e076ca34ae3514fb2f86400561b28c7b15949bf00000000";
     
     mining_notification_result_t result = { 0 };
@@ -231,7 +283,7 @@ TEST_CASE("BIP-110 signaling detected", "[coinbase_decoder]")
     mining_notify notify = { 0 };
     notify.version = 0x20000010;  // Version with BIP-110 signaling
     notify.job_id = "test_job";
-    notify.coinbase_1 = "01000000010000000000000000000000000000000000000000000000000000000000000000ffffffff4b03a5020cfabe6d6d379ae882651f6469f2ed6b8b40a4f9a4b41fd838a3ad6de8cba775f4e8f1d3080100000000000000";
+    notify.coinbase_1 = "01000000010000000000000000000000000000000000000000000000000000000000000000ffffffff4803a5020cfabe6d6d379ae882651f6469f2ed6b8b40a4f9a4b41fd838a3ad6de8cba775f4e8f1d3080100000000000000";
     notify.coinbase_2 = "41903d4c1b2f736c7573682f0000000003ca890d27000000001976a9147c154ed1dc59609e3d26abb2df2ea3d587cd8c4188ac00000000000000002c6a4c2952534b424c4f434b3a4cb4cb2ddfc37c41baf5ef6b6b4899e3253a8f1dfc7e5dd68a5b5b27005014ef0000000000000000266a24aa21a9ed5caa249f1af9fbf71c986fea8e076ca34ae3514fb2f86400561b28c7b15949bf00000000";
     
     mining_notification_result_t result = { 0 };
@@ -248,7 +300,7 @@ TEST_CASE("BIP-110 signaling last block", "[coinbase_decoder]")
     mining_notify notify = { 0 };
     notify.version = 0x20000010;  // Version with BIP-110 signaling
     notify.job_id = "test_job";
-    notify.coinbase_1 = "01000000010000000000000000000000000000000000000000000000000000000000000000ffffffff4b031fbc0efabe6d6d379ae882651f6469f2ed6b8b40a4f9a4b41fd838a3ad6de8cba775f4e8f1d3080100000000000000";
+    notify.coinbase_1 = "01000000010000000000000000000000000000000000000000000000000000000000000000ffffffff48031fbc0efabe6d6d379ae882651f6469f2ed6b8b40a4f9a4b41fd838a3ad6de8cba775f4e8f1d3080100000000000000";
     notify.coinbase_2 = "41903d4c1b2f736c7573682f0000000003ca890d27000000001976a9147c154ed1dc59609e3d26abb2df2ea3d587cd8c4188ac00000000000000002c6a4c2952534b424c4f434b3a4cb4cb2ddfc37c41baf5ef6b6b4899e3253a8f1dfc7e5dd68a5b5b27005014ef0000000000000000266a24aa21a9ed5caa249f1af9fbf71c986fea8e076ca34ae3514fb2f86400561b28c7b15949bf00000000";
     
     mining_notification_result_t result = { 0 };
@@ -266,7 +318,7 @@ TEST_CASE("BIP-110 signaling expired", "[coinbase_decoder]")
     mining_notify notify = { 0 };
     notify.version = 0x20000010;  // Version with BIP-110 signaling
     notify.job_id = "test_job";
-    notify.coinbase_1 = "01000000010000000000000000000000000000000000000000000000000000000000000000ffffffff4b0320bc0efabe6d6d379ae882651f6469f2ed6b8b40a4f9a4b41fd838a3ad6de8cba775f4e8f1d3080100000000000000";
+    notify.coinbase_1 = "01000000010000000000000000000000000000000000000000000000000000000000000000ffffffff480320bc0efabe6d6d379ae882651f6469f2ed6b8b40a4f9a4b41fd838a3ad6de8cba775f4e8f1d3080100000000000000";
     notify.coinbase_2 = "41903d4c1b2f736c7573682f0000000003ca890d27000000001976a9147c154ed1dc59609e3d26abb2df2ea3d587cd8c4188ac00000000000000002c6a4c2952534b424c4f434b3a4cb4cb2ddfc37c41baf5ef6b6b4899e3253a8f1dfc7e5dd68a5b5b27005014ef0000000000000000266a24aa21a9ed5caa249f1af9fbf71c986fea8e076ca34ae3514fb2f86400561b28c7b15949bf00000000";
     
     mining_notification_result_t result = { 0 };

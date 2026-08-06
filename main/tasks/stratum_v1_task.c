@@ -74,6 +74,7 @@ void stratum_v1_close_connection(GlobalState *GLOBAL_STATE)
     if (transport != NULL) {
         esp_transport_close(transport);
     }
+    STRATUM_V1_reset_buffer();
     SYSTEM_clean_jobs_queue(GLOBAL_STATE);
     vTaskDelay(1000 / portTICK_PERIOD_MS);
 }
@@ -179,7 +180,12 @@ void stratum_v1_task(void *pvParameters)
     // Set V1-specific free function for the work queue
     GLOBAL_STATE->stratum_queue.free_fn = (void (*)(void *))STRATUM_V1_free_mining_notify;
 
-    STRATUM_V1_initialize_buffer();
+    if (!STRATUM_V1_initialize()) {
+        ESP_LOGE(TAG, "Failed to initialize Stratum V1 receive state, notifying coordinator");
+        protocol_coordinator_notify_failure();
+        vTaskDelete(NULL);
+        return;
+    }
     int retry_attempts = 0;
     int retry_critical_attempts = 0;
 
@@ -188,8 +194,10 @@ void stratum_v1_task(void *pvParameters)
         // Check if coordinator wants us to shut down
         if (protocol_coordinator_v1_should_shutdown()) {
             ESP_LOGI(TAG, "Coordinator requested shutdown, exiting");
+            STRATUM_V1_cleanup_buffer();
             protocol_coordinator_v1_exited();
             vTaskDelete(NULL);
+            return;
         }
 
         if (!GLOBAL_STATE->ASIC_initalized) {
@@ -210,6 +218,7 @@ void stratum_v1_task(void *pvParameters)
             // recovery — see protocol_coordinator.c.
             ESP_LOGW(TAG, "Max V1 retry attempts reached (%d), notifying coordinator", retry_attempts);
             stratum_v1_close_connection(GLOBAL_STATE);
+            STRATUM_V1_cleanup_buffer();
             protocol_coordinator_notify_failure();
             vTaskDelete(NULL);
             return;
@@ -305,8 +314,10 @@ void stratum_v1_task(void *pvParameters)
             if (protocol_coordinator_v1_should_shutdown()) {
                 ESP_LOGI(TAG, "Coordinator requested shutdown during recv loop, exiting");
                 stratum_v1_close_connection(GLOBAL_STATE);
+                STRATUM_V1_cleanup_buffer();
                 protocol_coordinator_v1_exited();
                 vTaskDelete(NULL);
+                return;
             }
 
             char *line = STRATUM_V1_receive_jsonrpc_line(GLOBAL_STATE->transport);

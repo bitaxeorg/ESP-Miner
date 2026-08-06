@@ -1,6 +1,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <limits.h>
+#include <stdlib.h>
 #include "mining.h"
 #include "stratum_api.h"
 #include "utils.h"
@@ -12,16 +13,57 @@ void free_bm_job(bm_job *job)
     free(job);
 }
 
-void calculate_coinbase_tx_hash(const char *coinbase_1, const char *coinbase_2, const char *extranonce, const char *extranonce_2, uint8_t dest[32])
+__attribute__((weak)) void *stratum_mining_malloc(size_t size)
 {
+    return malloc(size);
+}
+
+static bool is_even_hex(const char *value)
+{
+    if (value == NULL) return false;
+
+    size_t length = strlen(value);
+    if ((length & 1U) != 0) return false;
+
+    for (size_t i = 0; i < length; i++) {
+        char digit = value[i];
+        if (!((digit >= '0' && digit <= '9') ||
+              (digit >= 'a' && digit <= 'f') ||
+              (digit >= 'A' && digit <= 'F'))) {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool calculate_coinbase_tx_hash(const char *coinbase_1, const char *coinbase_2,
+                                const char *extranonce, const char *extranonce_2,
+                                uint8_t dest[32])
+{
+    if (dest == NULL || !is_even_hex(coinbase_1) || !is_even_hex(coinbase_2) ||
+        !is_even_hex(extranonce) || !is_even_hex(extranonce_2)) {
+        return false;
+    }
+
     size_t len1 = strlen(coinbase_1);
     size_t len2 = strlen(extranonce);
     size_t len3 = strlen(extranonce_2);
     size_t len4 = strlen(coinbase_2);
 
-    size_t coinbase_tx_bin_len = (len1 + len2 + len3 + len4) / 2;
+    if (len1 > SIZE_MAX - len2 || len1 + len2 > SIZE_MAX - len3 ||
+        len1 + len2 + len3 > SIZE_MAX - len4) {
+        return false;
+    }
 
-    uint8_t coinbase_tx_bin[coinbase_tx_bin_len];
+    size_t coinbase_tx_bin_len = (len1 + len2 + len3 + len4) / 2;
+    if (coinbase_tx_bin_len == 0 || coinbase_tx_bin_len > MAX_COINBASE_TX_BYTES) {
+        return false;
+    }
+
+    uint8_t *coinbase_tx_bin = stratum_mining_malloc(coinbase_tx_bin_len);
+    if (coinbase_tx_bin == NULL) {
+        return false;
+    }
 
     size_t bin_offset = 0;
     bin_offset += hex2bin(coinbase_1, coinbase_tx_bin + bin_offset, coinbase_tx_bin_len - bin_offset);
@@ -29,7 +71,12 @@ void calculate_coinbase_tx_hash(const char *coinbase_1, const char *coinbase_2, 
     bin_offset += hex2bin(extranonce_2, coinbase_tx_bin + bin_offset, coinbase_tx_bin_len - bin_offset);
     bin_offset += hex2bin(coinbase_2, coinbase_tx_bin + bin_offset, coinbase_tx_bin_len - bin_offset);
 
-    double_sha256_bin(coinbase_tx_bin, coinbase_tx_bin_len, dest);
+    bool complete = bin_offset == coinbase_tx_bin_len;
+    if (complete) {
+        double_sha256_bin(coinbase_tx_bin, coinbase_tx_bin_len, dest);
+    }
+    free(coinbase_tx_bin);
+    return complete;
 }
 
 void calculate_coinbase_tx_hash_bin(const uint8_t *prefix, size_t prefix_len,

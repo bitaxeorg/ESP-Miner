@@ -24,29 +24,33 @@ static void ensure_base58_init(void) {
     }
 }
 
-uint64_t coinbase_decode_varint(const uint8_t *data, int *offset) {
-    uint8_t first_byte = data[*offset];
-    (*offset)++;
-    
-    if (first_byte < 0xFD) {
-        return first_byte;
-    } else if (first_byte == 0xFD) {
-        uint64_t value = data[*offset] | (data[*offset + 1] << 8);
-        *offset += 2;
-        return value;
-    } else if (first_byte == 0xFE) {
-        uint64_t value = data[*offset] | (data[*offset + 1] << 8) | 
-                        (data[*offset + 2] << 16) | (data[*offset + 3] << 24);
-        *offset += 4;
-        return value;
-    } else { // 0xFF
-        uint64_t value = 0;
-        for (int i = 0; i < 8; i++) {
-            value |= ((uint64_t)data[*offset + i]) << (i * 8);
-        }
-        *offset += 8;
-        return value;
+bool coinbase_decode_varint(const uint8_t *data, size_t data_len, size_t *offset, uint64_t *value)
+{
+    if (data == NULL || offset == NULL || value == NULL || *offset >= data_len) {
+        return false;
     }
+
+    size_t next = *offset;
+    uint8_t first_byte = data[next++];
+    if (first_byte < 0xFD) {
+        *offset = next;
+        *value = first_byte;
+        return true;
+    }
+
+    size_t payload_len = first_byte == 0xFD ? 2 : first_byte == 0xFE ? 4 : 8;
+    if (payload_len > data_len - next) {
+        return false;
+    }
+
+    uint64_t decoded = 0;
+    for (size_t i = 0; i < payload_len; i++) {
+        decoded |= ((uint64_t)data[next + i]) << (i * 8);
+    }
+
+    *offset = next + payload_len;
+    *value = decoded;
+    return true;
 }
 
 void coinbase_decode_address_from_scriptpubkey(const uint8_t *script, size_t script_len, 
@@ -268,7 +272,7 @@ esp_err_t coinbase_process_notification(const mining_notify *notification,
     
     hex2bin(notification->coinbase_2, coinbase_2_bin, coinbase_2_len);
     
-    int offset = coinbase_2_offset;
+    size_t offset = (size_t)coinbase_2_offset;
     
     // Read sequence (4 bytes) for BIP-54 detection
     if (offset + 4 > coinbase_2_len) {
@@ -287,13 +291,20 @@ esp_err_t coinbase_process_notification(const mining_notify *notification,
         return ESP_ERR_INVALID_ARG;
     }
     
-    uint64_t num_outputs = coinbase_decode_varint(coinbase_2_bin, &offset);
+    uint64_t num_outputs;
+    if (!coinbase_decode_varint(coinbase_2_bin, (size_t)coinbase_2_len, &offset, &num_outputs)) {
+        free(coinbase_2_bin);
+        return ESP_ERR_INVALID_ARG;
+    }
     result->output_count = 0;
     
     // Parse each output
-    for (uint64_t i = 0; i < num_outputs && offset < coinbase_2_len; i++) {
+    for (uint64_t i = 0; i < num_outputs; i++) {
         // Read value (8 bytes, little-endian)
-        if (offset + 8 > coinbase_2_len) break;
+        if ((size_t)coinbase_2_len - offset < 8) {
+            free(coinbase_2_bin);
+            return ESP_ERR_INVALID_ARG;
+        }
 
         uint64_t value_satoshis = 0;
         for (int i = 0; i < 8; i++) {
@@ -305,10 +316,12 @@ esp_err_t coinbase_process_notification(const mining_notify *notification,
         result->total_value_satoshis += value_satoshis;
 
         // Read scriptPubKey length
-        if (offset >= coinbase_2_len) break;
-        uint64_t script_len = coinbase_decode_varint(coinbase_2_bin, &offset);
-
-        if (offset + script_len > coinbase_2_len) break;
+        uint64_t script_len;
+        if (!coinbase_decode_varint(coinbase_2_bin, (size_t)coinbase_2_len, &offset, &script_len) ||
+            script_len > (uint64_t)((size_t)coinbase_2_len - offset)) {
+            free(coinbase_2_bin);
+            return ESP_ERR_INVALID_ARG;
+        }
 
         if (decode_coinbase_tx) {
             if (value_satoshis > 0) {            

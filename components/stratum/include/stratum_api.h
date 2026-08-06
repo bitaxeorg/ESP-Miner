@@ -13,6 +13,7 @@
 #define MAX_REQUEST_IDS 1024
 #define MAX_EXTRANONCE_2_LEN 32
 #define MAX_POOL_MESSAGE_LEN 256
+#define STRATUM_V1_MAX_JSON_LINE_SIZE 8192
 
 typedef enum
 {
@@ -81,7 +82,13 @@ typedef struct RequestTiming
 
 esp_transport_handle_t STRATUM_V1_transport_init(tls_mode tls, char * cert);
 
-void STRATUM_V1_initialize_buffer();
+bool STRATUM_V1_initialize(void);
+
+bool STRATUM_V1_initialize_buffer(void);
+
+void STRATUM_V1_cleanup_buffer(void);
+
+void STRATUM_V1_reset_buffer(void);
 
 char *STRATUM_V1_receive_jsonrpc_line(esp_transport_handle_t transport);
 

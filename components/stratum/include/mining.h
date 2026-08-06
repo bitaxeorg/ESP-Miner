@@ -1,7 +1,11 @@
 #ifndef MINING_H_
 #define MINING_H_
 
+#include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
+
+#define MAX_COINBASE_TX_BYTES 8192
 
 typedef struct mining_notify mining_notify;
 
@@ -27,7 +31,7 @@ typedef struct bm_job
 
 void free_bm_job(bm_job *job);
 
-void calculate_coinbase_tx_hash(const char *coinbase_1, const char *coinbase_2,
+bool calculate_coinbase_tx_hash(const char *coinbase_1, const char *coinbase_2,
                                 const char *extranonce, const char *extranonce_2, uint8_t dest[32]);
 
 void calculate_coinbase_tx_hash_bin(const uint8_t *prefix, size_t prefix_len,

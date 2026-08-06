@@ -27,10 +27,12 @@ typedef struct mining_notify mining_notify;
  * @brief Decode Bitcoin varint from binary data
  * 
  * @param data Binary data containing the varint
- * @param offset Pointer to current offset, will be updated after reading
- * @return Decoded varint value
+ * @param data_len Length of the binary data
+ * @param offset Pointer to current offset, updated after a successful read
+ * @param value Pointer to the decoded varint value
+ * @return true when a complete varint was decoded
  */
-uint64_t coinbase_decode_varint(const uint8_t *data, int *offset);
+bool coinbase_decode_varint(const uint8_t *data, size_t data_len, size_t *offset, uint64_t *value);
 
 /**
  * @brief Decode Bitcoin address from scriptPubKey
