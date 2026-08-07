@@ -53,7 +53,7 @@ export class LiveDataService {
     const updates$ = merge(
       this.connect().pipe(switchMap(() => EMPTY), catchError(() => EMPTY)),
       this.updates$.pipe(
-        // Buffer updates to handle bursts when tab is resumed
+        // Buffer updates to handle bursts when tab is resumed (1000ms = 1Hz UI refresh)
         bufferTime(500),
         filter(msgs => msgs.length > 0),
         map(msgs => msgs.reduce((acc, curr) => ({ ...acc, ...curr }), {} as Partial<ISystemInfo>))

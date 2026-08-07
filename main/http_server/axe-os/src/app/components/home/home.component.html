@@ -233,7 +233,7 @@
                         </h6>
                         @let powerProgress = ((info.power / info.maxPower) * 100);
                         <div class="w-full bg-progressbar rounded-sm overflow-hidden h-[6px]">
-                            <div class="bg-progressbar-value h-full transition-all duration-300" [style.width.%]="powerProgress"></div>
+                            <div class="bg-progressbar-value h-full transition-[width] duration-300" [style.width.%]="powerProgress"></div>
                         </div>
                     </div>
 
@@ -244,7 +244,7 @@
                         <div class="relative">
                             @let voltageProgress = ((info.voltage / (info.nominalVoltage + .5)) * 100);
                             <div class="w-full bg-progressbar rounded-sm overflow-hidden h-[6px]">
-                                <div class="bg-progressbar-value h-full transition-all duration-300" [style.width.%]="voltageProgress"></div>
+                                <div class="bg-progressbar-value h-full transition-[width] duration-300" [style.width.%]="voltageProgress"></div>
                             </div>
 
                             <!-- Conditional marker based on nominal voltage-->
@@ -268,7 +268,7 @@
                         </h6>
                         @let freqProgress = ((info.actualFrequency / maxFrequency) * 100);
                         <div class="w-full bg-progressbar rounded-sm overflow-hidden h-[6px]">
-                            <div class="bg-progressbar-value h-full transition-all duration-300" [style.width.%]="freqProgress"></div>
+                            <div class="bg-progressbar-value h-full transition-[width] duration-300" [style.width.%]="freqProgress"></div>
                         </div>
                     </div>
 
@@ -278,7 +278,7 @@
                         </h6>
                         @let coreVoltProgress = ((info.coreVoltageActual / 1.8) * 100);
                         <div class="w-full bg-progressbar rounded-sm overflow-hidden h-[6px]">
-                            <div class="bg-progressbar-value h-full transition-all duration-300" [style.width.%]="coreVoltProgress"></div>
+                            <div class="bg-progressbar-value h-full transition-[width] duration-300" [style.width.%]="coreVoltProgress"></div>
                         </div>
                     </div>
                 </div>
@@ -307,7 +307,7 @@
                         </h6>
                         @let tempProgress = ((info.temp / maxTemp) * 100);
                         <div class="w-full bg-progressbar rounded-sm overflow-hidden h-[6px]">
-                            <div class="bg-progressbar-value h-full transition-all duration-300" [style.width.%]="tempProgress"></div>
+                            <div class="bg-progressbar-value h-full transition-[width] duration-300" [style.width.%]="tempProgress"></div>
                         </div>
 
                         <strong class="text-red-500" *ngIf="info.temp >= 70">
@@ -324,7 +324,7 @@
                         </h6>
                         @let temp2Progress = ((info.temp2 / maxTemp) * 100);
                         <div class="w-full bg-progressbar rounded-sm overflow-hidden h-[6px]">
-                            <div class="bg-progressbar-value h-full transition-all duration-300" [style.width.%]="temp2Progress"></div>
+                            <div class="bg-progressbar-value h-full transition-[width] duration-300" [style.width.%]="temp2Progress"></div>
                         </div>
 
                         <strong class="text-red-500" *ngIf="info.temp2 >= 70">
@@ -338,7 +338,7 @@
                         </h6>
                         @let vrTempProgress = ((info.vrTemp / 120) * 100);
                         <div class="w-full bg-progressbar rounded-sm overflow-hidden h-[6px]">
-                            <div class="bg-progressbar-value h-full transition-all duration-300" [style.width.%]="vrTempProgress"></div>
+                            <div class="bg-progressbar-value h-full transition-[width] duration-300" [style.width.%]="vrTempProgress"></div>
                         </div>
 
                         <strong class="text-red-500" *ngIf="info.vrTemp >= 105">
@@ -370,7 +370,7 @@
                         </h6>
                         @let fanProgress = info.fanspeed;
                         <div class="w-full bg-progressbar rounded-sm overflow-hidden h-[6px]">
-                            <div class="bg-progressbar-value h-full transition-all duration-300" [style.width.%]="fanProgress"></div>
+                            <div class="bg-progressbar-value h-full transition-[width] duration-300" [style.width.%]="fanProgress"></div>
                         </div>
                     </div>
                 </div>
@@ -581,7 +581,7 @@
                                         {{ i + 1 }}
                                     </td>
                                 <td *ngFor="let domain of asic?.domains; trackBy: trackByIndex"
-                                    [style.--lightness]="getHeatmapLightness(domain, info.expectedHashrate)"
+                                    [style.--lightness]="domain | heatmapLightness: info.expectedHashrate : asicsAmount : asicDomainsAmount"
                                         [style.height]="(asicAmount <= 2 ? '2rem' : null)"
                                         class="heatmap-cell">
                                         <span class="text-xs">{{ domain | hashSuffix }}</span>
