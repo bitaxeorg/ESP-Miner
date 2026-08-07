@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include "unity.h"
 #include "coinbase_decoder.h"
@@ -244,10 +245,12 @@ TEST_CASE("BIP-110 signaling not detected", "[coinbase_decoder]")
     
     mining_notification_result_t result = { 0 };
     
-    // Use valid extranonce1 (8 hex chars = 4 bytes)
-    esp_err_t err = coinbase_process_notification(&notify, "01020304", 8, "", true, &result);
+    // This captured template reserves 15 scriptSig bytes for extranonces.
+    esp_err_t err = coinbase_process_notification(&notify, "01020304050607", 8, "", true, &result);
     TEST_ASSERT_EQUAL(ESP_OK, err);
+    TEST_ASSERT_EQUAL_INT(3, result.output_count);
     TEST_ASSERT_FALSE(result.bip110_signaling);
+    free(result.scriptsig);
 }
 
 TEST_CASE("BIP-110 signaling detected", "[coinbase_decoder]")
@@ -261,10 +264,12 @@ TEST_CASE("BIP-110 signaling detected", "[coinbase_decoder]")
     
     mining_notification_result_t result = { 0 };
     
-    // Use valid extranonce1 (8 hex chars = 4 bytes)
-    esp_err_t err = coinbase_process_notification(&notify, "01020304", 8, "", true, &result);
+    // This captured template reserves 15 scriptSig bytes for extranonces.
+    esp_err_t err = coinbase_process_notification(&notify, "01020304050607", 8, "", true, &result);
     TEST_ASSERT_EQUAL(ESP_OK, err);
+    TEST_ASSERT_EQUAL_INT(3, result.output_count);
     TEST_ASSERT_TRUE(result.bip110_signaling);
+    free(result.scriptsig);
 }
 
 TEST_CASE("BIP-110 signaling last block", "[coinbase_decoder]")
@@ -278,11 +283,13 @@ TEST_CASE("BIP-110 signaling last block", "[coinbase_decoder]")
     
     mining_notification_result_t result = { 0 };
     
-    // Use valid extranonce1 (8 hex chars = 4 bytes)
-    esp_err_t err = coinbase_process_notification(&notify, "01020304", 8, "", true, &result);
+    // This captured template reserves 15 scriptSig bytes for extranonces.
+    esp_err_t err = coinbase_process_notification(&notify, "01020304050607", 8, "", true, &result);
     TEST_ASSERT_EQUAL(ESP_OK, err);
+    TEST_ASSERT_EQUAL_INT(3, result.output_count);
     TEST_ASSERT_EQUAL(965663, result.block_height);
     TEST_ASSERT_TRUE(result.bip110_signaling);
+    free(result.scriptsig);
 }
 
 TEST_CASE("BIP-110 signaling expired", "[coinbase_decoder]")
@@ -296,9 +303,11 @@ TEST_CASE("BIP-110 signaling expired", "[coinbase_decoder]")
     
     mining_notification_result_t result = { 0 };
     
-    // Use valid extranonce1 (8 hex chars = 4 bytes)
-    esp_err_t err = coinbase_process_notification(&notify, "01020304", 8, "", true, &result);
+    // This captured template reserves 15 scriptSig bytes for extranonces.
+    esp_err_t err = coinbase_process_notification(&notify, "01020304050607", 8, "", true, &result);
     TEST_ASSERT_EQUAL(ESP_OK, err);
+    TEST_ASSERT_EQUAL_INT(3, result.output_count);
     TEST_ASSERT_EQUAL(965664, result.block_height);
     TEST_ASSERT_FALSE(result.bip110_signaling);
+    free(result.scriptsig);
 }
