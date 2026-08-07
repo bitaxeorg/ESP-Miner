@@ -99,16 +99,30 @@ static bool api_rx_local_hostname_is_valid(const char *host)
         return false;
     }
 
-    for (const unsigned char *p = (const unsigned char *)host; *p != '\0'; p++) {
-        if (!isalnum(*p) && *p != '-' && *p != '.') {
-            return false;
-        }
+    size_t host_len = strlen(host);
+    if (host_len > 253) {
+        return false;
     }
 
-    size_t host_len = strlen(host);
-    if (host[0] == '.' || host[0] == '-' ||
-        host[host_len - 1] == '.' || host[host_len - 1] == '-') {
-        return false;
+    const unsigned char *label = (const unsigned char *)host;
+    for (const unsigned char *p = label;; p++) {
+        if (*p != '\0' && *p != '.') {
+            if (!isalnum(*p) && *p != '-') {
+                return false;
+            }
+            continue;
+        }
+
+        size_t label_len = (size_t)(p - label);
+        if (label_len == 0 || label_len > 63 ||
+            label[0] == '-' || label[label_len - 1] == '-') {
+            return false;
+        }
+
+        if (*p == '\0') {
+            break;
+        }
+        label = p + 1;
     }
 
     if (strchr(host, '.') == NULL) {
