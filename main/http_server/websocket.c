@@ -1,3 +1,6 @@
+#include <string.h>
+#include <strings.h>
+
 #include <stdint.h>
 #include <unistd.h>
 #include "freertos/FreeRTOS.h"
@@ -10,9 +13,9 @@
 #include "websocket_api.h"
 #include "http_server.h"
 #include "log_buffer.h"
-#include "api_rx.h"
 
 #define WS_LOG_SCRATCH_SIZE 2048
+#define WS_MAX_WEBSOCKET_PAYLOAD_SIZE 1024U
 #define WS_HANDSHAKE_HEADER_SIZE 256
 
 static const char * TAG = "websocket";
@@ -27,6 +30,39 @@ static int type_counts[WS_TYPE_MAX] = {0};
 static SemaphoreHandle_t clients_mutex = NULL;
 static httpd_handle_t server_handle = NULL;
 static TaskHandle_t s_websocket_log_task_handle = NULL;
+
+static bool websocket_payload_fits(size_t payload_len)
+{
+    return payload_len <= WS_MAX_WEBSOCKET_PAYLOAD_SIZE;
+}
+
+static bool websocket_origin_matches_host(const char *origin, const char *host)
+{
+    if (origin == NULL || host == NULL || host[0] == 0) {
+        return false;
+    }
+
+    const char *authority = NULL;
+    static const char http_prefix[] = "http://";
+    static const char https_prefix[] = "https://";
+
+    if (strncasecmp(origin, http_prefix, sizeof(http_prefix) - 1) == 0) {
+        authority = origin + sizeof(http_prefix) - 1;
+    } else if (strncasecmp(origin, https_prefix, sizeof(https_prefix) - 1) == 0) {
+        authority = origin + sizeof(https_prefix) - 1;
+    } else {
+        return false;
+    }
+
+    size_t authority_len = strcspn(authority, "/?#");
+    if (authority_len == 0 || authority[authority_len] != 0) {
+        return false;
+    }
+
+    size_t host_len = strlen(host);
+    return authority_len == host_len && strncasecmp(authority, host, host_len) == 0;
+}
+
 
 static bool websocket_has_free_slot(void)
 {
@@ -71,7 +107,7 @@ static esp_err_t websocket_origin_is_allowed(httpd_req_t *req)
         return ESP_FAIL;
     }
 
-    if (!api_rx_websocket_origin_matches_host(origin, host)) {
+    if (!websocket_origin_matches_host(origin, host)) {
         ESP_LOGW(TAG, "Rejecting cross-origin WebSocket handshake");
         return ESP_FAIL;
     }
@@ -289,12 +325,12 @@ esp_err_t websocket_handler(httpd_req_t *req)
     // WebSocket stream synchronized. Never allocate based on a peer-provided
     // frame length.
     if (ws_pkt.len > 0) {
-        if (!api_rx_websocket_payload_fits(ws_pkt.len)) {
+        if (!websocket_payload_fits(ws_pkt.len)) {
             ESP_LOGW(TAG, "Rejecting oversized WebSocket frame: %zu bytes", ws_pkt.len);
             return ESP_ERR_INVALID_SIZE;
         }
 
-        uint8_t buf[API_RX_MAX_WEBSOCKET_PAYLOAD_SIZE];
+        uint8_t buf[WS_MAX_WEBSOCKET_PAYLOAD_SIZE];
         ws_pkt.payload = buf;
         return httpd_ws_recv_frame(req, &ws_pkt, sizeof(buf));
     }

@@ -90,7 +90,6 @@ PRIV_REQUIRES
     "esp_driver_i2c"
     "esp_driver_uart"
     "tcp_transport"
-    "api_rx"
     "esp_mm"
     "bt"
 
