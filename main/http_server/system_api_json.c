@@ -181,7 +181,8 @@ static void system_api_add_config(cJSON *root, GlobalState *g) {
             cJSON_AddBoolToObject(p_obj, "stratumDecodeCoinbase", p->decode_coinbase_tx);
             cJSON_AddStringToObject(p_obj, "stratumV2ChannelType", p->sv2_channel_type == SV2_CHANNEL_STANDARD ? SV2_CHANNEL_TYPE_STANDARD : SV2_CHANNEL_TYPE_EXTENDED);
             cJSON_AddStringToObject(p_obj, "stratumV2AuthorityPubkey", p->sv2_authority_pubkey ? p->sv2_authority_pubkey : "");
-            
+            cJSON_AddBoolToObject(p_obj, "stratumV2RequireAuth", p->sv2_require_auth);
+
             cJSON_AddItemToArray(pools_arr, p_obj);
         }
     }

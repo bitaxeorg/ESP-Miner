@@ -192,6 +192,20 @@
                                 </small>
                             </div>
                         </div>
+
+                        <!-- SV2 Require Authentication -->
+                        <div class="flex flex-col md:flex-row md:items-center gap-2">
+                            <label [htmlFor]="'stratumV2RequireAuth_' + poolControl.get('id')?.value" class="w-full md:w-2/12 font-medium cursor-pointer select-none">
+                                <tooltip-text-icon
+                                    text="Require Authentication"
+                                    tooltip="Refuse to connect unless the server certificate is verified against the Authority Pubkey above. Protects against the man-in-the-middle redirect described for the Authority Pubkey. When enabled without a key set, the miner will not connect."
+                                />
+                            </label>
+                            <div class="w-full md:w-10/12 flex items-center">
+                                <app-checkbox [name]="'stratumV2RequireAuth_' + poolControl.get('id')?.value" [inputId]="'stratumV2RequireAuth_' + poolControl.get('id')?.value" formControlName="stratumV2RequireAuth"
+                                    [binary]="true"></app-checkbox>
+                            </div>
+                        </div>
                     </ng-container>
 
                     <!-- Advanced Options Border/Legend -->

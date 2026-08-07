@@ -90,6 +90,9 @@ components:
           type: string
           description: SV2 authority public key for certificate verification (base58-encoded)
           pattern: "^[123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz]*$"
+        stratumV2RequireAuth:
+          type: boolean
+          description: Refuse to connect unless the SV2 server certificate is verified against the authority pubkey
         id:
           type: integer
           description: Pool NVS slot index (0 to 7)
