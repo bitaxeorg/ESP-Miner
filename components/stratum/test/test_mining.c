@@ -180,8 +180,11 @@ TEST_CASE("Extranonce generation rejects unsafe sizes", "[mining extranonce2]")
 {
     char output[65];
 
+    TEST_ASSERT_TRUE(extranonce_2_generate(0, 32, output, sizeof(output)));
+    TEST_ASSERT_EQUAL_size_t(64, strlen(output));
     TEST_ASSERT_FALSE(extranonce_2_generate(0, 33, output, sizeof(output)));
     TEST_ASSERT_FALSE(extranonce_2_generate(0, 32, output, sizeof(output) - 1));
+    TEST_ASSERT_FALSE(extranonce_2_generate(0, 1, NULL, 0));
 }
 
 TEST_CASE("Coinbase hashing rejects malformed hex", "[mining]")
@@ -192,6 +195,9 @@ TEST_CASE("Coinbase hashing rejects malformed hex", "[mining]")
         "00xz", "00", "00", "00", hash));
     TEST_ASSERT_FALSE(calculate_coinbase_tx_hash(
         "0", "00", "00", "00", hash));
+    TEST_ASSERT_FALSE(calculate_coinbase_tx_hash("", "", "", "", hash));
+    TEST_ASSERT_FALSE(calculate_coinbase_tx_hash(
+        "00", "00", "00", "00", NULL));
 }
 
 TEST_CASE("Test nonce diff checking", "[mining test_nonce][not-on-qemu]")

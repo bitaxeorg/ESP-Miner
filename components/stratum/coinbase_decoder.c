@@ -404,11 +404,13 @@ esp_err_t coinbase_process_notification(const mining_notify *notification,
     }
     
     // Read nLockTime (4 bytes at the end of the transaction) for BIP-54 detection
+    if (offset > coinbase_2_len || coinbase_2_len - offset != 4U) {
+        goto invalid_coinbase_2;
+    }
+
     uint32_t nLockTime = 0;
-    if (offset <= coinbase_2_len && coinbase_2_len - offset >= 4U) {
-        for (size_t i = 0; i < 4; i++) {
-            nLockTime |= ((uint32_t)coinbase_2_bin[offset + i]) << (i * 8U);
-        }
+    for (size_t i = 0; i < 4; i++) {
+        nLockTime |= ((uint32_t)coinbase_2_bin[offset + i]) << (i * 8U);
     }
     
     // Detect BIP-54 signaling: nLockTime = block_height - 1 AND nSequence != 0xffffffff

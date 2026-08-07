@@ -234,6 +234,48 @@ TEST_CASE("Decode regtest P2WPKH address", "[coinbase_decoder]")
 // integration-level — the detection logic is tested implicitly through
 // the address prefix matching in the full processing pipeline.
 
+TEST_CASE("Coinbase decoder requires exactly one locktime", "[coinbase_decoder][security]")
+{
+    const char *coinbase_1 =
+        "0100000001000000000000000000000000000000000000000000000000000000"
+        "0000000000ffffffff4b03a5020cfabe6d6d379ae882651f6469f2ed6b8b40a4"
+        "f9a4b41fd838a3ad6de8cba775f4e8f1d3080100000000000000";
+    const char *valid_coinbase_2 =
+        "41903d4c1b2f736c7573682f0000000003ca890d27000000001976a9147c154e"
+        "d1dc59609e3d26abb2df2ea3d587cd8c4188ac00000000000000002c6a4c2952"
+        "534b424c4f434b3a4cb4cb2ddfc37c41baf5ef6b6b4899e3253a8f1dfc7e5dd"
+        "68a5b5b27005014ef0000000000000000266a24aa21a9ed5caa249f1af9fbf71"
+        "c986fea8e076ca34ae3514fb2f86400561b28c7b15949bf00000000";
+    mining_notify notify = {
+        .version = 0x20000000,
+        .coinbase_1 = (char *)coinbase_1,
+    };
+    mining_notification_result_t result = { 0 };
+
+    char *missing_locktime = strdup(valid_coinbase_2);
+    TEST_ASSERT_NOT_NULL(missing_locktime);
+    missing_locktime[strlen(missing_locktime) - 8U] = '\0';
+    notify.coinbase_2 = missing_locktime;
+    TEST_ASSERT_EQUAL(ESP_ERR_INVALID_ARG,
+                      coinbase_process_notification(
+                          &notify, "01020304050607", 8, "", true, &result));
+    free(result.scriptsig);
+    free(missing_locktime);
+
+    size_t valid_length = strlen(valid_coinbase_2);
+    char *trailing_byte = malloc(valid_length + 3U);
+    TEST_ASSERT_NOT_NULL(trailing_byte);
+    memcpy(trailing_byte, valid_coinbase_2, valid_length);
+    memcpy(trailing_byte + valid_length, "00", 3U);
+    notify.coinbase_2 = trailing_byte;
+    memset(&result, 0, sizeof(result));
+    TEST_ASSERT_EQUAL(ESP_ERR_INVALID_ARG,
+                      coinbase_process_notification(
+                          &notify, "01020304050607", 8, "", true, &result));
+    free(result.scriptsig);
+    free(trailing_byte);
+}
+
 TEST_CASE("BIP-110 signaling not detected", "[coinbase_decoder]")
 {
     // Create a mining_notify without BIP-110 bit set

@@ -115,6 +115,57 @@ TEST_CASE("Receive rejects oversized JSON-RPC line", "[stratum][security]")
     free(json);
 }
 
+TEST_CASE("Receive accepts maximum line and preserves the next line", "[stratum][security]")
+{
+    const char *next_line = "{}\n";
+    size_t data_length = STRATUM_V1_MAX_JSON_LINE_SIZE + 1U +
+                         strlen(next_line);
+    char *data = malloc(data_length);
+    TEST_ASSERT_NOT_NULL(data);
+    memset(data, 'a', STRATUM_V1_MAX_JSON_LINE_SIZE);
+    data[STRATUM_V1_MAX_JSON_LINE_SIZE] = '\n';
+    memcpy(data + STRATUM_V1_MAX_JSON_LINE_SIZE + 1U, next_line,
+           strlen(next_line));
+
+    mock_transport_data_t mock = {
+        .data = data,
+        .length = data_length,
+        .max_chunk = data_length,
+    };
+    esp_transport_handle_t transport = create_mock_transport(&mock);
+    TEST_ASSERT_NOT_NULL(transport);
+
+    TEST_ASSERT_TRUE(STRATUM_V1_initialize_buffer());
+    char *maximum_line = STRATUM_V1_receive_jsonrpc_line(transport);
+    char *second_line = STRATUM_V1_receive_jsonrpc_line(transport);
+    TEST_ASSERT_NOT_NULL(maximum_line);
+    TEST_ASSERT_EQUAL_size_t(STRATUM_V1_MAX_JSON_LINE_SIZE,
+                             strlen(maximum_line));
+    TEST_ASSERT_EQUAL_STRING("{}", second_line);
+
+    free(maximum_line);
+    free(second_line);
+    esp_transport_destroy(transport);
+    free(data);
+}
+
+TEST_CASE("Receive rejects embedded NUL", "[stratum][security]")
+{
+    const char data[] = {'{', '}', '\0', '\n'};
+    mock_transport_data_t mock = {
+        .data = data,
+        .length = sizeof(data),
+        .max_chunk = sizeof(data),
+    };
+    esp_transport_handle_t transport = create_mock_transport(&mock);
+    TEST_ASSERT_NOT_NULL(transport);
+
+    TEST_ASSERT_TRUE(STRATUM_V1_initialize_buffer());
+    TEST_ASSERT_NULL(STRATUM_V1_receive_jsonrpc_line(transport));
+
+    esp_transport_destroy(transport);
+}
+
 TEST_CASE("Parse stratum method", "[stratum]")
 {
     StratumApiV1Message stratum_api_v1_message = {};
