@@ -87,14 +87,22 @@ void ASIC_result_task(void *pvParameters)
                     sv2_conn_t *conn = GLOBAL_STATE->sv2_conn;
                     // SV2 spec: extranonce_size is the miner's rollable portion.
                     // The pool prepends its extranonce_prefix separately.
-                    uint8_t en2_len = conn->extranonce_size;
-                    uint8_t extranonce_2[32];
-                    hex2bin(active_job->extranonce2, extranonce_2, en2_len);
-                    ret = stratum_v2_submit_share_extended(GLOBAL_STATE, sv2_job_id,
-                                                           asic_result->nonce,
-                                                           active_job->ntime,
-                                                           asic_result->rolled_version,
-                                                           extranonce_2, en2_len);
+                    uint8_t en2_len = conn != NULL ? conn->extranonce_size : 0;
+                    uint8_t extranonce_2[SV2_MAX_EXTRANONCE_SIZE];
+                    if (en2_len < SV2_MIN_EXTRANONCE_SIZE ||
+                        en2_len > sizeof(extranonce_2) ||
+                        active_job->extranonce2 == NULL ||
+                        strlen(active_job->extranonce2) != (size_t)en2_len * 2U ||
+                        hex2bin(active_job->extranonce2, extranonce_2, en2_len) != en2_len) {
+                        ESP_LOGW(TAG, "Dropping SV2 share with invalid extranonce data");
+                        ret = -1;
+                    } else {
+                        ret = stratum_v2_submit_share_extended(GLOBAL_STATE, sv2_job_id,
+                                                               asic_result->nonce,
+                                                               active_job->ntime,
+                                                               asic_result->rolled_version,
+                                                               extranonce_2, en2_len);
+                    }
                 } else {
                     ret = stratum_v2_submit_share(GLOBAL_STATE, sv2_job_id,
                                                    asic_result->nonce,

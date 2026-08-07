@@ -29,6 +29,8 @@
 #define SV2_MSG_SET_TARGET                              0x21
 
 #define SV2_MAX_MERKLE_BRANCHES 20
+#define SV2_MIN_EXTRANONCE_SIZE 2U
+#define SV2_MAX_EXTRANONCE_SIZE 32U
 
 // Extension type flag for channel messages
 #define SV2_CHANNEL_MSG_FLAG 0x8000
@@ -109,7 +111,7 @@ typedef struct sv2_conn {
     sv2_channel_type_t channel_type;
     uint8_t  extranonce_prefix[32];
     uint8_t  extranonce_prefix_len;
-    uint8_t  extranonce_size;              // total extranonce bytes assigned by pool
+    uint8_t  extranonce_size;              // locally rollable extranonce bytes
     sv2_ext_job_t *ext_pending_jobs[SV2_PENDING_JOBS_SIZE];
 } sv2_conn_t;
 

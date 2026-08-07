@@ -343,6 +343,11 @@ int sv2_build_open_extended_mining_channel(uint8_t *buf, size_t buf_len,
                                            uint32_t request_id, const char *user_identity,
                                            float nominal_hash_rate, uint16_t min_extranonce_size)
 {
+    if (min_extranonce_size < SV2_MIN_EXTRANONCE_SIZE ||
+        min_extranonce_size > SV2_MAX_EXTRANONCE_SIZE) {
+        return -1;
+    }
+
     uint8_t payload[512];
     int pos = 0;
 
@@ -417,6 +422,13 @@ int sv2_parse_open_extended_channel_success(const uint8_t *payload, uint32_t len
                                             uint8_t *extranonce_prefix_len,
                                             uint32_t *group_channel_id)
 {
+    if (payload == NULL || request_id == NULL || channel_id == NULL ||
+        target == NULL || extranonce_size == NULL ||
+        extranonce_prefix == NULL || extranonce_prefix_len == NULL ||
+        group_channel_id == NULL) {
+        return -1;
+    }
+
     // request_id(4) + channel_id(4) + target(32) + extranonce_size(2) + B0_32(1+N) + group_channel_id(4) = min 47 bytes
     if (len < 47) return -1;
 
@@ -425,12 +437,17 @@ int sv2_parse_open_extended_channel_success(const uint8_t *payload, uint32_t len
     *channel_id = read_u32_le(payload + pos); pos += 4;
     memcpy(target, payload + pos, 32); pos += 32;
 
-    *extranonce_size = read_u16_le(payload + pos); pos += 2;
+    uint16_t parsed_extranonce_size = read_u16_le(payload + pos); pos += 2;
+    if (parsed_extranonce_size < SV2_MIN_EXTRANONCE_SIZE ||
+        parsed_extranonce_size > SV2_MAX_EXTRANONCE_SIZE) {
+        return -1;
+    }
 
     // extranonce_prefix: B0_32 (1 byte length + data)
     uint8_t prefix_len = payload[pos++];
     if (prefix_len > 32) return -1;
-    if ((uint32_t)pos + prefix_len + 4 > len) return -1;
+    if ((uint32_t)pos + prefix_len + 4 != len) return -1;
+    *extranonce_size = parsed_extranonce_size;
     *extranonce_prefix_len = prefix_len;
     if (prefix_len > 0) {
         memcpy(extranonce_prefix, payload + pos, prefix_len);
