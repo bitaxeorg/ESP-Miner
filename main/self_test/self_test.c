@@ -49,6 +49,11 @@ static const char * TAG = "self_test";
 static SemaphoreHandle_t longPressSemaphore;
 static bool isFactoryTest = false;
 
+static void self_test_free_v1_work(void *work)
+{
+    STRATUM_V1_free_mining_notify((mining_notify *)work);
+}
+
 // local function prototypes
 static void tests_done(GlobalState * GLOBAL_STATE, bool test_result);
 
@@ -527,7 +532,12 @@ void self_test_task(void * pvParameters)
 
     if (msg.method == MINING_NOTIFY) {
         ESP_LOGI(TAG, "Enqueuing mock work into stratum_queue");
-        queue_enqueue(&GLOBAL_STATE->stratum_queue, msg.mining_notification);
+        queue_set_source(&GLOBAL_STATE->stratum_queue, WORK_ITEM_STRATUM_V1);
+        queue_enqueue(
+            &GLOBAL_STATE->stratum_queue,
+            work_queue_item_create(&GLOBAL_STATE->stratum_queue,
+                                   msg.mining_notification, WORK_ITEM_STRATUM_V1,
+                                   self_test_free_v1_work));
     } else {
         ESP_LOGE(TAG, "Failed to parse mock mining notification");
         tests_done(GLOBAL_STATE, false);

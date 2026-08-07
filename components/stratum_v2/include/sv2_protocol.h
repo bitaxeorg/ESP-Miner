@@ -84,6 +84,9 @@ typedef struct {
     uint16_t coinbase_prefix_len;
     uint8_t *coinbase_suffix;     // heap
     uint16_t coinbase_suffix_len;
+    uint8_t  extranonce_prefix[32];
+    uint8_t  extranonce_prefix_len;
+    uint8_t  extranonce_size;
 } sv2_ext_job_t;
 
 #define SV2_PENDING_JOBS_SIZE 8

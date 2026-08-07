@@ -29,6 +29,11 @@
 
 static const char *TAG = "stratum_v2_task";
 
+static void stratum_v2_free_extended_work(void *work)
+{
+    sv2_ext_job_free((sv2_ext_job_t *)work);
+}
+
 // Load authority pubkey from NVS (base58-encoded) into 32-byte buffer.
 // SV2 format: base58check(0x0001_LE + 32_byte_xonly_pubkey)
 // Decoded: 2-byte version + 32-byte pubkey + 4-byte checksum = 38 bytes
@@ -115,6 +120,9 @@ static void clear_active_job_ids(uint32_t *active_job_ids, int *count)
 void stratum_v2_close_connection(GlobalState *GLOBAL_STATE)
 {
     ESP_LOGE(TAG, "Shutting down SV2 connection and restarting...");
+    if (GLOBAL_STATE->sv2_conn) {
+        GLOBAL_STATE->sv2_conn->channel_opened = false;
+    }
     if (GLOBAL_STATE->sv2_noise_ctx) {
         sv2_noise_destroy(GLOBAL_STATE->sv2_noise_ctx);
         GLOBAL_STATE->sv2_noise_ctx = NULL;
@@ -239,22 +247,27 @@ static void stratum_v2_enqueue_job(GlobalState *GLOBAL_STATE, sv2_conn_t *conn,
 
     SYSTEM_notify_new_ntime(GLOBAL_STATE, ntime);
 
-    if (clean_jobs && (GLOBAL_STATE->stratum_queue.count > 0)) {
-        SYSTEM_clean_jobs_queue(GLOBAL_STATE);
+    if (clean_jobs) {
+        SYSTEM_set_work_source(GLOBAL_STATE, WORK_ITEM_STRATUM_V2_STANDARD);
     }
 
-    if (GLOBAL_STATE->stratum_queue.count == QUEUE_SIZE) {
-        void *old = queue_dequeue(&GLOBAL_STATE->stratum_queue);
-        free(old);
-    }
-
-    queue_enqueue(&GLOBAL_STATE->stratum_queue, job);
+    queue_enqueue(&GLOBAL_STATE->stratum_queue,
+                  work_queue_item_create(&GLOBAL_STATE->stratum_queue, job,
+                                         WORK_ITEM_STRATUM_V2_STANDARD, free));
 }
 
 // Enqueue an sv2_ext_job_t onto the stratum queue (extended channels)
 static void stratum_v2_enqueue_ext_job(GlobalState *GLOBAL_STATE, sv2_conn_t *conn,
                                         sv2_ext_job_t *job)
 {
+    if (conn->extranonce_prefix_len > sizeof(job->extranonce_prefix) ||
+        conn->extranonce_size < 2 ||
+        conn->extranonce_size > 32) {
+        ESP_LOGE(TAG, "Invalid extended-channel extranonce parameters");
+        sv2_ext_job_free(job);
+        return;
+    }
+
     if (job->clean_jobs) {
         clear_active_job_ids(conn->active_job_ids, &conn->active_job_ids_count);
     }
@@ -265,20 +278,23 @@ static void stratum_v2_enqueue_ext_job(GlobalState *GLOBAL_STATE, sv2_conn_t *co
         return;
     }
 
+    memcpy(job->extranonce_prefix, conn->extranonce_prefix,
+           conn->extranonce_prefix_len);
+    job->extranonce_prefix_len = conn->extranonce_prefix_len;
+    job->extranonce_size = conn->extranonce_size;
     GLOBAL_STATE->SYSTEM_MODULE.work_received++;
 
     SYSTEM_notify_new_ntime(GLOBAL_STATE, job->ntime);
 
-    if (job->clean_jobs && (GLOBAL_STATE->stratum_queue.count > 0)) {
-        SYSTEM_clean_jobs_queue(GLOBAL_STATE);
+    if (job->clean_jobs) {
+        SYSTEM_set_work_source(GLOBAL_STATE, WORK_ITEM_STRATUM_V2_EXTENDED);
     }
 
-    if (GLOBAL_STATE->stratum_queue.count == QUEUE_SIZE) {
-        void *old = queue_dequeue(&GLOBAL_STATE->stratum_queue);
-        sv2_ext_job_free((sv2_ext_job_t *)old);
-    }
-
-    queue_enqueue(&GLOBAL_STATE->stratum_queue, job);
+    queue_enqueue(
+        &GLOBAL_STATE->stratum_queue,
+        work_queue_item_create(&GLOBAL_STATE->stratum_queue, job,
+                               WORK_ITEM_STRATUM_V2_EXTENDED,
+                               stratum_v2_free_extended_work));
 }
 
 // Decode coinbase from extended job prefix/suffix by converting to hex and reusing V1 decoder
@@ -608,16 +624,9 @@ void stratum_v2_task(void *pvParameters)
 {
     GlobalState *GLOBAL_STATE = (GlobalState *)pvParameters;
 
-    // Determine channel type before setting up queue free function
+    // Determine channel type before opening the connection.
     bool use_fallback_init = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback;
     sv2_channel_type_t channel_type = sv2_select_channel_type(GLOBAL_STATE, use_fallback_init);
-
-    // Set V2-specific free function for the work queue
-    if (channel_type == SV2_CHANNEL_EXTENDED) {
-        GLOBAL_STATE->stratum_queue.free_fn = (void (*)(void *))sv2_ext_job_free;
-    } else {
-        GLOBAL_STATE->stratum_queue.free_fn = free;
-    }
 
     // Set default version mask for version rolling
     GLOBAL_STATE->version_mask = STRATUM_DEFAULT_VERSION_MASK;
@@ -968,6 +977,12 @@ void stratum_v2_task(void *pvParameters)
             conn->channel_id = channel_id;
             conn->channel_opened = true;
             memcpy(conn->target, target, 32);
+
+            SYSTEM_set_work_source(
+                GLOBAL_STATE,
+                channel_type == SV2_CHANNEL_EXTENDED
+                    ? WORK_ITEM_STRATUM_V2_EXTENDED
+                    : WORK_ITEM_STRATUM_V2_STANDARD);
 
             double pdiff = hash_to_pdiff(target);
             GLOBAL_STATE->pool_difficulty = pdiff;
