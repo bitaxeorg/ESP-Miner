@@ -2,7 +2,9 @@
 #define STRATUM_V2_TASK_H
 
 #include <stdbool.h>
-#include "global_state.h"
+#include <stdint.h>
+
+typedef struct GlobalState GlobalState;
 
 void stratum_v2_task(void *pvParameters);
 void stratum_v2_close_connection(GlobalState *GLOBAL_STATE);

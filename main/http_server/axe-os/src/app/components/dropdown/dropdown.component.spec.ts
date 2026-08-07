@@ -99,4 +99,27 @@ describe('DropdownComponent', () => {
     expect(component.trackByOption(0, { label: 'Test', value: 42 })).toBe(42);
     expect(component.trackByOption(3, { label: 'Test', value: undefined })).toBe(3);
   });
+
+  it('should set openUpward to true when space below is insufficient', () => {
+    const el = fixture.nativeElement;
+    spyOn(el, 'getBoundingClientRect').and.returnValue({
+      top: 500,
+      bottom: 530,
+      left: 0,
+      right: 100,
+      width: 100,
+      height: 30
+    } as DOMRect);
+
+    spyOnProperty(window, 'innerHeight', 'get').and.returnValue(600);
+
+    const trigger = fixture.debugElement.query(By.css('.cursor-pointer'));
+    trigger.nativeElement.click();
+    fixture.detectChanges();
+
+    expect(component.openUpward).toBeTrue();
+    const ul = fixture.debugElement.query(By.css('ul'));
+    expect(ul.classes['bottom-full']).toBeTrue();
+    expect(ul.classes['mb-1']).toBeTrue();
+  });
 });

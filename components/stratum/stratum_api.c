@@ -15,6 +15,7 @@
 #include "utils.h"
 #include "esp_timer.h"
 #include "esp_heap_caps.h"
+#include <inttypes.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -90,7 +91,7 @@ esp_transport_handle_t STRATUM_V1_transport_init(tls_mode tls, char * cert)
     return transport;
 }
 
-void STRATUM_V1_initialize_buffer()
+void STRATUM_V1_initialize_buffer(void)
 {
     // Free any existing buffer (may be non-NULL if a previous V1 task was running)
     free(json_rpc_buffer);
@@ -614,14 +615,14 @@ bool STRATUM_V1_parse(StratumApiV1Message *message, const char *stratum_json)
     return result;
 }
 
-void STRATUM_V1_free_mining_notify(mining_notify * params)
+void STRATUM_V1_free_mining_notify(mining_notify * mining_notify)
 {
-    free(params->job_id);
-    free(params->prev_block_hash);
-    free(params->coinbase_1);
-    free(params->coinbase_2);
-    free(params->merkle_branches);
-    free(params);
+    free(mining_notify->job_id);
+    free(mining_notify->prev_block_hash);
+    free(mining_notify->coinbase_1);
+    free(mining_notify->coinbase_2);
+    free(mining_notify->merkle_branches);
+    free(mining_notify);
 }
 
 static void stamp_tx(int request_id, uint64_t timestamp_us)
@@ -663,7 +664,7 @@ int STRATUM_V1_suggest_difficulty(esp_transport_handle_t transport, int send_uid
 {
     char difficulty_msg[BUFFER_SIZE];
     snprintf(difficulty_msg, sizeof(difficulty_msg),
-        "{\"id\":%d,\"method\":\"mining.suggest_difficulty\",\"params\":[%ld]}\n",
+        "{\"id\":%d,\"method\":\"mining.suggest_difficulty\",\"params\":[%" PRIu32 "]}\n",
         send_uid, difficulty);
     debug_stratum_tx(difficulty_msg);
 

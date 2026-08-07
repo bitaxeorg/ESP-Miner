@@ -1828,10 +1828,9 @@ esp_err_t http_404_error_handler(httpd_req_t * req, httpd_err_code_t err)
     return ESP_OK;
 }
 
-esp_err_t start_rest_server(void * pvParameters)
+esp_err_t start_rest_server(GlobalState * global_state)
 {
-    GLOBAL_STATE = (GlobalState *) pvParameters;
-    
+    GLOBAL_STATE = global_state;
     // Initialize the ASIC API with the global state
     asic_api_init(GLOBAL_STATE);
     const char * base_path = "";
@@ -2019,7 +2018,9 @@ esp_err_t start_rest_server(void * pvParameters)
         .method = HTTP_GET, 
         .handler = websocket_handler, 
         .user_ctx = (void *)WS_TYPE_LOGS, 
-        .is_websocket = true
+        .is_websocket = true,
+        .ws_pre_handshake_cb = websocket_pre_handshake,
+        .ws_post_handshake_cb = websocket_post_handshake
     };
     httpd_register_uri_handler(server, &ws);
 
@@ -2028,7 +2029,9 @@ esp_err_t start_rest_server(void * pvParameters)
         .method = HTTP_GET, 
         .handler = websocket_handler, 
         .user_ctx = (void *)WS_TYPE_API, 
-        .is_websocket = true
+        .is_websocket = true,
+        .ws_pre_handshake_cb = websocket_pre_handshake,
+        .ws_post_handshake_cb = websocket_post_handshake
     };
     httpd_register_uri_handler(server, &ws_live);
 

@@ -2,8 +2,19 @@
 #define SYSTEM_H_
 
 #include "esp_err.h"
-#include "global_state.h"
+
 #include "sv2_protocol.h"
+
+typedef struct GlobalState GlobalState;
+
+typedef enum {
+    STRATUM_PROTOCOL_UNKNOWN = 0,
+    STRATUM_PROTOCOL_V1 = 1,
+    STRATUM_PROTOCOL_V2 = 2,
+} stratum_protocol_t;
+
+#define STRATUM_V1 "SV1"
+#define STRATUM_V2 "SV2"
 
 void SYSTEM_init_system(GlobalState * GLOBAL_STATE);
 void SYSTEM_init_versions(GlobalState * GLOBAL_STATE);
