@@ -40,23 +40,18 @@ extern void BAP_parse_message(const char *message);
 
 void BAP_send_message(bap_command_t cmd, const char *parameter, const char *value) {
     char message[BAP_MAX_MESSAGE_LEN];
-    char sentence_body[BAP_MAX_MESSAGE_LEN];
-    int len;
+    size_t len;
 
-    if (value && strlen(value) > 0) {
-        snprintf(sentence_body, sizeof(sentence_body), "BAP,%s,%s,%s",
-                 BAP_command_to_string(cmd), parameter, value);
-    } else {
-        snprintf(sentence_body, sizeof(sentence_body), "BAP,%s,%s",
-                 BAP_command_to_string(cmd), parameter);
+    if (!BAP_format_message(message, sizeof(message), cmd, parameter, value, &len)) {
+        ESP_LOGW(TAG, "Dropping invalid or oversized BAP message");
+        return;
     }
 
-    uint8_t checksum = BAP_calculate_checksum(sentence_body);
-
-    len = snprintf(message, sizeof(message), "$%s*%02X\r\n", sentence_body, checksum);
-
     if (bap_uart_send_mutex != NULL && xSemaphoreTake(bap_uart_send_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
-        uart_write_bytes(BAP_UART_NUM, message, len);
+        int bytes_sent = uart_write_bytes(BAP_UART_NUM, message, len);
+        if (bytes_sent < 0 || (size_t)bytes_sent != len) {
+            ESP_LOGW(TAG, "UART send failed or partial: %d of %zu bytes", bytes_sent, len);
+        }
         xSemaphoreGive(bap_uart_send_mutex);
         
         //ESP_LOGI(TAG, "Sent: %s", message);
@@ -67,21 +62,13 @@ void BAP_send_message(bap_command_t cmd, const char *parameter, const char *valu
 
 void BAP_send_message_with_queue(bap_command_t cmd, const char *parameter, const char *value) {
     char message[BAP_MAX_MESSAGE_LEN];
-    char sentence_body[BAP_MAX_MESSAGE_LEN];
-    int len;
+    size_t len;
     bap_message_t msg;
 
-    if (value && strlen(value) > 0) {
-        snprintf(sentence_body, sizeof(sentence_body), "BAP,%s,%s,%s",
-                 BAP_command_to_string(cmd), parameter, value);
-    } else {
-        snprintf(sentence_body, sizeof(sentence_body), "BAP,%s,%s",
-                 BAP_command_to_string(cmd), parameter);
+    if (!BAP_format_message(message, sizeof(message), cmd, parameter, value, &len)) {
+        ESP_LOGW(TAG, "Dropping invalid or oversized BAP message");
+        return;
     }
-
-    uint8_t checksum = BAP_calculate_checksum(sentence_body);
-
-    len = snprintf(message, sizeof(message), "$%s*%02X\r\n", sentence_body, checksum);
 
     msg.message = malloc(len + 1);
     if (msg.message == NULL) {
@@ -89,8 +76,7 @@ void BAP_send_message_with_queue(bap_command_t cmd, const char *parameter, const
         return;
     }
     
-    strncpy(msg.message, message, len);
-    msg.message[len] = '\0';
+    memcpy(msg.message, message, len + 1);
     msg.length = len;
 
     if (xQueueSend(bap_uart_send_queue, &msg, UART_SEND_TIMEOUT_MS / portTICK_PERIOD_MS) != pdTRUE) {
@@ -189,9 +175,9 @@ static void uart_send_task(void *pvParameters) {
                     xSemaphoreGive(bap_uart_send_mutex);
                 } else {
                     int bytes_sent = uart_write_bytes(BAP_UART_NUM, msg.message, msg.length);
-                    if (bytes_sent == msg.length) {
+                    if (bytes_sent >= 0 && (size_t)bytes_sent == msg.length) {
                     } else {
-                        ESP_LOGW(TAG, "UART send failed or partial: %d of %d bytes", bytes_sent, msg.length);
+                        ESP_LOGW(TAG, "UART send failed or partial: %d of %zu bytes", bytes_sent, msg.length);
                     }
                     xSemaphoreGive(bap_uart_send_mutex);
                 }

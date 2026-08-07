@@ -11,6 +11,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include <stddef.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -90,6 +91,19 @@ bap_command_t BAP_command_from_string(const char *cmd_str);
  * @return Calculated checksum
  */
 uint8_t BAP_calculate_checksum(const char *sentence_body);
+
+/**
+ * @brief Format a complete BAP message, including checksum and line ending
+ * @param message Destination buffer
+ * @param message_size Size of the destination buffer
+ * @param cmd Command to include in the message
+ * @param parameter Parameter name to include in the message
+ * @param value Optional parameter value; NULL or empty omits the value field
+ * @param message_len Receives the formatted length, excluding the null terminator
+ * @return true when the complete message fits, false for invalid arguments or truncation
+ */
+bool BAP_format_message(char *message, size_t message_size, bap_command_t cmd,
+                        const char *parameter, const char *value, size_t *message_len);
 
 #ifdef __cplusplus
 }

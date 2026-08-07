@@ -1,2 +1,12 @@
-idf_component_register(SRCS "unit_test_all.c"
-                    INCLUDE_DIRS ".")
+idf_component_register(
+    SRCS
+        "unit_test_all.c"
+        "../../main/bap/bap_protocol.c"
+        "../../main/bap/test/test_bap_protocol.c"
+    INCLUDE_DIRS
+        "."
+        "../../main/bap"
+    PRIV_REQUIRES
+        log
+        unity
+)
