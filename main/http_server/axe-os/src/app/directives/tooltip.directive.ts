@@ -3,7 +3,9 @@ import {
   ElementRef, 
   Input, 
   HostListener, 
+  OnChanges,
   OnDestroy, 
+  SimpleChanges,
   Component, 
   ComponentRef, 
   ViewContainerRef, 
@@ -26,11 +28,19 @@ export class TooltipContentComponent {
   selector: '[appTooltip]',
   standalone: true
 })
-export class TooltipDirective implements OnDestroy {
+export class TooltipDirective implements OnChanges, OnDestroy {
   @Input('appTooltip') tooltipText = '';
   @Input() tooltipPosition: 'top' | 'bottom' | 'left' | 'right' = 'top';
 
   private componentRef: ComponentRef<TooltipContentComponent> | null = null;
+
+  ngOnChanges(changes: SimpleChanges) {
+    if (changes['tooltipText'] && this.componentRef) {
+      this.componentRef.instance.text = this.tooltipText;
+      this.componentRef.changeDetectorRef.detectChanges();
+      this.positionTooltip();
+    }
+  }
 
   constructor(
     private el: ElementRef, 
