@@ -13,10 +13,9 @@
 #include "websocket_api.h"
 #include "http_server.h"
 #include "log_buffer.h"
+#include "websocket_internal.h"
 
 #define WS_LOG_SCRATCH_SIZE 2048
-#define WS_MAX_WEBSOCKET_PAYLOAD_SIZE 1024U
-#define WS_HANDSHAKE_HEADER_SIZE 256
 
 static const char * TAG = "websocket";
 
@@ -31,12 +30,12 @@ static SemaphoreHandle_t clients_mutex = NULL;
 static httpd_handle_t server_handle = NULL;
 static TaskHandle_t s_websocket_log_task_handle = NULL;
 
-static bool websocket_payload_fits(size_t payload_len)
+WEBSOCKET_STATIC bool websocket_payload_fits(size_t payload_len)
 {
     return payload_len <= WS_MAX_WEBSOCKET_PAYLOAD_SIZE;
 }
 
-static bool websocket_origin_matches_host(const char *origin, const char *host)
+WEBSOCKET_STATIC bool websocket_origin_matches_host(const char *origin, const char *host)
 {
     if (origin == NULL || host == NULL || host[0] == 0) {
         return false;
@@ -64,7 +63,7 @@ static bool websocket_origin_matches_host(const char *origin, const char *host)
 }
 
 
-static bool websocket_has_free_slot(void)
+WEBSOCKET_STATIC bool websocket_has_free_slot(void)
 {
     if (clients_mutex == NULL ||
         xSemaphoreTake(clients_mutex, pdMS_TO_TICKS(100)) != pdTRUE) {
@@ -84,7 +83,7 @@ static bool websocket_has_free_slot(void)
     return has_free_slot;
 }
 
-static esp_err_t websocket_origin_is_allowed(httpd_req_t *req)
+WEBSOCKET_STATIC esp_err_t websocket_origin_is_allowed(httpd_req_t *req)
 {
     size_t origin_len = httpd_req_get_hdr_value_len(req, "Origin");
     if (origin_len == 0) {
