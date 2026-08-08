@@ -112,7 +112,8 @@ export class SystemApiService {
             stratumCert: "",
             stratumDecodeCoinbase: true,
             stratumV2ChannelType: "extended" as const,
-            stratumV2AuthorityPubkey: ""
+            stratumV2AuthorityPubkey: "",
+            stratumV2RequireAuth: false
           },
           {
             id: 1,
@@ -127,7 +128,8 @@ export class SystemApiService {
             stratumCert: "",
             stratumDecodeCoinbase: true,
             stratumV2ChannelType: "extended" as const,
-            stratumV2AuthorityPubkey: ""
+            stratumV2AuthorityPubkey: "",
+            stratumV2RequireAuth: false
           }
         ],
         stratumProtocol: "SV1" as const,
