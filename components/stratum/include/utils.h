@@ -11,6 +11,8 @@ size_t hex2bin(const char *hex, uint8_t *bin, size_t bin_len);
 void print_hex(const uint8_t *b, size_t len,
                const size_t in_line, const char *prefix);
 
+void sha256_bin(const uint8_t *data, size_t data_len, uint8_t dest[32]);
+
 void double_sha256_bin(const uint8_t *data, const size_t data_len, uint8_t dest[32]);
 
 void midstate_sha256_bin(const uint8_t *data, const size_t data_len, uint8_t dest[32]);

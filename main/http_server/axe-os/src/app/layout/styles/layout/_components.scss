@@ -7,10 +7,10 @@
   border-radius: var(--border-radius, 2px);
   font-weight: 500;
   transition: all 0.2s;
-  background-color: var(--button-bg);
+  background-color: var(--color-primary);
   color: var(--color-primary-text);
   cursor: pointer;
-  border: 1px solid var(--button-bg);
+  border: 1px solid var(--color-primary);
 
   &:hover:not(:disabled) {
     background-color: var(--color-primary-hover);
@@ -25,11 +25,11 @@
 .btn-secondary {
   background-color: transparent;
   color: var(--color-text-main);
-  border-color: var(--color-surface-border);
+  border-color: var(--color-border-content);
 
   &:hover:not(:disabled) {
     background-color: var(--color-bg-hover);
-    border-color: var(--color-surface-border);
+    border-color: var(--color-border-content);
   }
 }
 

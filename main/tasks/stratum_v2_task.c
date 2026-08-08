@@ -12,14 +12,13 @@
 #include "sv2_protocol.h"
 #include "sv2_noise.h"
 #include "mining.h"
-#include "nvs_config.h"
+#include "stratum_api.h"
 #include "work_queue.h"
 #include "utils.h"
 #include "libbase58.h"
 #include "device_config.h"
 #include "coinbase_decoder.h"
 #include "esp_heap_caps.h"
-#include "esp_psram.h"
 
 #include <string.h>
 #include <stdlib.h>
@@ -34,13 +33,12 @@ static const char *TAG = "stratum_v2_task";
 // SV2 format: base58check(0x0001_LE + 32_byte_xonly_pubkey)
 // Decoded: 2-byte version + 32-byte pubkey + 4-byte checksum = 38 bytes
 // Returns true if a valid base58 pubkey was decoded.
-static bool stratum_v2_load_authority_pubkey(uint8_t out[32], bool use_fallback)
+static bool stratum_v2_load_authority_pubkey(GlobalState *GLOBAL_STATE, uint8_t out[32], bool use_fallback)
 {
-    NvsConfigKey key = use_fallback ? NVS_CONFIG_FALLBACK_SV2_AUTHORITY_PUBKEY
-                                    : NVS_CONFIG_SV2_AUTHORITY_PUBKEY;
-    char *b58_key = nvs_config_get_string(key);
+    uint16_t pool_idx = use_fallback ? GLOBAL_STATE->SYSTEM_MODULE.secondary_pool_index
+                                    : GLOBAL_STATE->SYSTEM_MODULE.primary_pool_index;
+    const char *b58_key = GLOBAL_STATE->SYSTEM_MODULE.pools[pool_idx].sv2_authority_pubkey;
     if (!b58_key || strlen(b58_key) == 0) {
-        free(b58_key);
         return false;
     }
 
@@ -49,10 +47,8 @@ static bool stratum_v2_load_authority_pubkey(uint8_t out[32], bool use_fallback)
 
     if (!b58tobin(decoded, &decoded_len, b58_key, 0)) {
         ESP_LOGE(TAG, "Failed to decode base58 authority pubkey");
-        free(b58_key);
         return false;
     }
-    free(b58_key);
 
     // base58check = 2-byte version + 32-byte pubkey + 4-byte checksum = 38 bytes
     if (decoded_len != 38) {
@@ -77,20 +73,16 @@ static bool stratum_v2_load_authority_pubkey(uint8_t out[32], bool use_fallback)
 
 static sv2_channel_type_t sv2_select_channel_type(GlobalState *GLOBAL_STATE, bool use_fallback)
 {
-    NvsConfigKey key = use_fallback ? NVS_CONFIG_FALLBACK_SV2_CHANNEL_TYPE
-                                    : NVS_CONFIG_SV2_CHANNEL_TYPE;
-    char *cfg_str = nvs_config_get_string(key);
+    uint16_t pool_idx = use_fallback ? GLOBAL_STATE->SYSTEM_MODULE.secondary_pool_index
+                                    : GLOBAL_STATE->SYSTEM_MODULE.primary_pool_index;
     sv2_channel_type_t type = SV2_CHANNEL_EXTENDED;  // default, and forced for BM1397
-    if (cfg_str) {
-        sv2_channel_type_t parsed = sv2_channel_type_from_string(cfg_str);
-        if (parsed == SV2_CHANNEL_STANDARD) {
-            if (GLOBAL_STATE->DEVICE_CONFIG.family.asic.id != BM1397) {
-                type = SV2_CHANNEL_STANDARD;
-            }
-        } else if (parsed == SV2_CHANNEL_UNKNOWN && cfg_str[0] != '\0') {
-            ESP_LOGW(TAG, "Invalid SV2 channel type in NVS: '%s', defaulting to extended", cfg_str);
+    sv2_channel_type_t parsed = GLOBAL_STATE->SYSTEM_MODULE.pools[pool_idx].sv2_channel_type;
+    if (parsed == SV2_CHANNEL_STANDARD) {
+        if (GLOBAL_STATE->DEVICE_CONFIG.family.asic.id != BM1397) {
+            type = SV2_CHANNEL_STANDARD;
         }
-        free(cfg_str);
+    } else if (parsed == SV2_CHANNEL_EXTENDED) {
+        type = SV2_CHANNEL_EXTENDED;
     }
     return type;
 }
@@ -119,9 +111,25 @@ void stratum_v2_close_connection(GlobalState *GLOBAL_STATE)
 #define SV2_SUBMIT_TIMING_SLOTS 32
 static int64_t stratum_v2_submit_time_us[SV2_SUBMIT_TIMING_SLOTS] = {0};
 
-static inline void stratum_v2_record_submit_time(uint32_t sequence_number)
+// Shares submitted but not yet resolved by the pool (rises while it batches acks).
+static void stratum_v2_update_pending_shares(GlobalState *GLOBAL_STATE)
+{
+    sv2_conn_t *conn = GLOBAL_STATE->sv2_conn;
+    if (!conn) {
+        GLOBAL_STATE->SYSTEM_MODULE.shares_pending = 0;
+        return;
+    }
+    uint32_t pending = (conn->sequence_number > conn->resolved_shares)
+                           ? (conn->sequence_number - conn->resolved_shares)
+                           : 0;
+    GLOBAL_STATE->SYSTEM_MODULE.shares_pending = (uint16_t)(pending > UINT16_MAX ? UINT16_MAX : pending);
+}
+
+// Timestamp a submitted share (for response-time measurement) and refresh pending.
+static void stratum_v2_track_submit(GlobalState *GLOBAL_STATE, uint32_t sequence_number)
 {
     stratum_v2_submit_time_us[sequence_number % SV2_SUBMIT_TIMING_SLOTS] = esp_timer_get_time();
+    stratum_v2_update_pending_shares(GLOBAL_STATE);
 }
 
 int stratum_v2_submit_share(GlobalState *GLOBAL_STATE, uint32_t job_id, uint32_t nonce,
@@ -141,7 +149,7 @@ int stratum_v2_submit_share(GlobalState *GLOBAL_STATE, uint32_t job_id, uint32_t
                                                 job_id, nonce, ntime, version);
     if (len < 0) return -1;
 
-    stratum_v2_record_submit_time(sequence_number);
+    stratum_v2_track_submit(GLOBAL_STATE, sequence_number);
     return sv2_noise_send(GLOBAL_STATE->sv2_noise_ctx, GLOBAL_STATE->transport, buf, len);
 }
 
@@ -164,7 +172,7 @@ int stratum_v2_submit_share_extended(GlobalState *GLOBAL_STATE, uint32_t job_id,
                                                 extranonce, extranonce_len);
     if (len < 0) return -1;
 
-    stratum_v2_record_submit_time(sequence_number);
+    stratum_v2_track_submit(GLOBAL_STATE, sequence_number);
     return sv2_noise_send(GLOBAL_STATE->sv2_noise_ctx, GLOBAL_STATE->transport, buf, len);
 }
 
@@ -235,9 +243,9 @@ static void stratum_v2_decode_coinbase(GlobalState *GLOBAL_STATE, sv2_conn_t *co
                                         const sv2_ext_job_t *job)
 {
     bool use_fallback = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback;
-    bool decode_coinbase = use_fallback
-        ? GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_decode_coinbase_tx
-        : GLOBAL_STATE->SYSTEM_MODULE.pool_decode_coinbase_tx;
+    uint16_t pool_idx = use_fallback ? GLOBAL_STATE->SYSTEM_MODULE.secondary_pool_index
+                                     : GLOBAL_STATE->SYSTEM_MODULE.primary_pool_index;
+    bool decode_coinbase = GLOBAL_STATE->SYSTEM_MODULE.pools[pool_idx].decode_coinbase_tx;
 
     // Check for BIP141 SegWit marker/flag in prefix (bytes[4]==0x00, bytes[5]!=0x00).
     // Some SV2 pools send the coinbase in witness format; the V1 decoder expects
@@ -301,8 +309,7 @@ static void stratum_v2_decode_coinbase(GlobalState *GLOBAL_STATE, sv2_conn_t *co
     }
     memset(result, 0, sizeof(mining_notification_result_t));
 
-    const char *user = use_fallback ? GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_user
-                                    : GLOBAL_STATE->SYSTEM_MODULE.pool_user;
+    const char *user = GLOBAL_STATE->SYSTEM_MODULE.pools[pool_idx].user;
 
     esp_err_t err = coinbase_process_notification(&notify, extranonce1_hex, extranonce2_len,
                                                    user, decode_coinbase, result);
@@ -599,11 +606,9 @@ void stratum_v2_task(void *pvParameters)
 
     int retry_attempts = 0;
     bool use_fallback = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback;
-
-    char *stratum_url = use_fallback ? GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_url
-                                     : GLOBAL_STATE->SYSTEM_MODULE.pool_url;
-    uint16_t port = use_fallback ? GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_port
-                                 : GLOBAL_STATE->SYSTEM_MODULE.pool_port;
+    uint16_t pool_idx = use_fallback ? GLOBAL_STATE->SYSTEM_MODULE.secondary_pool_index : GLOBAL_STATE->SYSTEM_MODULE.primary_pool_index;
+    char *stratum_url = GLOBAL_STATE->SYSTEM_MODULE.pools[pool_idx].url;
+    uint16_t port = GLOBAL_STATE->SYSTEM_MODULE.pools[pool_idx].port;
 
     ESP_LOGI(TAG, "Starting SV2 task (%s), connecting to %s:%d (free heap: %lu)",
              use_fallback ? "fallback" : "primary",
@@ -693,6 +698,7 @@ void stratum_v2_task(void *pvParameters)
         // Reset connection state
         memset(conn, 0, sizeof(*conn));
         GLOBAL_STATE->sv2_conn = conn;
+        stratum_v2_update_pending_shares(GLOBAL_STATE);
 
         // --- Noise Handshake ---
         ESP_LOGI(TAG, "Starting Noise handshake (Noise_NX_Secp256k1+EllSwift_ChaChaPoly_SHA256)");
@@ -708,9 +714,24 @@ void stratum_v2_task(void *pvParameters)
         }
         GLOBAL_STATE->sv2_noise_ctx = noise_ctx;
 
-        // Load optional authority pubkey from NVS
+        // Load the optional authority pubkey and whether this pool requires it
         uint8_t auth_key[32];
-        bool has_auth = stratum_v2_load_authority_pubkey(auth_key, use_fallback);
+        bool has_auth = stratum_v2_load_authority_pubkey(GLOBAL_STATE, auth_key, use_fallback);
+        uint16_t auth_pool_idx = use_fallback ? GLOBAL_STATE->SYSTEM_MODULE.secondary_pool_index
+                                              : GLOBAL_STATE->SYSTEM_MODULE.primary_pool_index;
+        bool require_auth = GLOBAL_STATE->SYSTEM_MODULE.pools[auth_pool_idx].sv2_require_auth;
+
+        // When auth is required but no usable authority key is configured,
+        // refuse to connect rather than mine against an unverifiable server
+        if (require_auth && !has_auth) {
+            ESP_LOGE(TAG, "SV2 authentication required but no authority pubkey configured, refusing to connect");
+            snprintf(GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info,
+                     sizeof(GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info), "SV2: Auth required - no key");
+            stratum_v2_close_connection(GLOBAL_STATE);
+            retry_attempts++;
+            continue;
+        }
+
         if (has_auth) {
             ESP_LOGI(TAG, "Authority pubkey configured, will verify server certificate");
         } else {
@@ -807,8 +828,9 @@ void stratum_v2_task(void *pvParameters)
 
         // 3. Send OpenMiningChannel (extended or standard)
         {
-            char *user = use_fallback ? GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_user
-                                      : GLOBAL_STATE->SYSTEM_MODULE.pool_user;
+            uint16_t pool_idx = use_fallback ? GLOBAL_STATE->SYSTEM_MODULE.secondary_pool_index
+                                             : GLOBAL_STATE->SYSTEM_MODULE.primary_pool_index;
+            char *user = GLOBAL_STATE->SYSTEM_MODULE.pools[pool_idx].user;
             float hash_rate = 1e12;
             int frame_len;
 
@@ -974,6 +996,11 @@ void stratum_v2_task(void *pvParameters)
                         for (uint32_t i = 0; i < accepted_count; i++) {
                             SYSTEM_notify_accepted_share(GLOBAL_STATE);
                         }
+                        uint32_t resolved = last_sequence_number + 1;  // 0-based seq -> count
+                        if (resolved > conn->resolved_shares) {
+                            conn->resolved_shares = resolved;
+                        }
+                        stratum_v2_update_pending_shares(GLOBAL_STATE);
                     }
                     break;
                 }
@@ -986,6 +1013,11 @@ void stratum_v2_task(void *pvParameters)
                                                       error_code, sizeof(error_code)) == 0) {
                         ESP_LOGW(TAG, "Share rejected: %s", error_code);
                         SYSTEM_notify_rejected_share(GLOBAL_STATE, error_code);
+                        uint32_t resolved = seq_num + 1;
+                        if (resolved > conn->resolved_shares) {
+                            conn->resolved_shares = resolved;
+                        }
+                        stratum_v2_update_pending_shares(GLOBAL_STATE);
                     }
                     break;
                 }

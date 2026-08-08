@@ -14,6 +14,7 @@
 #include "esp_log.h"
 #include "esp_timer.h"
 #include "esp_heap_caps.h"
+#include "global_state.h"
 #include "bap_subscription.h"
 #include "bap_protocol.h"
 #include "bap_uart.h"

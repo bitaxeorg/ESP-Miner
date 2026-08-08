@@ -22,14 +22,22 @@ import { SelectOption } from '../../models/select-option.model';
 
       <ul
         *ngIf="isOpen"
-        class="absolute z-50 left-0 w-full mt-1 max-h-60 overflow-y-auto bg-bg-card border border-surface rounded shadow-lg list-none p-0 m-0"
+        [class.bottom-full]="openUpward"
+        [class.mb-1]="openUpward"
+        [class.top-full]="!openUpward"
+        [class.mt-1]="!openUpward"
+        class="absolute z-50 left-0 w-full max-h-60 overflow-y-auto bg-bg-card border border-surface rounded shadow-lg list-none p-0 m-0"
       >
         <li
-          *ngFor="let option of options; let i = index"
+          *ngFor="let option of options; trackBy: trackByOption; let i = index"
+          (mouseenter)="focusedIndex = i"
+          (mousedown)="$event.preventDefault()"
           (click)="select(option, $event)"
-          class="px-3 py-2 cursor-pointer transition-colors duration-150 hover:bg-primary hover:text-white"
-          [class.bg-bg-hover]="option.value === value || i === focusedIndex"
-          [class.text-primary]="option.value === value && i !== focusedIndex"
+          class="px-3 py-2 cursor-pointer select-none"
+          [class.bg-primary]="i === focusedIndex"
+          [class.text-white]="i === focusedIndex"
+          [class.bg-bg-hover]="i !== focusedIndex && option.value === value"
+          [class.text-primary]="i !== focusedIndex && option.value === value"
         >
           {{ option.name || option.label }}
         </li>
@@ -56,6 +64,7 @@ export class DropdownComponent implements ControlValueAccessor {
 
   public value: any = null;
   public isOpen: boolean = false;
+  public openUpward: boolean = false;
   public disabled: boolean = false;
   public focusedIndex: number = -1;
 
@@ -65,9 +74,35 @@ export class DropdownComponent implements ControlValueAccessor {
   constructor(private elementRef: ElementRef) {}
 
   get selectedOptionName(): string {
-    const selected = this.options.find(opt => opt.value === this.value);
+    const selected = this.options?.find(opt => opt.value === this.value);
     if (!selected) return this.placeholder;
     return selected.name || selected.label || this.placeholder;
+  }
+
+  trackByOption(index: number, option: SelectOption): any {
+    return option.value ?? index;
+  }
+
+  private checkDirection() {
+    if (!this.elementRef?.nativeElement) return;
+    const rect = this.elementRef.nativeElement.getBoundingClientRect();
+    const dropdownHeight = 240;
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const spaceAbove = rect.top;
+
+    this.openUpward = spaceBelow < dropdownHeight && spaceAbove > spaceBelow;
+  }
+
+  private scrollToFocused() {
+    setTimeout(() => {
+      if (!this.elementRef?.nativeElement || this.focusedIndex < 0) return;
+      const list = this.elementRef.nativeElement.querySelector('ul');
+      if (!list) return;
+      const items = list.querySelectorAll('li');
+      if (items && items[this.focusedIndex]) {
+        items[this.focusedIndex].scrollIntoView({ block: 'nearest', inline: 'nearest' });
+      }
+    }, 0);
   }
 
   toggle(event: Event) {
@@ -75,7 +110,12 @@ export class DropdownComponent implements ControlValueAccessor {
     event.stopPropagation();
     this.isOpen = !this.isOpen;
     if (this.isOpen) {
+      this.checkDirection();
       this.focusedIndex = this.options.findIndex(opt => opt.value === this.value);
+      if (this.focusedIndex === -1 && this.options.length > 0) {
+        this.focusedIndex = 0;
+      }
+      this.scrollToFocused();
     }
   }
 
@@ -103,23 +143,27 @@ export class DropdownComponent implements ControlValueAccessor {
       case 'ArrowDown':
         event.preventDefault();
         if (!this.isOpen) {
+          this.checkDirection();
           this.isOpen = true;
           this.focusedIndex = this.options.findIndex(opt => opt.value === this.value);
           if (this.focusedIndex === -1) this.focusedIndex = 0;
         } else {
           this.focusedIndex = (this.focusedIndex + 1) % this.options.length;
         }
+        this.scrollToFocused();
         break;
 
       case 'ArrowUp':
         event.preventDefault();
         if (!this.isOpen) {
+          this.checkDirection();
           this.isOpen = true;
           this.focusedIndex = this.options.findIndex(opt => opt.value === this.value);
           if (this.focusedIndex === -1) this.focusedIndex = this.options.length - 1;
         } else {
           this.focusedIndex = (this.focusedIndex - 1 + this.options.length) % this.options.length;
         }
+        this.scrollToFocused();
         break;
 
       case 'Enter':
@@ -132,9 +176,11 @@ export class DropdownComponent implements ControlValueAccessor {
             this.isOpen = false;
           }
         } else {
+          this.checkDirection();
           this.isOpen = true;
           this.focusedIndex = this.options.findIndex(opt => opt.value === this.value);
           if (this.focusedIndex === -1) this.focusedIndex = 0;
+          this.scrollToFocused();
         }
         break;
 

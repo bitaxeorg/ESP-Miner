@@ -136,11 +136,17 @@
         <div class="grid-stack-item" gs-id="shares">
             <div class="grid-stack-item-content">
                 <div class="card">
-                    <span class="block text-lg font-medium mb-4">Shares
-                        <i class="pi pi-arrow-up transition-opacity duration-500 ml-2" [ngClass]="{'opacity-100 text-green-500': flashShare, 'opacity-0': !flashShare}" appTooltip="Share Sent" tooltipPosition="top"></i>
-                    </span>
-                    <div class="font-medium text-2xl mb-4">
-                        {{info.sharesAccepted | number: '1.0-0'}}
+                    <div class="flex justify-between mb-4">
+                        <div>
+                            <span class="block text-lg font-medium mb-4">Shares
+                                <i class="pi pi-arrow-up transition-opacity duration-500 ml-2 text-sm align-middle text-green-500" [ngClass]="{'opacity-100': flashShareAccepted, 'opacity-0': !flashShareAccepted}" appTooltip="Share Accepted" tooltipPosition="top"></i>
+                                <i class="pi pi-times transition-opacity duration-500 ml-1 text-sm align-middle text-red-500" [ngClass]="{'opacity-100': flashShareRejected, 'opacity-0': !flashShareRejected}" appTooltip="Share Rejected" tooltipPosition="top"></i>
+                            </span>
+                            <div class="font-medium text-2xl">
+                                {{info.sharesAccepted | number: '1.0-0'}}
+                                <span *ngIf="(info.sharesPending ?? 0) > 0" class="text-base font-medium text-yellow-500 ml-2" pTooltip="Shares submitted to the pool but not yet acknowledged. The pool may batch acks, so this clears once it catches up." tooltipPosition="top">{{ info.sharesPending }} pending</span>
+                            </div>
+                        </div>
                     </div>
                     <div *ngIf="info.sharesRejected === 0">
                         <span class="text-red-500 font-medium">0 </span>
@@ -168,39 +174,23 @@
         <div class="grid-stack-item" gs-id="bestdiff">
             <div class="grid-stack-item-content">
                 <div class="card">
-                    <span class="block text-lg font-medium mb-4">Best Difficulty</span>
-                    <div class="mb-2">
-                        <span class="font-medium text-2xl cursor-pointer" appTooltip="{{info.bestDiff | number:'1.0-0'}}" tooltipPosition="bottom">
-                            {{info.bestDiff | diffSuffix}}
-                        </span>
-                        <span class="text-secondary text-lg">all-time best</span>
-                        <span class="text-sm font-medium" *ngIf="info.networkDifficulty">
-                            <tooltip-text-icon
-                                [text]="'(' + networkDifficultyPercentage + '%)'"
-                                tooltip="Chance to find a Block"
-                                [split]="false"
-                            />
-                        </span>
+                    <div class="flex justify-between mb-4">
+                        <div>
+                            <span class="block text-lg font-medium mb-4">Best Difficulty</span>
+                            <div class="font-medium text-2xl">
+                                <span class="cursor-pointer" appTooltip="{{info.bestDiff | number:'1.0-0'}}" tooltipPosition="bottom">
+                                    {{info.bestDiff | diffSuffix}}
+                                </span>
+                                <span class="text-secondary text-lg">all-time best</span>
+                            </div>
+                        </div>
                     </div>
                     <div class="mb-2">
                         <span class="font-medium cursor-pointer" appTooltip="{{info.bestSessionDiff | number:'1.0-0'}}" tooltipPosition="bottom">
                             {{info.bestSessionDiff | diffSuffix}}
                         </span>
                         <span class="text-secondary text-lg">session best</span>
-                        <span class="text-sm font-medium"> ({{ info.uptimeSeconds | dateAgo: { intervals: 2, strict:true, short:true } }})</span>
                     </div>
-                    <div *ngIf="info.totalLog2Work">
-                        <span class="font-medium cursor-pointer" appTooltip="{{info.totalHashes | number}} total hashes" tooltipPosition="bottom">
-                            {{info.totalLog2Work | number:'1.6-6'}}
-                        </span>
-                        <span class="text-secondary text-lg">
-                            <tooltip-text-icon
-                                text="total work (log 2)"
-                                tooltip="Approximate base-2 logarithm of your total accumulated hashes (personal mining effort). Example: log2_work = 50 means roughly 2^50 ≈ 1 quadrillion hashes attempted."
-                                tooltipPosition="bottom"
-                            />
-                        </span>
-                    </div>                
                 </div>
             </div>
         </div>
@@ -494,7 +484,7 @@
                 <div class="card">
                     <h4 class="whitespace-nowrap overflow-hidden text-ellipsis font-medium">
                         Block Header
-                        <i class="pi pi-arrow-down transition-opacity duration-500 ml-2 text-sm align-middle" [ngClass]="{'opacity-100 text-blue-500': flashJob, 'opacity-0': !flashJob}" appTooltip="New Job Received" tooltipPosition="top"></i>
+                        <i class="pi pi-arrow-down transition-opacity duration-500 ml-2 text-sm align-middle text-blue-500" [ngClass]="{'opacity-100': flashWorkReceived, 'opacity-0': !flashWorkReceived}" appTooltip="Work Received" tooltipPosition="top"></i>
                         <span *ngIf="info.blockSignals && info.blockSignals.length > 0" class="align-bottom ml-2">
                             <span *ngFor="let signal of info.blockSignals" class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-green-500 text-white ml-1">{{ signal }}</span>
                         </span>
@@ -591,15 +581,57 @@
                                         {{ i + 1 }}
                                     </td>
                                 <td *ngFor="let domain of asic?.domains; trackBy: trackByIndex"
-                                    [style.--heatmap-bg]="getHeatmapColor(domain, info.expectedHashrate)"
+                                    [style.--lightness]="getHeatmapLightness(domain, info.expectedHashrate)"
                                         [style.height]="(asicAmount <= 2 ? '2rem' : null)"
-                                        class="text-center">
+                                        class="heatmap-cell">
                                         <span class="text-xs">{{ domain | hashSuffix }}</span>
                                     </td>
                                 </tr>
                             </tbody>
                         </table>
                     </ng-container>
+                </div>
+            </div>
+        </div>
+
+        <!-- misc -->
+        <div class="grid-stack-item" gs-id="misc">
+            <div class="grid-stack-item-content">
+                <div class="card">
+                    <h4 class="white-space-nowrap overflow-hidden text-overflow-ellipsis font-medium">Misc</h4>
+
+                    <div class="flex flex-nowrap mb-1">
+                        <div class="w-24 shrink-0 text-secondary">
+                            <span>Uptime</span>
+                        </div>
+                        <div>
+                            <span>{{ info.uptimeSeconds | dateAgo: { intervals: 2, strict:true, short:false } }}</span>
+                        </div>
+                    </div>
+
+                    <div class="flex flex-nowrap mb-1" *ngIf="info.totalUptimeSeconds">
+                        <div class="w-24 shrink-0 text-secondary">
+                            <span>Total Uptime</span>
+                        </div>
+                        <div>
+                            <span>{{ info.totalUptimeSeconds | dateAgo: { intervals: 2, strict:true, short:false } }}</span>
+                        </div>
+                    </div>
+
+                    <div class="flex flex-nowrap" *ngIf="info.totalLog2Work">
+                        <div class="w-24 shrink-0 text-secondary">
+                            <tooltip-text-icon
+                                text="Total Work"
+                                tooltip="Approximate base-2 logarithm of your total accumulated hashes (personal mining effort). Example: log2_work = 50 means roughly 2^50 ≈ 1 quadrillion hashes attempted."
+                            />
+                        </div>
+                        <div>
+                            <span class="cursor-pointer font-medium" appTooltip="{{info.totalHashes | number}} total hashes" tooltipPosition="bottom">
+                                {{info.totalLog2Work | number:'1.6-6'}}
+                            </span>
+                            <span class="text-secondary text-sm ml-1">(log 2)</span>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>

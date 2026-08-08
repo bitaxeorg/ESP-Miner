@@ -1,13 +1,14 @@
 #include <lwip/tcpip.h>
 
 #include "system.h"
-#include "work_queue.h"
-#include "serial.h"
 #include <string.h>
 #include <stdlib.h>
 #include "esp_log.h"
-#include "nvs_config.h"
 #include "utils.h"
+#include "global_state.h"
+#include "mining.h"
+#include "stratum_api.h"
+#include "stratum_v1_task.h"
 #include "stratum_v2_task.h"
 #include "sv2_protocol.h"
 #include "hashrate_monitor_task.h"
@@ -107,7 +108,8 @@ void ASIC_result_task(void *pvParameters)
                 }
             } else {
                 // V1: submit with JSON-RPC
-                char * user = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback ? GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_user : GLOBAL_STATE->SYSTEM_MODULE.pool_user;
+                uint16_t active_idx = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback ? GLOBAL_STATE->SYSTEM_MODULE.secondary_pool_index : GLOBAL_STATE->SYSTEM_MODULE.primary_pool_index;
+                char * user = GLOBAL_STATE->SYSTEM_MODULE.pools[active_idx].user;
 
                 taskENTER_CRITICAL(&GLOBAL_STATE->stratum_mux);
                 esp_transport_handle_t transport = GLOBAL_STATE->transport;

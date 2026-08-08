@@ -164,7 +164,7 @@ typedef enum
 
 esp_err_t EMC2101_set_fan_speed(float);
 uint16_t EMC2101_get_fan_speed(void);
-esp_err_t EMC2101_init();
+esp_err_t EMC2101_init(int temp_offset_param);
 float EMC2101_get_external_temp(void);
 float EMC2101_get_internal_temp(void);
 esp_err_t EMC2101_set_ideality_factor(uint8_t);

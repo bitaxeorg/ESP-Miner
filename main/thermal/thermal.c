@@ -1,4 +1,6 @@
 #include "thermal.h"
+#include "device_config.h"
+#include "global_state.h"
 
 #include "esp_log.h"
 #include "esp_check.h"
