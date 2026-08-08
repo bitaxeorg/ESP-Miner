@@ -53,6 +53,11 @@ typedef struct RejectedReasonStat
     uint32_t count;
 } RejectedReasonStat;
 
+typedef enum {
+    NETWORK_MODE_WIFI,
+    NETWORK_MODE_USB,
+} NetworkMode;
+
 typedef struct {
     const esp_partition_t *part;
     char version[32];
@@ -83,8 +88,9 @@ typedef struct SystemModule
     char best_session_diff_string[DIFF_STRING_SIZE];
     int block_found;
     bool show_new_block;
+    NetworkMode network_mode;
     char * ssid;
-    char wifi_status[256];
+    char wifi_status[256]; // network_status
     char ip_addr_str[16]; // IP4ADDR_STRLEN_MAX
     char ipv6_addr_str[64]; // IPv6 address string with zone identifier (INET6_ADDRSTRLEN=46 + % + interface=15)
     char ap_ssid[12];

@@ -12,34 +12,53 @@
             </div>
         </div>
         <div class="flex flex-col md:flex-row md:items-center mb-4 gap-2">
-            <label for="ssid" class="w-full md:w-2/12 font-medium">Wi-Fi SSID</label>
-            <div class="w-full md:w-10/12 flex gap-2 items-center">
-                <input class="input-text flex-grow" id="ssid" type="text" formControlName="ssid" />
-                <button
-                    type="button"
-                    class="btn btn-secondary px-3.5 py-2.5 cursor-pointer"
-                    (click)="scanWifi()"
-                    [disabled]="scanning"
-                    appTooltip="Scan Wi-Fi"
-                    tooltipPosition="left">
-                    <i class="pi {{scanning ? 'pi-spinner pi-spin' : 'pi-search'}}"></i>
-                </button>
+            <label for="networkMode" class="w-full md:w-2/12 font-medium">
+                <tooltip-text-icon
+                    text="Network Mode"
+                    tooltip="Select Wi-Fi or Ethernet-over-USB for network connectivity"
+                />
+            </label>
+            <div class="w-full md:w-10/12">
+                <app-dropdown
+                    id="networkMode"
+                    formControlName="networkMode"
+                    [options]="networkModeOptions">
+                </app-dropdown>
             </div>
         </div>
-        <div class="flex flex-col md:flex-row md:items-center mb-4 gap-2">
-            <label for="wifiPass" class="w-full md:w-2/12 font-medium">Wi-Fi Password</label>
-            <div class="w-full md:w-10/12">
-                <div class="relative w-full">
-                    <input class="input-text pr-10" id="wifiPass" formControlName="wifiPass"
-                        [type]="showWifiPassword ? 'text' : 'password'"
-                        placeholder="Enter Wi-Fi password" />
-                    <span *ngIf="form.get('wifiPass')?.dirty" class="absolute inset-y-0 right-0 flex items-center pr-3 cursor-pointer text-secondary hover:text-main"
-                          (click)="toggleWifiPasswordVisibility()">
-                        <i class="pi {{!showWifiPassword ? 'pi-eye' : 'pi-eye-slash'}}"></i>
-                    </span>
+
+        <!-- WiFi-specific fields - only shown when networkMode is 'wifi' -->
+        <ng-container *ngIf="form.get('networkMode')?.value === 'wifi'">
+            <div class="flex flex-col md:flex-row md:items-center mb-4 gap-2">
+                <label for="ssid" class="w-full md:w-2/12 font-medium">Wi-Fi SSID</label>
+                <div class="w-full md:w-10/12 flex gap-2 items-center">
+                    <input class="input-text flex-grow" id="ssid" type="text" formControlName="ssid" />
+                    <button
+                        type="button"
+                        class="btn btn-secondary px-3.5 py-2.5 cursor-pointer"
+                        (click)="scanWifi()"
+                        [disabled]="scanning"
+                        appTooltip="Scan Wi-Fi"
+                        tooltipPosition="left">
+                        <i class="pi {{scanning ? 'pi-spinner pi-spin' : 'pi-search'}}"></i>
+                    </button>
                 </div>
             </div>
-        </div>
+            <div class="flex flex-col md:flex-row md:items-center mb-4 gap-2">
+                <label for="wifiPass" class="w-full md:w-2/12 font-medium">Wi-Fi Password</label>
+                <div class="w-full md:w-10/12">
+                    <div class="relative w-full">
+                        <input class="input-text pr-10" id="wifiPass" formControlName="wifiPass"
+                            [type]="showWifiPassword ? 'text' : 'password'"
+                            placeholder="Enter Wi-Fi password" />
+                        <span *ngIf="form.get('wifiPass')?.dirty" class="absolute inset-y-0 right-0 flex items-center pr-3 cursor-pointer text-secondary hover:text-main"
+                              (click)="toggleWifiPasswordVisibility()">
+                            <i class="pi {{!showWifiPassword ? 'pi-eye' : 'pi-eye-slash'}}"></i>
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </ng-container>
 
         <div class="flex mt-5 gap-3">
             <button [disabled]="!form.dirty || form.invalid" (click)="updateSystem()"

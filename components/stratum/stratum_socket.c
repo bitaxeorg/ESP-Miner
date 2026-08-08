@@ -86,16 +86,19 @@ esp_err_t stratum_socket_resolve(const char *hostname, uint16_t port, stratum_co
                 ESP_LOGW(TAG, "Link-local IPv6 address without scope ID - attempting to set from WiFi STA interface");
 
                 esp_netif_t *netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
+                if (netif == NULL) {
+                    netif = esp_netif_get_handle_from_ifkey("USB_NCM");
+                }
                 if (netif) {
                     int index = esp_netif_get_netif_impl_index(netif);
                     if (index >= 0) {
                         addr6->sin6_scope_id = (uint32_t)index;
                         ESP_LOGI(TAG, "Set IPv6 scope_id to interface index: %lu", (unsigned long)addr6->sin6_scope_id);
                     } else {
-                        ESP_LOGW(TAG, "Failed to get valid interface index for WIFI_STA_DEF");
+                        ESP_LOGW(TAG, "Failed to get valid interface index");
                     }
                 } else {
-                    ESP_LOGW(TAG, "Could not get netif handle for WIFI_STA_DEF");
+                    ESP_LOGW(TAG, "Could not get netif handle");
                 }
             } else {
                 ESP_LOGI(TAG, "Link-local IPv6 address with existing scope_id: %lu", (unsigned long)addr6->sin6_scope_id);

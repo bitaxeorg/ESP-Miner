@@ -4,6 +4,7 @@ dependencies:
   lvgl/lvgl: "9.5.0"
   espressif/esp_lvgl_port: "2.8.0"
   esp_lcd_sh1107: "1.1.0"  
+  espressif/esp_tinyusb: "2.0.1~1"
   espressif/mdns: "^1.8.0"
   ## Required IDF version
   idf:
