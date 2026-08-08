@@ -97,7 +97,7 @@ export class SystemComponent implements OnInit, OnDestroy {
       { label: 'ASIC Type', value: (data.asic.asicCount > 1 ? data.asic.asicCount + 'x ' : ' ') + data.asic.ASICModel, class: 'pb-6' },
       { label: 'Uptime', value: DateAgoPipe.transform(data.info.uptimeSeconds) },
       { label: 'Total Uptime', value: DateAgoPipe.transform(data.info.totalUptimeSeconds || 0) },
-      { label: 'Total Work (log2)', value: (data.info.totalLog2Work || 0).toFixed(6) },
+      { label: 'Total Log2 Work', value: (data.info.totalLog2Work || 0).toFixed(6) },
       { label: 'Total Hashes', value: formatNumber(data.info.totalHashes || 0, 'en-us')},
       { label: 'Reset Reason', value: data.info.resetReason, class: 'pb-6' },
       { label: 'Wi-Fi SSID', value: data.info.ssid, isSensitiveData: true },

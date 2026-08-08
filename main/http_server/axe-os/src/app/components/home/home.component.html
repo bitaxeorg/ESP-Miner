@@ -609,7 +609,7 @@
                         </div>
                     </div>
 
-                    <div class="flex flex-nowrap mb-1" *ngIf="info.totalUptimeSeconds">
+                    <div class="flex flex-nowrap mb-4" *ngIf="info.totalUptimeSeconds">
                         <div class="w-24 shrink-0 text-secondary">
                             <span>Total Uptime</span>
                         </div>
@@ -621,15 +621,14 @@
                     <div class="flex flex-nowrap" *ngIf="info.totalLog2Work">
                         <div class="w-24 shrink-0 text-secondary">
                             <tooltip-text-icon
-                                text="Total Work"
-                                tooltip="Approximate base-2 logarithm of your total accumulated hashes (personal mining effort). Example: log2_work = 50 means roughly 2^50 ≈ 1 quadrillion hashes attempted."
+                                text="Hashes"
+                                tooltip="Approximate number of your total accumulated hashes (personal mining effort)."
                             />
                         </div>
                         <div>
                             <span class="cursor-pointer font-medium" appTooltip="{{info.totalHashes | number}} total hashes" tooltipPosition="bottom">
-                                {{info.totalLog2Work | number:'1.6-6'}}
+                                2<sup>{{info.totalLog2Work | number:'1.6-6'}}</sup>
                             </span>
-                            <span class="text-secondary text-sm ml-1">(log 2)</span>
                         </div>
                     </div>
                 </div>
