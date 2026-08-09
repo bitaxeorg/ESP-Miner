@@ -371,6 +371,9 @@ private isIpAddress(value: string): boolean {
   }
 
   public postAction(device: any, action: string) {
+    if (action === 'restart' && !confirm('Are you sure you want to restart the device?')) {
+      return;
+    }
     this.httpClient.post(`http://${device.connectionAddress}/api/system/${action}`, {}, { responseType: 'text' }).pipe(
       timeout(800),
       catchError(error => {
