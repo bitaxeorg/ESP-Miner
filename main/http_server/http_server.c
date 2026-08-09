@@ -13,18 +13,18 @@
 #include "esp_log.h"
 #include "esp_system.h"
 #include "esp_timer.h"
-#include "esp_wifi.h"
 #include "esp_vfs.h"
+#include "esp_wifi.h"
 
 #include "dns_server.h"
 #include "esp_ota_ops.h"
-#include "esp_wifi.h"
 #include "lwip/inet.h"
 #include <arpa/inet.h>
 #include "lwip/sockets.h"
 
 #include "cJSON.h"
 #include "global_state.h"
+#include "ota_api.h"
 #include "nvs_config.h"
 #include "system.h"
 #include "connect.h"
@@ -1665,172 +1665,6 @@ static esp_err_t GET_scoreboard(httpd_req_t * req)
     return res;
 }
 
-esp_err_t POST_WWW_update(httpd_req_t * req)
-{
-    GlobalState *GLOBAL_STATE = (GlobalState *)httpd_get_global_user_ctx(req->handle);
-    if (is_network_allowed(req) != ESP_OK) {
-        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
-    }
-
-    wifi_mode_t mode;
-    esp_wifi_get_mode(&mode);
-    if (mode == WIFI_MODE_AP || mode == WIFI_MODE_APSTA)
-    {
-        HTTP_send_json_error(req, "500 Internal Server Error", "Not allowed in AP mode");
-        return ESP_OK;
-    }
-
-    GLOBAL_STATE->SYSTEM_MODULE.is_firmware_update = true;
-    snprintf(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_filename, 20, "www.bin");
-    snprintf(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_status, 20, "Starting...");
-
-    char buf[1000];
-    int remaining = req->content_len;
-
-    const esp_partition_t * www_partition =
-        esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_SPIFFS, "www");
-    if (www_partition == NULL) {
-        HTTP_send_json_error(req, "500 Internal Server Error", "WWW partition not found");
-        return ESP_OK;
-    }
-
-    // Don't attempt to write more than what can be stored in the partition
-    if (remaining > www_partition->size) {
-        HTTP_send_json_error(req, "400 Bad Request", "File provided is too large for device");
-        return ESP_OK;
-    }
-
-    // Erase the entire www partition before writing, in chunks to prevent WDT timeout
-    size_t erase_size = 65536; // 64KB chunks
-    for (size_t offset = 0; offset < www_partition->size; offset += erase_size) {
-        size_t size_to_erase = MIN(erase_size, www_partition->size - offset);
-        ESP_ERROR_CHECK(esp_partition_erase_range(www_partition, offset, size_to_erase));
-        vTaskDelay(10 / portTICK_PERIOD_MS);
-    }
-
-    int chunks = 0;
-    while (remaining > 0) {
-        int recv_len = httpd_req_recv(req, buf, MIN(remaining, sizeof(buf)));
-
-        if (recv_len == HTTPD_SOCK_ERR_TIMEOUT) {
-            continue;
-        } else if (recv_len <= 0) {
-            snprintf(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_status, 20, "Protocol Error");
-            HTTP_send_json_error(req, "500 Internal Server Error", "Protocol Error");
-            return ESP_FAIL;
-        }
-
-        if (esp_partition_write(www_partition, www_partition->size - remaining, (const void *) buf, recv_len) != ESP_OK) {
-            snprintf(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_status, 20, "Write Error");
-            HTTP_send_json_error(req, "500 Internal Server Error", "Write Error");
-            return ESP_FAIL;
-        }
-
-
-        uint8_t percentage = 100 - ((remaining * 100 / req->content_len));
-        snprintf(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_status, 20, "Working (%d%%)", percentage);
-
-        remaining -= recv_len;
-
-        chunks++;
-        if (chunks % 16 == 0) {
-            vTaskDelay(10 / portTICK_PERIOD_MS);
-        }
-    }
-    httpd_resp_set_type(req, "text/plain");
-    httpd_resp_sendstr(req, "WWW update complete, rebooting now!\n");
-    nvs_config_set_bool(NVS_CONFIG_USE_CUSTOM_WWW, true);
-
-    snprintf(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_status, 20, "Rebooting...");
-    vTaskDelay(1000 / portTICK_PERIOD_MS);
-    GLOBAL_STATE->SYSTEM_MODULE.is_firmware_update = false;
-    esp_restart();
-
-    return ESP_OK;
-}
-
-/*
- * Handle OTA file upload
- */
-esp_err_t POST_OTA_update(httpd_req_t * req)
-{
-    GlobalState *GLOBAL_STATE = (GlobalState *)httpd_get_global_user_ctx(req->handle);
-    if (is_network_allowed(req) != ESP_OK) {
-        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
-    }
-
-    wifi_mode_t mode;
-    esp_wifi_get_mode(&mode);
-    if (mode == WIFI_MODE_AP || mode == WIFI_MODE_APSTA)
-    {
-        HTTP_send_json_error(req, "500 Internal Server Error", "Not allowed in AP mode");
-        return ESP_OK;
-    }
-    
-    GLOBAL_STATE->SYSTEM_MODULE.is_firmware_update = true;
-    snprintf(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_filename, 20, "esp-miner.bin");
-    snprintf(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_status, 20, "Starting...");
-
-    char buf[1000];
-    esp_ota_handle_t ota_handle;
-    int remaining = req->content_len;
-
-    const esp_partition_t * ota_partition = esp_ota_get_next_update_partition(NULL);
-    ESP_ERROR_CHECK(esp_ota_begin(ota_partition, OTA_SIZE_UNKNOWN, &ota_handle));
-
-    int chunks = 0;
-    while (remaining > 0) {
-        int recv_len = httpd_req_recv(req, buf, MIN(remaining, sizeof(buf)));
-
-        // Timeout Error: Just retry
-        if (recv_len == HTTPD_SOCK_ERR_TIMEOUT) {
-            continue;
-
-            // Serious Error: Abort OTA
-        } else if (recv_len <= 0) {
-            snprintf(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_status, 20, "Protocol Error");
-            HTTP_send_json_error(req, "500 Internal Server Error", "Protocol Error");
-            return ESP_FAIL;
-        }
-
-        // Successful Upload: Flash firmware chunk
-        if (esp_ota_write(ota_handle, (const void *) buf, recv_len) != ESP_OK) {
-            esp_ota_abort(ota_handle);
-            snprintf(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_status, 20, "Write Error");
-            HTTP_send_json_error(req, "500 Internal Server Error", "Write Error");
-            return ESP_FAIL;
-        }
-
-        uint8_t percentage = 100 - ((remaining * 100 / req->content_len));
-
-        snprintf(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_status, 20, "Working (%d%%)", percentage);
-
-        remaining -= recv_len;
-
-        chunks++;
-        if (chunks % 16 == 0) {
-            vTaskDelay(10 / portTICK_PERIOD_MS);
-        }
-    }
-
-    // Validate and switch to new OTA image and reboot
-    if (esp_ota_end(ota_handle) != ESP_OK || esp_ota_set_boot_partition(ota_partition) != ESP_OK) {
-        snprintf(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_status, 20, "Validation Error");
-        HTTP_send_json_error(req, "500 Internal Server Error", "Validation / Activation Error");
-        return ESP_OK;
-    }
-
-    snprintf(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_status, 20, "Rebooting...");
-
-    httpd_resp_set_type(req, "text/plain");
-    httpd_resp_sendstr(req, "Firmware update complete, rebooting now!\n");
-    ESP_LOGI(TAG, "Restarting System because of Firmware update complete");
-    vTaskDelay(1000 / portTICK_PERIOD_MS);
-    esp_restart();
-
-    return ESP_OK;
-}
-
 // HTTP Error (404) Handler - Redirects all requests to the root page
 esp_err_t http_404_error_handler(httpd_req_t * req, httpd_err_code_t err)
 {
@@ -1852,7 +1686,7 @@ esp_err_t start_rest_server(GlobalState * GLOBAL_STATE)
     config.uri_match_fn = httpd_uri_match_wildcard;
     config.stack_size = 8192;
     config.max_open_sockets = 20;
-    config.max_uri_handlers = 25;
+    config.max_uri_handlers = 35;
     config.close_fn = websocket_close_fn;
     config.lru_purge_enable = true;
 
@@ -1999,9 +1833,9 @@ esp_err_t start_rest_server(GlobalState * GLOBAL_STATE)
     httpd_register_uri_handler(server, &update_post_ota_firmware);
 
     httpd_uri_t update_post_ota_www = {
-        .uri = "/api/system/OTAWWW", 
-        .method = HTTP_POST, 
-        .handler = POST_WWW_update,
+        .uri = "/api/system/OTAWWW",
+        .method = HTTP_POST,
+        .handler = POST_WWW_update
     };
     httpd_register_uri_handler(server, &update_post_ota_www);
 

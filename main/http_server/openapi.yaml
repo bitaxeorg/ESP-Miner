@@ -268,6 +268,9 @@ components:
         - nominalVoltage
         - overheat_mode
         - overclockEnabled
+        - isFirmwareUpdate
+        - firmwareUpdatePercent
+        - firmwareUpdateStatus
         - primaryPoolIndex
         - secondaryPoolIndex
         - pools
@@ -489,6 +492,16 @@ components:
         overclockEnabled:
           type: integer
           description: Set custom voltage/frequency in AxeOS
+        isFirmwareUpdate:
+          type: integer
+          description: Whether a firmware update is currently in progress (0=no, 1=yes)
+          enum: [0, 1]
+        firmwareUpdatePercent:
+          type: integer
+          description: Firmware update progress percentage (0-100)
+        firmwareUpdateStatus:
+          type: string
+          description: Firmware update status message
         useCustomWWW:
           type: integer
           description: Whether to serve files from the SPIFFS www partition instead of the embedded Web UI (0=embedded, 1=custom/SPIFFS)

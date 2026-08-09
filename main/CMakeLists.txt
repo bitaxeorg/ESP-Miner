@@ -28,6 +28,7 @@ SRCS
     "./http_server/cjson_utils.c"
     "./http_server/system_api_json.c"
     "./http_server/theme_api.c"
+    "./http_server/ota_api.c"
     "./http_server/axe-os/api/system/asic_settings.c"
     "./self_test/self_test.c"
     "./tasks/stratum_v1_task.c"

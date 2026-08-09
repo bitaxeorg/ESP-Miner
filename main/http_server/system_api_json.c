@@ -97,6 +97,9 @@ static void system_api_add_telemetry(cJSON *root, GlobalState *g) {
     cJSON_AddFloatToObject(root, "cpuUsage", g->SYSTEM_MODULE.cpu_usage);
     cJSON_AddBoolToObject(root, "miningPaused", g->SYSTEM_MODULE.mining_paused);
     cJSON_AddNumberToObject(root, "overheat_mode", g->SYSTEM_MODULE.overheat_mode ? 1 : 0);
+    cJSON_AddNumberToObject(root, "isFirmwareUpdate", g->SYSTEM_MODULE.is_firmware_update ? 1 : 0);
+    cJSON_AddNumberToObject(root, "firmwareUpdatePercent", g->SYSTEM_MODULE.firmware_update_percent);
+    cJSON_AddStringToObject(root, "firmwareUpdateStatus", g->SYSTEM_MODULE.firmware_update_status);
     cJSON_AddStringToObject(root, "wifiStatus", g->SYSTEM_MODULE.wifi_status);
 
     int8_t rssi = -90;
