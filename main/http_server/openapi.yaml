@@ -616,6 +616,16 @@ components:
         displayTimeout:
           type: number
           description: Turn off display after timeout
+        carouselScreens:
+          type: integer
+          minimum: 1
+          maximum: 15
+          description: Bitmask of enabled carousel screens (bit0=URLS, bit1=STATS, bit2=MINING, bit3=WIFI)
+        carouselDelay:
+          type: integer
+          minimum: 1
+          maximum: 60
+          description: Carousel dwell time per screen in seconds
         statsFrequency:
           type: number
           description: Statistics frequency in seconds
