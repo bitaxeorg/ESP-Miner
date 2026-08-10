@@ -83,16 +83,9 @@ void app_main(void)
     }
 #endif
   
-    // Init I2C
-    ESP_ERROR_CHECK(i2c_bitaxe_init());
-    ESP_LOGI(TAG, "I2C initialized successfully");
-
     // Initialize RST pin to low early to minimize ASIC power consumption
     ESP_ERROR_CHECK(asic_hold_reset_low());
     ESP_LOGI(TAG, "RST pin initialized to low");
-
-    // wait for I2C to init
-    vTaskDelay(100 / portTICK_PERIOD_MS);
 
     // Init ADC
     ADC_init();
@@ -128,6 +121,17 @@ void app_main(void)
         ESP_LOGE(TAG, "Failed to init device config");
         return;
     }
+
+    // Init I2C
+    if (GLOBAL_STATE.DEVICE_CONFIG.pins.i2c != NULL) {
+        ESP_ERROR_CHECK(i2c_bitaxe_init(GLOBAL_STATE.DEVICE_CONFIG.pins.i2c->sda, GLOBAL_STATE.DEVICE_CONFIG.pins.i2c->scl));
+        ESP_LOGI(TAG, "I2C initialized successfully");
+    } else {
+        ESP_LOGI(TAG, "I2C pins not configured for board; skipping I2C initialization");
+    }
+
+    // wait for I2C to init
+    vTaskDelay(100 / portTICK_PERIOD_MS);
 
     if (self_test_init(&GLOBAL_STATE) != ESP_OK) {
         ESP_LOGE(TAG, "Failed to init self test");

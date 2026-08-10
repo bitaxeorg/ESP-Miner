@@ -23,7 +23,7 @@ esp_err_t device_config_init(GlobalState * GLOBAL_STATE)
             ESP_LOGI(TAG, "ASIC: %dx %s (%d cores)", GLOBAL_STATE->DEVICE_CONFIG.family.asic_count, GLOBAL_STATE->DEVICE_CONFIG.family.asic.name, GLOBAL_STATE->DEVICE_CONFIG.family.asic.core_count);
 
             free(board_version);
-            return ESP_OK;
+            return device_pins_init(&GLOBAL_STATE->DEVICE_CONFIG.pins);
         }
     }
 
@@ -76,5 +76,5 @@ esp_err_t device_config_init(GlobalState * GLOBAL_STATE)
     free(device_model);
     free(asic_model);
 
-    return ESP_OK;
+    return device_pins_init(&GLOBAL_STATE->DEVICE_CONFIG.pins);
 }
