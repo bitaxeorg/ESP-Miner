@@ -345,7 +345,7 @@ private isIpAddress(value: string): boolean {
         return;
       }
 
-      if (this.swarm.some(item => item.connectionAddress === info['ipv4'])) {
+      if (this.swarm.some(item => item.connectionAddress === address)) {
         this.toastr.warning('Device already added to the swarm.', `Device at ${address}`);
         return;
       }
@@ -353,7 +353,10 @@ private isIpAddress(value: string): boolean {
       const device = {
         address: info['fullHostname'] || info['hostname'] || address,
         displayName: info['hostname'] ? info['hostname'].replace(/\.local$/i, '') : address,
-        connectionAddress: info['ipv4'] || address,
+        // The action target must be the address we actually
+        // connected to, never a response-supplied field — a rogue LAN
+        // responder could otherwise redirect restart/identify POSTs.
+        connectionAddress: address,
         ...asic,
         ...info,
         ...this.numerizeDeviceBestDiffs(info)
@@ -519,12 +522,23 @@ private isIpAddress(value: string): boolean {
   }
 
   private fallbackDeviceModel(data: any): any {
+    const safeColor = this.sanitizeSwarmColor(data.swarmColor);
+    if (data.swarmColor && !safeColor) {
+      data = { ...data, swarmColor: undefined };
+    }
     if (data.deviceModel && data.swarmColor && data.poolDifficulty && data.hashRate) return data;
     const deviceModel = data.deviceModel || this.deriveDeviceModel(data);
-    const swarmColor = data.swarmColor || this.deriveSwarmColor(deviceModel);
+    const swarmColor = safeColor || this.deriveSwarmColor(deviceModel);
     const poolDifficulty = data.poolDifficulty || data.stratumDiff;
     const hashRate = data.hashRate || data.hashRate_10m;
     return { ...data, deviceModel, swarmColor, poolDifficulty, hashRate };
+  }
+
+  // swarmColor is a remote-supplied string rendered as a CSS
+  // value; clamp it to the known palette instead of trusting the peer.
+  private sanitizeSwarmColor(color: any): string | null {
+    const palette = ['red', 'purple', 'blue', 'orange', 'green', 'cyan', 'gray'];
+    return (typeof color === 'string' && palette.includes(color)) ? color : null;
   }
 
   private numerizeDeviceBestDiffs(info: ISystemInfo) {
