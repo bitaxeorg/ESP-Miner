@@ -393,6 +393,18 @@ static void nvs_task(void *pvParameters)
     }
 }
 
+static void nvs_config_flush(void)
+{
+    if (nvs_save_queue != NULL) {
+        int timeout_count = 0;
+        while (uxQueueMessagesWaiting(nvs_save_queue) > 0 && timeout_count < 50) {
+            vTaskDelay(pdMS_TO_TICKS(20));
+            timeout_count++;
+        }
+        vTaskDelay(pdMS_TO_TICKS(100));
+    }
+}
+
 esp_err_t nvs_config_init(void)
 {
     esp_err_t err = nvs_flash_init();
@@ -516,6 +528,9 @@ esp_err_t nvs_config_init(void)
 
         return ESP_FAIL;
     }
+
+    esp_register_shutdown_handler(nvs_config_flush);
+
     return ESP_OK;
 }
 

@@ -1351,6 +1351,43 @@ paths:
         '500':
           description: Internal server error
 
+  /api/system/OTA/github:
+    post:
+      summary: Update system firmware directly from GitHub
+      description: Downloads and installs firmware binary directly from an official GitHub release
+      operationId: updateFirmwareFromGithub
+      tags:
+        - system
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                url:
+                  type: string
+                  description: Optional explicit release asset URL (must be github.com/bitaxeorg/ESP-Miner)
+                tag:
+                  type: string
+                  description: Optional release tag version (e.g. v2.3.0)
+      responses:
+        '200':
+          description: Firmware update initiated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+        '400':
+          description: Invalid or non-GitHub URL provided
+        '401':
+          description: Unauthorized - Client not in allowed network range
+        '500':
+          description: Internal server error
+
   /api/system/OTAWWW:
     post:
       summary: Update web interface

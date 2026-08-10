@@ -213,7 +213,6 @@ static esp_err_t GET_wifi_scan(httpd_req_t *req)
 
 #define FILE_PATH_MAX (ESP_VFS_PATH_MAX + 128)
 #define MESSAGE_QUEUE_SIZE (128)
-#define MAX_REST_PAYLOAD_SIZE (16384) /* 16 KB max REST JSON payload */
 
 #define CHECK_FILE_EXTENSION(filename, ext) (strcasecmp(&filename[strlen(filename) - strlen(ext)], ext) == 0)
 
@@ -1838,6 +1837,13 @@ esp_err_t start_rest_server(GlobalState * GLOBAL_STATE)
         .handler = POST_WWW_update
     };
     httpd_register_uri_handler(server, &update_post_ota_www);
+
+    httpd_uri_t update_post_ota_github = {
+        .uri = "/api/system/OTA/github",
+        .method = HTTP_POST,
+        .handler = POST_OTA_github_update
+    };
+    httpd_register_uri_handler(server, &update_post_ota_github);
 
     httpd_uri_t ws = {
         .uri = "/api/ws", 

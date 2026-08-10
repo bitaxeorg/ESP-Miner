@@ -480,5 +480,15 @@ export class SystemApiService {
     }).pipe(delay(1000));
   }
 
+  public updateFirmwareFromGithub(payload: { tag?: string; url?: string }, uri: string = ''): Observable<{ status?: string }> {
+    if (!environment.mock && this.api && !uri) {
+      return from(this.api.invoke(functions.updateFirmwareFromGithub as any, { body: payload }) as Promise<{ status?: string }>);
+    }
 
+    if (!environment.mock && uri) {
+      return this.httpClient.post<{ status?: string }>(`${uri}/api/system/OTA/github`, payload);
+    }
+
+    return of({ status: 'Downloading' }).pipe(delay(1000));
+  }
 }

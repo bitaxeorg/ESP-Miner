@@ -28,33 +28,87 @@
                 </ng-container>
 
                 <ng-template #afterCheck>
-                    <ng-container *ngIf="latestRelease$ | async as latestRelease">
-                        <h3>Latest Release:
-                            <a style="text-decoration: underline;" target="_blank"
-                            [href]="latestRelease.html_url">{{latestRelease.name}}</a>
-                        </h3>
-
-                        <div class="text-orange-500 mb-3">Download both files for update!</div>
-
-                        <div *ngFor="let asset of latestRelease.assets">
-                            <div *ngIf="asset.name == 'esp-miner.bin'">
-                                <a style="text-decoration: underline;" target="_blank"
-                                    [href]="asset.browser_download_url">esp-miner.bin</a>
+                    <ng-container *ngIf="releases$ | async as releases; else loadingReleases">
+                        <ng-container *ngIf="releases.length > 0; else noReleases">
+                            <div class="flex items-center gap-2 mb-3">
+                                <app-checkbox
+                                    inputId="includePrereleases"
+                                    [binary]="true"
+                                    [ngModel]="includePrereleases"
+                                    (onChange)="togglePrereleases($event.checked)">
+                                </app-checkbox>
+                                <label for="includePrereleases" class="cursor-pointer text-sm font-medium">Include pre-releases (beta / RC)</label>
                             </div>
-                            <div *ngIf="asset.name == 'www.bin'">
-                                <a style="text-decoration: underline;" target="_blank"
-                                    [href]="asset.browser_download_url">www.bin</a>
+
+                            <div class="mb-3">
+                                <label class="block text-xs font-semibold uppercase tracking-wider text-secondary mb-1">Select Version:</label>
+                                <app-dropdown
+                                    inputId="releaseSelect"
+                                    [options]="getReleaseOptions(releases)"
+                                    [ngModel]="selectedRelease?.tag_name || releases[0].tag_name"
+                                    (onChange)="selectReleaseByTag($event.value, releases)">
+                                </app-dropdown>
                             </div>
-                        </div>
 
-                        <a class="text-secondary underline block mt-3 cursor-pointer" (click)="releaseNotesModal.isVisible = true">
-                            Release Notes
-                        </a>
+                            @let activeRel = selectedRelease || releases[0];
+                            <ng-container *ngIf="activeRel">
+                                <h3>
+                                    <a style="text-decoration: underline;" target="_blank"
+                                    [href]="activeRel.html_url">{{ activeRel.name || activeRel.tag_name }}</a>
+                                    <span *ngIf="activeRel.prerelease" class="ml-2 px-2 py-0.5 text-xs font-semibold rounded bg-amber-500/20 text-amber-400 border border-amber-500/30">Pre-release</span>
+                                </h3>
 
-                        <app-modal #releaseNotesModal [headline]="latestRelease.name">
-                            <div [innerHTML]="simpleMarkdownParser(latestRelease.body)"></div>
-                        </app-modal>
+                                <button class="btn btn-primary w-full text-center flex justify-center items-center gap-2 my-3"
+                                    (click)="installGithubRelease(activeRel)">
+                                    <i class="pi pi-download"></i>
+                                    <span>Install {{ activeRel.tag_name }} from GitHub</span>
+                                </button>
+
+                                <div class="text-orange-500 mb-2 text-xs">Or download manually for local upload:</div>
+
+                                <div *ngFor="let asset of activeRel.assets">
+                                    <div *ngIf="asset.name == 'esp-miner.bin'">
+                                        <a style="text-decoration: underline;" target="_blank"
+                                            [href]="asset.browser_download_url">esp-miner.bin</a>
+                                    </div>
+                                    <div *ngIf="asset.name == 'www.bin'">
+                                        <a style="text-decoration: underline;" target="_blank"
+                                            [href]="asset.browser_download_url">www.bin</a>
+                                    </div>
+                                </div>
+
+                                <a class="text-secondary underline block mt-3 cursor-pointer" (click)="releaseNotesModal.isVisible = true">
+                                    Release Notes
+                                </a>
+
+                                <app-modal #releaseNotesModal [headline]="activeRel.name || activeRel.tag_name">
+                                    <div [innerHTML]="simpleMarkdownParser(activeRel.body)"></div>
+                                </app-modal>
+                            </ng-container>
+                        </ng-container>
+                        <ng-template #noReleases>
+                            <div class="text-amber-400 text-xs mb-2">
+                                GitHub API rate limit reached or offline.<span *ngIf="rateLimitResetTime"> Rate limit resets at {{ rateLimitResetTime }}.</span> You can manually enter a release tag below to install directly from GitHub:
+                            </div>
+                            <div class="mb-3">
+                                <label class="block text-xs font-semibold uppercase tracking-wider text-secondary mb-1">Version Tag:</label>
+                                <div class="flex gap-2">
+                                    <input type="text" class="w-full bg-surface-100 border border-white/10 rounded px-2 py-1.5 text-sm"
+                                        placeholder="e.g. v2.3.0" #manualTagInput>
+                                    <button class="btn btn-primary text-sm whitespace-nowrap"
+                                        (click)="installGithubTag(manualTagInput.value)">
+                                        Install
+                                    </button>
+                                </div>
+                            </div>
+                        </ng-template>
                     </ng-container>
+                    <ng-template #loadingReleases>
+                        <div class="flex items-center gap-2 text-secondary text-sm my-3">
+                            <i class="pi pi-spin pi-spinner"></i>
+                            <span>Fetching releases from GitHub...</span>
+                        </div>
+                    </ng-template>
                 </ng-template>
             </div>
         </div>
@@ -86,6 +140,9 @@
                 <small class="text-orange-500 block mb-4">* A device restart is required to apply this change.</small>
 
                 <div *ngIf="(info$ | async)?.useCustomWWW === 1" class="rounded p-3 bg-white/5 border border-white/10">
+                    <div class="text-sm font-medium mb-3">
+                        Installed Version: <span class="font-mono text-primary">{{ (info$ | async)?.axeOSVersion }}</span>
+                    </div>
                     <h5 class="mt-0 mb-3 text-main">Upload Custom UI</h5>
                     <label class="btn w-full text-center relative flex justify-center items-center gap-2 cursor-pointer my-2">
                         <i class="pi pi-upload"></i>

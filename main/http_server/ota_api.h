@@ -13,4 +13,9 @@ esp_err_t POST_OTA_update(httpd_req_t *req);
  */
 esp_err_t POST_WWW_update(httpd_req_t *req);
 
+/**
+ * @brief Handle direct GitHub OTA firmware download (/api/system/OTA/github)
+ */
+esp_err_t POST_OTA_github_update(httpd_req_t *req);
+
 #endif /* OTA_API_H_ */
