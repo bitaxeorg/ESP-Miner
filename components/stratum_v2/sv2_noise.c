@@ -4,6 +4,7 @@
 
 #include <string.h>
 #include <stdlib.h>
+#include <time.h>
 
 #include "esp_log.h"
 #include "esp_random.h"
@@ -481,6 +482,25 @@ int sv2_noise_handshake(sv2_noise_ctx_t *ctx, esp_transport_handle_t transport,
 
     ESP_LOGI(TAG, "Server certificate: version=%d, valid_from=%lu, not_valid_after=%lu",
              cert_version, valid_from, not_valid_after);
+
+    // Enforce the certificate validity window. It is SV2's only
+    // revocation mechanism; without this check a leaked or retired pool
+    // endpoint key remains MITM-usable indefinitely. Note the wall clock
+    // here is pool-influenced unless the ntime plausibility checks in
+    // system.c are in place — the two fixes should ship together.
+    time_t now = time(NULL);
+    if (now > 0) {
+        if ((uint64_t) now < (uint64_t) valid_from) {
+            ESP_LOGE(TAG, "Server certificate not yet valid (valid_from=%lu, now=%lld)",
+                     (unsigned long) valid_from, (long long) now);
+            return -1;
+        }
+        if ((uint64_t) now > (uint64_t) not_valid_after) {
+            ESP_LOGE(TAG, "Server certificate expired (not_valid_after=%lu, now=%lld)",
+                     (unsigned long) not_valid_after, (long long) now);
+            return -1;
+        }
+    }
 
     // Step 15: Verify Schnorr signature if authority pubkey provided
     if (authority_pubkey) {
