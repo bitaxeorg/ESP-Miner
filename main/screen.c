@@ -42,6 +42,23 @@ static int delays_ms[MAX_SCREENS] = {0, 0, 0, 0, 0, 1000, 3000, 3000, 10000, 100
 static int current_screen_time_ms;
 static int current_screen_delay_ms;
 
+static uint16_t get_carousel_screens_mask(void)
+{
+    uint16_t mask = nvs_config_get_u16(NVS_CONFIG_CAROUSEL_SCREENS);
+    if (mask < 1 || mask > 0x0F) {
+        mask = 0x0F;
+    }
+    return mask;
+}
+
+static uint16_t get_carousel_delay_sec(void)
+{
+    uint16_t sec = nvs_config_get_u16(NVS_CONFIG_CAROUSEL_DELAY);
+    if (sec < 1) sec = 1;
+    if (sec > 60) sec = 60;
+    return sec;
+}
+
 // static int screen_chars;
 static int screen_lines;
 
@@ -391,7 +408,11 @@ static bool screen_show(screen_t screen)
         }
 
         current_screen_time_ms = 0;
-        current_screen_delay_ms = delays_ms[screen];
+        if (screen >= SCR_CAROUSEL_START) {
+            current_screen_delay_ms = get_carousel_delay_sec() * 1000;
+        } else {
+            current_screen_delay_ms = delays_ms[screen];
+        }
     }
 
     lvgl_port_unlock();
@@ -401,15 +422,24 @@ static bool screen_show(screen_t screen)
 
 void screen_next()
 {
+    uint16_t mask = get_carousel_screens_mask();
     screen_t next_scr = get_current_screen();
-    do {
+
+    for (int i = 0; i < 4; i++) {
         next_scr++;
 
-        if (next_scr == MAX_SCREENS) {
+        if (next_scr < SCR_CAROUSEL_START || next_scr >= MAX_SCREENS) {
             next_scr = SCR_CAROUSEL_START;
         }
 
-    } while (!screen_show(next_scr));
+        if (!((mask >> (next_scr - SCR_CAROUSEL_START)) & 1)) {
+            continue;
+        }
+
+        if (screen_show(next_scr)) {
+            return;
+        }
+    }
 }
 
 static void screen_update_cb(lv_timer_t * timer)
