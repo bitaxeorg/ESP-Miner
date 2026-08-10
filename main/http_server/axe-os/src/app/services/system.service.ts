@@ -170,6 +170,8 @@ export class SystemApiService {
         rotation: 0,
         invertscreen: 0,
         displayTimeout: -1,
+        carouselScreens: 15,
+        carouselDelay: 10,
         autofanspeed: 1,
         isPSRAMAvailable: 1,
         overclockEnabled: 1,
