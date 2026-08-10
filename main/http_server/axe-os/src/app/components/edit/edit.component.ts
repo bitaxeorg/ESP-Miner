@@ -1,7 +1,7 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { getHttpErrorMessage } from 'src/app/utils/error-handler';
 import { Component, Input, OnInit, OnDestroy, OnChanges, SimpleChanges } from '@angular/core';
-import { FormBuilder, FormGroup, FormControl, Validators, ReactiveFormsModule } from '@angular/forms';
+import { FormBuilder, FormGroup, FormControl, Validators, ReactiveFormsModule, FormsModule } from '@angular/forms';
 import { ToastrService } from 'ngx-toastr';
 import { forkJoin, startWith, Subject, takeUntil, pairwise, BehaviorSubject, Observable, first } from 'rxjs';
 import { LoadingService } from 'src/app/services/loading.service';
@@ -26,6 +26,7 @@ const STATS_FREQUENCY_STEPS = [0, 1, 2, 5, 10, 30, 60, 60 * 2, 60 * 6, 60 * 14, 
     imports: [
         CommonModule,
         ReactiveFormsModule,
+        FormsModule,
         CheckboxComponent,
         DropdownComponent,
         SliderComponent,
@@ -291,6 +292,10 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
   disableOverheatMode() {
     this.form.patchValue({ overheat_mode: 0 });
     this.updateSystem();
+  }
+
+  isCarouselScreenEnabled(bit: number): boolean {
+    return ((this.form.controls['carouselScreens'].value >> bit) & 1) === 1;
   }
 
   toggleCarouselScreen(bit: number, enable: boolean) {

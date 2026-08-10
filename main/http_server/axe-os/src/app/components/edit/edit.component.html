@@ -143,6 +143,60 @@
         </div>
 
         <div class="flex flex-col md:flex-row md:items-center mb-4 gap-2">
+            <label class="w-full md:w-2/12 hidden md:flex font-medium">
+                Carousel
+            </label>
+            <div class="w-full md:w-10/12">
+                <div class="flex flex-wrap gap-4 mb-2">
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <app-checkbox
+                            name="carouselUrls"
+                            [binary]="true"
+                            [ngModel]="isCarouselScreenEnabled(0)"
+                            (ngModelChange)="toggleCarouselScreen(0, $event)"
+                            [ngModelOptions]="{standalone: true}">
+                        </app-checkbox>
+                        URLs
+                    </label>
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <app-checkbox
+                            name="carouselStats"
+                            [binary]="true"
+                            [ngModel]="isCarouselScreenEnabled(1)"
+                            (ngModelChange)="toggleCarouselScreen(1, $event)"
+                            [ngModelOptions]="{standalone: true}">
+                        </app-checkbox>
+                        Stats
+                    </label>
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <app-checkbox
+                            name="carouselMining"
+                            [binary]="true"
+                            [ngModel]="isCarouselScreenEnabled(2)"
+                            (ngModelChange)="toggleCarouselScreen(2, $event)"
+                            [ngModelOptions]="{standalone: true}">
+                        </app-checkbox>
+                        Mining
+                    </label>
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <app-checkbox
+                            name="carouselWifi"
+                            [binary]="true"
+                            [ngModel]="isCarouselScreenEnabled(3)"
+                            (ngModelChange)="toggleCarouselScreen(3, $event)"
+                            [ngModelOptions]="{standalone: true}">
+                        </app-checkbox>
+                        Wi-Fi
+                    </label>
+                </div>
+                <label class="block mb-1">
+                    Dwell: {{ form.controls['carouselDelay'].value }}s per screen
+                </label>
+                <app-slider [min]="1" [max]="60" [step]="1" formControlName="carouselDelay"></app-slider>
+            </div>
+        </div>
+
+        <div class="flex flex-col md:flex-row md:items-center mb-4 gap-2">
             <label for="invertscreen" class="w-full md:w-2/12 font-medium cursor-pointer select-none">Invert Display Colors</label>
             <div class="w-full md:w-10/12 flex items-center">
                 <app-checkbox name="invertscreen" formControlName="invertscreen" inputId="invertscreen" [binary]="true"></app-checkbox>
