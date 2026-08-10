@@ -307,6 +307,30 @@ static void normalize_hostname(char *hostname, size_t max_len) {
     }
 }
 
+// Validate hostname charset (RFC 1123 label: letters, digits,
+// hyphens; no leading/trailing hyphen; <= 63 chars). The value flows into the
+// mDNS responder name, DHCP option 12 and the display, none of which sanitize.
+static bool is_valid_hostname(const char *hostname) {
+    if (hostname == NULL) {
+        return false;
+    }
+    size_t len = strlen(hostname);
+    if (len == 0 || len > 63) {
+        return false;
+    }
+    if (hostname[0] == '-' || hostname[len - 1] == '-') {
+        return false;
+    }
+    for (size_t i = 0; i < len; i++) {
+        char c = hostname[i];
+        if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+              (c >= '0' && c <= '9') || c == '-')) {
+            return false;
+        }
+    }
+    return true;
+}
+
 esp_err_t is_network_allowed(httpd_req_t * req)
 {
     if (GLOBAL_STATE->SYSTEM_MODULE.ap_enabled == true) {
@@ -838,6 +862,11 @@ bool check_settings_and_update(const cJSON * const root, char **redirect_url)
         char normalized_new_hostname[64];
         strlcpy(normalized_new_hostname, hostname_item->valuestring, sizeof(normalized_new_hostname));
         normalize_hostname(normalized_new_hostname, sizeof(normalized_new_hostname));
+        if (!is_valid_hostname(normalized_new_hostname)) {
+            ESP_LOGW(TAG, "Invalid hostname charset: '%s'", hostname_item->valuestring);
+            free(old_hostname);
+            return false;
+        }
         if (strcmp(old_hostname, normalized_new_hostname) != 0) {
             hostname_changed = true;
             ESP_LOGI(TAG, "Hostname change detected: %s -> %s", old_hostname, hostname_item->valuestring);
