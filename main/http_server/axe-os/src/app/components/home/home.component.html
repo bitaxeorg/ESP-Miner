@@ -672,7 +672,7 @@
           </div>
 
           @if (info.totalUptimeSeconds) {
-            <div class="flex flex-nowrap mb-2">
+            <div class="flex flex-nowrap mb-1">
               <div class="w-24 shrink-0 text-secondary">
                 <span>Total Uptime</span>
               </div>
@@ -692,7 +692,7 @@
               </div>
               <div>
                 <span class="cursor-pointer font-medium" appTooltip="{{info.totalHashes | number}} total hashes" tooltipPosition="bottom">
-                  2<sup>{{info.totalLog2Work | number:'1.6-6'}}</sup>
+                  2<sup class="leading-none align-baseline relative -top-[0.4em]">{{info.totalLog2Work | number:'1.6-6'}}</sup>
                 </span>
               </div>
             </div>
