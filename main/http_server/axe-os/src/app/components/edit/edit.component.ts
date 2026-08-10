@@ -180,6 +180,16 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
             Validators.min(-1),
             Validators.max(this.displayTimeoutMaxValue)
           ]],
+          carouselScreens: [info.carouselScreens ?? 15, [
+            Validators.required,
+            Validators.min(1),
+            Validators.max(15)
+          ]],
+          carouselDelay: [info.carouselDelay ?? 10, [
+            Validators.required,
+            Validators.min(1),
+            Validators.max(60)
+          ]],
           coreVoltage: [info.coreVoltage, [Validators.required]],
           frequency: [info.frequency, [Validators.required]],
           autofanspeed: [info.autofanspeed == 1, [Validators.required]],
@@ -283,6 +293,21 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
     this.updateSystem();
   }
 
+  toggleCarouselScreen(bit: number, enable: boolean) {
+    const current: number = this.form.controls['carouselScreens'].value;
+    const candidate = enable
+      ? (current | (1 << bit))
+      : (current & ~(1 << bit));
+
+    if (candidate === 0) {
+      this.toastr.warning('At least one carousel screen must be enabled.');
+      return;
+    }
+
+    this.form.patchValue({ carouselScreens: candidate });
+    this.form.controls['carouselScreens'].markAsDirty();
+  }
+
   toggleOverclockMode(enable: boolean) {
     this.settingsUnlocked = enable;
     this.saveOverclockSetting(enable ? 1 : 0);
@@ -374,6 +399,8 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
   get noRestartFields(): string[] {
     return [
       'displayTimeout',
+      'carouselScreens',
+      'carouselDelay',
       'coreVoltage',
       'frequency',
       'autofanspeed',
