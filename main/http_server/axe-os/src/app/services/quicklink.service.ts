@@ -18,7 +18,9 @@ export class QuicklinkService {
    * @returns A URL to the pool's user stats page, or undefined if no matching pool is found
    */
   public getQuickLink(stratumURL: string, stratumUser: string): string | undefined {
-    const user = stratumUser.split('.')[0];
+    // stratumUser is user-controlled via the settings API;
+    // encode it before splicing it into third-party URL paths/queries.
+    const user = encodeURIComponent(stratumUser.split('.')[0]);
 
     // Match entries against a lowercased stratum URL.
     const pools: Pool[] = [
