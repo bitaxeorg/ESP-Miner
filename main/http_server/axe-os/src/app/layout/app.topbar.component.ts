@@ -74,9 +74,11 @@ export class AppTopBarComponent implements OnInit, OnDestroy {
   }
 
   public restart() {
-    this.systemService.restart().subscribe({
-      next: () => this.toastr.success('Device restarted'),
-      error: () => this.toastr.error('Restart failed')
-    });
+    if (confirm('Are you sure you want to restart the device?')) {
+      this.systemService.restart().subscribe({
+        next: () => this.toastr.success('Device restarted'),
+        error: () => this.toastr.error('Restart failed')
+      });
+    }
   }
 }

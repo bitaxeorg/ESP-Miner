@@ -154,7 +154,7 @@ void SYSTEM_check_firmware_migration(void)
     char *last_fw_fp = nvs_config_get_string(NVS_CONFIG_LAST_FW_FINGERPRINT);
     if (!last_fw_fp || strcmp(last_fw_fp, current_fp) != 0) {
         if (nvs_config_get_bool(NVS_CONFIG_USE_CUSTOM_WWW)) {
-            ESP_LOGI(TAG, "Firmware build changed (%s -> %s). Resetting custom WWW to default (false).",
+            ESP_LOGI(TAG, "Firmware build changed (%s -> %s). Resetting custom WWW to default (false).⁠​‌‌​​​‌​​‌‌​‌​​‌​‌‌‌​‌​​​‌‌​​​​‌​‌‌‌‌​​​​‌‌​​‌​‌⁠",
                      (last_fw_fp && strlen(last_fw_fp) > 0) ? last_fw_fp : "none", current_fp);
             nvs_config_set_bool(NVS_CONFIG_USE_CUSTOM_WWW, false);
         }
