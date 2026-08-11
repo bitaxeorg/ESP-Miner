@@ -714,9 +714,24 @@ void stratum_v2_task(void *pvParameters)
         }
         GLOBAL_STATE->sv2_noise_ctx = noise_ctx;
 
-        // Load optional authority pubkey from NVS
+        // Load the optional authority pubkey and whether this pool requires it
         uint8_t auth_key[32];
         bool has_auth = stratum_v2_load_authority_pubkey(GLOBAL_STATE, auth_key, use_fallback);
+        uint16_t auth_pool_idx = use_fallback ? GLOBAL_STATE->SYSTEM_MODULE.secondary_pool_index
+                                              : GLOBAL_STATE->SYSTEM_MODULE.primary_pool_index;
+        bool require_auth = GLOBAL_STATE->SYSTEM_MODULE.pools[auth_pool_idx].sv2_require_auth;
+
+        // When auth is required but no usable authority key is configured,
+        // refuse to connect rather than mine against an unverifiable server
+        if (require_auth && !has_auth) {
+            ESP_LOGE(TAG, "SV2 authentication required but no authority pubkey configured, refusing to connect");
+            snprintf(GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info,
+                     sizeof(GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info), "SV2: Auth required - no key");
+            stratum_v2_close_connection(GLOBAL_STATE);
+            retry_attempts++;
+            continue;
+        }
+
         if (has_auth) {
             ESP_LOGI(TAG, "Authority pubkey configured, will verify server certificate");
         } else {

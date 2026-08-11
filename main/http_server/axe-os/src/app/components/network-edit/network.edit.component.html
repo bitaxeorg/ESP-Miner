@@ -1,50 +1,53 @@
-<form *ngIf="form" [formGroup]="form">
+@if (form) {
+  <form [formGroup]="form">
     <div class="card">
-        <div class="flex flex-col md:flex-row md:items-center mb-4 gap-2">
-            <label for="hostname" class="w-full md:w-2/12 font-medium">
-                <tooltip-text-icon
-                    text="Hostname"
-                    tooltip="Name of the device on your local network"
-                />
-            </label>
-            <div class="w-full md:w-10/12">
-                <input class="input-text" id="hostname" type="text" formControlName="hostname" />
-            </div>
+      <div class="flex flex-col md:flex-row md:items-center mb-4 gap-2">
+        <label for="hostname" class="w-full md:w-2/12 font-medium">
+          <tooltip-text-icon
+            text="Hostname"
+            tooltip="Name of the device on your local network"
+            />
+        </label>
+        <div class="w-full md:w-10/12">
+          <input class="input-text" id="hostname" type="text" formControlName="hostname" />
         </div>
-        <div class="flex flex-col md:flex-row md:items-center mb-4 gap-2">
-            <label for="ssid" class="w-full md:w-2/12 font-medium">Wi-Fi SSID</label>
-            <div class="w-full md:w-10/12 flex gap-2 items-center">
-                <input class="input-text flex-grow" id="ssid" type="text" formControlName="ssid" />
-                <button
-                    type="button"
-                    class="btn btn-secondary px-3.5 py-2.5 cursor-pointer"
-                    (click)="scanWifi()"
-                    [disabled]="scanning"
-                    appTooltip="Scan Wi-Fi"
-                    tooltipPosition="left">
-                    <i class="pi {{scanning ? 'pi-spinner pi-spin' : 'pi-search'}}"></i>
-                </button>
-            </div>
+      </div>
+      <div class="flex flex-col md:flex-row md:items-center mb-4 gap-2">
+        <label for="ssid" class="w-full md:w-2/12 font-medium">Wi-Fi SSID</label>
+        <div class="w-full md:w-10/12 flex gap-2 items-center">
+          <input class="input-text flex-grow" id="ssid" type="text" formControlName="ssid" />
+          <button
+            type="button"
+            class="btn btn-secondary px-3.5 py-2.5 cursor-pointer"
+            (click)="scanWifi()"
+            [disabled]="scanning"
+            appTooltip="Scan Wi-Fi"
+            tooltipPosition="left">
+            <i class="pi {{scanning ? 'pi-spinner pi-spin' : 'pi-search'}}"></i>
+          </button>
         </div>
-        <div class="flex flex-col md:flex-row md:items-center mb-4 gap-2">
-            <label for="wifiPass" class="w-full md:w-2/12 font-medium">Wi-Fi Password</label>
-            <div class="w-full md:w-10/12">
-                <div class="relative w-full">
-                    <input class="input-text pr-10" id="wifiPass" formControlName="wifiPass"
-                        [type]="showWifiPassword ? 'text' : 'password'"
-                        placeholder="Enter Wi-Fi password" />
-                    <span *ngIf="form.get('wifiPass')?.dirty" class="absolute inset-y-0 right-0 flex items-center pr-3 cursor-pointer text-secondary hover:text-main"
-                          (click)="toggleWifiPasswordVisibility()">
-                        <i class="pi {{!showWifiPassword ? 'pi-eye' : 'pi-eye-slash'}}"></i>
-                    </span>
-                </div>
-            </div>
+      </div>
+      <div class="flex flex-col md:flex-row md:items-center mb-4 gap-2">
+        <label for="wifiPass" class="w-full md:w-2/12 font-medium">Wi-Fi Password</label>
+        <div class="w-full md:w-10/12">
+          <div class="relative w-full">
+            <input class="input-text pr-10" id="wifiPass" formControlName="wifiPass"
+              [type]="showWifiPassword ? 'text' : 'password'"
+              placeholder="Enter Wi-Fi password" />
+            @if (form.get('wifiPass')?.dirty) {
+              <span class="absolute inset-y-0 right-0 flex items-center pr-3 cursor-pointer text-secondary hover:text-main"
+                (click)="toggleWifiPasswordVisibility()">
+                <i class="pi {{!showWifiPassword ? 'pi-eye' : 'pi-eye-slash'}}"></i>
+              </span>
+            }
+          </div>
         </div>
-
-        <div class="flex mt-5 gap-3">
-            <button [disabled]="!form.dirty || form.invalid" (click)="updateSystem()"
-                class="btn">Save</button>
-            <button [disabled]="!savedChanges" (click)="restart()" class="btn" [class.btn-secondary]="!savedChanges">Restart</button>
-        </div>
+      </div>
+      <div class="flex mt-5 gap-3">
+        <button [disabled]="!form.dirty || form.invalid" (click)="updateSystem()"
+        class="btn">Save</button>
+        <button [disabled]="!savedChanges" (click)="restart()" class="btn" [class.btn-secondary]="!savedChanges">Restart</button>
+      </div>
     </div>
-</form>
+  </form>
+}

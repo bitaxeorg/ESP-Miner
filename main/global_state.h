@@ -38,6 +38,7 @@ typedef struct PoolConfig
     bool decode_coinbase_tx;
     uint16_t sv2_channel_type;
     char * sv2_authority_pubkey;
+    bool sv2_require_auth;
 } PoolConfig;
 
 #define HISTORY_LENGTH 100
