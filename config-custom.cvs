@@ -86,6 +86,8 @@ TPS546,data,u16,1
 TMP1075,data,u16,1
 # Self-test Power Consumption Target (> 0)
 power_cons_tgt,data,u16,12
+# Nominal board voltage override (Volts)
+#nominal_voltage,data,u16,5
 # Self-test Target Temperature
 selftest_temp,data,u16,65
 # Self-test Warmup Temperature

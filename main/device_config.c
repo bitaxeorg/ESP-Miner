@@ -103,6 +103,9 @@ esp_err_t device_config_init(GlobalState * GLOBAL_STATE)
     if (nvs_config_has_key(NVS_CONFIG_POWER_CONSUMPTION_TARGET)) {
         GLOBAL_STATE->DEVICE_CONFIG.power_consumption_target = nvs_config_get_u16(NVS_CONFIG_POWER_CONSUMPTION_TARGET);
     }
+    if (nvs_config_has_key(NVS_CONFIG_NOMINAL_VOLTAGE)) {
+        GLOBAL_STATE->DEVICE_CONFIG.family.nominal_voltage = nvs_config_get_u16(NVS_CONFIG_NOMINAL_VOLTAGE);
+    }
 
     free(board_version);
 
