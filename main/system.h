@@ -2,11 +2,23 @@
 #define SYSTEM_H_
 
 #include "esp_err.h"
-#include "global_state.h"
+
 #include "sv2_protocol.h"
+
+typedef struct GlobalState GlobalState;
+
+typedef enum {
+    STRATUM_PROTOCOL_UNKNOWN = 0,
+    STRATUM_PROTOCOL_V1 = 1,
+    STRATUM_PROTOCOL_V2 = 2,
+} stratum_protocol_t;
+
+#define STRATUM_V1 "SV1"
+#define STRATUM_V2 "SV2"
 
 void SYSTEM_init_system(GlobalState * GLOBAL_STATE);
 void SYSTEM_init_versions(GlobalState * GLOBAL_STATE);
+void SYSTEM_init_partitions(GlobalState * GLOBAL_STATE);
 esp_err_t SYSTEM_init_peripherals(GlobalState * GLOBAL_STATE);
 
 // Clear the stratum job queue and valid-job tracking on a clean-jobs event,
@@ -21,5 +33,6 @@ void SYSTEM_notify_new_ntime(GlobalState * GLOBAL_STATE, uint32_t ntime);
 
 stratum_protocol_t stratum_protocol_from_string(const char *s);
 sv2_channel_type_t sv2_channel_type_from_string(const char *s);
+void SYSTEM_load_pool_from_nvs(GlobalState * GLOBAL_STATE, int i);
 
 #endif /* SYSTEM_H_ */

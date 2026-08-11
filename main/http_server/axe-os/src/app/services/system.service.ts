@@ -88,6 +88,7 @@ export class SystemApiService {
         apEnabled: 0,
         sharesAccepted: 1,
         sharesRejected: 10,
+        sharesPending: 0,
         sharesRejectedReasons: [
           { message: "Above target", count: 8 },
           { message: "Duplicate share", count: 2 }
@@ -95,6 +96,42 @@ export class SystemApiService {
         uptimeSeconds: 38,
         smallCoreCount: 672,
         ASICModel: "BM1370" as any,
+        primaryPoolIndex: 0,
+        secondaryPoolIndex: 1,
+        pools: [
+          {
+            id: 0,
+            stratumProtocol: "SV1" as const,
+            stratumURL: "public-pool.io",
+            stratumPort: 21496,
+            stratumUser: "bc1q99n3pu025yyu0jlywpmwzalyhm36tg5u37w20d.bitaxe-U1",
+            stratumPassword: "x",
+            stratumSuggestedDifficulty: 1000,
+            stratumExtranonceSubscribe: false,
+            stratumTLS: 0,
+            stratumCert: "",
+            stratumDecodeCoinbase: true,
+            stratumV2ChannelType: "extended" as const,
+            stratumV2AuthorityPubkey: "",
+            stratumV2RequireAuth: false
+          },
+          {
+            id: 1,
+            stratumProtocol: "SV1" as const,
+            stratumURL: "test.public-pool.io",
+            stratumPort: 21497,
+            stratumUser: "bc1q99n3pu025yyu0jlywpmwzalyhm36tg5u37w20d.bitaxe-U1",
+            stratumPassword: "x",
+            stratumSuggestedDifficulty: 1000,
+            stratumExtranonceSubscribe: false,
+            stratumTLS: 0,
+            stratumCert: "",
+            stratumDecodeCoinbase: true,
+            stratumV2ChannelType: "extended" as const,
+            stratumV2AuthorityPubkey: "",
+            stratumV2RequireAuth: false
+          }
+        ],
         stratumProtocol: "SV1" as const,
         stratumURL: "public-pool.io",
         stratumPort: 21496,
@@ -136,6 +173,7 @@ export class SystemApiService {
         autofanspeed: 1,
         isPSRAMAvailable: 1,
         overclockEnabled: 1,
+        useCustomWWW: 0 as const,
         runningPartition: "factory",
         minFanSpeed: 25,
         fanspeed: 50,
@@ -149,6 +187,12 @@ export class SystemApiService {
         boardtemp2: 40,
         overheat_mode: 0,
         statsLimit: 720,
+
+        partitions: [
+          { label: 'factory', version: 'v2.11.0', compileDate: 'Jul 10 2026', compileTime: '12:00:00', isCurrent: false, isFactory: true, usagePercent: 58 },
+          { label: 'ota_0', version: 'v2.12.0', compileDate: 'Jul 19 2026', compileTime: '15:30:00', isCurrent: true, isFactory: false, usagePercent: 58 },
+          { label: 'ota_1', version: 'v2.10.0', compileDate: 'Jun 20 2026', compileTime: '08:45:00', isCurrent: false, isFactory: false, usagePercent: 58 }
+        ],
 
         blockHeight: 811111,
         scriptsig: "..%..h..,H...ckpool.eu/solo.ckpool.org/",
@@ -168,6 +212,7 @@ export class SystemApiService {
         coinbaseValueTotalSatoshis: 50,
         coinbaseValueUserSatoshis: 50,
         miningPaused: false,
+        workReceived: 42,
       }
     ).pipe(delay(1000));
   }
@@ -359,6 +404,14 @@ export class SystemApiService {
     return of(undefined);
   }
 
+  public deletePool(uri: string = '', id: number): Observable<any> {
+    if (environment.production) {
+      const targetUri = uri ? `${uri}/api/system/pools/${id}` : `/api/system/pools/${id}`;
+      return this.httpClient.delete<any>(targetUri);
+    }
+    return of({ message: 'Pool deleted successfully (mock)' }).pipe(delay(500));
+  }
+
   private otaUpdate(file: File | Blob, url: string): Observable<HttpEvent<string>> {
     return new Observable<HttpEvent<string>>((subscriber) => {
       const reader = new FileReader();
@@ -395,6 +448,18 @@ export class SystemApiService {
 
   public performWWWOTAUpdate(file: File | Blob): Observable<HttpEvent<string>> {
     return this.otaUpdate(file, '/api/system/OTAWWW');
+  }
+
+  public switchBootPartition(partition: string, uri: string = ''): Observable<GenericResponse> {
+    if (environment.production && this.api && !uri) {
+      return from(this.api.invoke(functions.setBootPartition as any, { body: { partition } }) as Promise<GenericResponse>);
+    }
+
+    if (environment.production && uri) {
+      return this.httpClient.post<GenericResponse>(`${uri}/api/system/boot`, { partition });
+    }
+
+    return of({ message: `Successfully switched to ${partition} (mock)` }).pipe(delay(1000));
   }
 
   public getAsicSettings(uri: string = ''): Observable<ISystemASIC> {

@@ -85,10 +85,8 @@ static void my_log_cb(lv_log_level_t level, const char * buf)
     }
 }
 
-esp_err_t display_init(void * pvParameters)
+esp_err_t display_init(GlobalState * GLOBAL_STATE)
 {
-    GlobalState * GLOBAL_STATE = (GlobalState *) pvParameters;
-
     ESP_RETURN_ON_ERROR(read_display_config(GLOBAL_STATE), TAG, "Failed to read display config");
 
     lvgl_port_cfg_t lvgl_cfg = ESP_LVGL_PORT_INIT_CONFIG();

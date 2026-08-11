@@ -39,6 +39,65 @@ components:
               type: number
             message:
               type: string
+    Pool:
+      type: object
+      required:
+        - stratumURL
+        - stratumPort
+        - stratumUser
+      properties:
+        stratumProtocol:
+          type: string
+          enum: [SV1, SV2]
+          description: Stratum protocol
+        stratumURL:
+          type: string
+          description: Stratum server URL
+        stratumPort:
+          type: integer
+          description: Stratum server port
+          minimum: 1
+          maximum: 65535
+        stratumUser:
+          type: string
+          description: Stratum username
+        stratumPassword:
+          type: string
+          description: Stratum password
+          writeOnly: true
+        stratumSuggestedDifficulty:
+          type: number
+          description: Suggested difficulty
+        stratumExtranonceSubscribe:
+          type: boolean
+          description: Enable extranonce subscribe
+        stratumTLS:
+          type: integer
+          description: Enable stratum TLS (0=disabled, 1=enabled, 2=enabled with verification)
+          minimum: 0
+          maximum: 2
+        stratumCert:
+          type: string
+          description: Stratum TLS cert
+        stratumDecodeCoinbase:
+          type: boolean
+          description: Enable pool coinbase transaction decoding
+        stratumV2ChannelType:
+          type: string
+          enum: [standard, extended]
+          description: SV2 channel type
+        stratumV2AuthorityPubkey:
+          type: string
+          description: SV2 authority public key for certificate verification (base58-encoded)
+          pattern: "^[123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz]*$"
+        stratumV2RequireAuth:
+          type: boolean
+          description: Refuse to connect unless the SV2 server certificate is verified against the authority pubkey
+        id:
+          type: integer
+          description: Pool NVS slot index (0 to 7)
+          minimum: 0
+          maximum: 7
     SharesRejectedReason:
       type: object
       required:
@@ -124,6 +183,39 @@ components:
           description: Number of errors
           type: number
 
+    SystemPartition:
+      type: object
+      required:
+        - label
+        - isCurrent
+        - isFactory
+      properties:
+        label:
+          type: string
+          description: Partition label (e.g., ota_0, ota_1, factory)
+        version:
+          type: string
+          nullable: true
+          description: Firmware version on this partition
+        compileDate:
+          type: string
+          nullable: true
+          description: Compile date of the firmware on this partition
+        compileTime:
+          type: string
+          nullable: true
+          description: Compile time of the firmware on this partition
+        isCurrent:
+          type: boolean
+          description: Whether this is the currently running partition
+        isFactory:
+          type: boolean
+          description: Whether this is a factory partition
+        usagePercent:
+          type: integer
+          nullable: true
+          description: Partition space usage percentage (0-100)
+
     SystemInfo:
       type: object
       required:
@@ -176,6 +268,9 @@ components:
         - nominalVoltage
         - overheat_mode
         - overclockEnabled
+        - primaryPoolIndex
+        - secondaryPoolIndex
+        - pools
         - poolConnectionInfo
         - poolDifficulty
         - power
@@ -215,12 +310,12 @@ components:
         - networkDifficulty
         - blockSignals
         - blockFound
-        - coinbaseOutputs
         - coinbaseValueTotalSatoshis
         - coinbaseValueUserSatoshis
-        - hashrateMonitor
         - miningPaused
         - statsLimit
+        - partitions
+        - useCustomWWW
       properties:
         ASICModel:
           type: string
@@ -392,6 +487,21 @@ components:
         overclockEnabled:
           type: integer
           description: Set custom voltage/frequency in AxeOS
+        useCustomWWW:
+          type: integer
+          description: Whether to serve files from the SPIFFS www partition instead of the embedded Web UI (0=embedded, 1=custom/SPIFFS)
+          enum: [0, 1]
+        primaryPoolIndex:
+          type: integer
+          description: Index of the primary pool
+        secondaryPoolIndex:
+          type: integer
+          description: Index of the secondary pool (fallback)
+        pools:
+          type: array
+          description: Configured stratum pools
+          items:
+            $ref: '#/components/schemas/Pool'
         poolConnectionInfo:
           type: string
           description: Current pool address family
@@ -419,6 +529,9 @@ components:
         sharesRejected:
           type: number
           description: Number of rejected shares
+        sharesPending:
+          type: number
+          description: Shares submitted but not yet resolved by the pool (SV2; 0 for SV1). Rises while the pool batches/buffers acks, drops to 0 once it catches up.
         sharesRejectedReasons:
           type: array
           description: Reason(s) shares were rejected
@@ -562,6 +675,14 @@ components:
         statsLimit:
           type: integer
           description: Maximum number of statistics data points
+        workReceived:
+          type: integer
+          description: Total number of mining jobs received from the pool
+        partitions:
+          type: array
+          description: List of available app partitions and their firmware versions
+          items:
+            $ref: '#/components/schemas/SystemPartition'
 
     SystemASIC:
       type: object
@@ -688,6 +809,17 @@ components:
         useFallbackStratum:
           type: number
           description: Forces the use the fallback stratum pool
+        primaryPoolIndex:
+          type: integer
+          description: Index of the primary pool
+        secondaryPoolIndex:
+          type: integer
+          description: Index of the secondary pool (fallback)
+        pools:
+          type: array
+          description: Configured stratum pools
+          items:
+            $ref: '#/components/schemas/Pool'
         stratumURL:
           type: string
           description: Primary stratum server URL
@@ -822,6 +954,12 @@ components:
           type: integer
           description: Set custom voltage/frequency in AxeOS (0=disabled, 1=enabled)
           enum: [0,1]
+          examples:
+            - 0
+        useCustomWWW:
+          type: integer
+          description: Whether to serve files from the SPIFFS www partition instead of the embedded Web UI (0=embedded, 1=custom/SPIFFS)
+          enum: [0, 1]
           examples:
             - 0
         invertscreen:
@@ -1039,6 +1177,39 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/GenericResponse'
+        '401':
+          description: Unauthorized - Client not in allowed network range
+        '500':
+          description: Internal server error
+
+  /api/system/boot:
+    post:
+      summary: Set next boot partition
+      description: Sets the partition to be used for the next system boot
+      operationId: setBootPartition
+      tags:
+        - system
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - partition
+              properties:
+                partition:
+                  type: string
+                  description: Partition label to boot from (e.g., ota_0, ota_1, factory)
+      responses:
+        '200':
+          description: Boot partition set successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericResponse'
+        '400':
+          description: Invalid partition label
         '401':
           description: Unauthorized - Client not in allowed network range
         '500':

@@ -3,7 +3,7 @@
 #include <esp_heap_caps.h>
 #include <math.h>
 #include "esp_log.h"
-#include "esp_timer.h"
+#include "global_state.h"
 #include "system.h"
 #include "asic_common.h"
 #include "asic.h"

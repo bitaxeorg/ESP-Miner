@@ -22,7 +22,7 @@ jobs:
     - name: esp-idf build
       uses: espressif/esp-idf-ci-action@v1
       with:
-        esp_idf_version: v5.5.3
+        esp_idf_version: v6.0.2
         target: esp32s3
         command: GITHUB_ACTIONS="true" idf.py build
         path: '.'
@@ -43,8 +43,4 @@ jobs:
       with:
         name: esp-miner.bin
         path: ./build/esp-miner.bin
-    - name: upload www.bin
-      uses: actions/upload-artifact@v4
-      with:
-        name: www.bin
-        path: ./build/www.bin
+

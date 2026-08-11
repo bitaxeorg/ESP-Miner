@@ -9,6 +9,7 @@
 #include "pmbus_commands.h"
 
 #include "i2c_bitaxe.h"
+#include "global_state.h"
 #include "TPS546.h"
 
 //#define DEBUG_TPS546_MEAS 1 //uncomment to debug TPS546 measurements

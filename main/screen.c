@@ -517,7 +517,8 @@ static void screen_update_cb(lv_timer_t * timer)
 
     PowerManagementModule * power_management = &GLOBAL_STATE->POWER_MANAGEMENT_MODULE;
 
-    char *pool_url = module->is_using_fallback ? module->fallback_pool_url : module->pool_url;
+    uint16_t pool_idx = module->is_using_fallback ? module->secondary_pool_index : module->primary_pool_index;
+    char *pool_url = module->pools[pool_idx].url;
     if (strcmp(lv_label_get_text(urls_mining_url_label), pool_url) != 0) {
         lv_label_set_text(urls_mining_url_label, pool_url);
     }
@@ -687,13 +688,13 @@ static void uptime_update_cb(lv_timer_t * timer)
     }
 }
 
-esp_err_t screen_start(void * pvParameters)
+esp_err_t screen_start(GlobalState * global_state)
 {
+    GLOBAL_STATE = global_state;
     if (lvgl_port_lock(0)) {
         // screen_chars = lv_display_get_horizontal_resolution(NULL) / 6;
         screen_lines = lv_display_get_vertical_resolution(NULL) / 8;
 
-        GLOBAL_STATE = (GlobalState *) pvParameters;
         SystemModule * SYSTEM_MODULE = &GLOBAL_STATE->SYSTEM_MODULE;
 
         if (SYSTEM_MODULE->is_screen_active) {

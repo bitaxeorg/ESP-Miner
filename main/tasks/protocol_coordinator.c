@@ -6,12 +6,13 @@
 #include "freertos/queue.h"
 #include "esp_heap_caps.h"
 
+#include "global_state.h"
 #include "protocol_coordinator.h"
 #include "stratum_v1_task.h"
+#include "stratum_api.h"
 #include "stratum_v2_task.h"
 #include "connect.h"
 #include "system.h"
-#include "nvs_config.h"
 
 #include <string.h>
 
@@ -133,8 +134,9 @@ static void reset_share_stats(GlobalState *gs)
 
 static bool has_fallback_pool(GlobalState *gs)
 {
-    return (gs->SYSTEM_MODULE.fallback_pool_url != NULL &&
-            gs->SYSTEM_MODULE.fallback_pool_url[0] != '\0');
+    uint16_t sec_idx = gs->SYSTEM_MODULE.secondary_pool_index;
+    return (gs->SYSTEM_MODULE.pools[sec_idx].url != NULL &&
+            gs->SYSTEM_MODULE.pools[sec_idx].url[0] != '\0');
 }
 
 // Start the V1 stratum task (for primary V1 or fallback)
@@ -272,19 +274,14 @@ static bool probe_pool_v1(GlobalState *gs, const char *url, uint16_t port,
 // Probe a pool using the appropriate protocol for it.
 static bool probe_pool(GlobalState *gs, bool use_fallback)
 {
-    stratum_protocol_t protocol = use_fallback ? s_fallback_protocol : s_primary_protocol;
-    const char *url   = use_fallback ? gs->SYSTEM_MODULE.fallback_pool_url   : gs->SYSTEM_MODULE.pool_url;
-    uint16_t    port  = use_fallback ? gs->SYSTEM_MODULE.fallback_pool_port  : gs->SYSTEM_MODULE.pool_port;
+    uint16_t idx = use_fallback ? gs->SYSTEM_MODULE.secondary_pool_index : gs->SYSTEM_MODULE.primary_pool_index;
+    PoolConfig *pool = &gs->SYSTEM_MODULE.pools[idx];
 
-    if (protocol == STRATUM_PROTOCOL_V2) {
-        return probe_pool_sv2(url, port);
+    if (pool->protocol == STRATUM_PROTOCOL_V2) {
+        return probe_pool_sv2(pool->url, pool->port);
     }
 
-    tls_mode tls       = use_fallback ? gs->SYSTEM_MODULE.fallback_pool_tls  : gs->SYSTEM_MODULE.pool_tls;
-    char     *cert     = use_fallback ? gs->SYSTEM_MODULE.fallback_pool_cert : gs->SYSTEM_MODULE.pool_cert;
-    const char *user   = use_fallback ? gs->SYSTEM_MODULE.fallback_pool_user : gs->SYSTEM_MODULE.pool_user;
-    const char *pass   = use_fallback ? gs->SYSTEM_MODULE.fallback_pool_pass : gs->SYSTEM_MODULE.pool_pass;
-    return probe_pool_v1(gs, url, port, tls, cert, user, pass);
+    return probe_pool_v1(gs, pool->url, pool->port, pool->tls, pool->cert, pool->user, pool->pass);
 }
 
 // Switch from primary to fallback pool.
@@ -489,10 +486,13 @@ void protocol_coordinator_task(void *pvParameters)
 {
     GlobalState *gs = (GlobalState *)pvParameters;
 
-    s_primary_url = gs->SYSTEM_MODULE.pool_url;
-    s_primary_port = gs->SYSTEM_MODULE.pool_port;
-    s_primary_protocol = gs->stratum_protocol;
-    s_fallback_protocol = gs->SYSTEM_MODULE.fallback_pool_protocol;
+    uint16_t prim_idx = gs->SYSTEM_MODULE.primary_pool_index;
+    uint16_t sec_idx = gs->SYSTEM_MODULE.secondary_pool_index;
+
+    s_primary_url = gs->SYSTEM_MODULE.pools[prim_idx].url;
+    s_primary_port = gs->SYSTEM_MODULE.pools[prim_idx].port;
+    s_primary_protocol = gs->SYSTEM_MODULE.pools[prim_idx].protocol;
+    s_fallback_protocol = gs->SYSTEM_MODULE.pools[sec_idx].protocol;
 
     // Start initial protocol task
     if (gs->SYSTEM_MODULE.is_using_fallback) {

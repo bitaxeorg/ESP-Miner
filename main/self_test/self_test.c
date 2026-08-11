@@ -18,6 +18,7 @@
 #include "hashrate_monitor_task.h"
 #include "PID.h"
 #include "self_test.h"
+#include "stratum_api.h"
 
 #define GPIO_ASIC_ENABLE CONFIG_GPIO_ASIC_ENABLE
 
@@ -263,9 +264,8 @@ static float self_test_get_nonce_hashrate(GlobalState * GLOBAL_STATE, uint64_t e
     return (float)(hashes / seconds / 1000000000.0);
 }
 
-void self_test_record_nonce(void * pvParameters, double nonce_diff)
+void self_test_record_nonce(GlobalState * GLOBAL_STATE, double nonce_diff)
 {
-    GlobalState * GLOBAL_STATE = (GlobalState *) pvParameters;
     SelfTestNonceMeasurement * measurement = &GLOBAL_STATE->SELF_TEST_MODULE.nonce_measurement;
     double ticket_diff = GLOBAL_STATE->DEVICE_CONFIG.family.asic.difficulty;
 
@@ -294,11 +294,9 @@ static bool self_test_should_run()
     return gpio_get_level(CONFIG_GPIO_BUTTON_BOOT) == 0; // LOW when pressed
 }
 
-esp_err_t self_test_init(void * pvParameters)
+esp_err_t self_test_init(GlobalState * GLOBAL_STATE)
 {
     if (self_test_should_run()) {
-        GlobalState * GLOBAL_STATE = (GlobalState *) pvParameters;
-
         GLOBAL_STATE->SELF_TEST_MODULE.is_active = true;
         pthread_mutex_init(&GLOBAL_STATE->SELF_TEST_MODULE.nonce_measurement.lock, NULL);
         GLOBAL_STATE->DEVICE_CONFIG.family.asic.difficulty = DIFFICULTY;
@@ -337,10 +335,8 @@ void self_test_reset()
     }
 }
 
-void self_test_show_message(void * pvParameters, const char * msg)
+void self_test_show_message(GlobalState * GLOBAL_STATE, const char * msg)
 {
-    GlobalState * GLOBAL_STATE = (GlobalState *) pvParameters;
-    
     if (!GLOBAL_STATE->SELF_TEST_MODULE.is_active) return;
 
     GLOBAL_STATE->SELF_TEST_MODULE.message = msg;

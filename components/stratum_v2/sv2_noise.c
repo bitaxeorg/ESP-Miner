@@ -1,5 +1,6 @@
 #include "sv2_noise.h"
 #include "sv2_protocol.h"
+#include "utils.h"
 
 #include <string.h>
 #include <stdlib.h>
@@ -8,9 +9,7 @@
 #include "esp_random.h"
 #include "esp_timer.h"
 
-#include "mbedtls/sha256.h"
-#include "mbedtls/md.h"
-#include "mbedtls/chachapoly.h"
+#include "psa/crypto.h"
 
 #include "secp256k1.h"
 #include "secp256k1_ellswift.h"
@@ -69,16 +68,32 @@ static int noise_send_all(esp_transport_handle_t transport, const uint8_t *buf, 
 
 // --- Crypto helpers ---
 
+static int sha256_concat(const uint8_t *part1, size_t len1,
+                         const uint8_t *part2, size_t len2,
+                         uint8_t out[32])
+{
+    psa_hash_operation_t operation = PSA_HASH_OPERATION_INIT;
+    psa_status_t status = psa_hash_setup(&operation, PSA_ALG_SHA_256);
+    if (status == PSA_SUCCESS && len1 > 0) status = psa_hash_update(&operation, part1, len1);
+    if (status == PSA_SUCCESS && len2 > 0) status = psa_hash_update(&operation, part2, len2);
+
+    size_t output_len = 0;
+    if (status == PSA_SUCCESS) {
+        status = psa_hash_finish(&operation, out, 32, &output_len);
+    }
+    psa_hash_abort(&operation);
+
+    if (status != PSA_SUCCESS || output_len != 32) {
+        memset(out, 0, 32);
+        return -1;
+    }
+    return 0;
+}
+
 // h = SHA-256(h || data)
 static void mix_hash(uint8_t h[32], const uint8_t *data, size_t len)
 {
-    mbedtls_sha256_context sha;
-    mbedtls_sha256_init(&sha);
-    mbedtls_sha256_starts(&sha, 0);
-    mbedtls_sha256_update(&sha, h, 32);
-    mbedtls_sha256_update(&sha, data, len);
-    mbedtls_sha256_finish(&sha, h);
-    mbedtls_sha256_free(&sha);
+    sha256_concat(h, 32, data, len, h);
 }
 
 // HMAC-SHA256
@@ -86,13 +101,28 @@ static void hmac_sha256(const uint8_t *key, size_t key_len,
                         const uint8_t *data, size_t data_len,
                         uint8_t out[32])
 {
-    mbedtls_md_context_t md;
-    mbedtls_md_init(&md);
-    mbedtls_md_setup(&md, mbedtls_md_info_from_type(MBEDTLS_MD_SHA256), 1);
-    mbedtls_md_hmac_starts(&md, key, key_len);
-    mbedtls_md_hmac_update(&md, data, data_len);
-    mbedtls_md_hmac_finish(&md, out);
-    mbedtls_md_free(&md);
+    psa_key_attributes_t attributes = PSA_KEY_ATTRIBUTES_INIT;
+    psa_set_key_usage_flags(&attributes, PSA_KEY_USAGE_SIGN_MESSAGE);
+    psa_set_key_algorithm(&attributes, PSA_ALG_HMAC(PSA_ALG_SHA_256));
+    psa_set_key_type(&attributes, PSA_KEY_TYPE_HMAC);
+
+    psa_key_id_t key_id = 0;
+    psa_status_t status = psa_import_key(&attributes, key, key_len, &key_id);
+    psa_reset_key_attributes(&attributes);
+
+    size_t output_len = 0;
+    if (status == PSA_SUCCESS) {
+        status = psa_mac_compute(key_id, PSA_ALG_HMAC(PSA_ALG_SHA_256),
+                                 data, data_len, out, 32, &output_len);
+    }
+    if (key_id != 0) {
+        psa_destroy_key(key_id);
+    }
+
+    if (status != PSA_SUCCESS || output_len != 32) {
+        ESP_LOGE(TAG, "hmac failed: %ld", (long)status);
+        memset(out, 0, 32);
+    }
 }
 
 // Noise HKDF-2: derive two 32-byte keys from chaining key and input key material
@@ -132,18 +162,29 @@ static int noise_encrypt(const uint8_t key[32], uint64_t nonce_counter,
     uint8_t nonce[12];
     build_nonce(nonce_counter, nonce);
 
-    mbedtls_chachapoly_context ctx;
-    mbedtls_chachapoly_init(&ctx);
-    mbedtls_chachapoly_setkey(&ctx, key);
+    psa_key_attributes_t attributes = PSA_KEY_ATTRIBUTES_INIT;
+    psa_set_key_usage_flags(&attributes, PSA_KEY_USAGE_ENCRYPT);
+    psa_set_key_algorithm(&attributes, PSA_ALG_CHACHA20_POLY1305);
+    psa_set_key_type(&attributes, PSA_KEY_TYPE_CHACHA20);
+    psa_set_key_bits(&attributes, 256);
 
-    int ret = mbedtls_chachapoly_encrypt_and_tag(&ctx, pt_len,
-                                                  nonce, aad, aad_len,
-                                                  plaintext, out,
-                                                  out + pt_len); // 16-byte tag appended
-    mbedtls_chachapoly_free(&ctx);
+    psa_key_id_t key_id = 0;
+    psa_status_t status = psa_import_key(&attributes, key, 32, &key_id);
+    psa_reset_key_attributes(&attributes);
 
-    if (ret != 0) {
-        ESP_LOGE(TAG, "encrypt failed: %d", ret);
+    size_t output_len = 0;
+    if (status == PSA_SUCCESS) {
+        status = psa_aead_encrypt(key_id, PSA_ALG_CHACHA20_POLY1305,
+                                  nonce, sizeof(nonce), aad, aad_len,
+                                  plaintext, pt_len, out, pt_len + 16,
+                                  &output_len);
+    }
+    if (key_id != 0) {
+        psa_destroy_key(key_id);
+    }
+
+    if (status != PSA_SUCCESS || output_len != pt_len + 16) {
+        ESP_LOGE(TAG, "encrypt failed: %ld", (long)status);
         return -1;
     }
     return 0;
@@ -162,19 +203,29 @@ static int noise_decrypt(const uint8_t key[32], uint64_t nonce_counter,
     build_nonce(nonce_counter, nonce);
 
     size_t pt_len = ct_len - 16;
-    const uint8_t *tag = ciphertext + pt_len;
+    psa_key_attributes_t attributes = PSA_KEY_ATTRIBUTES_INIT;
+    psa_set_key_usage_flags(&attributes, PSA_KEY_USAGE_DECRYPT);
+    psa_set_key_algorithm(&attributes, PSA_ALG_CHACHA20_POLY1305);
+    psa_set_key_type(&attributes, PSA_KEY_TYPE_CHACHA20);
+    psa_set_key_bits(&attributes, 256);
 
-    mbedtls_chachapoly_context ctx;
-    mbedtls_chachapoly_init(&ctx);
-    mbedtls_chachapoly_setkey(&ctx, key);
+    psa_key_id_t key_id = 0;
+    psa_status_t status = psa_import_key(&attributes, key, 32, &key_id);
+    psa_reset_key_attributes(&attributes);
 
-    int ret = mbedtls_chachapoly_auth_decrypt(&ctx, pt_len,
-                                               nonce, aad, aad_len,
-                                               tag, ciphertext, out);
-    mbedtls_chachapoly_free(&ctx);
+    size_t output_len = 0;
+    if (status == PSA_SUCCESS) {
+        status = psa_aead_decrypt(key_id, PSA_ALG_CHACHA20_POLY1305,
+                                  nonce, sizeof(nonce), aad, aad_len,
+                                  ciphertext, ct_len, out, pt_len,
+                                  &output_len);
+    }
+    if (key_id != 0) {
+        psa_destroy_key(key_id);
+    }
 
-    if (ret != 0) {
-        ESP_LOGE(TAG, "decrypt failed: %d", ret);
+    if (status != PSA_SUCCESS || output_len != pt_len) {
+        ESP_LOGE(TAG, "decrypt failed: %ld", (long)status);
         return -1;
     }
     return 0;
@@ -281,8 +332,8 @@ int sv2_noise_handshake(sv2_noise_ctx_t *ctx, esp_transport_handle_t transport,
     }
 
     // Step 1: Initialize h and ck = SHA-256(protocol_name)
-    mbedtls_sha256((const uint8_t *)NOISE_PROTOCOL_NAME,
-                   strlen(NOISE_PROTOCOL_NAME), ctx->h, 0);
+    sha256_bin((const uint8_t *)NOISE_PROTOCOL_NAME,
+               strlen(NOISE_PROTOCOL_NAME), ctx->h);
     memcpy(ctx->ck, ctx->h, 32);
 
     // Verify initial hash matches known reference value
@@ -437,26 +488,21 @@ int sv2_noise_handshake(sv2_noise_ctx_t *ctx, esp_transport_handle_t transport,
 
         // Decode the responder's static public key from ElligatorSwift to get x-only bytes
         uint8_t sig_hash[32];
-        {
-            mbedtls_sha256_context sha;
-            mbedtls_sha256_init(&sha);
-            mbedtls_sha256_starts(&sha, 0);
-            mbedtls_sha256_update(&sha, sig_msg, 10); // version(2) + valid_from(4) + not_valid_after(4)
-            // Decode rs_static to get the actual 32-byte x-only pubkey
-            secp256k1_pubkey decoded_pubkey;
-            secp256k1_ellswift_decode(ctx->secp_ctx, &decoded_pubkey, rs_static);
-            secp256k1_xonly_pubkey xonly_pk;
-            int pk_parity;
-            if (!secp256k1_xonly_pubkey_from_pubkey(ctx->secp_ctx, &xonly_pk, &pk_parity, &decoded_pubkey)) {
-                ESP_LOGE(TAG, "Failed to extract x-only pubkey from server key");
-                mbedtls_sha256_free(&sha);
-                return -1;
-            }
-            uint8_t xonly_bytes[32];
-            secp256k1_xonly_pubkey_serialize(ctx->secp_ctx, xonly_bytes, &xonly_pk);
-            mbedtls_sha256_update(&sha, xonly_bytes, 32);
-            mbedtls_sha256_finish(&sha, sig_hash);
-            mbedtls_sha256_free(&sha);
+        // Decode rs_static to get the actual 32-byte x-only pubkey
+        secp256k1_pubkey decoded_pubkey;
+        secp256k1_ellswift_decode(ctx->secp_ctx, &decoded_pubkey, rs_static);
+        secp256k1_xonly_pubkey xonly_pk;
+        int pk_parity;
+        if (!secp256k1_xonly_pubkey_from_pubkey(ctx->secp_ctx, &xonly_pk, &pk_parity, &decoded_pubkey)) {
+            ESP_LOGE(TAG, "Failed to extract x-only pubkey from server key");
+            return -1;
+        }
+        uint8_t xonly_bytes[32];
+        secp256k1_xonly_pubkey_serialize(ctx->secp_ctx, xonly_bytes, &xonly_pk);
+        if (sha256_concat(sig_msg, 10, xonly_bytes, sizeof(xonly_bytes),
+                          sig_hash) != 0) {
+            ESP_LOGE(TAG, "Failed to hash server certificate");
+            return -1;
         }
 
         // Parse authority pubkey

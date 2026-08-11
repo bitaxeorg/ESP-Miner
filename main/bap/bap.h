@@ -10,7 +10,6 @@
 #define BAP_H_
 
 #include "esp_err.h"
-#include "global_state.h"
 #include "freertos/FreeRTOS.h" 
 #include "freertos/queue.h"
 #include "freertos/semphr.h"
@@ -20,6 +19,8 @@
 #include "bap_uart.h"
 #include "bap_handlers.h"
 #include "bap_subscription.h"
+
+typedef struct GlobalState GlobalState;
 
 extern QueueHandle_t bap_uart_send_queue;
 extern SemaphoreHandle_t bap_uart_send_mutex;
