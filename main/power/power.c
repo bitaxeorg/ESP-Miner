@@ -1,7 +1,8 @@
 #include "TPS546.h"
 #include "INA260.h"
-#include "DS4432U.h"
 
+#include "global_state.h"
+#include "device_config.h"
 #include "power.h"
 
 void Power_get_output(GlobalState * GLOBAL_STATE, float * power_out, float * current_out)
