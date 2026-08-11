@@ -103,6 +103,9 @@ void app_main(void)
         return;
     }
 
+    // Check firmware version migration (resets useCustomWWW on update/downgrade)
+    SYSTEM_check_firmware_migration();
+
     // Confirm app validity for OTA rollback
     const esp_partition_t *running = esp_ota_get_running_partition();
     esp_ota_img_states_t ota_state;
@@ -158,13 +161,13 @@ void app_main(void)
         ESP_LOGE(TAG, "Critical peripheral initialization failure (%s). Entering degraded mode.", esp_err_to_name(GLOBAL_STATE.SELF_TEST_MODULE.system_init_ret));
     }
     
+    // Read version info (from SPIFFS if custom WWW is active)
+    SYSTEM_init_versions(&GLOBAL_STATE);
+
     if (!GLOBAL_STATE.SELF_TEST_MODULE.is_active) {
         // start the API for AxeOS
         start_rest_server(&GLOBAL_STATE);
     }
-
-    // After mounting SPIFFS
-    SYSTEM_init_versions(&GLOBAL_STATE);
 
     // Pre-cache partition descriptions and space usage percentage
     SYSTEM_init_partitions(&GLOBAL_STATE);
