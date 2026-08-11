@@ -251,9 +251,15 @@ Starting with the unified firmware releases, ESP-Miner uses a unified architectu
 
 A separate Web UI image (`www.bin`) is no longer required for standard usage since the web interface is served directly from the firmware. If you want to use a custom or modified AxeOS frontend, you can still enable the **custom web UI** option in the settings. This allows you to upload and serve a separate `www.bin` from the SPIFFS partition, which takes priority over the built-in assets.
 
-### Disabling Custom Web UI via API
+### Disabling Custom Web UI via Recovery Page or API
 
-If a device is stuck serving an older custom `www.bin` partition and the Web UI settings option is not accessible, you can disable `useCustomWWW` directly via the REST API:
+If a device is stuck serving an older custom `www.bin` partition and the Web UI settings option is not accessible, you can disable custom WWW and revert to the embedded AxeOS interface by visiting the recovery page in your browser:
+
+```
+http://<IP>/recovery
+```
+
+Alternatively, you can disable `useCustomWWW` directly via the REST API:
 
 ```bash
 # Disable custom Web UI (revert to embedded AxeOS)
