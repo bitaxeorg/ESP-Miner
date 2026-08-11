@@ -20,6 +20,13 @@ typedef enum {
     WS_TYPE_MAX
 } WebSocketClientType;
 
+typedef struct {
+    WebSocketClientType type;
+} WebSocketEndpointCtx;
+
+extern const WebSocketEndpointCtx WS_CTX_LOGS;
+extern const WebSocketEndpointCtx WS_CTX_API;
+
 esp_err_t websocket_add_client(int fd, WebSocketClientType type);
 void websocket_remove_client(int fd);
 void websocket_broadcast(WebSocketClientType type, httpd_ws_frame_t *pkt);

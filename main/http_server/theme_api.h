@@ -7,6 +7,6 @@
 #define DEFAULT_COLOR "#F80421"
 
 // Register theme API endpoints
-esp_err_t register_theme_api_endpoints(httpd_handle_t server, void* ctx);
+esp_err_t register_theme_api_endpoints(httpd_handle_t server);
 
 #endif // THEME_API_H
