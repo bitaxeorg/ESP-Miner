@@ -16,6 +16,8 @@ typedef enum {
 #define STRATUM_V1 "SV1"
 #define STRATUM_V2 "SV2"
 
+void SYSTEM_check_firmware_migration(void);
+void SYSTEM_reset_custom_www(void);
 void SYSTEM_init_system(GlobalState * GLOBAL_STATE);
 void SYSTEM_init_versions(GlobalState * GLOBAL_STATE);
 void SYSTEM_init_partitions(GlobalState * GLOBAL_STATE);

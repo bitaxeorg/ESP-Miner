@@ -83,7 +83,8 @@
           </app-checkbox>
           <label for="customWWWToggle" class="font-medium cursor-pointer">Enable custom web UI</label>
         </div>
-        <small class="text-orange-500 block mb-4">* A device restart is required to apply this change.</small>
+        <small class="text-orange-500 block mb-2">* A device restart is required to apply this change.</small>
+        <small class="text-secondary block mb-4">If an incompatible custom UI is loaded, visit <a href="/recovery" target="_blank" class="underline">/recovery</a> to disable Custom Frondend.</small>
 
         @if ((info$ | async)?.useCustomWWW === 1) {
           <div class="rounded p-3 bg-white/5 border border-white/10">
@@ -120,9 +121,7 @@
         </div>
       }
       @let progressVal = (updateTarget === 'AxeOS' ? websiteUpdateProgress : firmwareUpdateProgress);
-      <div class="w-full bg-progressbar rounded-sm overflow-hidden h-6">
-        <div class="bg-progressbar-value h-full transition-all duration-300" [style.width.%]="progressVal"></div>
-      </div>
+      <app-progressbar [value]="progressVal ?? 0" heightClass="h-6"></app-progressbar>
       <div class="text-center mt-3 text-secondary">
         Please do not disconnect the power.
       </div>

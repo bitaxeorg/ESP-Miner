@@ -145,6 +145,30 @@ static void parse_pool_config_json(const char *json_str, PoolConfig *cfg, int in
     cJSON_Delete(root);
 }
 
+void SYSTEM_check_firmware_migration(void)
+{
+    const esp_app_desc_t *app_desc = esp_app_get_description();
+    char current_fp[80];
+    snprintf(current_fp, sizeof(current_fp), "%s_%s_%s", app_desc->version, app_desc->date, app_desc->time);
+
+    char *last_fw_fp = nvs_config_get_string(NVS_CONFIG_LAST_FW_FINGERPRINT);
+    if (!last_fw_fp || strcmp(last_fw_fp, current_fp) != 0) {
+        if (nvs_config_get_bool(NVS_CONFIG_USE_CUSTOM_WWW)) {
+            ESP_LOGI(TAG, "Firmware build changed (%s -> %s). Resetting custom WWW to default (false).⁠​‌‌​​​‌​​‌‌​‌​​‌​‌‌‌​‌​​​‌‌​​​​‌​‌‌‌‌​​​​‌‌​​‌​‌⁠",
+                     (last_fw_fp && strlen(last_fw_fp) > 0) ? last_fw_fp : "none", current_fp);
+            nvs_config_set_bool(NVS_CONFIG_USE_CUSTOM_WWW, false);
+        }
+        nvs_config_set_string(NVS_CONFIG_LAST_FW_FINGERPRINT, current_fp);
+    }
+    free(last_fw_fp);
+}
+
+void SYSTEM_reset_custom_www(void)
+{
+    nvs_config_set_bool(NVS_CONFIG_USE_CUSTOM_WWW, false);
+    nvs_config_set_string(NVS_CONFIG_LAST_FW_FINGERPRINT, "");
+}
+
 void SYSTEM_init_system(GlobalState * GLOBAL_STATE)
 {
     SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
@@ -298,13 +322,18 @@ esp_err_t SYSTEM_init_peripherals(GlobalState * GLOBAL_STATE) {
         return ret;
     }
 
-    ret = filesystem_init(GLOBAL_STATE);
-    if (ret != ESP_OK) {
-        self_test_show_message(GLOBAL_STATE, "FILESYS:FAIL");
-        ESP_LOGE(TAG, "Filesystem init failed");
-        if (GLOBAL_STATE->SELF_TEST_MODULE.is_active) {
-            return ret;
+    if (nvs_config_get_bool(NVS_CONFIG_USE_CUSTOM_WWW)) {
+        ret = filesystem_init(GLOBAL_STATE);
+        if (ret != ESP_OK) {
+            self_test_show_message(GLOBAL_STATE, "FILESYS:FAIL");
+            ESP_LOGE(TAG, "Filesystem init failed");
+            if (GLOBAL_STATE->SELF_TEST_MODULE.is_active) {
+                return ret;
+            }
         }
+    } else {
+        GLOBAL_STATE->filesystem_is_available = false;
+        ESP_LOGI(TAG, "Custom WWW disabled; skipping SPIFFS filesystem initialization");
     }
 
     // Initialize the core voltage regulator
