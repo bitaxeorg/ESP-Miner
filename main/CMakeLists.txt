@@ -3,6 +3,7 @@ SRCS
     "adc.c"
     "i2c_bitaxe.c"
     "main.c"
+    "btc_price.c"      # <-- 添加这一行
     "log_buffer.c"
     "nvs_config.c"
     "display.c"
@@ -72,6 +73,7 @@ REQUIRES
     "dns_server"
     "stratum"
     "stratum_v2"
+    "cjson"              # <--- 可以同时在这里添加
 
 PRIV_REQUIRES
     "app_update"
@@ -79,6 +81,7 @@ PRIV_REQUIRES
     "esp_app_format"
     "esp_driver_gpio"
     "esp_event"
+    "esp_http_client"   # <--- 添加这一行
     "esp_http_server"
     "esp_netif"
     "esp_psram"
@@ -92,6 +95,7 @@ PRIV_REQUIRES
     "tcp_transport"
     "esp_mm"
     "bt"
+    "cjson"  
 
 EMBED_FILES "http_server/recovery_page.html"
 )

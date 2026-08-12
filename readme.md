@@ -355,3 +355,4 @@ the Stratum Host and Stratum Port.
 ## Attributions
 
 The display font is Portfolio 6x8 from https://int10h.org/oldschool-pc-fonts/ by VileR.
+"# ESP-Miner" 

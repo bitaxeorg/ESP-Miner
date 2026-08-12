@@ -5,6 +5,7 @@
 #include "esp_psram.h"
 #include "esp_heap_caps.h"
 #include "cJSON.h"
+#include "btc_price.h"
 
 #include "asic_result_task.h"
 #include "create_jobs_task.h"
@@ -192,6 +193,8 @@ void app_main(void)
 
     // Connected to WiFi: tear down the setup BLE service to free the radio.
     setup_ble_stop();
+
+    btc_price_init();   // <--- 添加这一行
 
     queue_init(&GLOBAL_STATE.stratum_queue);
 

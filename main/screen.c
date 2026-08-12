@@ -9,6 +9,7 @@
 #include "nvs_config.h"
 #include "display.h"
 #include "connect.h"
+#include "btc_price.h"
 #include "esp_timer.h"
 
 typedef enum {
@@ -57,7 +58,6 @@ static lv_obj_t *asic_status_label;
 
 static lv_obj_t *mining_block_height_label;
 static lv_obj_t *mining_network_difficulty_label;
-static lv_obj_t *mining_scriptsig_title_label;
 static lv_obj_t *mining_scriptsig_label;
 
 static lv_obj_t *firmware_update_scr_filename_label;
@@ -72,6 +72,7 @@ static lv_obj_t *stats_hashrate_label;
 static lv_obj_t *stats_efficiency_label;
 static lv_obj_t *stats_difficulty_label;
 static lv_obj_t *stats_temp_label;
+static lv_obj_t *stats_price_label;
 
 static lv_obj_t *wifi_rssi_value_label;
 static lv_obj_t *wifi_signal_strength_label;
@@ -83,7 +84,6 @@ static lv_obj_t *identify_image;
 static float current_hashrate;
 static float current_power;
 static uint64_t current_difficulty;
-static float current_chip_temp;
 
 #define NOTIFICATION_SHARE_ACCEPTED (1 << 0)
 #define NOTIFICATION_SHARE_REJECTED (1 << 1)
@@ -319,20 +319,36 @@ static lv_obj_t * create_scr_stats() {
     return scr;
 }
 
+// 创建 Mining 页面 - 使用固定布局，防止位移
 static lv_obj_t * create_scr_mining() {
-    lv_obj_t * scr = create_flex_screen(4);
+    lv_obj_t * scr = lv_obj_create(NULL);
+    
+    // 使用固定高度和宽度，防止布局变化
+    lv_obj_set_size(scr, LV_HOR_RES, LV_VER_RES);
+    lv_obj_set_flex_flow(scr, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(scr, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+    lv_obj_set_style_pad_top(scr, 0, LV_PART_MAIN);
+    lv_obj_set_style_pad_row(scr, 0, LV_PART_MAIN);
 
+    // 第一行：价格
+    stats_price_label = lv_label_create(scr);
+    lv_label_set_text(stats_price_label, "BTC: --");
+    lv_obj_set_pos(stats_price_label, 0, 0);
+
+    // 第二行：区块高度
     mining_block_height_label = lv_label_create(scr);
     lv_label_set_text(mining_block_height_label, "Block: --");
+    lv_obj_set_pos(mining_block_height_label, 0, 8);
 
+    // 第三行：难度
     mining_network_difficulty_label = lv_label_create(scr);
-    lv_label_set_text(mining_network_difficulty_label, "Difficulty: --");
+    lv_label_set_text(mining_network_difficulty_label, "Diff: --");
+    lv_obj_set_pos(mining_network_difficulty_label, 0, 16);
 
-    mining_scriptsig_title_label = lv_label_create(scr);
-    lv_label_set_text(mining_scriptsig_title_label, "Scriptsig:");
-
+    // 第四行：ScriptSig（合并显示）
     mining_scriptsig_label = lv_label_create(scr);
-    lv_label_set_text(mining_scriptsig_label, "--");
+    lv_label_set_text(mining_scriptsig_label, "Sig: --");
+    lv_obj_set_pos(mining_scriptsig_label, 0, 24);
     lv_obj_set_width(mining_scriptsig_label, LV_HOR_RES);
     lv_label_set_long_mode(mining_scriptsig_label, LV_LABEL_LONG_SCROLL_CIRCULAR);
 
@@ -551,33 +567,52 @@ static void screen_update_cb(lv_timer_t * timer)
         current_difficulty = module->best_session_nonce_diff;
     }
 
-    if (current_chip_temp != power_management->chip_temp_avg) {
-        if (power_management->chip_temp_avg > 0) {
-            if (power_management->chip_temp2_avg > 0) {
-                lv_label_set_text_fmt(stats_temp_label, "Temp: %.1f°C/%.1f°C", power_management->chip_temp_avg, power_management->chip_temp2_avg);
+    // 更新价格
+    if (stats_price_label != NULL) {
+        const char* raw_price = btc_price_get_current();
+        static char last_price_str[16] = "";
+        char formatted_price[16] = "";
+        
+        // 格式化价格
+        if (strcmp(raw_price, "N/A") == 0) {
+            strcpy(formatted_price, "N/A");
+        } else {
+            int int_part = 0, dec_part = 0;
+            if (sscanf(raw_price, "%d.%2d", &int_part, &dec_part) == 2) {
+                snprintf(formatted_price, sizeof(formatted_price), "%d.%02d", int_part, dec_part);
             } else {
-                lv_label_set_text_fmt(stats_temp_label, "Temp: %.1f°C", power_management->chip_temp_avg);
+                strcpy(formatted_price, raw_price);
             }
         }
-        current_chip_temp = power_management->chip_temp_avg;
+        
+        if (strcmp(last_price_str, formatted_price) != 0) {
+            strcpy(last_price_str, formatted_price);
+            lv_label_set_text_fmt(stats_price_label, "BTC: $%s", formatted_price);
+        }
     }
 
     if (GLOBAL_STATE->stratum_protocol == STRATUM_PROTOCOL_V2) {
         // SV2 standard channel: no coinbase data, so no block height or scriptsig
         lv_label_set_text(mining_block_height_label, "Protocol: SV2");
-        lv_obj_add_flag(mining_scriptsig_title_label, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_add_flag(mining_scriptsig_label, LV_OBJ_FLAG_HIDDEN);
+        if (mining_scriptsig_label != NULL) {
+            lv_obj_add_flag(mining_scriptsig_label, LV_OBJ_FLAG_HIDDEN);
+        }
     } else {
-        lv_obj_clear_flag(mining_scriptsig_title_label, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_clear_flag(mining_scriptsig_label, LV_OBJ_FLAG_HIDDEN);
+        if (mining_scriptsig_label != NULL) {
+            lv_obj_clear_flag(mining_scriptsig_label, LV_OBJ_FLAG_HIDDEN);
+        }
 
         if (current_block_height != GLOBAL_STATE->block_height) {
             lv_label_set_text_fmt(mining_block_height_label, "Block: %d", GLOBAL_STATE->block_height);
             current_block_height = GLOBAL_STATE->block_height;
         }
 
-        if (strcmp(lv_label_get_text(mining_scriptsig_label), GLOBAL_STATE->scriptsig) != 0) {
-            lv_label_set_text(mining_scriptsig_label, GLOBAL_STATE->scriptsig);
+        if (mining_scriptsig_label != NULL) {
+            char sig_display[64];
+            snprintf(sig_display, sizeof(sig_display), "Sig: %.30s", GLOBAL_STATE->scriptsig);
+            if (strcmp(lv_label_get_text(mining_scriptsig_label), sig_display) != 0) {
+                lv_label_set_text(mining_scriptsig_label, sig_display);
+            }
         }
     }
 
