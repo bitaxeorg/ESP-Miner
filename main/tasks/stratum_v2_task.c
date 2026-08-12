@@ -721,9 +721,21 @@ void stratum_v2_task(void *pvParameters)
 
         int64_t connect_start_us = esp_timer_get_time();
 
-        esp_err_t ret = esp_transport_connect(transport, conn_info.host_ip, port, TRANSPORT_TIMEOUT_MS);
-        if (ret != ESP_OK) {
-            ESP_LOGE(TAG, "TCP connect failed to %s:%d (%s) (err %d)", stratum_url, port, conn_info.host_ip, ret);
+        esp_err_t ret = stratum_socket_connect_async(transport, conn_info.host_ip, port,
+                                                     TRANSPORT_TIMEOUT_MS, protocol_coordinator_v2_should_shutdown);
+        if (ret == ESP_ERR_INVALID_STATE) {
+            ESP_LOGI(TAG, "Shutdown requested by coordinator during connection attempt");
+            esp_transport_close(transport);
+            esp_transport_destroy(transport);
+            free(frame_buf);
+            free(recv_buf);
+            free(conn);
+            GLOBAL_STATE->sv2_conn = NULL;
+            protocol_coordinator_v2_exited();
+            vTaskDelete(NULL);
+            return;
+        } else if (ret != ESP_OK) {
+            ESP_LOGE(TAG, "TCP connect failed to %s:%d (%s)", stratum_url, port, conn_info.host_ip);
             snprintf(GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info,
                      sizeof(GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info), "SV2: Pool unreachable");
             esp_transport_close(transport);

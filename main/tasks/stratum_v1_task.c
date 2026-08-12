@@ -292,10 +292,19 @@ void stratum_v1_task(void *pvParameters)
             esp_transport_ssl_set_common_name(GLOBAL_STATE->transport, stratum_url);
         }
         ESP_LOGI(TAG, "Transport initialized, connecting to %s:%d (%s)", stratum_url, port, conn_info.host_ip);
-        esp_err_t ret = esp_transport_connect(GLOBAL_STATE->transport, conn_info.host_ip, port, TRANSPORT_TIMEOUT_MS);
-        if (ret != ESP_OK) {
+        esp_err_t ret = stratum_socket_connect_async(GLOBAL_STATE->transport, conn_info.host_ip, port,
+                                                     TRANSPORT_TIMEOUT_MS, protocol_coordinator_v1_should_shutdown);
+        if (ret == ESP_ERR_INVALID_STATE) {
+            ESP_LOGI(TAG, "Coordinator requested shutdown during connection attempt, aborting");
+            esp_transport_close(GLOBAL_STATE->transport);
+            esp_transport_destroy(GLOBAL_STATE->transport);
+            GLOBAL_STATE->transport = NULL;
+            protocol_coordinator_v1_exited();
+            vTaskDelete(NULL);
+            return;
+        } else if (ret != ESP_OK) {
             retry_attempts++;
-            ESP_LOGE(TAG, "Transport unable to connect to %s:%d (errno %d). Attempt: %d", stratum_url, port, ret, retry_attempts);
+            ESP_LOGE(TAG, "Transport unable to connect to %s:%d. Attempt: %d", stratum_url, port, retry_attempts);
             // close the transport
             esp_transport_close(GLOBAL_STATE->transport);
             esp_transport_destroy(GLOBAL_STATE->transport);
