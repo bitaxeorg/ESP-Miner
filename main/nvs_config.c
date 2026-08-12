@@ -77,6 +77,7 @@ static Settings settings[NVS_CONFIG_COUNT] = {
     [NVS_CONFIG_OVERHEAT_MODE]                         = {.nvs_key_name = "overheat_mode",   .type = TYPE_BOOL,                                                                         .rest_name = "overheat_mode",                      .min = 0,  .max = 0},
 
     [NVS_CONFIG_USE_CUSTOM_WWW]                        = {.nvs_key_name = "use_custom_www",  .type = TYPE_BOOL,  .default_value = {.b = false},                                         .rest_name = "useCustomWWW",                       .min = 0, .max = 1},
+    [NVS_CONFIG_LAST_FW_FINGERPRINT]                   = {.nvs_key_name = "last_fw_fp",      .type = TYPE_STR,   .default_value = {.str = ""}},
 
     [NVS_CONFIG_STATISTICS_FREQUENCY]                  = {.nvs_key_name = "statsFrequency",  .type = TYPE_U16,                                                                          .rest_name = "statsFrequency",                     .min = 0,  .max = UINT16_MAX},
 

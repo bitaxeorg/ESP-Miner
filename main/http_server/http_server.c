@@ -1478,6 +1478,9 @@ static esp_err_t POST_system_boot(httpd_req_t *req)
         return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to set boot partition");
     }
 
+    // Reset custom WWW so the booted partition defaults to its matching embedded Web UI
+    SYSTEM_reset_custom_www();
+
     cJSON *resp = cJSON_CreateObject();
     cJSON_AddStringToObject(resp, "message", "Next boot partition set successfully. Rebooting...");
     httpd_resp_set_type(req, "application/json");
@@ -1806,6 +1809,9 @@ esp_err_t POST_OTA_update(httpd_req_t * req)
     }
 
     snprintf(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_status, 20, "Rebooting...");
+
+    // Reset custom WWW so the newly flashed firmware defaults to its matching embedded Web UI
+    SYSTEM_reset_custom_www();
 
     httpd_resp_set_type(req, "text/plain");
     httpd_resp_sendstr(req, "Firmware update complete, rebooting now!\n");

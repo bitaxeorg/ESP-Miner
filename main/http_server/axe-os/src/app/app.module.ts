@@ -13,6 +13,7 @@ import { RadioButtonComponent } from './components/radio-button/radio-button.com
 import { SliderComponent } from './components/slider/slider.component';
 import { AppChartComponent } from './components/chart/app-chart.component';
 import { DropdownComponent } from './components/dropdown/dropdown.component';
+import { ProgressbarComponent } from './components/progressbar/progressbar.component';
 
 import { AppRoutingModule } from './app-routing.module';
 import { AppComponent } from './app.component';
@@ -90,6 +91,7 @@ const components = [
     AppChartComponent,
     EditComponent,
     SettingsComponent,
+    ProgressbarComponent,
     ANSIPipe,
     DateAgoPipe,
     HashSuffixPipe,
