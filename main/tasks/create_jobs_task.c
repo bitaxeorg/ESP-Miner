@@ -341,7 +341,7 @@ static void generate_work_sv2_ext(GlobalState *GLOBAL_STATE, sv2_ext_job_t *ext_
     uint8_t coinbase_tx_hash[32];
     calculate_coinbase_tx_hash_bin(
         ext_job->coinbase_prefix, ext_job->coinbase_prefix_len,
-        conn->extranonce_prefix, conn->extranonce_prefix_len,
+        ext_job->extranonce_prefix, ext_job->extranonce_prefix_len,
         extranonce_2, extranonce_2_len,
         ext_job->coinbase_suffix, ext_job->coinbase_suffix_len,
         coinbase_tx_hash);
