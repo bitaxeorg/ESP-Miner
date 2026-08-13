@@ -2,7 +2,6 @@
 #define WORK_QUEUE_H
 
 #include <pthread.h>
-#include "mining.h"
 
 #define QUEUE_SIZE 12
 
@@ -15,6 +14,7 @@ typedef struct
     pthread_mutex_t lock;
     pthread_cond_t not_empty;
     pthread_cond_t not_full;
+    void (*free_fn)(void *); // Protocol-specific free function for queue items
 } work_queue;
 
 void queue_init(work_queue *queue);

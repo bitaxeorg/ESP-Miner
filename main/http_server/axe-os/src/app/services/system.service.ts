@@ -1,17 +1,20 @@
 import { HttpClient, HttpEvent } from '@angular/common/http';
 import { Injectable, Optional } from '@angular/core';
-import { delay, Observable, of, timeout } from 'rxjs';
+import { delay, Observable, of, timeout, from } from 'rxjs';
 import { eChartLabel } from 'src/models/enum/eChartLabel';
 import { chartLabelKey } from 'src/models/enum/eChartLabel';
 import { chartLabelValue } from 'src/models/enum/eChartLabel';
 import {
   SystemInfo as ISystemInfo,
   SystemStatistics as ISystemStatistics,
-  SystemASIC as ISystemASIC,
-  SystemASICASICModelEnum,
-  SystemService as GeneratedSystemService,
-  Settings
-} from 'src/app/generated';
+  SystemAsic as ISystemASIC,
+  SystemScoreboardEntry as ISystemScoreboardEntry,
+  Settings,
+  GenericResponse
+} from '../generated/models';
+import { Api } from '../generated/api';
+import * as functions from '../generated/functions';
+import { ISystemUpdateResponse } from 'src/models/ISystemUpdateResponse';
 
 import { environment } from '../../environments/environment';
 
@@ -24,15 +27,27 @@ export class SystemApiService {
 
   constructor(
     private httpClient: HttpClient,
-    @Optional() private generatedSystemService: GeneratedSystemService
+    @Optional() private api: Api
   ) { }
 
-  public getInfo(uri: string = ''): Observable<ISystemInfo> {
-    if (environment.production && this.generatedSystemService && !uri) {
-      return this.generatedSystemService.getSystemInfo().pipe(timeout(API_TIMEOUT));
+  public downloadLogs(uri: string = ''): Observable<Blob> {
+    if (!environment.mock && this.api && !uri) {
+      return from(this.api.invoke(functions.downloadSystemLogs, {}) as Promise<Blob>);
     }
 
-    if (environment.production && uri) {
+    if (!environment.mock && uri) {
+      return this.httpClient.get(`${uri}/api/system/logs`, { responseType: 'blob' });
+    }
+
+    return of(new Blob(['Mock logs content'], { type: 'text/plain' })).pipe(delay(1000));
+  }
+
+  public getInfo(uri: string = ''): Observable<ISystemInfo> {
+    if (!environment.mock && this.api && !uri) {
+      return from(this.api.invoke(functions.getSystemInfo, {})).pipe(timeout(API_TIMEOUT));
+    }
+
+    if (!environment.mock && uri) {
       return this.httpClient.get<ISystemInfo>(`${uri}/api/system/info`).pipe(timeout(API_TIMEOUT));
     }
 
@@ -54,9 +69,12 @@ export class SystemApiService {
         errorPercentage: 0.2,
         bestDiff: 238214491,
         bestSessionDiff: 21212121,
+        cpuUsage: 12.5,
         freeHeap: 200504,
         freeHeapInternal: 200504,
         freeHeapSpiram: 200504,
+        minFreeHeap: 180000,
+        maxAllocHeap: 90000,
         coreVoltage: 1200,
         coreVoltageActual: 1200,
         hostname: "Bitaxe",
@@ -70,13 +88,54 @@ export class SystemApiService {
         apEnabled: 0,
         sharesAccepted: 1,
         sharesRejected: 10,
+        sharesPending: 0,
         sharesRejectedReasons: [
           { message: "Above target", count: 8 },
           { message: "Duplicate share", count: 2 }
         ],
         uptimeSeconds: 38,
+        totalUptimeSeconds: 123456,
+        totalHashes: 456789012345,
+        totalLog2Work: 38.729,
         smallCoreCount: 672,
-        ASICModel: "BM1370" as SystemASICASICModelEnum,
+        ASICModel: "BM1370" as any,
+        primaryPoolIndex: 0,
+        secondaryPoolIndex: 1,
+        pools: [
+          {
+            id: 0,
+            stratumProtocol: "SV1" as const,
+            stratumURL: "public-pool.io",
+            stratumPort: 21496,
+            stratumUser: "bc1q99n3pu025yyu0jlywpmwzalyhm36tg5u37w20d.bitaxe-U1",
+            stratumPassword: "x",
+            stratumSuggestedDifficulty: 1000,
+            stratumExtranonceSubscribe: false,
+            stratumTLS: 0,
+            stratumCert: "",
+            stratumDecodeCoinbase: true,
+            stratumV2ChannelType: "extended" as const,
+            stratumV2AuthorityPubkey: "",
+            stratumV2RequireAuth: false
+          },
+          {
+            id: 1,
+            stratumProtocol: "SV1" as const,
+            stratumURL: "test.public-pool.io",
+            stratumPort: 21497,
+            stratumUser: "bc1q99n3pu025yyu0jlywpmwzalyhm36tg5u37w20d.bitaxe-U1",
+            stratumPassword: "x",
+            stratumSuggestedDifficulty: 1000,
+            stratumExtranonceSubscribe: false,
+            stratumTLS: 0,
+            stratumCert: "",
+            stratumDecodeCoinbase: true,
+            stratumV2ChannelType: "extended" as const,
+            stratumV2AuthorityPubkey: "",
+            stratumV2RequireAuth: false
+          }
+        ],
+        stratumProtocol: "SV1" as const,
         stratumURL: "public-pool.io",
         stratumPort: 21496,
         stratumUser: "bc1q99n3pu025yyu0jlywpmwzalyhm36tg5u37w20d.bitaxe-U1",
@@ -84,6 +143,10 @@ export class SystemApiService {
         stratumExtranonceSubscribe: !!0,
         stratumTLS: !!0,
         stratumCert: "",
+        stratumV2AuthorityPubkey: "",
+        stratumV2ChannelType: "extended" as const,
+        stratumDecodeCoinbase: true,
+        fallbackStratumProtocol: "SV1" as const,
         fallbackStratumURL: "test.public-pool.io",
         fallbackStratumPort: 21497,
         fallbackStratumUser: "bc1q99n3pu025yyu0jlywpmwzalyhm36tg5u37w20d.bitaxe-U1",
@@ -91,11 +154,16 @@ export class SystemApiService {
         fallbackStratumExtranonceSubscribe: !!0,
         fallbackStratumTLS: !!0,
         fallbackStratumCert: "",
+        fallbackStratumDecodeCoinbase: true,
+        fallbackStratumV2AuthorityPubkey: "",
+        fallbackStratumV2ChannelType: "extended" as const,
         poolDifficulty: 1000,
         responseTime: 10,
+        responseShareBatch: 1,
         isUsingFallbackStratum: 0,
         poolConnectionInfo: "IPv4 (TLS)",
         frequency: 485,
+        actualFrequency: 485,
         version: "v2.12.0",
         axeOSVersion: "v2.12.0",
         idfVersion: "v5.5.1",
@@ -108,6 +176,7 @@ export class SystemApiService {
         autofanspeed: 1,
         isPSRAMAvailable: 1,
         overclockEnabled: 1,
+        useCustomWWW: 0 as const,
         runningPartition: "factory",
         minFanSpeed: 25,
         fanspeed: 50,
@@ -120,10 +189,18 @@ export class SystemApiService {
         boardtemp1: 30,
         boardtemp2: 40,
         overheat_mode: 0,
+        statsLimit: 720,
+
+        partitions: [
+          { label: 'factory', version: 'v2.11.0', compileDate: 'Jul 10 2026', compileTime: '12:00:00', isCurrent: false, isFactory: true, usagePercent: 58 },
+          { label: 'ota_0', version: 'v2.12.0', compileDate: 'Jul 19 2026', compileTime: '15:30:00', isCurrent: true, isFactory: false, usagePercent: 58 },
+          { label: 'ota_1', version: 'v2.10.0', compileDate: 'Jun 20 2026', compileTime: '08:45:00', isCurrent: false, isFactory: false, usagePercent: 58 }
+        ],
 
         blockHeight: 811111,
         scriptsig: "..%..h..,H...ckpool.eu/solo.ckpool.org/",
         networkDifficulty: 155970000000000,
+        blockSignals: [],
         hashrateMonitor: {
           asics: [{
             total: 441.2579,
@@ -132,28 +209,39 @@ export class SystemApiService {
           }],
           hashrate: 441.2579,
         },
-        blockFound: 0,
+        blockFound: 1,
+        showNewBlock: true,
+        coinbaseOutputs: [{value: 50, address: "payoutaddress"}],
+        coinbaseValueTotalSatoshis: 50,
+        coinbaseValueUserSatoshis: 50,
+        miningPaused: false,
+        workReceived: 42,
       }
     ).pipe(delay(1000));
   }
 
-  public getStatistics(y1: string, y2: string, uri: string = ''): Observable<ISystemStatistics> {
+  public getStatistics(y1: string[], y2: string[], uri: string = ''): Observable<ISystemStatistics> {
     let columnList = [chartLabelKey(eChartLabel.hashrate), chartLabelKey(eChartLabel.power)];
 
-    if ((y1 != chartLabelKey(eChartLabel.hashrate)) && (y1 != chartLabelKey(eChartLabel.power))) {
-      columnList.push(y1);
+    for (const y of y1) {
+      if ((y != chartLabelKey(eChartLabel.hashrate)) && (y != chartLabelKey(eChartLabel.power)) && !columnList.includes(y)) {
+        columnList.push(y);
+      }
     }
-    if ((y2 != chartLabelKey(eChartLabel.hashrate)) && (y2 != chartLabelKey(eChartLabel.power))) {
-      columnList.push(y2);
+    for (const y of y2) {
+      if ((y != chartLabelKey(eChartLabel.hashrate)) && (y != chartLabelKey(eChartLabel.power)) && !columnList.includes(y)) {
+        columnList.push(y);
+      }
     }
 
-    if (environment.production && this.generatedSystemService) {
-      return this.generatedSystemService.getSystemStatistics(columnList).pipe(timeout(API_TIMEOUT));
+    if (!environment.mock && this.api) {
+      return from(this.api.invoke(functions.getSystemStatistics, { columns: columnList })).pipe(timeout(API_TIMEOUT));
     }
 
     const hashrateData = [0,413.4903744405481,410.7764830376959,440.100549473198,430.5816012914026,452.5464981767163,414.9564271189586,498.7294609150379,411.1671601439723,491.327834852684];
     const powerData = [14.45068359375,14.86083984375,15.03173828125,15.1171875,15.1171875,15.1513671875,15.185546875,15.27099609375,15.30517578125,15.33935546875];
     const asicTempData = [-1,58.5,59.625,60.125,60.75,61.5,61.875,62.125,62.5,63];
+    const asicTemp2Data = [-1,57.5,58.625,59.125,59.75,60.5,60.875,61.125,61.5,62];
     const vrTempData = [45,45,45,44,45,44,44,45,45,45];
     const asicVoltageData = [1221,1223,1219,1223,1217,1222,1221,1219,1221,1221];
     const voltageData = [5196.875,5204.6875,5196.875,5196.875,5196.875,5196.875,5196.875,5196.875,5196.875,5204.6875];
@@ -179,6 +267,7 @@ export class SystemApiService {
           case eChartLabel.hashrate_1h:  statisticsList[i][j] = hashrateData[i];     break;
           case eChartLabel.power:        statisticsList[i][j] = powerData[i];        break;
           case eChartLabel.asicTemp:     statisticsList[i][j] = asicTempData[i];     break;
+          case eChartLabel.asicTemp2:    statisticsList[i][j] = asicTemp2Data[i];    break;
           case eChartLabel.vrTemp:       statisticsList[i][j] = vrTempData[i];       break;
           case eChartLabel.asicVoltage:  statisticsList[i][j] = asicVoltageData[i];  break;
           case eChartLabel.voltage:      statisticsList[i][j] = voltageData[i];      break;
@@ -207,40 +296,123 @@ export class SystemApiService {
     });
   }
 
-  public restart(uri: string = '') {
-    if (environment.production && this.generatedSystemService && !uri) {
-      return this.generatedSystemService.restartSystem();
+  public getScoreboard(uri: string = ''): Observable<ISystemScoreboardEntry[]> {
+    if (!environment.mock) {
+      return this.httpClient.get<ISystemScoreboardEntry[]>(`${uri}/api/system/scoreboard`).pipe(timeout(5000));
     }
 
-    if (environment.production && uri) {
-      return this.httpClient.post(`${uri}/api/system/restart`, {});
-    }
-
-    return of('Device restarted (mock)');
+    // Mock data for development
+    return of([
+      {
+        rank: 0,
+        since: 3606,
+        difficulty: 2000,
+        job_id: "123456",
+        extranonce2: "000000",
+        ntime: 61125,
+        nonce: "00000000",
+        version_bits: "20000000"
+      },
+      {
+        rank: 1,
+        since: 3605,
+        difficulty: 1000,
+        job_id: "123457",
+        extranonce2: "000001",
+        ntime: 61126,
+        nonce: "00000001",
+        version_bits: "20000000"
+      }]).pipe(delay(1000));
   }
 
-  public identify(uri: string = '') {
-    if (environment.production && this.generatedSystemService && !uri) {
-      return this.generatedSystemService.identifySystem();
+  public restart(uri: string = ''): Observable<GenericResponse> {
+    if (!environment.mock && this.api && !uri) {
+      return from(this.api.invoke(functions.restartSystem, {}) as Promise<GenericResponse>);
     }
 
-    if (environment.production && uri) {
-      return this.httpClient.post(`${uri}/api/system/identify`, {});
+    if (!environment.mock && uri) {
+      return this.httpClient.post<GenericResponse>(`${uri}/api/system/restart`, {});
     }
 
-    return of('Device identified (mock)');
+    return of({ message: 'Device restarted (mock)' });
   }
 
-  public updateSystem(uri: string = '', update: any) {
-    if (environment.production && this.generatedSystemService && !uri) {
-      return this.generatedSystemService.updateSystemSettings(update as Settings);
+  public dismissBlockFound(uri: string = ''): Observable<GenericResponse> {
+    if (!environment.mock && this.api && !uri) {
+      return from(this.api.invoke(functions.dismissBlockFound, {}) as Promise<GenericResponse>);
     }
 
-    if (environment.production && uri) {
+    if (!environment.mock && uri) {
+      return this.httpClient.post<GenericResponse>(`${uri}/api/system/blockFound/dismiss`, {});
+    }
+
+    return of({ message: 'Block found notification dismissed (mock)' });
+  }
+
+  public pauseMining(uri: string = ''): Observable<GenericResponse> {
+    if (!environment.mock && this.api && !uri) {
+      return from(this.api.invoke(functions.pauseMining, {}) as Promise<GenericResponse>);
+    }
+
+    if (!environment.mock && uri) {
+      return this.httpClient.post<GenericResponse>(`${uri}/api/system/pause`, {});
+    }
+
+    return of<GenericResponse>({ message: 'Mining paused' });
+  }
+
+  public resumeMining(uri: string = ''): Observable<GenericResponse> {
+    if (!environment.mock && this.api && !uri) {
+      return from(this.api.invoke(functions.resumeMining, {}) as Promise<GenericResponse>);
+    }
+
+    if (!environment.mock && uri) {
+      return this.httpClient.post<GenericResponse>(`${uri}/api/system/resume`, {});
+    }
+
+    return of<GenericResponse>({ message: 'Mining resumed' });
+  }
+
+  public identify(uri: string = ''): Observable<GenericResponse> {
+    if (!environment.mock && this.api && !uri) {
+      return from(this.api.invoke(functions.identifySystem, {}) as Promise<GenericResponse>);
+    }
+
+    if (!environment.mock && uri) {
+      return this.httpClient.post<GenericResponse>(`${uri}/api/system/identify`, {});
+    }
+
+    return of({ message: 'Device identified (mock)' });
+  }
+
+  public updateSystem(uri: string = '', update: any): Observable<any | ISystemUpdateResponse> {
+    if (!environment.mock && this.api && !uri) {
+      return from(this.api.invoke(functions.updateSystemSettings, { body: update as Settings }));
+    }
+
+    if (!environment.mock && uri) {
       return this.httpClient.patch(`${uri}/api/system`, update);
     }
 
-    return of(true);
+    if (update.hostname) {
+      return of({
+        status: 'success',
+        redirect: {
+          url: `http://${update.hostname}.local`,
+          delay: 2000,
+          message: 'Hostname updated. Redirecting to new address...'
+        }
+      } as ISystemUpdateResponse);
+    }
+    return of(undefined);
+  }
+
+  public deletePool(uri: string = '', id: number): Observable<any> {
+    if (environment.production) {
+      const targetUri = uri ? `${uri}/api/system/pools/${id}` : `/api/system/pools/${id}`;
+      return this.httpClient.delete<any>(targetUri);
+    }
+    return of({ message: 'Pool deleted successfully (mock)' }).pipe(delay(500));
   }
 
   private otaUpdate(file: File | Blob, url: string): Observable<HttpEvent<string>> {
@@ -274,30 +446,36 @@ export class SystemApiService {
   }
 
   public performOTAUpdate(file: File | Blob): Observable<HttpEvent<string>> {
-    if (environment.production && this.generatedSystemService) {
-      return this.generatedSystemService.updateFirmware(file, 'events', true);
-    }
     return this.otaUpdate(file, '/api/system/OTA');
   }
 
   public performWWWOTAUpdate(file: File | Blob): Observable<HttpEvent<string>> {
-    if (environment.production && this.generatedSystemService) {
-      return this.generatedSystemService.updateWebInterface(file, 'events', true);
-    }
     return this.otaUpdate(file, '/api/system/OTAWWW');
   }
 
-  public getAsicSettings(uri: string = ''): Observable<ISystemASIC> {
-    if (environment.production && this.generatedSystemService && !uri) {
-      return this.generatedSystemService.getAsicSettings().pipe(timeout(API_TIMEOUT));
+  public switchBootPartition(partition: string, uri: string = ''): Observable<GenericResponse> {
+    if (environment.production && this.api && !uri) {
+      return from(this.api.invoke(functions.setBootPartition as any, { body: { partition } }) as Promise<GenericResponse>);
     }
 
     if (environment.production && uri) {
+      return this.httpClient.post<GenericResponse>(`${uri}/api/system/boot`, { partition });
+    }
+
+    return of({ message: `Successfully switched to ${partition} (mock)` }).pipe(delay(1000));
+  }
+
+  public getAsicSettings(uri: string = ''): Observable<ISystemASIC> {
+    if (!environment.mock && this.api && !uri) {
+      return from(this.api.invoke(functions.getAsicSettings, {})).pipe(timeout(API_TIMEOUT));
+    }
+
+    if (!environment.mock && uri) {
       return this.httpClient.get<ISystemASIC>(`${uri}/api/system/asic`).pipe(timeout(API_TIMEOUT));
     }
 
     return of({
-      ASICModel: "BM1370" as SystemASICASICModelEnum,
+      ASICModel: "BM1370" as any,
       deviceModel: "Gamma",
       swarmColor: "purple",
       asicCount: 1,

@@ -5,8 +5,11 @@
 #include "DS4432U.h"
 #include "INA260.h"
 #include "TPS546.h"
+#include "nvs_config.h"
 #include "adc.h"
 #include "driver/gpio.h"
+#include "global_state.h"
+#include "device_config.h"
 #include "vcore.h"
 
 #define GPIO_ASIC_ENABLE CONFIG_GPIO_ASIC_ENABLE
@@ -17,6 +20,7 @@ static const char *TAG = "vcore";
 static TPS546_CONFIG get_tps546_config(const FamilyConfig * family)
 {
     TPS546_CONFIG config = {0};
+    config.TPS546_INIT_FREQUENCY = TPS546_DEFAULT_FREQUENCY;
 
     // Set family-specific parameters
     switch (family->id) {
@@ -25,7 +29,7 @@ static TPS546_CONFIG get_tps546_config(const FamilyConfig * family)
         config.TPS546_INIT_VIN_ON = 11.0;
         config.TPS546_INIT_VIN_OFF = 10.5;
         config.TPS546_INIT_VIN_UV_WARN_LIMIT = 11.0;
-        config.TPS546_INIT_VIN_OV_FAULT_LIMIT = 14.0;
+        config.TPS546_INIT_VIN_OV_FAULT_LIMIT = 14.8;
         config.TPS546_INIT_SCALE_LOOP = 0.25;
         config.TPS546_INIT_VOUT_MIN = 1;
         config.TPS546_INIT_VOUT_MAX = 3;
@@ -48,7 +52,7 @@ static TPS546_CONFIG get_tps546_config(const FamilyConfig * family)
         config.TPS546_INIT_VIN_ON = 11.5;
         config.TPS546_INIT_VIN_OFF = 11.0;
         config.TPS546_INIT_VIN_UV_WARN_LIMIT = 11.0;
-        config.TPS546_INIT_VIN_OV_FAULT_LIMIT = 14.0;
+        config.TPS546_INIT_VIN_OV_FAULT_LIMIT = 14.8;
         config.TPS546_INIT_SCALE_LOOP = 0.125;
         config.TPS546_INIT_VOUT_MIN = 2.5;
         config.TPS546_INIT_VOUT_MAX = 4.5;
@@ -76,6 +80,49 @@ static TPS546_CONFIG get_tps546_config(const FamilyConfig * family)
         config.TPS546_INIT_STACK_CONFIG = 0x0000; // 1 module
         config.TPS546_INIT_SYNC_CONFIG = 0x10;    // Disable SYNC
         break;
+    }
+
+    if (nvs_config_has_key(NVS_CONFIG_TPS546_PHASE)) {
+        config.TPS546_INIT_PHASE = (uint8_t)nvs_config_get_u16(NVS_CONFIG_TPS546_PHASE);
+    }
+    if (nvs_config_has_key(NVS_CONFIG_TPS546_VIN_ON)) {
+        config.TPS546_INIT_VIN_ON = nvs_config_get_float(NVS_CONFIG_TPS546_VIN_ON);
+    }
+    if (nvs_config_has_key(NVS_CONFIG_TPS546_VIN_OFF)) {
+        config.TPS546_INIT_VIN_OFF = nvs_config_get_float(NVS_CONFIG_TPS546_VIN_OFF);
+    }
+    if (nvs_config_has_key(NVS_CONFIG_TPS546_VIN_UV_WARN)) {
+        config.TPS546_INIT_VIN_UV_WARN_LIMIT = nvs_config_get_float(NVS_CONFIG_TPS546_VIN_UV_WARN);
+    }
+    if (nvs_config_has_key(NVS_CONFIG_TPS546_VIN_OV_FAULT)) {
+        config.TPS546_INIT_VIN_OV_FAULT_LIMIT = nvs_config_get_float(NVS_CONFIG_TPS546_VIN_OV_FAULT);
+    }
+    if (nvs_config_has_key(NVS_CONFIG_TPS546_SCALE_LOOP)) {
+        config.TPS546_INIT_SCALE_LOOP = nvs_config_get_float(NVS_CONFIG_TPS546_SCALE_LOOP);
+    }
+    if (nvs_config_has_key(NVS_CONFIG_TPS546_VOUT_MIN)) {
+        config.TPS546_INIT_VOUT_MIN = nvs_config_get_float(NVS_CONFIG_TPS546_VOUT_MIN);
+    }
+    if (nvs_config_has_key(NVS_CONFIG_TPS546_VOUT_MAX)) {
+        config.TPS546_INIT_VOUT_MAX = nvs_config_get_float(NVS_CONFIG_TPS546_VOUT_MAX);
+    }
+    if (nvs_config_has_key(NVS_CONFIG_TPS546_VOUT_COMMAND)) {
+        config.TPS546_INIT_VOUT_COMMAND = nvs_config_get_float(NVS_CONFIG_TPS546_VOUT_COMMAND);
+    }
+    if (nvs_config_has_key(NVS_CONFIG_TPS546_IOUT_OC_WARN)) {
+        config.TPS546_INIT_IOUT_OC_WARN_LIMIT = nvs_config_get_float(NVS_CONFIG_TPS546_IOUT_OC_WARN);
+    }
+    if (nvs_config_has_key(NVS_CONFIG_TPS546_IOUT_OC_FAULT)) {
+        config.TPS546_INIT_IOUT_OC_FAULT_LIMIT = nvs_config_get_float(NVS_CONFIG_TPS546_IOUT_OC_FAULT);
+    }
+    if (nvs_config_has_key(NVS_CONFIG_TPS546_STACK_CONFIG)) {
+        config.TPS546_INIT_STACK_CONFIG = nvs_config_get_u16(NVS_CONFIG_TPS546_STACK_CONFIG);
+    }
+    if (nvs_config_has_key(NVS_CONFIG_TPS546_SYNC_CONFIG)) {
+        config.TPS546_INIT_SYNC_CONFIG = (uint8_t)nvs_config_get_u16(NVS_CONFIG_TPS546_SYNC_CONFIG);
+    }
+    if (nvs_config_has_key(NVS_CONFIG_TPS546_FREQUENCY)) {
+        config.TPS546_INIT_FREQUENCY = nvs_config_get_u16(NVS_CONFIG_TPS546_FREQUENCY);
     }
 
     return config;
@@ -120,6 +167,11 @@ esp_err_t VCORE_set_voltage(GlobalState * GLOBAL_STATE, float core_voltage)
 {
     ESP_LOGI(TAG, "Set ASIC voltage = %.3fV", core_voltage);
 
+    // Enable/disable the ASIC power enable GPIO before touching the regulator
+    if (GLOBAL_STATE->DEVICE_CONFIG.asic_enable) {
+        gpio_set_level(GPIO_ASIC_ENABLE, core_voltage == 0.0f ? 1 : 0);
+    }
+
     if (GLOBAL_STATE->DEVICE_CONFIG.DS4432U) {
         if (core_voltage != 0.0f) {
             ESP_RETURN_ON_ERROR(DS4432U_set_voltage(core_voltage), TAG, "DS4432U set voltage failed!");
@@ -128,9 +180,6 @@ esp_err_t VCORE_set_voltage(GlobalState * GLOBAL_STATE, float core_voltage)
     if (GLOBAL_STATE->DEVICE_CONFIG.TPS546) {
         uint16_t voltage_domains = GLOBAL_STATE->DEVICE_CONFIG.family.voltage_domains;
         ESP_RETURN_ON_ERROR(TPS546_set_vout(core_voltage * voltage_domains), TAG, "TPS546 set voltage failed!");
-    }
-    if (core_voltage == 0.0f && GLOBAL_STATE->DEVICE_CONFIG.asic_enable) {
-        gpio_set_level(GPIO_ASIC_ENABLE, 1);
     }
 
     return ESP_OK;

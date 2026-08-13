@@ -16,50 +16,50 @@ typedef enum {
 } PIDProportionalMode;
 
 typedef struct {
-    double dispKp;
-    double dispKi;
-    double dispKd;
+    float dispKp;
+    float dispKi;
+    float dispKd;
 
-    double kp;
-    double ki;
-    double kd;
+    float kp;
+    float ki;
+    float kd;
 
     PIDDirection controllerDirection;
     PIDProportionalMode pOn;
     bool pOnE;
 
-    double *input;
-    double *output;
-    double *setpoint;
+    float *input;
+    float *output;
+    float *setpoint;
 
     unsigned long lastTime;
     unsigned long sampleTime;
-    double outMin;
-    double outMax;
+    float outMin;
+    float outMax;
     bool inAuto;
 
-    double outputSum;
-    double lastInput;
+    float outputSum;
+    float lastInput;
 } PIDController;
 
-void pid_init(PIDController *pid, double *input, double *output, double *setpoint,
-              double Kp, double Ki, double Kd, PIDProportionalMode POn, PIDDirection ControllerDirection);
+void pid_init(PIDController *pid, float *input, float *output, float *setpoint,
+              float Kp, float Ki, float Kd, PIDProportionalMode POn, PIDDirection ControllerDirection);
 
 void pid_set_mode(PIDController *pid, int mode);
 bool pid_compute(PIDController *pid);
-void pid_set_output_limits(PIDController *pid, double min, double max);
-void pid_set_tunings(PIDController *pid, double Kp, double Ki, double Kd);
-void pid_set_tunings_adv(PIDController *pid, double Kp, double Ki, double Kd, PIDProportionalMode POn);
+void pid_set_output_limits(PIDController *pid, float min, float max);
+void pid_set_tunings(PIDController *pid, float Kp, float Ki, float Kd);
+void pid_set_tunings_adv(PIDController *pid, float Kp, float Ki, float Kd, PIDProportionalMode POn);
 void pid_set_sample_time(PIDController *pid, int newSampleTime);
 void pid_set_controller_direction(PIDController *pid, PIDDirection direction);
 void pid_initialize(PIDController *pid);
 
 // Getter functions
-double pid_get_kp(PIDController *pid);
-double pid_get_ki(PIDController *pid);
-double pid_get_kd(PIDController *pid);
-double pid_get_ti(PIDController *pid);
-double pid_get_td(PIDController *pid);
+float pid_get_kp(PIDController *pid);
+float pid_get_ki(PIDController *pid);
+float pid_get_kd(PIDController *pid);
+float pid_get_ti(PIDController *pid);
+float pid_get_td(PIDController *pid);
 int pid_get_mode(PIDController *pid);
 PIDDirection pid_get_direction(PIDController *pid);
 

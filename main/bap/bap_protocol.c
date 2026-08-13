@@ -30,6 +30,8 @@ static const char *parameter_strings[] = {
     "best_difficulty",
     "block_height",
     "wifi",
+    "found_block",
+    "show_new_block",
     "unknown"
 };
 

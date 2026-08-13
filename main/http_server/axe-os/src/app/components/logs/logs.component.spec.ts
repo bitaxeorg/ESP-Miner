@@ -1,10 +1,13 @@
-import { ComponentFixture, TestBed } from '@angular/core/testing';
-
-import { LogsComponent } from './logs.component';
-import { provideToastr } from 'ngx-toastr';
-import { ButtonModule } from 'primeng/button';
+import { provideRouter } from '@angular/router';
+import { ANSIPipe } from 'src/app/pipes/ansi.pipe';
+import { CommonModule } from '@angular/common';
+import { SystemApiService } from 'src/app/services/system.service';
+import { provideHttpClient } from '@angular/common/http';
+import { TooltipDirective } from '../../directives/tooltip.directive';
 import { ReactiveFormsModule } from '@angular/forms';
-import { TooltipModule } from 'primeng/tooltip';
+import { provideToastr } from 'ngx-toastr';
+import { LogsComponent } from './logs.component';
+import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { TranslatePipe } from 'src/app/i18n/translate.pipe';
 
 describe('LogsComponent', () => {
@@ -13,9 +16,20 @@ describe('LogsComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [LogsComponent, TranslatePipe],
-      imports: [ButtonModule, ReactiveFormsModule, TooltipModule],
-      providers: [provideToastr()]
+      declarations: [LogsComponent],
+      imports: [
+        CommonModule,
+        ReactiveFormsModule,
+        TooltipDirective,
+        ANSIPipe,
+        TranslatePipe
+      ],
+      providers: [
+        provideRouter([]),
+        provideToastr(),
+        provideHttpClient(),
+        SystemApiService
+      ]
     })
     .compileComponents();
     

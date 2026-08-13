@@ -8,6 +8,9 @@
 # ESP-Miner
 esp-miner is open source ESP32 firmware for the [Bitaxe](https://github.com/bitaxeorg/bitaxe)
 
+## Community
+The ESP-Miner firmware is maintained by OSMU which hosts it's own discussion forum at [Forum](https://osmu.xyz).
+
 If you are looking for premade images to load on your Bitaxe, check out the [latest release](https://github.com/bitaxeorg/ESP-Miner/releases/latest) page. Maybe you want [instructions](https://github.com/bitaxeorg/ESP-Miner/blob/master/flashing.md) for loading factory images.
 
 # Bitaxetool
@@ -59,7 +62,9 @@ Available API endpoints:
 * `/api/system/asic` Get ASIC settings information
 * `/api/system/statistics` Get system statistics (data logging should be activated)
 * `/api/system/statistics/dashboard` Get system statistics for dashboard
+* `/api/system/scoreboard` Get top 20 highest difficulty shares
 * `/api/system/wifi/scan` Scan for available Wi-Fi networks
+* `/api/system/logs` Download system logs
 
 **POST**
 
@@ -72,7 +77,12 @@ Available API endpoints:
 
 * `/api/system` Update system settings
 
-### API examples in `curl`:
+**WEBSOCKETS**
+
+* `/api/ws` Text stream log
+* `/api/ws/live` JSONp stream of partial system info updates
+
+### API examples in `curl` (works with IP addresses or .local hostnames):
 
 ```bash
 # Get system information
@@ -90,9 +100,18 @@ curl http://YOUR-BITAXE-IP/api/system/statistics/dashboard
 # Get available Wi-Fi networks
 curl http://YOUR-BITAXE-IP/api/system/wifi/scan
 
+# Download system logs
+curl http://YOUR-BITAXE-IP/api/system/logs
+
 
 # Restart the system
 curl -X POST http://YOUR-BITAXE-IP/api/system/restart
+
+# Pause mining
+curl -X POST http://YOUR-BITAXE-IP/api/system/pause
+
+# Resume mining
+curl -X POST http://YOUR-BITAXE-IP/api/system/resume
 
 # Let the device say Hi!
 curl -X POST http://YOUR-BITAXE-IP/api/system/identify
@@ -103,7 +122,7 @@ curl -X POST \
      --data-binary "@esp-miner.bin" \
      http://YOUR-BITAXE-IP/api/system/OTA
 
-# Update AxeOS
+# Update with a custom AxeOS Web UI partition (www.bin)
 curl -X POST \
      -H "Content-Type: application/octet-stream" \
      --data-binary "@www.bin" \
@@ -114,7 +133,105 @@ curl -X POST \
 curl -X PATCH http://YOUR-BITAXE-IP/api/system \
      -H "Content-Type: application/json" \
      -d '{"fanspeed": "desired_speed_value"}'
+
+# Configure a Stratum V1 Pool (Slot Index 0)
+curl -X PUT http://YOUR-BITAXE-IP/api/system/pools/0 \
+     -H "Content-Type: application/json" \
+     -d '{
+       "stratumProtocol": "SV1",
+       "stratumURL": "solo.ckpool.org",
+       "stratumPort": 3333,
+       "stratumUser": "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa.worker1",
+       "stratumPassword": "x",
+       "stratumSuggestedDifficulty": 0,
+       "stratumExtranonceSubscribe": true,
+       "stratumTLS": 0,
+       "stratumDecodeCoinbase": true
+     }'
+
+# Configure a Stratum V2 Pool (Slot Index 1)
+curl -X PUT http://YOUR-BITAXE-IP/api/system/pools/1 \
+     -H "Content-Type: application/json" \
+     -d '{
+       "stratumProtocol": "SV2",
+       "stratumURL": "v2.srtm.ocean.xyz",
+       "stratumPort": 3334,
+       "stratumUser": "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa.worker1",
+       "stratumPassword": "x",
+       "stratumSuggestedDifficulty": 0,
+       "stratumExtranonceSubscribe": true,
+       "stratumTLS": 0,
+       "stratumDecodeCoinbase": true,
+       "stratumV2ChannelType": "extended",
+       "stratumV2AuthorityPubkey": "your_base58_sv2_authority_public_key"
+     }'
+
+# Stream logs
+websocat ws://YOUR-BITAXE-IP/api/ws
+
+# Stream Info API
+websocat ws://YOUR-BITAXE-IP/api/ws/live
 ```
+
+## mDNS Support
+
+ESP-Miner now includes comprehensive mDNS (multicast DNS) support for seamless network discovery and device accessibility. This feature enables automatic device discovery on local networks without requiring manual IP address configuration.
+
+### Features
+
+- **Automatic mDNS Initialization**: Device automatically registers with mDNS/Bonjour/Avahi services on network connection
+- **Dynamic Hostname Registration**: Device hostname is registered as `<hostname>.local` (e.g., `bitaxe.local`)
+- **Service Advertisement**: HTTP service is advertised as `_http._tcp` on port 80
+- **AxeOS Subtype**: Advertises `_axeos._sub._http._tcp` for targeted DNS-SD discovery of AxeOS devices
+- **Device TXT Records**: Includes board version, family, ASIC model, ASIC count, and firmware version as DNS-SD TXT records
+- **Dynamic Hostname Updates**: mDNS hostname updates automatically when device hostname is changed via web interface
+- **Hostname Normalization**: Automatically strips `.local` suffix when setting hostnames to prevent duplicate registrations
+- **CORS Support**: Enhanced CORS handling to allow requests from mDNS hostnames
+- **Hostname Conflict Resolution**: Automatically detects and resolves hostname conflicts by appending MAC address suffix when needed
+- **Enhanced Swarm Discovery**: Swarm mode supports both IP addresses and .local hostnames for seamless network management
+
+### Network Discovery
+
+Once connected to your local network, the device becomes discoverable through:
+
+```bash
+# Using avahi-browse (Linux)
+avahi-browse _http._tcp
+
+# Discover AxeOS devices specifically
+avahi-browse _axeos._sub._http._tcp
+
+# Using dns-sd (macOS)
+dns-sd -B _http._tcp
+
+# Discover AxeOS devices with TXT records
+dns-sd -B _axeos._sub._http._tcp
+
+# Direct access
+http://<hostname>.local
+```
+
+### Configuration
+
+- **Default Hostname**: `bitaxe` (configurable via web interface)
+- **Service Type**: `_http._tcp`
+- **Subtype**: `_axeos._sub._http._tcp`
+- **Port**: `80`
+- **Instance Name**: `Bitaxe <family> <board> (<mac_suffix>)` (e.g., `Bitaxe Gamma 601 (A1B2)`)
+- **TXT Records**: `board`, `family`, `asic`, `asic_count`, `fw_version`
+
+### Hostname Conflict Resolution
+
+If multiple devices attempt to use the same hostname, ESP-Miner automatically resolves conflicts by appending a MAC address-derived suffix (e.g., `bitaxe-12ab` if `bitaxe` is taken). This ensures unique network identification without manual intervention.
+
+### Benefits
+
+- **Zero-Configuration Discovery**: Devices automatically appear in network browsers
+- **Cross-Platform Compatibility**: Works with Windows, macOS, Linux, and mobile devices
+- **No IP Address Required**: Access devices using human-readable names
+- **Automatic Resolution**: DNS resolution happens transparently in the background
+- **Zero-Configuration Swarm Management**: Automatic device discovery and management without IP configuration
+- **Enhanced Cross-Platform Compatibility**: Improved support across different network environments and discovery protocols
 
 ## Administration
 
@@ -122,11 +239,76 @@ The firmware hosts a small web server on port 80 for administrative purposes. On
 
 ### Recovery
 
-In the event that the admin web front end is inaccessible, for example because of an unsuccessful firmware update (`www.bin`), a recovery page can be accessed at `http://<IP>/recovery`.
+In the event that the admin web front end is inaccessible, for example because of an unsuccessful custom Web UI update, a recovery page can be accessed at `http://<IP>/recovery`.
 
 ### Unlock Settings
 
 In order to unlock the Input fields for ASIC Frequency and ASIC Core Voltage you need to append `?oc` to the end of the settings tab URL in your browser. Be aware that without additional cooling overclocking can overheat and/or damage your Bitaxe.
+
+## Unified Firmware & Rollbacks
+
+Starting with the unified firmware releases, ESP-Miner uses a unified architecture where the AxeOS frontend is compiled, gzipped, and embedded directly into the firmware application binary (`esp-miner.bin`). 
+
+A separate Web UI image (`www.bin`) is no longer required for standard usage since the web interface is served directly from the firmware. If you want to use a custom or modified AxeOS frontend, you can still enable the **custom web UI** option in the settings. This allows you to upload and serve a separate `www.bin` from the SPIFFS partition, which takes priority over the built-in assets.
+
+### Disabling Custom Web UI via Recovery Page or API
+
+If a device is stuck serving an older custom `www.bin` partition and the Web UI settings option is not accessible, you can disable custom WWW and revert to the embedded AxeOS interface by visiting the recovery page in your browser:
+
+```
+http://<IP>/recovery
+```
+
+Alternatively, you can disable `useCustomWWW` directly via the REST API:
+
+```bash
+# Disable custom Web UI (revert to embedded AxeOS)
+curl -X PATCH http://YOUR-BITAXE-IP/api/system \
+     -H "Content-Type: application/json" \
+     -d '{"useCustomWWW": 0}'
+
+# Restart the device to apply changes
+curl -X POST http://YOUR-BITAXE-IP/api/system/restart
+```
+
+### Rollback to Pre-Unified Firmware
+
+If you roll back the firmware from a unified version to an older, pre-unified version (which expects a separate web partition):
+
+- **www partition persistence**: The `www` (SPIFFS) partition on the flash chip will remain untouched during the rollback, keeping whatever latest non-unified Web UI version was last active on the device.
+- **Potential UI Version Mismatch**: Since older firmware relies entirely on the separate `www` partition to serve the web interface, the device will load whatever files exist in that partition. If you experience layout errors or missing features after rolling back, you will need to manually flash or upload a compatible `www.bin` version that matches the older firmware version.
+
+## Development using esp-miner/devcontainer
+
+This configuration allows you to edit locally and compile the source code using a docker container so you don't have to install the ESP-IDF toolchain and other supporting software on your computer to compile the firmware.
+
+### Prerequisites
+
+- Docker server
+
+### Local PC Setup
+
+These instructions will assume an installation to your home directory.
+```
+cd ~
+git clone --recursive https://github.com/bitaxeorg/ESP-MINER.git
+cd ESP-MINER
+git checkout <the branch you want>
+git submodule update --init --recursive
+# The next step builds the docker container that will compile the source code
+# This will take several minutes to finish
+docker build -t espminer-build .devcontainer
+```
+### Building
+
+```
+cd ~/ESP-MINER
+docker run --rm -it -v $PWD:/workspace espminer-build /bin/bash
+git config --global --add safe.directory /workspace    # set git permissions or build will fail; only done once
+cd /workspace
+idf.py build
+```	
+Once the build is done exit out of the docker session and flash the new firmware.
 
 ## Development
 
@@ -135,6 +317,18 @@ In order to unlock the Input fields for ASIC Frequency and ASIC Core Voltage you
 - Install the ESP-IDF toolchain from https://docs.espressif.com/projects/esp-idf/en/stable/esp32/get-started/
 - Install nodejs/npm from https://nodejs.org/en/download
 - (Optional) Install the ESP-IDF extension for VSCode from https://marketplace.visualstudio.com/items?itemName=espressif.esp-idf-extension
+
+### Cloning
+
+This project uses git submodules (e.g. libsecp256k1). Clone with `--recursive`:
+```
+git clone --recursive https://github.com/bitaxeorg/ESP-Miner.git
+```
+
+If you already have a checkout, initialize the submodules with:
+```
+git submodule update --init --recursive
+```
 
 ### Building
 

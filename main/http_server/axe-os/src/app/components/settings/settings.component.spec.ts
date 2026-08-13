@@ -5,9 +5,6 @@ import { EditComponent } from '../edit/edit.component';
 import { provideHttpClient } from '@angular/common/http';
 import { provideToastr } from 'ngx-toastr';
 import { provideRouter } from '@angular/router';
-import { TranslatePipe } from 'src/app/i18n/translate.pipe';
-import { FormsModule } from '@angular/forms';
-import { DropdownModule } from 'primeng/dropdown';
 
 describe('SettingsComponent', () => {
   let component: SettingsComponent;
@@ -15,8 +12,7 @@ describe('SettingsComponent', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      declarations: [SettingsComponent, EditComponent, TranslatePipe],
-      imports: [FormsModule, DropdownModule],
+      imports: [SettingsComponent, EditComponent],
       providers: [provideHttpClient(), provideToastr(), provideRouter([])]
     });
     fixture = TestBed.createComponent(SettingsComponent);

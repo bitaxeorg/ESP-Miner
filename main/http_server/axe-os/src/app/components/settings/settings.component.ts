@@ -1,17 +1,18 @@
 import { Component, ViewChild, AfterViewInit, OnDestroy, OnInit } from '@angular/core';
-import { FormGroup } from '@angular/forms';
+import { CommonModule } from '@angular/common';
+import { FormGroup, FormsModule } from '@angular/forms';
 import { Observable, Subject, takeUntil } from 'rxjs';
 import { EditComponent } from '../edit/edit.component';
+import { DropdownComponent } from '../dropdown/dropdown.component';
 import { I18nService, Locale } from 'src/app/i18n/i18n.service';
-
-type LanguageOption = {
-  label: string;
-  value: Locale;
-};
+import { TranslatePipe } from 'src/app/i18n/translate.pipe';
+import { SelectOption } from 'src/app/models/select-option.model';
 
 @Component({
-  selector: 'app-settings',
-  templateUrl: './settings.component.html',
+    selector: 'app-settings',
+    templateUrl: './settings.component.html',
+    standalone: true,
+    imports: [CommonModule, FormsModule, EditComponent, DropdownComponent, TranslatePipe]
 })
 export class SettingsComponent implements AfterViewInit, OnInit, OnDestroy {
   form$!: Observable<FormGroup | null>;
@@ -19,7 +20,6 @@ export class SettingsComponent implements AfterViewInit, OnInit, OnDestroy {
   private currentLocale: Locale = 'en';
   localeDirty = false;
   private localeDirtyMarksForm = false;
-
   private destroy$ = new Subject<void>();
 
   @ViewChild(EditComponent) editComponent!: EditComponent;
@@ -29,7 +29,6 @@ export class SettingsComponent implements AfterViewInit, OnInit, OnDestroy {
   ngOnInit() {
     this.currentLocale = this.i18n.locale;
     this.selectedLocale = this.currentLocale;
-    this.localeDirty = false;
     this.i18n.locale$
       .pipe(takeUntil(this.destroy$))
       .subscribe(locale => {
@@ -53,12 +52,11 @@ export class SettingsComponent implements AfterViewInit, OnInit, OnDestroy {
     this.destroy$.complete();
   }
 
-  get languageOptions(): LanguageOption[] {
-    const t = (key: string) => this.i18n.t(key);
+  get languageOptions(): SelectOption<Locale>[] {
     return [
-      { value: 'en', label: t('settings.ui.languages.en') },
-      { value: 'de', label: t('settings.ui.languages.de') },
-      { value: 'es', label: t('settings.ui.languages.es') }
+      { value: 'en', label: this.i18n.t('settings.ui.languages.en') },
+      { value: 'de', label: this.i18n.t('settings.ui.languages.de') },
+      { value: 'es', label: this.i18n.t('settings.ui.languages.es') },
     ];
   }
 
@@ -68,12 +66,9 @@ export class SettingsComponent implements AfterViewInit, OnInit, OnDestroy {
   }
 
   applyLocaleOnSave() {
-    if (!this.localeDirty) {
-      return;
+    if (this.localeDirty) {
+      this.i18n.setLocale(this.selectedLocale);
     }
-    this.currentLocale = this.selectedLocale;
-    this.updateLocaleDirty();
-    this.i18n.setLocale(this.selectedLocale);
   }
 
   private updateLocaleDirty() {
@@ -89,31 +84,17 @@ export class SettingsComponent implements AfterViewInit, OnInit, OnDestroy {
 
   private markFormDirtyForLocale() {
     const form = this.editComponent?.form;
-    if (!form) {
-      return;
-    }
-    if (!form.dirty) {
-      this.localeDirtyMarksForm = true;
-      form.markAsDirty();
-    } else {
-      this.localeDirtyMarksForm = false;
-    }
+    if (!form) return;
+
+    this.localeDirtyMarksForm = !form.dirty;
+    form.markAsDirty();
   }
 
   private clearFormDirtyForLocale() {
     const form = this.editComponent?.form;
-    if (!form) {
-      this.localeDirtyMarksForm = false;
-      return;
-    }
-
-    if (this.localeDirtyMarksForm && !this.hasDirtyControl(form)) {
+    if (form && this.localeDirtyMarksForm && !Object.values(form.controls).some(control => control.dirty)) {
       form.markAsPristine();
     }
     this.localeDirtyMarksForm = false;
-  }
-
-  private hasDirtyControl(form: FormGroup): boolean {
-    return Object.values(form.controls).some(control => control.dirty);
   }
 }

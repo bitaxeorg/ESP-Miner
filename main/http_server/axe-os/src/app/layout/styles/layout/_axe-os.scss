@@ -1,0 +1,20 @@
+:root {
+    --text-color: var(--color-text-main);
+    --text-color-secondary: var(--color-text-secondary);
+    --font-family: 'Nippo-Regular';
+    --border-radius: 2px;
+
+    --color-surface-border: var(--color-border-content);
+}
+
+h1, h2, h3, h4, h5, h6 {
+    color: var(--color-text-main) !important;
+}
+
+/* Global element borders */
+fieldset {
+    border-color: var(--color-border-content) !important;
+}
+table.border-1 {
+    border-color: var(--card-border) !important;
+}

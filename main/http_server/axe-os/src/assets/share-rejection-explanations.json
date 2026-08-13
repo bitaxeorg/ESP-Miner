@@ -26,5 +26,21 @@
     "Job not found": "miner.rejection_explanations.job_not_found",
     "Duplicate share": "miner.rejection_explanations.duplicate_share",
     "Difficulty too low": "miner.rejection_explanations.difficulty_too_low"
+  },
+  {
+    "Invalid subscription message": "miner.rejection_explanations.invalid_subscription_message",
+    "Invalid configuration message": "miner.rejection_explanations.invalid_configuration_message",
+    "Invalid authorization message": "miner.rejection_explanations.invalid_authorization_message",
+    "Invalid Bitcoin address": "miner.rejection_explanations.invalid_bitcoin_address",
+    "Invalid suggest difficulty message": "miner.rejection_explanations.invalid_suggest_difficulty_message",
+    "Suggest difficulty is disabled for this connection": "miner.rejection_explanations.suggest_difficulty_disabled",
+    "Invalid mining submit message": "miner.rejection_explanations.invalid_mining_submit_message",
+    "Unauthorized worker": "miner.rejection_explanations.unauthorized_worker",
+    "Not subscribed": "miner.rejection_explanations.not_subscribed",
+    "stale": "miner.rejection_explanations.stale",
+    "invalid-channel-id": "miner.rejection_explanations.invalid_channel_id",
+    "invalid-job-id": "miner.rejection_explanations.invalid_job_id_sv2",
+    "stale-share": "miner.rejection_explanations.stale",
+    "difficulty-too-low": "miner.rejection_explanations.difficulty_too_low_sv2"
   }
 ]

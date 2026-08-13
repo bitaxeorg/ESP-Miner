@@ -1,33 +1,32 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
-import { Observable, Subject, shareReplay } from 'rxjs';
-import { takeUntil } from 'rxjs/operators';
-import { SystemApiService } from '../services/system.service';
+import { Observable, Subject, takeUntil } from 'rxjs';
+import { LiveDataService } from '../services/live-data.service';
 import { LayoutService } from './service/app.layout.service';
-import { SystemInfo as ISystemInfo } from 'src/app/generated';
+import { SystemInfo as ISystemInfo } from 'src/app/generated/models';
 import { I18nService } from '../i18n/i18n.service';
 
 @Component({
-  selector: 'app-menu',
-  templateUrl: './app.menu.component.html'
+    selector: 'app-menu',
+    templateUrl: './app.menu.component.html',
+    standalone: false
 })
 export class AppMenuComponent implements OnInit, OnDestroy {
-  public info$!: Observable<ISystemInfo>;
+  public info$: Observable<ISystemInfo>;
 
   model: any[] = [];
   private destroy$ = new Subject<void>();
 
-  constructor(public layoutService: LayoutService,
-    private systemService: SystemApiService,
-    private i18n: I18nService
+  constructor(
+    public layoutService: LayoutService,
+    private liveDataService: LiveDataService,
+    private i18n: I18nService,
   ) {
-    this.info$ = this.systemService.getInfo().pipe(shareReplay({ refCount: true, bufferSize: 1 }))
+    this.info$ = this.liveDataService.info$;
   }
 
   ngOnInit() {
     this.buildMenu();
-    this.i18n.locale$.pipe(takeUntil(this.destroy$)).subscribe(() => {
-      this.buildMenu();
-    });
+    this.i18n.locale$.pipe(takeUntil(this.destroy$)).subscribe(() => this.buildMenu());
   }
 
   ngOnDestroy() {
@@ -41,6 +40,7 @@ export class AppMenuComponent implements OnInit, OnDestroy {
         label: this.i18n.t('nav.menu'),
         items: [
           { label: this.i18n.t('nav.dashboard'), icon: 'pi pi-fw pi-home', routerLink: ['/'] },
+          { label: this.i18n.t('nav.scoreboard'), icon: 'pi pi-fw pi-trophy', routerLink: ['scoreboard'] },
           { label: this.i18n.t('nav.swarm'), icon: 'pi pi-fw pi-sitemap', routerLink: ['swarm'] },
           { label: this.i18n.t('nav.logs'), icon: 'pi pi-fw pi-list', routerLink: ['logs'] },
           { label: this.i18n.t('nav.system'), icon: 'pi pi-fw pi-wave-pulse', routerLink: ['system'] },

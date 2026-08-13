@@ -2,6 +2,7 @@
   "nav": {
     "menu": "Menu",
     "dashboard": "Dashboard",
+    "scoreboard": "Scoreboard",
     "swarm": "Swarm",
     "logs": "Logs",
     "system": "System",
@@ -43,7 +44,23 @@
     "remove": "Remove",
     "clear_logs": "Clear Logs",
     "minimize": "Minimize",
-    "maximize": "Maximize"
+    "maximize": "Maximize",
+    "activate": "Activate",
+    "close": "Close",
+    "delete_pool": "Delete Pool",
+    "dismiss": "Dismiss",
+    "download_logs": "Download Logs",
+    "widgets": "Widgets",
+    "standard_width": "Standard Width",
+    "wide_view": "Wide View",
+    "reset_layout": "Reset Layout",
+    "save_layout": "Save Layout",
+    "edit_layout": "Edit Layout",
+    "resume_mining": "Resume Mining",
+    "pause_mining": "Pause Mining",
+    "start_scrolling": "Start Scrolling",
+    "stop_scrolling": "Stop Scrolling",
+    "restart_device": "Restart Device"
   },
   "common": {
     "app_name": "AxeOS",
@@ -71,7 +88,12 @@
     "password": "Password",
     "dont_show_again": "Don't show again",
     "scrolling": "Scrolling",
-    "logs": "Logs"
+    "logs": "Logs",
+    "address": "Address",
+    "chart": "Chart",
+    "misc": "Misc",
+    "mode": "Mode",
+    "sort": "Sort"
   },
   "messages": {
     "restart_required": "You must restart this device after saving for changes to take effect.",
@@ -110,7 +132,16 @@
     "power_fault_check": "{fault} Check your Power Supply.",
     "frequency_low": "Device frequency is set low - See settings",
     "fallback_pool": "Using fallback pool - Share stats reset. Check Pool Settings and / or reboot Device.",
-    "version_mismatch": "Firmware ({fw}) and AxeOS ({axeos}) versions do not match. Please make sure to update both www.bin and esp-miner.bin."
+    "version_mismatch": "Firmware ({fw}) and AxeOS ({axeos}) versions do not match. Please make sure to update both www.bin and esp-miner.bin.",
+    "blocks_found": "Today is your lucky day! Your device has found {count} blocks 🎉",
+    "block_notification_dismissed": "Block found notification dismissed",
+    "firmware_updated_reload": "Firmware updated. The page will reload when the device comes back online.",
+    "logs_downloaded": "Logs downloaded successfully",
+    "mining_paused": "Mining is paused",
+    "mining_reward_share": "Your share of the mining reward is only {percentage}%",
+    "no_mining_reward": "You don't have a share in the mining reward",
+    "restart_command_sent": "Restart command sent.",
+    "swarm_peer_upgrade": "Potential swarm peer detected at {address} - upgrade its firmware to be able to add it."
   },
   "errors": {
     "save_failed": "Could not save. {error}",
@@ -134,7 +165,14 @@
     "device_action_failed": "Action failed: {action}",
     "device_action_failed_detail": "Action failed: {action}. {error}",
     "websocket_connection_failed": "Error opening websocket connection",
-    "identify_failed": "Could not identify device. {error}"
+    "identify_failed": "Could not identify device. {error}",
+    "dismiss_notification_failed": "Error dismissing notification: {error}",
+    "logs_download_failed": "Failed to download logs",
+    "mining_state_failed": "Failed to change mining state",
+    "pool_delete_active": "Cannot delete a pool that is currently selected as primary or fallback.",
+    "pool_delete_failed": "Saved settings, but failed to delete cleared pools: {error}",
+    "switch_partition_failed": "Failed to switch partition",
+    "web_ui_source_failed": "Failed to change Web UI source. {error}"
   },
   "settings": {
     "title": "Settings",
@@ -151,7 +189,9 @@
       "color_scheme": "Color Scheme",
       "dark": "Dark",
       "light": "Light",
-      "theme_colors": "Theme Colors"
+      "white": "White",
+      "theme_colors": "Theme Colors",
+      "custom_color": "Custom Color"
     },
     "ui": {
       "title": "UI",
@@ -176,7 +216,14 @@
       "certificate_placeholder": "Enter or choose a certificate file (.pem, .crt, .cer)",
       "tls_none": "No TLS",
       "tls_system": "TLS (System certificate)",
-      "tls_custom": "TLS (Custom CA certificate)"
+      "tls_custom": "TLS (Custom CA certificate)",
+      "active_selection": "Active Pool Selection",
+      "primary_pool": "Primary Pool",
+      "fallback_pool": "Fallback Pool",
+      "configurations": "Pool Configurations",
+      "not_configured": "(not configured)",
+      "sv2_extended": "Extended Channels",
+      "sv2_standard": "Standard Channels"
     },
     "device": {
       "custom_settings_warning": "Custom settings can cause damage and system instability. Only change these settings if you understand the risks of running outside designed parameters.",
@@ -238,6 +285,7 @@
     "voltage_regulator_temperature": "Voltage Regulator Temperature",
     "fan": "Fan",
     "fan_speed": "Fan Speed",
+    "fan_speeds": "Fan Speeds",
     "fan_rpm": "Fan RPM",
     "fan_1_rpm": "Fan 1 RPM",
     "fan_2_rpm": "Fan 2 RPM",
@@ -249,14 +297,17 @@
     "difficulty": "Difficulty",
     "pool_diff": "Pool diff",
     "block_header": "Block Header",
+    "work_received": "Work Received",
     "block_height": "Height",
     "scriptsig": "Scriptsig",
+    "outputs": "Outputs",
     "hashrate_registers": "Hashrate Registers",
     "asic": "ASIC",
     "domain": "Domain",
     "domains": "Domains",
     "asic_error_count": "Error count: {count}",
     "asic_error_count_with_index": "ASIC {index} - Error count: {count}",
+    "hash_error_help": "Hash error percentage as reported by the ASIC. A small amount of errors is normal; aggressive overclocking, undervolting, or a poor power supply can increase it.",
     "rejection_reasons": {
       "invalid_nonce2_length": "Invalid nonce2 length",
       "worker_mismatch": "Worker mismatch",
@@ -281,7 +332,19 @@
       "mining_submit_validation_error": "Mining Submit validation error",
       "job_not_found": "Job not found",
       "duplicate_share": "Duplicate share",
-      "difficulty_too_low": "Difficulty too low"
+      "difficulty_too_low": "Difficulty too low",
+      "invalid_subscription_message": "Invalid subscription message",
+      "invalid_configuration_message": "Invalid configuration message",
+      "invalid_authorization_message": "Invalid authorization message",
+      "invalid_bitcoin_address": "Invalid Bitcoin address",
+      "invalid_suggest_difficulty_message": "Invalid suggest difficulty message",
+      "suggest_difficulty_disabled": "Suggest difficulty disabled",
+      "invalid_mining_submit_message": "Invalid mining submit message",
+      "unauthorized_worker": "Unauthorized worker",
+      "not_subscribed": "Not subscribed",
+      "invalid_channel_id": "Invalid channel ID",
+      "invalid_job_id_sv2": "Invalid job ID",
+      "difficulty_too_low_sv2": "Difficulty too low"
     },
     "rejection_explanations": {
       "invalid_nonce2_length": "The nonce2 value does not match the expected length for this mining job.",
@@ -307,7 +370,19 @@
       "mining_submit_validation_error": "The submitted mining work was invalid or improperly formatted.",
       "job_not_found": "While this share was being submitted, the network had already found a new block, making this share invalid.",
       "duplicate_share": "This share has already been submitted.",
-      "difficulty_too_low": "The submitted share does not meet the minimum required difficulty."
+      "difficulty_too_low": "The submitted share does not meet the minimum required difficulty.",
+      "invalid_subscription_message": "The miner's mining.subscribe request was malformed.",
+      "invalid_configuration_message": "The miner's mining.configure request was malformed.",
+      "invalid_authorization_message": "The miner's mining.authorize request was malformed.",
+      "invalid_bitcoin_address": "The submitted username is not a valid Bitcoin address.",
+      "invalid_suggest_difficulty_message": "The mining.suggest_difficulty request was malformed.",
+      "suggest_difficulty_disabled": "This pool port does not allow miners to suggest a difficulty.",
+      "invalid_mining_submit_message": "The mining.submit request was malformed.",
+      "unauthorized_worker": "This worker has not been authorized - submit mining.authorize first.",
+      "not_subscribed": "This connection has not subscribed - submit mining.subscribe first.",
+      "invalid_channel_id": "The SV2 channel ID in the share submission is not known to the pool.",
+      "invalid_job_id_sv2": "The job ID in the share submission is not known to the pool.",
+      "difficulty_too_low_sv2": "The submitted share does not meet the required difficulty."
     }
   },
   "device": {
@@ -318,6 +393,9 @@
       "board_version": "Board Version",
       "asic_type": "ASIC Type",
       "uptime": "Uptime",
+      "total_uptime": "Total Uptime",
+      "total_log2_work": "Total Log2 Work",
+      "total_hashes": "Total Hashes",
       "reset_reason": "Reset Reason",
       "wifi_ssid": "Wi-Fi SSID",
       "wifi_status": "Wi-Fi Status",
@@ -331,9 +409,12 @@
       "wifi_ipv4": "Wi-Fi IPv4",
       "wifi_ipv6": "Wi-Fi IPv6",
       "mac_address": "MAC Address",
+      "cpu_usage": "CPU Usage",
       "free_heap": "Free Heap Memory",
       "free_heap_internal": "• Internal",
       "free_heap_spiram": "• Spiram",
+      "min_free_heap": "• Min Free (All Time)",
+      "max_alloc_heap": "• Max Alloc Block",
       "firmware_version": "Firmware Version",
       "axeos_version": "AxeOS Version",
       "idf_version": "ESP-IDF Version"
@@ -345,7 +426,15 @@
       "privacy_warning_title": "Privacy Warning",
       "release_notes": "Release Notes",
       "axeos": "Update AxeOS",
-      "firmware": "Update Firmware"
+      "firmware": "Update Firmware",
+      "custom_frontend": "Custom Frontend",
+      "enable_custom_ui": "Enable custom web UI",
+      "upload_custom_ui": "Upload Custom UI",
+      "installed_firmware": "Installed Firmware",
+      "partition": "Partition",
+      "build_time": "Build time",
+      "space": "Space",
+      "actions": "Actions"
     }
   },
   "units": {},
@@ -372,5 +461,9 @@
   "logs": {
     "realtime_title": "Realtime Logs",
     "case_sensitive_filter": "Case-sensitive filter"
+  },
+  "confirm": {
+    "restart_device": "Are you sure you want to restart the device?",
+    "switch_partition": "Set {label} as the next boot partition? The device will restart to apply this change."
   }
 }

@@ -4,7 +4,8 @@ import { I18nService } from './i18n.service';
 
 @Pipe({
   name: 't',
-  pure: false
+  pure: false,
+  standalone: true
 })
 export class TranslatePipe implements PipeTransform {
   constructor(private i18n: I18nService) {}

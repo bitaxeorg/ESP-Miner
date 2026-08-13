@@ -24,6 +24,80 @@ components:
       properties:
         message:
           type: string
+    UpdateSettingsResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: success
+        redirect:
+          type: object
+          properties:
+            url:
+              type: string
+            delay:
+              type: number
+            message:
+              type: string
+    Pool:
+      type: object
+      required:
+        - stratumURL
+        - stratumPort
+        - stratumUser
+      properties:
+        stratumProtocol:
+          type: string
+          enum: [SV1, SV2]
+          description: Stratum protocol
+        stratumURL:
+          type: string
+          description: Stratum server URL
+        stratumPort:
+          type: integer
+          description: Stratum server port
+          minimum: 1
+          maximum: 65535
+        stratumUser:
+          type: string
+          description: Stratum username
+        stratumPassword:
+          type: string
+          description: Stratum password
+          writeOnly: true
+        stratumSuggestedDifficulty:
+          type: number
+          description: Suggested difficulty
+        stratumExtranonceSubscribe:
+          type: boolean
+          description: Enable extranonce subscribe
+        stratumTLS:
+          type: integer
+          description: Enable stratum TLS (0=disabled, 1=enabled, 2=enabled with verification)
+          minimum: 0
+          maximum: 2
+        stratumCert:
+          type: string
+          description: Stratum TLS cert
+        stratumDecodeCoinbase:
+          type: boolean
+          description: Enable pool coinbase transaction decoding
+        stratumV2ChannelType:
+          type: string
+          enum: [standard, extended]
+          description: SV2 channel type
+        stratumV2AuthorityPubkey:
+          type: string
+          description: SV2 authority public key for certificate verification (base58-encoded)
+          pattern: "^[123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz]*$"
+        stratumV2RequireAuth:
+          type: boolean
+          description: Refuse to connect unless the SV2 server certificate is verified against the authority pubkey
+        id:
+          type: integer
+          description: Pool NVS slot index (0 to 7)
+          minimum: 0
+          maximum: 7
     SharesRejectedReason:
       type: object
       required:
@@ -109,6 +183,39 @@ components:
           description: Number of errors
           type: number
 
+    SystemPartition:
+      type: object
+      required:
+        - label
+        - isCurrent
+        - isFactory
+      properties:
+        label:
+          type: string
+          description: Partition label (e.g., ota_0, ota_1, factory)
+        version:
+          type: string
+          nullable: true
+          description: Firmware version on this partition
+        compileDate:
+          type: string
+          nullable: true
+          description: Compile date of the firmware on this partition
+        compileTime:
+          type: string
+          nullable: true
+          description: Compile time of the firmware on this partition
+        isCurrent:
+          type: boolean
+          description: Whether this is the currently running partition
+        isFactory:
+          type: boolean
+          description: Whether this is a factory partition
+        usagePercent:
+          type: integer
+          nullable: true
+          description: Partition space usage percentage (0-100)
+
     SystemInfo:
       type: object
       required:
@@ -129,15 +236,20 @@ components:
         - fallbackStratumUser
         - fallbackStratumTLS
         - fallbackStratumCert
+        - fallbackStratumDecodeCoinbase
         - fanrpm
         - fan2rpm
         - fanspeed
         - temptarget
         - rotation
+        - cpuUsage
         - freeHeap
         - freeHeapInternal
         - freeHeapSpiram
+        - minFreeHeap
+        - maxAllocHeap
         - frequency
+        - actualFrequency
         - hashRate
         - hashRate_1m
         - hashRate_10m
@@ -156,6 +268,9 @@ components:
         - nominalVoltage
         - overheat_mode
         - overclockEnabled
+        - primaryPoolIndex
+        - secondaryPoolIndex
+        - pools
         - poolConnectionInfo
         - poolDifficulty
         - power
@@ -171,11 +286,14 @@ components:
         - ipv6
         - stratumExtranonceSubscribe
         - stratumPort
+        - stratumProtocol
+        - stratumV2AuthorityPubkey
         - stratumSuggestedDifficulty
         - stratumURL
         - stratumUser
         - stratumTLS
         - stratumCert
+        - stratumDecodeCoinbase
         - temp
         - temp2
         - uptimeSeconds
@@ -190,8 +308,14 @@ components:
         - blockHeight
         - scriptsig
         - networkDifficulty
+        - blockSignals
         - blockFound
-        - hashrateMonitor
+        - coinbaseValueTotalSatoshis
+        - coinbaseValueUserSatoshis
+        - miningPaused
+        - statsLimit
+        - partitions
+        - useCustomWWW
       properties:
         ASICModel:
           type: string
@@ -244,6 +368,20 @@ components:
         fallbackStratumCert:
           type: string
           description: Fallback stratum TLS cert
+        fallbackStratumDecodeCoinbase:
+          type: boolean
+          description: Enable fallback pool coinbase transaction decoding
+        fallbackStratumProtocol:
+          type: string
+          enum: [SV1, SV2]
+          description: Configured fallback stratum protocol
+        fallbackStratumV2AuthorityPubkey:
+          type: string
+          description: Fallback SV2 authority public key for certificate verification (base58-encoded)
+        fallbackStratumV2ChannelType:
+          type: string
+          enum: [standard, extended]
+          description: Configured fallback SV2 channel type
         fanrpm:
           type: number
           description: Current fan speed in RPM
@@ -259,9 +397,15 @@ components:
         responseTime:
           type: number
           description: Pool response time in ms
+        responseShareBatch:
+          type: number
+          description: Number of shares acknowledged in the batch that produced responseTime (SV2; 1 = single share, >1 = batched ack)
         rotation:
           type: number
           description: Screen rotation setting (0, 90, 180, 270)
+        cpuUsage:
+          type: number
+          description: CPU usage percentage
         freeHeap:
           type: number
           description: Available heap memory in bytes
@@ -271,9 +415,18 @@ components:
         freeHeapSpiram:
           type: number
           description: Available Spiram heap memory in bytes
+        minFreeHeap:
+          type: number
+          description: All-time low watermark for free heap memory in bytes
+        maxAllocHeap:
+          type: number
+          description: Largest contiguous free block of internal heap memory in bytes
         frequency:
           type: number
           description: ASIC frequency in MHz
+        actualFrequency:
+          type: number
+          description: Real-time ASIC frequency in MHz
         hashRate:
           type: number
           description: Current hashrate in Gh/s
@@ -295,6 +448,12 @@ components:
         hostname:
           type: string
           description: Device hostname
+        fullHostname:
+          type: string
+          description: Full hostname including .local domain for mDNS
+        mdnsHostname:
+          type: string
+          description: mDNS/Bonjour hostname for network discovery
         idfVersion:
           type: string
           description: ESP-IDF version
@@ -328,6 +487,21 @@ components:
         overclockEnabled:
           type: integer
           description: Set custom voltage/frequency in AxeOS
+        useCustomWWW:
+          type: integer
+          description: Whether to serve files from the SPIFFS www partition instead of the embedded Web UI (0=embedded, 1=custom/SPIFFS)
+          enum: [0, 1]
+        primaryPoolIndex:
+          type: integer
+          description: Index of the primary pool
+        secondaryPoolIndex:
+          type: integer
+          description: Index of the secondary pool (fallback)
+        pools:
+          type: array
+          description: Configured stratum pools
+          items:
+            $ref: '#/components/schemas/Pool'
         poolConnectionInfo:
           type: string
           description: Current pool address family
@@ -340,6 +514,9 @@ components:
         power_fault:
           type: string
           description: Voltage regulator fault reason, if any
+        hardware_fault:
+          type: string
+          description: Hardware/Peripheral fault reason, if any
         resetReason:
           type: string
           description: Reason for the last system reset
@@ -352,6 +529,18 @@ components:
         sharesRejected:
           type: number
           description: Number of rejected shares
+        totalUptimeSeconds:
+          type: number
+          description: Total uptime in seconds
+        totalHashes:
+          type: number
+          description: Total hashes done by the device
+        totalLog2Work:
+          type: number
+          description: Log2 of total hashes
+        sharesPending:
+          type: number
+          description: Shares submitted but not yet resolved by the pool (SV2; 0 for SV1). Rises while the pool batches/buffers acks, drops to 0 once it catches up.
         sharesRejectedReasons:
           type: array
           description: Reason(s) shares were rejected
@@ -375,6 +564,17 @@ components:
         stratumPort:
           type: number
           description: Primary stratum server port
+        stratumProtocol:
+          type: string
+          enum: [SV1, SV2]
+          description: Configured stratum protocol
+        stratumV2AuthorityPubkey:
+          type: string
+          description: SV2 authority public key for certificate verification (base58-encoded)
+        stratumV2ChannelType:
+          type: string
+          enum: [standard, extended]
+          description: Configured SV2 channel type
         stratumSuggestedDifficulty:
           type: number
           description: Pool suggested difficulty
@@ -390,6 +590,9 @@ components:
         stratumCert:
           type: string
           description: Primary stratum TLS cert
+        stratumDecodeCoinbase:
+          type: boolean
+          description: Enable primary pool coinbase transaction decoding
         temp:
           type: number
           description: Average chip temperature
@@ -432,9 +635,39 @@ components:
         networkDifficulty:
           type: number
           description: Current network difficulty
+        blockSignals:
+          type: array
+          description: Active block signaling (e.g., BIP-110)
+          items:
+            type: string
         blockFound:
           type: number
-          description: Whether a block was found (0=no, 1=yes)
+          description: Number of blocks found
+        showNewBlock:
+          type: boolean
+          description: Whether to show the block found notification
+        coinbaseOutputs:
+          type: array
+          description: Coinbase transaction outputs
+          items:
+            type: object
+            title: coinbaseOutput
+            required:
+              - value
+              - address
+            properties:
+              value:
+                type: integer
+                description: Output value in satoshis
+              address:
+                type: string
+                description: Output address
+        coinbaseValueTotalSatoshis:
+          type: integer
+          description: Total value of coinbase transaction in satoshis
+        coinbaseValueUserSatoshis:
+          type: integer
+          description: User's portion of coinbase value in satoshis
         hashrateMonitor:
           type: object
           required:
@@ -445,6 +678,20 @@ components:
               description: Hashrate register value per ASIC
               items:
                 $ref: '#/components/schemas/HashrateMonitorAsic'
+        miningPaused:
+          type: boolean
+          description: Whether mining is currently paused
+        statsLimit:
+          type: integer
+          description: Maximum number of statistics data points
+        workReceived:
+          type: integer
+          description: Total number of mining jobs received from the pool
+        partitions:
+          type: array
+          description: List of available app partitions and their firmware versions
+          items:
+            $ref: '#/components/schemas/SystemPartition'
 
     SystemASIC:
       type: object
@@ -530,12 +777,58 @@ components:
             items:
               type: number
 
+    SystemScoreboardEntry:
+      type: object
+      required:
+        - difficulty
+        - job_id
+        - extranonce2
+        - ntime
+        - nonce
+        - version_bits
+      properties:
+        rank:
+          type: number
+          description: Rank of the share in the scoreboard
+        since:
+          type: number
+          description: Time since share found in seconds
+        difficulty:
+          type: number
+          description: Difficulty of the share
+        job_id:
+          type: string
+          description: Job ID of the share
+        extranonce2:
+          type: string
+          description: Extranonce2 of the share
+        ntime:
+          type: number
+          description: Ntime of the share
+        nonce:
+          type: string
+          description: Nonce of the share
+        version_bits:
+          type: string
+          description: Version bits of the share
+
     Settings:
       type: object
       properties:
         useFallbackStratum:
           type: number
           description: Forces the use the fallback stratum pool
+        primaryPoolIndex:
+          type: integer
+          description: Index of the primary pool
+        secondaryPoolIndex:
+          type: integer
+          description: Index of the secondary pool (fallback)
+        pools:
+          type: array
+          description: Configured stratum pools
+          items:
+            $ref: '#/components/schemas/Pool'
         stratumURL:
           type: string
           description: Primary stratum server URL
@@ -575,6 +868,26 @@ components:
           maximum: 65535
           examples:
             - 3333
+        stratumProtocol:
+          type: string
+          description: Stratum protocol
+          enum: [SV1, SV2]
+          examples:
+            - "SV1"
+        stratumV2ChannelType:
+          type: string
+          description: SV2 channel type
+          enum: [standard, extended]
+          examples:
+            - "standard"
+        stratumV2AuthorityPubkey:
+          type: string
+          description: Optional SV2 authority public key for certificate verification (base58-encoded)
+          pattern: "^[123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz]*$"
+          maxLength: 52
+          examples:
+            - ""
+            - "9auqWEzQDVyd2oe1JVGFLMLHZtCo2FFqZwtKA5gd9xbuEu7PH72"
         fallbackStratumPort:
           type: integer
           description: Port number for fallback stratum server
@@ -582,6 +895,25 @@ components:
           maximum: 65535
           examples:
             - 3333
+        fallbackStratumProtocol:
+          type: string
+          description: Fallback stratum protocol
+          enum: [SV1, SV2]
+          examples:
+            - "SV1"
+        fallbackStratumV2ChannelType:
+          type: string
+          description: Fallback SV2 channel type
+          enum: [standard, extended]
+          examples:
+            - "standard"
+        fallbackStratumV2AuthorityPubkey:
+          type: string
+          description: Optional fallback SV2 authority public key for certificate verification (base58-encoded)
+          pattern: "^[123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz]*$"
+          maxLength: 52
+          examples:
+            - ""
         ssid:
           type: string
           description: WiFi network SSID
@@ -631,6 +963,12 @@ components:
           type: integer
           description: Set custom voltage/frequency in AxeOS (0=disabled, 1=enabled)
           enum: [0,1]
+          examples:
+            - 0
+        useCustomWWW:
+          type: integer
+          description: Whether to serve files from the SPIFFS www partition instead of the embedded Web UI (0=embedded, 1=custom/SPIFFS)
+          enum: [0, 1]
           examples:
             - 0
         invertscreen:
@@ -695,6 +1033,7 @@ paths:
           content:
             application/json:
               schema:
+                title: SystemWifiScan
                 type: object
                 required:
                   - networks
@@ -722,6 +1061,26 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SystemInfo'
+        '401':
+          description: Unauthorized - Client not in allowed network range
+        '500':
+          description: Internal server error
+
+  /api/system/logs:
+    get:
+      summary: Download system logs
+      description: Returns the current system logs as a text file
+      operationId: downloadSystemLogs
+      tags:
+        - system
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            text/plain:
+              schema:
+                type: string
+                format: binary
         '401':
           description: Unauthorized - Client not in allowed network range
         '500':
@@ -777,6 +1136,94 @@ paths:
         '500':
           description: Internal server error
 
+  /api/system/scoreboard:
+    get:
+      summary: Get best difficulty share scoreboard
+      description: Returns top 20 best difficulty shares
+      operationId: getSystemScoreboard
+      tags:
+        - system
+      responses:
+        '200':      
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SystemScoreboardEntry'
+
+  /api/system/pause:
+    post:
+      summary: Pause mining
+      description: Pauses mining activity
+      operationId: pauseMining
+      tags:
+        - system
+      responses:
+        '200':
+          description: Mining paused
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericResponse'
+        '401':
+          description: Unauthorized - Client not in allowed network range
+        '500':
+          description: Internal server error
+
+  /api/system/resume:
+    post:
+      summary: Resume mining
+      description: Resumes mining activity
+      operationId: resumeMining
+      tags:
+        - system
+      responses:
+        '200':
+          description: Mining resumed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericResponse'
+        '401':
+          description: Unauthorized - Client not in allowed network range
+        '500':
+          description: Internal server error
+
+  /api/system/boot:
+    post:
+      summary: Set next boot partition
+      description: Sets the partition to be used for the next system boot
+      operationId: setBootPartition
+      tags:
+        - system
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - partition
+              properties:
+                partition:
+                  type: string
+                  description: Partition label to boot from (e.g., ota_0, ota_1, factory)
+      responses:
+        '200':
+          description: Boot partition set successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericResponse'
+        '400':
+          description: Invalid partition label
+        '401':
+          description: Unauthorized - Client not in allowed network range
+        '500':
+          description: Internal server error
+
   /api/system/restart:
     post:
       summary: Restart the system
@@ -815,6 +1262,34 @@ paths:
         '500':
           description: Internal server error
 
+  /api/system/blockFound/dismiss:
+    post:
+      summary: Dismiss block found notification
+      description: Dismisses the block found notification while preserving the count
+      operationId: dismissBlockFound
+      tags:
+        - system
+      responses:
+        '200':
+          description: Block found notification dismissed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  blockFound:
+                    type: number
+                    description: Number of blocks found
+                  showNewBlock:
+                    type: boolean
+                    description: Whether to show the block found notification
+                  message:
+                    type: string
+        '401':
+          description: Unauthorized - Client not in allowed network range
+        '500':
+          description: Internal server error
+
   /api/system:
     patch:
       summary: Update system settings
@@ -831,6 +1306,10 @@ paths:
       responses:
         '200':
           description: Settings updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpdateSettingsResponse'
         '400':
           description: Invalid settings provided
         '401':

@@ -2,6 +2,7 @@
   "nav": {
     "menu": "Menú",
     "dashboard": "Panel",
+    "scoreboard": "Marcador",
     "swarm": "Swarm",
     "logs": "Logs",
     "system": "Sistema",
@@ -43,7 +44,23 @@
     "remove": "Eliminar",
     "clear_logs": "Borrar logs",
     "minimize": "Minimizar",
-    "maximize": "Maximizar"
+    "maximize": "Maximizar",
+    "activate": "Activar",
+    "close": "Cerrar",
+    "delete_pool": "Eliminar pool",
+    "dismiss": "Descartar",
+    "download_logs": "Descargar logs",
+    "widgets": "Widgets",
+    "standard_width": "Ancho estándar",
+    "wide_view": "Vista amplia",
+    "reset_layout": "Restablecer diseño",
+    "save_layout": "Guardar diseño",
+    "edit_layout": "Editar diseño",
+    "resume_mining": "Reanudar minería",
+    "pause_mining": "Pausar minería",
+    "start_scrolling": "Iniciar desplazamiento",
+    "stop_scrolling": "Detener desplazamiento",
+    "restart_device": "Reiniciar dispositivo"
   },
   "common": {
     "app_name": "AxeOS",
@@ -71,7 +88,12 @@
     "password": "Contraseña",
     "dont_show_again": "No volver a mostrar",
     "scrolling": "Desplazamiento",
-    "logs": "Logs"
+    "logs": "Logs",
+    "address": "Dirección",
+    "chart": "Gráfico",
+    "misc": "Varios",
+    "mode": "Modo",
+    "sort": "Ordenar"
   },
   "messages": {
     "restart_required": "Debes reiniciar el dispositivo después de guardar.",
@@ -110,7 +132,16 @@
     "overheated_short": "Sobrecalentado",
     "power_fault_short": "Fallo de alimentación",
     "frequency_low_short": "Frecuencia baja",
-    "fallback_pool_short": "Pool de respaldo"
+    "fallback_pool_short": "Pool de respaldo",
+    "blocks_found": "¡Hoy es tu día de suerte! Tu dispositivo encontró {count} bloques 🎉",
+    "block_notification_dismissed": "Aviso de bloque encontrado descartado",
+    "firmware_updated_reload": "Firmware actualizado. La página se recargará cuando el dispositivo vuelva a estar disponible.",
+    "logs_downloaded": "Logs descargados correctamente",
+    "mining_paused": "La minería está pausada",
+    "mining_reward_share": "Tu parte de la recompensa de minería es solo del {percentage}%",
+    "no_mining_reward": "No tienes participación en la recompensa de minería",
+    "restart_command_sent": "Comando de reinicio enviado.",
+    "swarm_peer_upgrade": "Se detectó un posible peer del swarm en {address}; actualiza su firmware para poder añadirlo."
   },
   "errors": {
     "save_failed": "No se pudo guardar. {error}",
@@ -134,7 +165,14 @@
     "device_action_failed": "Acción fallida: {action}",
     "device_action_failed_detail": "Acción fallida: {action}. {error}",
     "websocket_connection_failed": "Error al abrir la conexión WebSocket",
-    "identify_failed": "No se pudo identificar el dispositivo. {error}"
+    "identify_failed": "No se pudo identificar el dispositivo. {error}",
+    "dismiss_notification_failed": "Error al descartar el aviso: {error}",
+    "logs_download_failed": "No se pudieron descargar los logs",
+    "mining_state_failed": "No se pudo cambiar el estado de minería",
+    "pool_delete_active": "No se puede eliminar un pool seleccionado como principal o de respaldo.",
+    "pool_delete_failed": "Los ajustes se guardaron, pero no se pudieron eliminar los pools vacíos: {error}",
+    "switch_partition_failed": "No se pudo cambiar la partición",
+    "web_ui_source_failed": "No se pudo cambiar el origen de la interfaz web. {error}"
   },
   "settings": {
     "title": "Ajustes",
@@ -151,7 +189,9 @@
       "color_scheme": "Esquema de color",
       "dark": "Oscuro",
       "light": "Claro",
-      "theme_colors": "Colores del tema"
+      "white": "Blanco",
+      "theme_colors": "Colores del tema",
+      "custom_color": "Color personalizado"
     },
     "ui": {
       "title": "UI",
@@ -176,7 +216,14 @@
       "certificate_placeholder": "Introduce o elige un certificado (.pem, .crt, .cer)",
       "tls_none": "Sin TLS",
       "tls_system": "TLS (certificado del sistema)",
-      "tls_custom": "TLS (CA personalizada)"
+      "tls_custom": "TLS (CA personalizada)",
+      "active_selection": "Selección de pool activo",
+      "primary_pool": "Pool principal",
+      "fallback_pool": "Pool de respaldo",
+      "configurations": "Configuraciones de pools",
+      "not_configured": "(sin configurar)",
+      "sv2_extended": "Canales extendidos",
+      "sv2_standard": "Canales estándar"
     },
     "device": {
       "custom_settings_warning": "Los ajustes personalizados pueden causar daños e inestabilidad. Modifícalos solo si entiendes los riesgos.",
@@ -238,6 +285,7 @@
     "voltage_regulator_temperature": "Temp. regulador",
     "fan": "Ventilador",
     "fan_speed": "Vel. ventilador",
+    "fan_speeds": "Velocidades de ventiladores",
     "fan_rpm": "RPM ventilador",
     "fan_1_rpm": "RPM ventilador 1",
     "fan_2_rpm": "RPM ventilador 2",
@@ -249,14 +297,17 @@
     "difficulty": "Dificultad",
     "pool_diff": "Diff pool",
     "block_header": "Cabecera de bloque",
+    "work_received": "Trabajo recibido",
     "block_height": "Altura",
     "scriptsig": "Scriptsig",
+    "outputs": "Salidas",
     "hashrate_registers": "Registros de hashrate",
     "asic": "ASIC",
     "domain": "Dominio",
     "domains": "Dominios",
     "asic_error_count": "Conteo de errores: {count}",
     "asic_error_count_with_index": "ASIC {index} - Conteo de errores: {count}",
+    "hash_error_help": "Porcentaje de errores de hash informado por el ASIC. Unos pocos errores son normales; el overclocking agresivo, el undervolting o una mala fuente pueden aumentarlo.",
     "rejection_reasons": {
       "invalid_nonce2_length": "Longitud de nonce2 inválida",
       "worker_mismatch": "Worker no coincide",
@@ -281,7 +332,19 @@
       "mining_submit_validation_error": "Envío de minería inválido",
       "job_not_found": "Trabajo no encontrado",
       "duplicate_share": "Share duplicado",
-      "difficulty_too_low": "Dificultad demasiado baja"
+      "difficulty_too_low": "Dificultad demasiado baja",
+      "invalid_subscription_message": "Mensaje de suscripción inválido",
+      "invalid_configuration_message": "Mensaje de configuración inválido",
+      "invalid_authorization_message": "Mensaje de autorización inválido",
+      "invalid_bitcoin_address": "Dirección Bitcoin inválida",
+      "invalid_suggest_difficulty_message": "Mensaje de dificultad sugerida inválido",
+      "suggest_difficulty_disabled": "Sugerencia de dificultad desactivada",
+      "invalid_mining_submit_message": "Mensaje de envío de minería inválido",
+      "unauthorized_worker": "Worker no autorizado",
+      "not_subscribed": "Sin suscripción",
+      "invalid_channel_id": "ID de canal inválido",
+      "invalid_job_id_sv2": "ID de trabajo inválido",
+      "difficulty_too_low_sv2": "Dificultad demasiado baja"
     },
     "rejection_explanations": {
       "invalid_nonce2_length": "El valor de nonce2 no coincide con la longitud esperada para este trabajo de minería.",
@@ -307,7 +370,19 @@
       "mining_submit_validation_error": "El trabajo de minería enviado era inválido o estaba mal formateado.",
       "job_not_found": "Mientras se enviaba este Share, la red ya había encontrado un nuevo bloque, por lo que el Share es inválido.",
       "duplicate_share": "Este Share ya se había enviado.",
-      "difficulty_too_low": "El Share enviado no cumple la dificultad mínima requerida."
+      "difficulty_too_low": "El Share enviado no cumple la dificultad mínima requerida.",
+      "invalid_subscription_message": "La solicitud mining.subscribe del minero estaba malformada.",
+      "invalid_configuration_message": "La solicitud mining.configure del minero estaba malformada.",
+      "invalid_authorization_message": "La solicitud mining.authorize del minero estaba malformada.",
+      "invalid_bitcoin_address": "El nombre de usuario enviado no es una dirección Bitcoin válida.",
+      "invalid_suggest_difficulty_message": "La solicitud mining.suggest_difficulty estaba malformada.",
+      "suggest_difficulty_disabled": "Este puerto del pool no permite sugerir una dificultad.",
+      "invalid_mining_submit_message": "La solicitud mining.submit estaba malformada.",
+      "unauthorized_worker": "Este worker no está autorizado; envía mining.authorize primero.",
+      "not_subscribed": "Esta conexión no está suscrita; envía mining.subscribe primero.",
+      "invalid_channel_id": "El pool no reconoce el ID de canal SV2 del share enviado.",
+      "invalid_job_id_sv2": "El pool no reconoce el ID de trabajo del share enviado.",
+      "difficulty_too_low_sv2": "El share enviado no cumple la dificultad requerida."
     }
   },
   "device": {
@@ -318,6 +393,9 @@
       "board_version": "Versión de placa",
       "asic_type": "Tipo de ASIC",
       "uptime": "Tiempo activo",
+      "total_uptime": "Tiempo activo total",
+      "total_log2_work": "Trabajo Log2 total",
+      "total_hashes": "Hashes totales",
       "reset_reason": "Motivo de reinicio",
       "wifi_ssid": "SSID de Wi-Fi",
       "wifi_status": "Estado de Wi-Fi",
@@ -331,9 +409,12 @@
       "wifi_ipv4": "Wi-Fi IPv4",
       "wifi_ipv6": "Wi-Fi IPv6",
       "mac_address": "Dirección MAC",
+      "cpu_usage": "Uso de CPU",
       "free_heap": "Memoria heap libre",
       "free_heap_internal": "• Interna",
       "free_heap_spiram": "• SPIRAM",
+      "min_free_heap": "• Mínimo libre histórico",
+      "max_alloc_heap": "• Bloque máximo asignable",
       "firmware_version": "Versión de firmware",
       "axeos_version": "Versión de AxeOS",
       "idf_version": "Versión de ESP-IDF"
@@ -345,7 +426,15 @@
       "privacy_warning_title": "Aviso de privacidad",
       "release_notes": "Notas de versión",
       "axeos": "Actualizar AxeOS",
-      "firmware": "Actualizar firmware"
+      "firmware": "Actualizar firmware",
+      "custom_frontend": "Frontend personalizado",
+      "enable_custom_ui": "Activar interfaz web personalizada",
+      "upload_custom_ui": "Subir interfaz personalizada",
+      "installed_firmware": "Firmware instalado",
+      "partition": "Partición",
+      "build_time": "Hora de compilación",
+      "space": "Espacio",
+      "actions": "Acciones"
     }
   },
   "units": {},
@@ -372,5 +461,9 @@
   "logs": {
     "realtime_title": "Logs en tiempo real",
     "case_sensitive_filter": "Filtro con distinción de mayúsculas"
+  },
+  "confirm": {
+    "restart_device": "¿Seguro que quieres reiniciar el dispositivo?",
+    "switch_partition": "¿Usar {label} como próxima partición de arranque? El dispositivo se reiniciará para aplicar el cambio."
   }
 }

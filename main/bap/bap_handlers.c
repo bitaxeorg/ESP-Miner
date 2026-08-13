@@ -7,11 +7,11 @@
 
 #include <string.h>
 #include <stdio.h>
-#include <ctype.h>
 #include <stdlib.h>
 #include "esp_log.h"
 #include "esp_timer.h"
 #include "nvs_config.h"
+#include "global_state.h"
 #include "bap_handlers.h"
 #include "bap_protocol.h"
 #include "bap_uart.h"
@@ -232,15 +232,16 @@ void BAP_send_request(bap_parameter_t param, GlobalState *state) {
             BAP_send_message(BAP_CMD_RES, "deviceModel", state->DEVICE_CONFIG.family.name);
             BAP_send_message(BAP_CMD_RES, "asicModel", state->DEVICE_CONFIG.family.asic.name);
             char port_str[6];
-            snprintf(port_str, sizeof(port_str),"%u", state->SYSTEM_MODULE.pool_port);
-            BAP_send_message(BAP_CMD_RES, "pool", state->SYSTEM_MODULE.pool_url);
+            uint16_t prim_idx = state->SYSTEM_MODULE.primary_pool_index;
+            snprintf(port_str, sizeof(port_str),"%u", state->SYSTEM_MODULE.pools[prim_idx].port);
+            BAP_send_message(BAP_CMD_RES, "pool", state->SYSTEM_MODULE.pools[prim_idx].url);
             BAP_send_message(BAP_CMD_RES, "poolPort", port_str);
-            BAP_send_message(BAP_CMD_RES, "poolUser", state->SYSTEM_MODULE.pool_user);
+            BAP_send_message(BAP_CMD_RES, "poolUser", state->SYSTEM_MODULE.pools[prim_idx].user);
             break;
         case BAP_PARAM_SHARES:
             {
                 char shares_ar_str[64];
-                snprintf(shares_ar_str, sizeof(shares_ar_str), "%llu/%llu", state->SYSTEM_MODULE.shares_accepted, state->SYSTEM_MODULE.shares_rejected);
+                snprintf(shares_ar_str, sizeof(shares_ar_str), "%" PRIu64 "/%" PRIu64, state->SYSTEM_MODULE.shares_accepted, state->SYSTEM_MODULE.shares_rejected);
                 BAP_send_message(BAP_CMD_RES, "shares", shares_ar_str);
             }
             break;
@@ -249,6 +250,20 @@ void BAP_send_request(bap_parameter_t param, GlobalState *state) {
                 char block_height_str[32];
                 snprintf(block_height_str, sizeof(block_height_str), "%d", state->block_height);
                 BAP_send_message(BAP_CMD_RES, "block_height", block_height_str);
+            }
+            break;
+        case BAP_PARAM_FOUND_BLOCK:
+            {
+                char block_found_str[16];
+                snprintf(block_found_str, sizeof(block_found_str), "%d", state->SYSTEM_MODULE.block_found);
+                BAP_send_message(BAP_CMD_RES, "block_found", block_found_str);
+            }
+            break;
+        case BAP_PARAM_SHOW_NEW_BLOCK:
+            {
+                char show_new_block_str[2];
+                snprintf(show_new_block_str, sizeof(show_new_block_str), "%d", state->SYSTEM_MODULE.show_new_block);
+                BAP_send_message(BAP_CMD_RES, "show_new_block", show_new_block_str);
             }
             break;
         default:
@@ -298,22 +313,18 @@ void BAP_handle_settings(const char *parameter, const char *value) {
                 
                 //ESP_LOGI(TAG, "Setting ASIC frequency to %.2f MHz", target_frequency);
                 
-                bool success = ASIC_set_frequency(bap_global_state, target_frequency);
-                
-                if (success) {
-                    //ESP_LOGI(TAG, "Frequency successfully set to %.2f MHz", target_frequency);
-                    
-                    bap_global_state->POWER_MANAGEMENT_MODULE.frequency_value = target_frequency;
-                    nvs_config_set_float(NVS_CONFIG_ASIC_FREQUENCY, target_frequency);
-                    
-                    char freq_str[32];
-                    snprintf(freq_str, sizeof(freq_str), "%.2f", target_frequency);
-                    BAP_send_message(BAP_CMD_ACK, parameter, freq_str);
-                } else {
-                    ESP_LOGE(TAG, "Failed to set frequency to %.2f MHz", target_frequency);
-                    BAP_send_message(BAP_CMD_ERR, parameter, "set_failed");
-                }
-            }
+                bap_global_state->POWER_MANAGEMENT_MODULE.frequency_value = target_frequency;
+
+                ASIC_set_frequency(bap_global_state);
+                ASIC_set_nonce_space(bap_global_state);
+
+                //ESP_LOGI(TAG, "Frequency successfully set to %.2f MHz", target_frequency);
+
+                nvs_config_set_float(NVS_CONFIG_ASIC_FREQUENCY, target_frequency);
+
+                char freq_str[32];
+                snprintf(freq_str, sizeof(freq_str), "%.2f", target_frequency);
+                BAP_send_message(BAP_CMD_ACK, parameter, freq_str);            }
             break;
 
         case BAP_PARAM_ASIC_VOLTAGE:
@@ -351,6 +362,18 @@ void BAP_handle_settings(const char *parameter, const char *value) {
                     //ESP_LOGI(TAG, "WiFi SSID set to: %s", value);
                     BAP_send_message(BAP_CMD_ACK, parameter, value);
                     if (current_ssid) free(current_ssid);
+                    // If a password is already configured, reboot now to apply the new SSID.
+                    // If no password exists yet, the password SET handler will trigger the reboot.
+                    char *existing_pass = nvs_config_get_string(NVS_CONFIG_WIFI_PASS);
+                    if (existing_pass && strlen(existing_pass) > 0) {
+                        free(existing_pass);
+                        vTaskDelay(pdMS_TO_TICKS(100));
+                        BAP_send_message(BAP_CMD_STA, "status", "restarting");
+                        vTaskDelay(pdMS_TO_TICKS(1000));
+                        esp_restart();
+                    } else {
+                        if (existing_pass) free(existing_pass);
+                    }
                 } else {
                     ESP_LOGE(TAG, "Failed to set WiFi SSID");
                     BAP_send_message(BAP_CMD_ERR, parameter, "set_failed");
@@ -411,6 +434,22 @@ void BAP_handle_settings(const char *parameter, const char *value) {
                 nvs_config_set_bool(NVS_CONFIG_AUTO_FAN_SPEED, auto_fan_speed);
                 BAP_send_message(BAP_CMD_ACK, parameter, "auto_fan_speed_set");
                 return;
+            }
+            break;
+
+        case BAP_PARAM_FOUND_BLOCK:
+            {
+                int block_found_val = atoi(value);
+                bap_global_state->SYSTEM_MODULE.block_found = block_found_val;
+                BAP_send_message(BAP_CMD_ACK, parameter, value);
+            }
+            break;
+
+        case BAP_PARAM_SHOW_NEW_BLOCK:
+            {
+                int show_new_block_val = atoi(value);
+                bap_global_state->SYSTEM_MODULE.show_new_block = (show_new_block_val != 0);
+                BAP_send_message(BAP_CMD_ACK, parameter, value);
             }
             break;
             

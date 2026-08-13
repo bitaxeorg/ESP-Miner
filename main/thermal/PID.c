@@ -14,8 +14,8 @@ static unsigned long millis() {
  * An increase in input causes a decrease in output.
  * Use this when the output should move in the opposite direction of the error.
  */
-void pid_init(PIDController *pid, double *input, double *output, double *setpoint,
-              double Kp, double Ki, double Kd, PIDProportionalMode POn, PIDDirection ControllerDirection) {
+void pid_init(PIDController *pid, float *input, float *output, float *setpoint,
+              float Kp, float Ki, float Kd, PIDProportionalMode POn, PIDDirection ControllerDirection) {
     pid->input = input;
     pid->output = output;
     pid->setpoint = setpoint;
@@ -52,9 +52,9 @@ bool pid_compute(PIDController *pid) {
     unsigned long timeChange = now - pid->lastTime;
 
     if (timeChange >= pid->sampleTime) {
-        double input = *(pid->input);
-        double error = *(pid->setpoint) - input;
-        double dInput = input - pid->lastInput;
+        float input = *(pid->input);
+        float error = *(pid->setpoint) - input;
+        float dInput = input - pid->lastInput;
         pid->outputSum += pid->ki * error;
 
         if (!pid->pOnE) pid->outputSum -= pid->kp * dInput;
@@ -62,7 +62,7 @@ bool pid_compute(PIDController *pid) {
         if (pid->outputSum > pid->outMax) pid->outputSum = pid->outMax;
         else if (pid->outputSum < pid->outMin) pid->outputSum = pid->outMin;
 
-        double output = pid->pOnE ? pid->kp * error : 0;
+        float output = pid->pOnE ? pid->kp * error : 0;
         output += pid->outputSum - pid->kd * dInput;
 
         if (output > pid->outMax) {
@@ -81,7 +81,7 @@ bool pid_compute(PIDController *pid) {
     return false;
 }
 
-void pid_set_tunings_adv(PIDController *pid, double Kp, double Ki, double Kd, PIDProportionalMode POn) {
+void pid_set_tunings_adv(PIDController *pid, float Kp, float Ki, float Kd, PIDProportionalMode POn) {
     if (Kp < 0 || Ki < 0 || Kd < 0) return;
 
     pid->pOn = POn;
@@ -91,7 +91,7 @@ void pid_set_tunings_adv(PIDController *pid, double Kp, double Ki, double Kd, PI
     pid->dispKi = Ki;
     pid->dispKd = Kd;
 
-    double sampleTimeInSec = ((double)pid->sampleTime) / 1000.0;
+    float sampleTimeInSec = ((float)pid->sampleTime) / 1000.0;
     pid->kp = Kp;
     pid->ki = Ki * sampleTimeInSec;
     pid->kd = Kd / sampleTimeInSec;
@@ -103,20 +103,20 @@ void pid_set_tunings_adv(PIDController *pid, double Kp, double Ki, double Kd, PI
     }
 }
 
-void pid_set_tunings(PIDController *pid, double Kp, double Ki, double Kd) {
+void pid_set_tunings(PIDController *pid, float Kp, float Ki, float Kd) {
     pid_set_tunings_adv(pid, Kp, Ki, Kd, pid->pOn);
 }
 
 void pid_set_sample_time(PIDController *pid, int newSampleTime) {
     if (newSampleTime > 0) {
-        double ratio = (double)newSampleTime / (double)pid->sampleTime;
+        float ratio = (float)newSampleTime / (float)pid->sampleTime;
         pid->ki *= ratio;
         pid->kd /= ratio;
         pid->sampleTime = newSampleTime;
     }
 }
 
-void pid_set_output_limits(PIDController *pid, double min, double max) {
+void pid_set_output_limits(PIDController *pid, float min, float max) {
     if (min >= max) return;
     pid->outMin = min;
     pid->outMax = max;
@@ -146,10 +146,10 @@ void pid_initialize(PIDController *pid) {
     else if (pid->outputSum < pid->outMin) pid->outputSum = pid->outMin;
 }
 
-double pid_get_kp(PIDController *pid) { return pid->dispKp; }
-double pid_get_ki(PIDController *pid) { return pid->dispKi; }
-double pid_get_kd(PIDController *pid) { return pid->dispKd; }
-double pid_get_ti(PIDController *pid) { return pid->dispKp / pid->dispKi; }
-double pid_get_td(PIDController *pid) { return pid->dispKd / pid->dispKp; }
+float pid_get_kp(PIDController *pid) { return pid->dispKp; }
+float pid_get_ki(PIDController *pid) { return pid->dispKi; }
+float pid_get_kd(PIDController *pid) { return pid->dispKd; }
+float pid_get_ti(PIDController *pid) { return pid->dispKp / pid->dispKi; }
+float pid_get_td(PIDController *pid) { return pid->dispKd / pid->dispKp; }
 int pid_get_mode(PIDController *pid) { return pid->inAuto ? AUTOMATIC : MANUAL; }
 PIDDirection pid_get_direction(PIDController *pid) { return pid->controllerDirection; }

@@ -1,0 +1,78 @@
+:root, .theme-dark {
+    /* Theme color variables for Dark Theme (Default) */
+    --color-bg-content: #070D17;
+    --color-bg-card: #0B1219;
+    --color-border-content: #454d59;
+    --card-border: #1A2632;
+    --surface-border: #192730;
+    --color-text-main: rgba(255, 255, 255, 0.87);
+    --color-text-secondary: rgba(255, 255, 255, 0.6);
+    --color-mask-bg: rgba(0, 0, 0, 0.4);
+    --color-overlay-select-bg: #0B1219;
+    --color-overlay-select-border: #1A2632;
+
+    /* Theme Settings & Sizing Defaults */
+    --color-bg-hover: rgba(255, 255, 255, 0.05);
+    --border-radius: 2px;
+    --font-family: 'Nippo-Regular';
+
+    /* Layout & Sizing */
+    font-size: 14px;
+    --topbar-height: 5.5rem;
+    --sidebar-width: 12rem;
+    --transition-duration: 0.2s;
+    --card-shadow: 0 2px 1px -1px rgba(0, 0, 0, 0.2), 0 1px 1px 0 rgba(0, 0, 0, 0.14), 0 1px 3px 0 rgba(0, 0, 0, 0.12);
+
+    /* Branding Source Variables (Reactive via JS) */
+    --color-primary: #F80421;
+    --color-primary-text: #ffffff;
+    --color-primary-hover: oklch(from var(--color-primary) calc(l - 0.08) c h);
+
+    /* Dynamic Theme variables calculated from --color-primary */
+    --focus-ring: 0 0 0 0.2rem oklch(from var(--color-primary) l c h / 0.2);
+    --slider-bg: #dee2e6;
+
+    /* Custom Message severity styles */
+    --color-message-warn-bg: #ffecb3;
+    --color-message-warn-text: #614a00;
+    --color-message-warn-border: #ffe082;
+    --color-message-error-bg: #ffcdd2;
+    --color-message-error-text: #73000c;
+    --color-message-error-border: #ef9a9a;
+    --color-message-info-bg: #b3e5fc;
+    --color-message-info-text: #01579b;
+    --color-message-info-border: #81d4fa;
+    --color-message-success-bg: #c8e6c9;
+    --color-message-success-text: #256029;
+    --color-message-success-border: #a5d6a7;
+}
+
+.theme-light {
+    /* Theme color variables for Light Theme */
+    --color-bg-content: #243447;
+    --color-bg-card: #1a2632;
+    --color-border-content: #454d59;
+    --card-border: #2f4562;
+    --surface-border: #2f4562;
+    --color-text-main: rgba(255, 255, 255, 0.9);
+    --color-text-secondary: rgba(255, 255, 255, 0.7);
+    --color-mask-bg: rgba(0, 0, 0, 0.2);
+    --color-overlay-select-bg: #1a2632;
+    --color-overlay-select-border: #2f4562;
+    --color-bg-hover: rgba(255, 255, 255, 0.05);
+}
+
+.theme-white {
+    /* Theme color variables for White Theme */
+    --color-bg-content: #f8fafc;
+    --color-bg-card: #f1f5f9;
+    --color-border-content: #e2e8f0;
+    --card-border: #e2e8f0;
+    --surface-border: #cbd5e1;
+    --color-text-main: #0f172a;
+    --color-text-secondary: #64748b;
+    --color-mask-bg: rgba(0, 0, 0, 0.2);
+    --color-overlay-select-bg: #f1f5f9;
+    --color-overlay-select-border: #e2e8f0;
+    --color-bg-hover: rgba(0, 0, 0, 0.04);
+}

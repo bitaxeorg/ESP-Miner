@@ -45,7 +45,7 @@ static esp_err_t set_fan_range(uint8_t reg_addr, fan_config_range_t range, uint8
  *
  * @return esp_err_t ESP_OK on success, or an error code on failure.
  */
-esp_err_t EMC2302_init()
+esp_err_t EMC2302_init(void)
 {
     ESP_RETURN_ON_ERROR(i2c_bitaxe_add_device(EMC2302_I2CADDR_DEFAULT, &EMC2302_dev_handle, TAG), TAG, "Failed to add device");
 

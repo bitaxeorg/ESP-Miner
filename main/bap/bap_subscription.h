@@ -11,8 +11,8 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "esp_err.h"
-#include "global_state.h"
-#include "bap_protocol.h"
+
+typedef struct GlobalState GlobalState;
 
 #ifdef __cplusplus
 extern "C" {
