@@ -5,39 +5,31 @@
 #include "cJSON.h"
 #include "http_server.h"
 
-static int theme_prebuffer_len = 256;
+static const char *TAG = "theme_api";
 
-// Helper function to set CORS headers
-static esp_err_t set_cors_headers(httpd_req_t *req)
-{
-    httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
-    httpd_resp_set_hdr(req, "Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-    httpd_resp_set_hdr(req, "Access-Control-Allow-Headers", "Content-Type");
-    return ESP_OK;
-}
+static int theme_prebuffer_len = 256;
 
 // GET /api/theme handler
 static esp_err_t theme_get_handler(httpd_req_t *req)
 {
+    if (is_network_allowed(req) != ESP_OK) {
+        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+    }
+
     httpd_resp_set_type(req, "application/json");
     set_cors_headers(req);
 
     char *scheme = nvs_config_get_string(NVS_CONFIG_THEME_SCHEME);
-    char *colors = nvs_config_get_string(NVS_CONFIG_THEME_COLORS);
+    char *primary_color = nvs_config_get_string(NVS_CONFIG_THEME_COLOR);
 
     cJSON *root = cJSON_CreateObject();
-    cJSON_AddStringToObject(root, "colorScheme", scheme);
-    
-    // Parse stored colors JSON string
-    cJSON *colors_json = cJSON_Parse(colors);
-    if (colors_json) {
-        cJSON_AddItemToObject(root, "accentColors", colors_json);
-    }
+    cJSON_AddStringToObject(root, "colorScheme", scheme ? scheme : "");
+    cJSON_AddStringToObject(root, "primaryColor", primary_color ? primary_color : "");
 
     esp_err_t res = HTTP_send_json(req, root, &theme_prebuffer_len);
 
     free(scheme);
-    free(colors);
+    free(primary_color);
 
     cJSON_Delete(root);
 
@@ -47,6 +39,10 @@ static esp_err_t theme_get_handler(httpd_req_t *req)
 // POST /api/theme handler
 static esp_err_t theme_post_handler(httpd_req_t *req)
 {
+    if (is_network_allowed(req) != ESP_OK) {
+        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+    }
+
     set_cors_headers(req);
 
     // Read POST data
@@ -67,12 +63,18 @@ static esp_err_t theme_post_handler(httpd_req_t *req)
     // Update theme settings
     cJSON *item;
     if ((item = cJSON_GetObjectItem(root, "colorScheme")) != NULL) {
-        nvs_config_set_string(NVS_CONFIG_THEME_SCHEME, item->valuestring);
+        if (!cJSON_IsString(item) || item->valuestring == NULL) {
+            ESP_LOGW(TAG, "colorScheme: expected string, ignoring");
+        } else {
+            nvs_config_set_string(NVS_CONFIG_THEME_SCHEME, item->valuestring);
+        }
     }
-    if ((item = cJSON_GetObjectItem(root, "accentColors")) != NULL) {
-        char *colors_str = cJSON_Print(item);
-        nvs_config_set_string(NVS_CONFIG_THEME_COLORS, colors_str);
-        free(colors_str);
+    if ((item = cJSON_GetObjectItem(root, "primaryColor")) != NULL) {
+        if (!cJSON_IsString(item) || item->valuestring == NULL) {
+            ESP_LOGW(TAG, "primaryColor: expected string, ignoring");
+        } else {
+            nvs_config_set_string(NVS_CONFIG_THEME_COLOR, item->valuestring);
+        }
     }
 
     cJSON_Delete(root);

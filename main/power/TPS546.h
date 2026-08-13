@@ -5,7 +5,7 @@
 #include <esp_err.h>
 #include <stdbool.h>
 
-#include "global_state.h"
+typedef struct GlobalState GlobalState;
 
 #define TPS546_I2CADDR         0x24  // TPS546 i2c address
 #define TPS546_I2CADDR_ALERT   0x0C  // TPS546 SMBus Alert address
@@ -24,7 +24,8 @@
 #define TPS546_INIT_PHASE_SINGLE 0x00  /* Single-phase (Single TPS) */
 #define TPS546_INIT_PHASE_MULTI   0xFF  /* Multi-phase stack (Multi TPS) */
 
-#define TPS546_INIT_FREQUENCY 650  /* KHz */
+#define TPS546_DEFAULT_FREQUENCY 650  /* KHz */
+
 
 
 typedef struct {
@@ -58,6 +59,7 @@ typedef struct
   uint16_t TPS546_INIT_STACK_CONFIG; /* Stack configuration */
   uint8_t TPS546_INIT_SYNC_CONFIG; /* Sync configuration */
   uint8_t TPS546_INIT_COMPENSATION_CONFIG[5];
+  uint16_t TPS546_INIT_FREQUENCY; /* Switch frequency in KHz */
   
 } TPS546_CONFIG;
 

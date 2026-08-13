@@ -1,14 +1,15 @@
 import { Component, Input, HostListener } from '@angular/core';
 
 @Component({
-  selector: 'tooltip-icon',
-  templateUrl: './tooltip-icon.component.html',
-  styleUrls: ['./tooltip-icon.component.scss'],
+    selector: 'tooltip-icon',
+    templateUrl: './tooltip-icon.component.html',
+    styleUrls: ['./tooltip-icon.component.scss'],
+    standalone: false
 })
 export class TooltipIconComponent {
   @Input() tooltip: string = '';
   @Input() size: string = 'xs';
-  @Input() icon: string = '';
+  @Input() icon: string = 'pi-question-circle';
 
   showMobileTooltip = false;
   isMobile = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);

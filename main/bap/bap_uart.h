@@ -13,8 +13,9 @@
 #include "freertos/task.h"
 #include "freertos/queue.h"
 #include "freertos/semphr.h"
-#include "global_state.h"
 #include "bap_protocol.h"
+
+typedef struct GlobalState GlobalState;
 
 #ifdef __cplusplus
 extern "C" {

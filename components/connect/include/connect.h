@@ -4,8 +4,12 @@
 #include "lwip/sys.h"
 #include <arpa/inet.h>
 #include <lwip/netdb.h>
+#include <stdbool.h>
 
+#include "esp_err.h"
 #include "esp_wifi_types.h"
+
+typedef struct GlobalState GlobalState;
 
 // Structure to hold WiFi scan results
 typedef struct {
@@ -15,8 +19,11 @@ typedef struct {
 } wifi_ap_record_simple_t;
 
 void toggle_wifi_softap(void);
-void wifi_init(void * GLOBAL_STATE);
+void wifi_init(GlobalState * GLOBAL_STATE);
+esp_err_t wifi_apply_hostname(const char *hostname);
 esp_err_t wifi_scan(wifi_ap_record_simple_t *ap_records, uint16_t *ap_count);
 esp_err_t get_wifi_current_rssi(int8_t *rssi);
+bool wifi_is_connected(void);
+esp_err_t update_mdns_hostname(const char *new_hostname, GlobalState *GLOBAL_STATE);
 
 #endif /* CONNECT_H_ */

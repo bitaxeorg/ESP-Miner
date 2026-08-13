@@ -53,7 +53,7 @@
 
 #define _TEMP_LSB 0.125                   ///< single bit value for internal temperature readings
 
-esp_err_t EMC2302_init();
+esp_err_t EMC2302_init(void);
 esp_err_t EMC2302_set_fan_speed(float);
 uint16_t EMC2302_get_fan_speed(void);
 uint16_t EMC2302_get_fan2_speed(void);

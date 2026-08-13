@@ -7,11 +7,11 @@
 
 #include <string.h>
 #include <stdio.h>
-#include <ctype.h>
 #include <stdlib.h>
 #include "esp_log.h"
 #include "esp_timer.h"
 #include "nvs_config.h"
+#include "global_state.h"
 #include "bap_handlers.h"
 #include "bap_protocol.h"
 #include "bap_uart.h"
@@ -232,15 +232,16 @@ void BAP_send_request(bap_parameter_t param, GlobalState *state) {
             BAP_send_message(BAP_CMD_RES, "deviceModel", state->DEVICE_CONFIG.family.name);
             BAP_send_message(BAP_CMD_RES, "asicModel", state->DEVICE_CONFIG.family.asic.name);
             char port_str[6];
-            snprintf(port_str, sizeof(port_str),"%u", state->SYSTEM_MODULE.pool_port);
-            BAP_send_message(BAP_CMD_RES, "pool", state->SYSTEM_MODULE.pool_url);
+            uint16_t prim_idx = state->SYSTEM_MODULE.primary_pool_index;
+            snprintf(port_str, sizeof(port_str),"%u", state->SYSTEM_MODULE.pools[prim_idx].port);
+            BAP_send_message(BAP_CMD_RES, "pool", state->SYSTEM_MODULE.pools[prim_idx].url);
             BAP_send_message(BAP_CMD_RES, "poolPort", port_str);
-            BAP_send_message(BAP_CMD_RES, "poolUser", state->SYSTEM_MODULE.pool_user);
+            BAP_send_message(BAP_CMD_RES, "poolUser", state->SYSTEM_MODULE.pools[prim_idx].user);
             break;
         case BAP_PARAM_SHARES:
             {
                 char shares_ar_str[64];
-                snprintf(shares_ar_str, sizeof(shares_ar_str), "%llu/%llu", state->SYSTEM_MODULE.shares_accepted, state->SYSTEM_MODULE.shares_rejected);
+                snprintf(shares_ar_str, sizeof(shares_ar_str), "%" PRIu64 "/%" PRIu64, state->SYSTEM_MODULE.shares_accepted, state->SYSTEM_MODULE.shares_rejected);
                 BAP_send_message(BAP_CMD_RES, "shares", shares_ar_str);
             }
             break;
@@ -312,22 +313,18 @@ void BAP_handle_settings(const char *parameter, const char *value) {
                 
                 //ESP_LOGI(TAG, "Setting ASIC frequency to %.2f MHz", target_frequency);
                 
-                bool success = ASIC_set_frequency(bap_global_state, target_frequency);
-                
-                if (success) {
-                    //ESP_LOGI(TAG, "Frequency successfully set to %.2f MHz", target_frequency);
-                    
-                    bap_global_state->POWER_MANAGEMENT_MODULE.frequency_value = target_frequency;
-                    nvs_config_set_float(NVS_CONFIG_ASIC_FREQUENCY, target_frequency);
-                    
-                    char freq_str[32];
-                    snprintf(freq_str, sizeof(freq_str), "%.2f", target_frequency);
-                    BAP_send_message(BAP_CMD_ACK, parameter, freq_str);
-                } else {
-                    ESP_LOGE(TAG, "Failed to set frequency to %.2f MHz", target_frequency);
-                    BAP_send_message(BAP_CMD_ERR, parameter, "set_failed");
-                }
-            }
+                bap_global_state->POWER_MANAGEMENT_MODULE.frequency_value = target_frequency;
+
+                ASIC_set_frequency(bap_global_state);
+                ASIC_set_nonce_space(bap_global_state);
+
+                //ESP_LOGI(TAG, "Frequency successfully set to %.2f MHz", target_frequency);
+
+                nvs_config_set_float(NVS_CONFIG_ASIC_FREQUENCY, target_frequency);
+
+                char freq_str[32];
+                snprintf(freq_str, sizeof(freq_str), "%.2f", target_frequency);
+                BAP_send_message(BAP_CMD_ACK, parameter, freq_str);            }
             break;
 
         case BAP_PARAM_ASIC_VOLTAGE:

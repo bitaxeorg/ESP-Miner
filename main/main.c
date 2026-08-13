@@ -1,16 +1,20 @@
+#include <stdlib.h>
+
 #include "esp_event.h"
 #include "esp_log.h"
 #include "esp_psram.h"
+#include "esp_heap_caps.h"
+#include "cJSON.h"
 
 #include "asic_result_task.h"
 #include "create_jobs_task.h"
 #include "hashrate_monitor_task.h"
 #include "fan_controller_task.h"
 #include "statistics_task.h"
+#include "global_state.h"
 #include "system.h"
 #include "http_server.h"
-#include "serial.h"
-#include "stratum_task.h"
+#include "protocol_coordinator.h"
 #include "i2c_bitaxe.h"
 #include "adc.h"
 #include "nvs_config.h"
@@ -21,22 +25,64 @@
 #include "connect.h"
 #include "asic_reset.h"
 #include "asic_init.h"
+#include "task_monitor.h"
+#include "filesystem.h"
+#include "log_buffer.h"
+#include "setup_ble.h"
+#include "esp_ota_ops.h"
 
 static GlobalState GLOBAL_STATE;
 
 static const char * TAG = "bitaxe";
 
+static void heap_alloc_failed_hook(size_t requested_size, uint32_t caps, const char *function_name)
+{
+    if (caps & MALLOC_CAP_SPIRAM) {
+        ESP_EARLY_LOGE(TAG, "%s failed to allocate %zu bytes from PSRAM", function_name, requested_size);
+        abort();
+    }
+}
+
+static void *cjson_malloc_psram(size_t size)
+{
+    if (esp_psram_is_initialized()) {
+        return heap_caps_malloc(size, MALLOC_CAP_SPIRAM);
+    }
+    return malloc(size);
+}
+
+static void cjson_free_psram(void *ptr)
+{
+    free(ptr);
+}
+
 void app_main(void)
 {
-    ESP_LOGI(TAG, "Welcome to the bitaxe - FOSS || GTFO!");
+    ESP_ERROR_CHECK(heap_caps_register_failed_alloc_callback(heap_alloc_failed_hook));
 
-    if (!esp_psram_is_initialized()) {
-        ESP_LOGE(TAG, "No PSRAM available on ESP32 device!");
-        GLOBAL_STATE.psram_is_available = false;
-    } else {
+    cJSON_Hooks hooks = {
+        .malloc_fn = cjson_malloc_psram,
+        .free_fn = cjson_free_psram
+    };
+    cJSON_InitHooks(&hooks);
+    if (esp_psram_is_initialized()) {
         GLOBAL_STATE.psram_is_available = true;
+        log_buffer_init();
+    } else {
+        ESP_LOGE(TAG, "No PSRAM available on ESP32 device!");
     }
 
+    ESP_LOGI(TAG, "Welcome to the bitaxe - FOSS || GTFO!");
+
+    if (xTaskCreateWithCaps(cpu_monitor_task, "cpu_monitor", 4096, (void *)&GLOBAL_STATE, 1, NULL, MALLOC_CAP_SPIRAM) != pdPASS) {
+        ESP_LOGE(TAG, "Error creating cpu monitor task");
+    }
+#ifdef CONFIG_ENABLE_TASK_MONITOR
+    if (xTaskCreateWithCaps(task_monitor_task, "task_monitor", 8192, NULL, 1, NULL, MALLOC_CAP_SPIRAM) != pdPASS) {
+        ESP_LOGE(TAG, "Error creating task monitor task");
+    }
+#endif
+  
     // Init I2C
     ESP_ERROR_CHECK(i2c_bitaxe_init());
     ESP_LOGI(TAG, "I2C initialized successfully");
@@ -57,6 +103,19 @@ void app_main(void)
         return;
     }
 
+    // Check firmware version migration (resets useCustomWWW on update/downgrade)
+    SYSTEM_check_firmware_migration();
+
+    // Confirm app validity for OTA rollback
+    const esp_partition_t *running = esp_ota_get_running_partition();
+    esp_ota_img_states_t ota_state;
+    if (esp_ota_get_state_partition(running, &ota_state) == ESP_OK) {
+        if (ota_state == ESP_OTA_IMG_PENDING_VERIFY) {
+            ESP_LOGI(TAG, "First boot after OTA update, confirming app validity");
+            esp_ota_mark_app_valid_cancel_rollback();
+        }
+    }
+
     // Ensure SSID is initialized before any screen/self-test uses it.
     GLOBAL_STATE.SYSTEM_MODULE.ssid = nvs_config_get_string(NVS_CONFIG_WIFI_SSID);
     if (GLOBAL_STATE.SYSTEM_MODULE.ssid == NULL) {
@@ -73,28 +132,45 @@ void app_main(void)
         return;
     }
 
-    if (self_test(&GLOBAL_STATE))
+    if (self_test_init(&GLOBAL_STATE) != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to init self test");
         return;
+    }
 
     SYSTEM_init_system(&GLOBAL_STATE);
-
-    // init AP and connect to wifi
-    wifi_init(&GLOBAL_STATE);
-
-    SYSTEM_init_peripherals(&GLOBAL_STATE);
-
-    if (xTaskCreate(POWER_MANAGEMENT_task, "power management", 8192, (void *) &GLOBAL_STATE, 10, NULL) != pdPASS) {
-        ESP_LOGE(TAG, "Error creating power management task");
-    }
-    if (xTaskCreate(FAN_CONTROLLER_task, "fan_controller", 8192, (void *) &GLOBAL_STATE, 5, NULL) != pdPASS) {
-        ESP_LOGE(TAG, "Error creating fan controller task");
+    if (scoreboard_init(&GLOBAL_STATE.SYSTEM_MODULE.scoreboard) != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to init scoreboard");
     }
 
-    // start the API for AxeOS
-    start_rest_server((void *) &GLOBAL_STATE);
+    if (!GLOBAL_STATE.SELF_TEST_MODULE.is_active) {
+        wifi_init(&GLOBAL_STATE);
+    }
 
-    // After mounting SPIFFS
+    esp_err_t system_init_ret = SYSTEM_init_peripherals(&GLOBAL_STATE);
+    
+    if (system_init_ret == ESP_OK) {
+        if (xTaskCreate(POWER_MANAGEMENT_task, "power management", 8192, (void *) &GLOBAL_STATE, 10, NULL) != pdPASS) {
+            ESP_LOGE(TAG, "Error creating power management task");
+        }
+        if (!GLOBAL_STATE.SELF_TEST_MODULE.is_active) {
+            if (xTaskCreate(FAN_CONTROLLER_task, "fan_controller", 8192, (void *) &GLOBAL_STATE, 5, NULL) != pdPASS) {
+                ESP_LOGE(TAG, "Error creating fan controller task");
+            }
+        }
+    } else {
+        ESP_LOGE(TAG, "Critical peripheral initialization failure (%s). Entering degraded mode.", esp_err_to_name(GLOBAL_STATE.SELF_TEST_MODULE.system_init_ret));
+    }
+    
+    // Read version info (from SPIFFS if custom WWW is active)
     SYSTEM_init_versions(&GLOBAL_STATE);
+
+    if (!GLOBAL_STATE.SELF_TEST_MODULE.is_active) {
+        // start the API for AxeOS
+        start_rest_server(&GLOBAL_STATE);
+    }
+
+    // Pre-cache partition descriptions and space usage percentage
+    SYSTEM_init_partitions(&GLOBAL_STATE);
 
     // Initialize BAP interface
     esp_err_t bap_ret = BAP_init(&GLOBAL_STATE);
@@ -103,30 +179,59 @@ void app_main(void)
         // Continue anyway, as BAP is not critical for core functionality
     }
 
+    // While the device is still in setup mode (config AP up but no WiFi
+    // connection), expose the BLE provisioning service so the miner can be
+    // configured over Bluetooth. A short grace period avoids spinning up BLE on
+    // a normal boot that connects within a few seconds. setup_ble_start() is
+    // idempotent and only takes effect once the AP is actually enabled.
+    int setup_ble_grace_ms = 0;
     while (!GLOBAL_STATE.SYSTEM_MODULE.is_connected) {
+        if (GLOBAL_STATE.SYSTEM_MODULE.ap_enabled && setup_ble_grace_ms >= 5000) {
+            setup_ble_start(&GLOBAL_STATE);
+        }
+        setup_ble_grace_ms += 100;
         vTaskDelay(100 / portTICK_PERIOD_MS);
     }
 
+    // Connected to WiFi: tear down the setup BLE service to free the radio.
+    setup_ble_stop();
+
     queue_init(&GLOBAL_STATE.stratum_queue);
 
-    if (asic_initialize(&GLOBAL_STATE, ASIC_INIT_COLD_BOOT, 0) == 0) {
-        return;
+    if (system_init_ret == ESP_OK) {
+        if (asic_initialize(&GLOBAL_STATE, ASIC_INIT_COLD_BOOT, 0) == 0) {
+            if (!GLOBAL_STATE.SELF_TEST_MODULE.is_active) {
+                return;
+            }
+
+            self_test_show_message(&GLOBAL_STATE, GLOBAL_STATE.SYSTEM_MODULE.asic_status);
+            system_init_ret = ESP_FAIL;
+        } else {
+            if (xTaskCreate(create_jobs_task, "stratum miner", 8192, (void *) &GLOBAL_STATE, 20, NULL) != pdPASS) {
+                ESP_LOGE(TAG, "Error creating stratum miner task");
+            }
+            if (xTaskCreate(ASIC_result_task, "asic result", 8192, (void *) &GLOBAL_STATE, 15, NULL) != pdPASS) {
+                ESP_LOGE(TAG, "Error creating asic result task");
+            }
+
+            if (xTaskCreateWithCaps(hashrate_monitor_task, "hashrate monitor", 8192, (void *) &GLOBAL_STATE, 5, NULL, MALLOC_CAP_SPIRAM) != pdPASS) {
+                ESP_LOGE(TAG, "Error creating hashrate monitor task");
+            }
+            if (xTaskCreateWithCaps(statistics_task, "statistics", 8192, (void *) &GLOBAL_STATE, 3, NULL, MALLOC_CAP_SPIRAM) != pdPASS) {
+                ESP_LOGE(TAG, "Error creating statistics task");
+            }
+        }
     }
 
-    if (xTaskCreate(stratum_task, "stratum admin", 8192, (void *) &GLOBAL_STATE, 5, NULL) != pdPASS) {
-        ESP_LOGE(TAG, "Error creating stratum admin task");
+    protocol_coordinator_init(&GLOBAL_STATE);
+    if (xTaskCreateWithCaps(protocol_coordinator_task, "protocol coord", 3072, (void *) &GLOBAL_STATE, 5, NULL, MALLOC_CAP_SPIRAM) != pdPASS) {
+        ESP_LOGE(TAG, "Error creating protocol coordinator task");
     }
-    if (xTaskCreate(create_jobs_task, "stratum miner", 8192, (void *) &GLOBAL_STATE, 20, NULL) != pdPASS) {
-        ESP_LOGE(TAG, "Error creating stratum miner task");
-    }
-    if (xTaskCreate(ASIC_result_task, "asic result", 8192, (void *) &GLOBAL_STATE, 15, NULL) != pdPASS) {
-        ESP_LOGE(TAG, "Error creating asic result task");
-    }
-    if (xTaskCreateWithCaps(hashrate_monitor_task, "hashrate monitor", 8192, (void *) &GLOBAL_STATE, 5, NULL, MALLOC_CAP_SPIRAM) !=
-        pdPASS) {
-        ESP_LOGE(TAG, "Error creating hashrate monitor task");
-    }
-    if (xTaskCreateWithCaps(statistics_task, "statistics", 8192, (void *) &GLOBAL_STATE, 3, NULL, MALLOC_CAP_SPIRAM) != pdPASS) {
-        ESP_LOGE(TAG, "Error creating statistics task");
+
+    if (GLOBAL_STATE.SELF_TEST_MODULE.is_active) {
+        GLOBAL_STATE.SELF_TEST_MODULE.system_init_ret = system_init_ret;
+        if (xTaskCreateWithCaps(self_test_task, "self_test", 8192, (void *) &GLOBAL_STATE, 10, NULL, MALLOC_CAP_SPIRAM) != pdPASS) {
+            ESP_LOGE(TAG, "Error creating self test task");
+        }
     }
 }

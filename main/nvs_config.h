@@ -10,24 +10,9 @@ typedef enum {
     NVS_CONFIG_WIFI_PASS,
     NVS_CONFIG_HOSTNAME,
 
-    NVS_CONFIG_STRATUM_URL,
-    NVS_CONFIG_STRATUM_PORT,
-    NVS_CONFIG_STRATUM_USER,
-    NVS_CONFIG_STRATUM_PASS,
-    NVS_CONFIG_STRATUM_DIFFICULTY,
-    NVS_CONFIG_STRATUM_EXTRANONCE_SUBSCRIBE,
-    NVS_CONFIG_STRATUM_TLS,
-    NVS_CONFIG_STRATUM_CERT,
-    NVS_CONFIG_STRATUM_DECODE_COINBASE_TX,
-    NVS_CONFIG_FALLBACK_STRATUM_URL,
-    NVS_CONFIG_FALLBACK_STRATUM_PORT,
-    NVS_CONFIG_FALLBACK_STRATUM_USER,
-    NVS_CONFIG_FALLBACK_STRATUM_PASS,
-    NVS_CONFIG_FALLBACK_STRATUM_DIFFICULTY,
-    NVS_CONFIG_FALLBACK_STRATUM_EXTRANONCE_SUBSCRIBE,
-    NVS_CONFIG_FALLBACK_STRATUM_TLS,
-    NVS_CONFIG_FALLBACK_STRATUM_CERT,
-    NVS_CONFIG_FALLBACK_STRATUM_DECODE_COINBASE_TX,
+    NVS_CONFIG_POOL,
+    NVS_CONFIG_PRIMARY_POOL_INDEX,
+    NVS_CONFIG_SECONDARY_POOL_INDEX,
     NVS_CONFIG_USE_FALLBACK_STRATUM,
     
     NVS_CONFIG_ASIC_FREQUENCY,
@@ -45,6 +30,9 @@ typedef enum {
     NVS_CONFIG_MIN_FAN_SPEED,
     NVS_CONFIG_TEMP_TARGET,
     NVS_CONFIG_OVERHEAT_MODE,
+
+    NVS_CONFIG_USE_CUSTOM_WWW,    
+    NVS_CONFIG_LAST_FW_FINGERPRINT,
     
     NVS_CONFIG_STATISTICS_FREQUENCY,
     
@@ -52,7 +40,8 @@ typedef enum {
     NVS_CONFIG_SELF_TEST,
     NVS_CONFIG_SWARM,
     NVS_CONFIG_THEME_SCHEME,
-    NVS_CONFIG_THEME_COLORS,
+    NVS_CONFIG_THEME_COLOR,
+    NVS_CONFIG_SCOREBOARD,
     
     NVS_CONFIG_BOARD_VERSION,
     NVS_CONFIG_DEVICE_MODEL,
@@ -72,6 +61,29 @@ typedef enum {
     NVS_CONFIG_TPS546,
     NVS_CONFIG_TMP1075,
     NVS_CONFIG_POWER_CONSUMPTION_TARGET,
+    NVS_CONFIG_TOTAL_UPTIME,
+    NVS_CONFIG_CUMULATIVE_HASHES_HIGH,
+    NVS_CONFIG_CUMULATIVE_HASHES_LOW,
+
+    NVS_CONFIG_SELF_TEST_TEMP_TARGET,
+    NVS_CONFIG_SELF_TEST_TEMP_WARMUP,
+    NVS_CONFIG_SELF_TEST_TEMP_MAX,
+    NVS_CONFIG_SELF_TEST_FAN_SPEED,
+    NVS_CONFIG_TPS546_PHASE,
+    NVS_CONFIG_TPS546_VIN_ON,
+    NVS_CONFIG_TPS546_VIN_OFF,
+    NVS_CONFIG_TPS546_VIN_UV_WARN,
+    NVS_CONFIG_TPS546_VIN_OV_FAULT,
+    NVS_CONFIG_TPS546_SCALE_LOOP,
+    NVS_CONFIG_TPS546_VOUT_MIN,
+    NVS_CONFIG_TPS546_VOUT_MAX,
+    NVS_CONFIG_TPS546_VOUT_COMMAND,
+    NVS_CONFIG_TPS546_IOUT_OC_WARN,
+    NVS_CONFIG_TPS546_IOUT_OC_FAULT,
+    NVS_CONFIG_TPS546_STACK_CONFIG,
+    NVS_CONFIG_TPS546_SYNC_CONFIG,
+    NVS_CONFIG_TPS546_FREQUENCY,
+    NVS_CONFIG_NOMINAL_VOLTAGE,
     NVS_CONFIG_COUNT
 } NvsConfigKey;
 
@@ -97,18 +109,19 @@ typedef struct {
     const char *nvs_key_name;
     ConfigType type;
     ConfigValue *value;
-    int array_size;
+    int array_size; // Numbered entries
     ConfigValue default_value;
     const char *rest_name;
     int min;
     int max;
+    bool is_set;
 } Settings;
 
 esp_err_t nvs_config_init(void);
 
-char * nvs_config_get_string(NvsConfigKey key);
-void nvs_config_set_string(NvsConfigKey key, const char * value);
+char *nvs_config_get_string(NvsConfigKey key);
 char *nvs_config_get_string_indexed(NvsConfigKey key, int index);
+void nvs_config_set_string(NvsConfigKey key, const char * value);
 void nvs_config_set_string_indexed(NvsConfigKey key, int index, const char *value);
 uint16_t nvs_config_get_u16(NvsConfigKey key);
 void nvs_config_set_u16(NvsConfigKey key, uint16_t value);
@@ -120,6 +133,7 @@ float nvs_config_get_float(NvsConfigKey key);
 void nvs_config_set_float(NvsConfigKey key, float value);
 bool nvs_config_get_bool(NvsConfigKey key);
 void nvs_config_set_bool(NvsConfigKey key, bool value);
+bool nvs_config_has_key(NvsConfigKey key);
 Settings *nvs_config_get_settings(NvsConfigKey key);
 
 #endif // MAIN_NVS_CONFIG_H

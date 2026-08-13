@@ -1,5 +1,7 @@
 name: Unit Test
 on: [push, pull_request]
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 permissions:
   contents: read
@@ -16,13 +18,13 @@ jobs:
       - name: esp-idf build
         uses: espressif/esp-idf-ci-action@v1
         with:
-          esp_idf_version: v5.5.3
+          esp_idf_version: v6.0.2
           target: esp32s3
           command: GITHUB_ACTIONS="true" idf.py build
           path: 'test-ci'
 
       - name: Run tests
-        uses: bitaxeorg/esp32-qemu-test-action@main
+        uses: bitaxeorg/esp32-qemu-test-action@v6
         with:
           path: 'test-ci'
 
@@ -47,3 +49,29 @@ jobs:
             echo "::error ::Detected $FAILURES test failures."
             exit 1
           fi
+
+  frontend-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v6
+        with:
+          submodules: 'recursive'
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24.14.0'
+
+      - name: Run frontend tests
+        working-directory: ./main/http_server/axe-os
+        run: |
+          npm ci
+          npm run test:ci
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-test-results
+          path: main/http_server/axe-os/report.xml

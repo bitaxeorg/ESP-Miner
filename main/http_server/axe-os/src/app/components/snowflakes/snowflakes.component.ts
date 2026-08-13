@@ -1,9 +1,10 @@
 import { AfterViewInit, Component, ElementRef, OnDestroy, OnInit, ViewChild } from '@angular/core';
 
 @Component({
-  selector: 'app-snowflakes',
-  templateUrl: './snowflakes.component.html',
-  styleUrls: ['./snowflakes.component.scss']
+    selector: 'app-snowflakes',
+    templateUrl: './snowflakes.component.html',
+    styleUrls: ['./snowflakes.component.scss'],
+    standalone: false
 })
 export class SnowflakesComponent implements OnInit, AfterViewInit, OnDestroy {
   @ViewChild('container', { static: true }) containerRef!: ElementRef<HTMLDivElement>;

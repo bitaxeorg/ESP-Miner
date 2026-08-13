@@ -1,13 +1,20 @@
 .card {
-    background: var(--surface-card);
-    border: 1px solid var(--surface-border);
+    background: var(--color-bg-card);
+    border: 1px solid var(--card-border);
     padding: 1.5rem;
     margin-bottom: 1rem;
     box-shadow: var(--card-shadow);
     border-radius: $borderRadius;
 
+    &.chart {
+        padding: 10px;
+    }
+
     @media (min-width: 768px) {
         padding: 2rem;
+        &.chart {
+            padding: 10px;
+        }
     }
 
     &:last-child {
@@ -19,24 +26,8 @@
     line-height: unset;
 }
 
-.p-toast {
-    &.p-toast-top-right,
-    &.p-toast-top-left,
-    &.p-toast-top-center {
-        top: 100px;
-    }
-}
-
-.p-tooltip-text {
+.app-tooltip-text {
     font-size: 0.9rem;
-}
-
-.field.grid > label {
-    @media (min-width: 768px) {
-        align-items: baseline;
-        flex-direction: column;
-        justify-content: center;
-    }
 }
 
 .sensitive-data-hidden {
@@ -47,14 +38,14 @@
         display: inline-block;
         white-space: nowrap;        
 
-        &.p-inputtext {
+        &.input-text {
             -webkit-text-security: disc;
-            color: var(--text-color); 
+            color: var(--color-text-main); 
         }
 
         &::before {
             content: '••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••';
-            color: var(--text-color); 
+            color: var(--color-text-main); 
             position: absolute;
             left: 0;
             width: 100%;
@@ -63,4 +54,14 @@
             overflow: hidden;
         }
     }
+}
+
+.line-break-anywhere {
+    line-break: anywhere;
+}
+
+.text-monospace {
+    line-break: anywhere;
+    font-family: monospace;
+    font-size: medium;
 }

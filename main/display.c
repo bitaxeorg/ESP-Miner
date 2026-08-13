@@ -85,10 +85,8 @@ static void my_log_cb(lv_log_level_t level, const char * buf)
     }
 }
 
-esp_err_t display_init(void * pvParameters)
+esp_err_t display_init(GlobalState * GLOBAL_STATE)
 {
-    GlobalState * GLOBAL_STATE = (GlobalState *) pvParameters;
-
     ESP_RETURN_ON_ERROR(read_display_config(GLOBAL_STATE), TAG, "Failed to read display config");
 
     lvgl_port_cfg_t lvgl_cfg = ESP_LVGL_PORT_INIT_CONFIG();
@@ -98,7 +96,10 @@ esp_err_t display_init(void * pvParameters)
     if (GLOBAL_STATE->DISPLAY_CONFIG.display == NONE) {
         ESP_LOGI(TAG, "Initialize LVGL");
         ESP_RETURN_ON_ERROR(lvgl_port_init(&lvgl_cfg), TAG, "LVGL init failed");
-        lv_display_create(1, 1);
+        if (lvgl_port_lock(0)) {
+            lv_display_create(1, 1);
+            lvgl_port_unlock();
+        }
         return ESP_OK;
     }
 
@@ -174,7 +175,10 @@ esp_err_t display_init(void * pvParameters)
 
     ESP_RETURN_ON_ERROR(lvgl_port_init(&lvgl_cfg), TAG, "LVGL init failed");
 
-    lv_log_register_print_cb(my_log_cb);
+    if (lvgl_port_lock(0)) {
+        lv_log_register_print_cb(my_log_cb);
+        lvgl_port_unlock();
+    }
 
     const lvgl_port_display_cfg_t disp_cfg = {
         .io_handle = io_handle,

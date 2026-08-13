@@ -56,23 +56,27 @@ esp_err_t input_init(void (*button_short_clicked_cb)(void), void (*button_long_p
     // Install ISR service and hook the interrupt handler
     ESP_RETURN_ON_ERROR(gpio_isr_handler_add(GPIO_BUTTON_BOOT, button_isr_handler, NULL), TAG, "Error adding ISR handler");
 
-    lv_group_t * group = lv_group_create();
-    lv_group_set_default(group);
-    lv_group_add_obj(group, lv_obj_create(NULL)); // dummy screen for event handling, in case no display is attached
+    if (lvgl_port_lock(0)) {
+        lv_group_t * group = lv_group_create();
+        lv_group_set_default(group);
+        lv_group_add_obj(group, lv_obj_create(NULL)); // dummy screen for event handling, in case no display is attached
 
-    // Create input device
-    lv_indev_t * indev = lv_indev_create();
-    lv_indev_set_type(indev, LV_INDEV_TYPE_KEYPAD);
-    lv_indev_set_long_press_time(indev, LONG_PRESS_DURATION_MS);
-    lv_indev_set_read_cb(indev, button_read);
-    lv_indev_set_group(indev, group);
-    if (button_short_clicked_cb != NULL) {
-        button_short_clicked_fn = button_short_clicked_cb;
-        lv_indev_add_event_cb(indev, button_short_clicked_event_cb, LV_EVENT_SHORT_CLICKED, NULL);
-    }
-    if (button_long_pressed_cb != NULL) {
-        button_long_pressed_fn = button_long_pressed_cb;
-        lv_indev_add_event_cb(indev, button_long_pressed_event_cb, LV_EVENT_LONG_PRESSED, NULL);
+        // Create input device
+        lv_indev_t * indev = lv_indev_create();
+        lv_indev_set_type(indev, LV_INDEV_TYPE_KEYPAD);
+        lv_indev_set_long_press_time(indev, LONG_PRESS_DURATION_MS);
+        lv_indev_set_read_cb(indev, button_read);
+        lv_indev_set_group(indev, group);
+        if (button_short_clicked_cb != NULL) {
+            button_short_clicked_fn = button_short_clicked_cb;
+            lv_indev_add_event_cb(indev, button_short_clicked_event_cb, LV_EVENT_SHORT_CLICKED, NULL);
+        }
+        if (button_long_pressed_cb != NULL) {
+            button_long_pressed_fn = button_long_pressed_cb;
+            lv_indev_add_event_cb(indev, button_long_pressed_event_cb, LV_EVENT_LONG_PRESSED, NULL);
+        }
+
+        lvgl_port_unlock();
     }
 
     return ESP_OK;
