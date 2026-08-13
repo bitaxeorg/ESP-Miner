@@ -57,6 +57,7 @@ static void parse_pool_config_json(const char *json_str, PoolConfig *cfg, int in
     cfg->decode_coinbase_tx = true;
     cfg->sv2_channel_type = SV2_CHANNEL_EXTENDED;
     cfg->sv2_authority_pubkey = strdup("");
+    cfg->sv2_require_auth = false;
 
     if (!json_str || strlen(json_str) == 0) {
         return;
@@ -134,6 +135,11 @@ static void parse_pool_config_json(const char *json_str, PoolConfig *cfg, int in
     if (item && cJSON_IsString(item)) {
         free(cfg->sv2_authority_pubkey);
         cfg->sv2_authority_pubkey = strdup(item->valuestring);
+    }
+
+    item = cJSON_GetObjectItem(root, "stratumV2RequireAuth");
+    if (item && (cJSON_IsBool(item) || cJSON_IsNumber(item))) {
+        cfg->sv2_require_auth = cJSON_IsTrue(item) || (cJSON_IsNumber(item) && item->valueint != 0);
     }
 
     cJSON_Delete(root);

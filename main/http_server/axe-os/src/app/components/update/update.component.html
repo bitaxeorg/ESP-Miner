@@ -1,204 +1,223 @@
 <div class="card">
-    <h2>Update</h2>
+  <h2>Update</h2>
 
-    <div class="flex flex-wrap -mx-2">
-        <div class="w-full xl:w-1/3 px-2 mb-4 xl:mb-0">
-            <div class="card h-full">
-                <h5>Current Version: {{(info$ | async)?.version}}</h5>
+  <div class="flex flex-wrap -mx-2">
+    <div class="w-full xl:w-1/3 px-2 mb-4 xl:mb-0">
+      <div class="card h-full">
+        <h5>Current Version: {{(info$ | async)?.version}}</h5>
 
-                <ng-container *ngIf="checkLatestRelease == false; else afterCheck">
-                    <h3>Latest Release: <button class="btn text-sm ml-2" (click)="handleReleaseCheck()">Check</button></h3>
-
-                    <app-modal #privacyModal [headline]="'Privacy Warning'">
-                        <p>
-                            Please note, this will connect to <strong>github.com</strong> to check for the latest release.
-                        </p>
-                        <p class="flex items-center gap-2">
-                            <app-checkbox
-                                [binary]="true"
-                                inputId="ignoreWarning"
-                                #ignoreWarning></app-checkbox>
-                            <label for="ignoreWarning" class="cursor-pointer">Don't show again</label>
-                        </p>
-                        <div class="flex gap-3 mt-5">
-                            <button class="btn" (click)="continueReleaseCheck(ignoreWarning.model)">Continue</button>
-                            <button class="btn btn-secondary" (click)="privacyModal.isVisible = false">Cancel</button>
-                        </div>
-                    </app-modal>
-                </ng-container>
-
-                <ng-template #afterCheck>
-                    <ng-container *ngIf="latestRelease$ | async as latestRelease">
-                        <h3>Latest Release:
-                            <a style="text-decoration: underline;" target="_blank"
-                            [href]="latestRelease.html_url">{{latestRelease.name}}</a>
-                        </h3>
-
-                        <div class="text-orange-500 mb-3">Download both files for update!</div>
-
-                        <div *ngFor="let asset of latestRelease.assets">
-                            <div *ngIf="asset.name == 'esp-miner.bin'">
-                                <a style="text-decoration: underline;" target="_blank"
-                                    [href]="asset.browser_download_url">esp-miner.bin</a>
-                            </div>
-                            <div *ngIf="asset.name == 'www.bin'">
-                                <a style="text-decoration: underline;" target="_blank"
-                                    [href]="asset.browser_download_url">www.bin</a>
-                            </div>
-                        </div>
-
-                        <a class="text-secondary underline block mt-3 cursor-pointer" (click)="releaseNotesModal.isVisible = true">
-                            Release Notes
-                        </a>
-
-                        <app-modal #releaseNotesModal [headline]="latestRelease.name">
-                            <div [innerHTML]="simpleMarkdownParser(latestRelease.body)"></div>
-                        </app-modal>
-                    </ng-container>
-                </ng-template>
+        @if (checkLatestRelease == false) {
+          <h3>Latest Release: <button class="btn text-sm ml-2" (click)="handleReleaseCheck()">Check</button></h3>
+          <app-modal #privacyModal [headline]="'Privacy Warning'">
+            <p>
+              Please note, this will connect to <strong>github.com</strong> to check for the latest release.
+            </p>
+            <p class="flex items-center gap-2">
+              <app-checkbox
+                [binary]="true"
+                inputId="ignoreWarning"
+                #ignoreWarning></app-checkbox>
+              <label for="ignoreWarning" class="cursor-pointer">Don't show again</label>
+            </p>
+            <div class="flex gap-3 mt-5">
+              <button class="btn" (click)="continueReleaseCheck(ignoreWarning.model)">Continue</button>
+              <button class="btn btn-secondary" (click)="privacyModal.isVisible = false">Cancel</button>
             </div>
-        </div>
-        <div class="w-full lg:w-1/2 xl:w-1/3 px-2 mb-4 lg:mb-0">
-            <div class="card h-full">
-                <h3>Update Firmware</h3>
-                <label class="btn w-full text-center relative flex justify-center items-center gap-2 cursor-pointer my-2">
-                    <i class="pi pi-upload"></i>
-                    <span>Browse</span>
-                    <input #firmwareUpload type="file" accept=".bin" (change)="onFileSelected($event, 'firmwareUpload')" class="hidden">
-                </label>
+          </app-modal>
+        } @else {
+          @if (latestRelease$ | async; as latestRelease) {
+            <h3>Latest Release:
+              <a style="text-decoration: underline;" target="_blank"
+              [href]="latestRelease.html_url">{{latestRelease.name}}</a>
+            </h3>
+            <div class="text-orange-500 mb-3">Download both files for update!</div>
+            @for (asset of latestRelease.assets; track asset) {
+              <div>
+                @if (asset.name == 'esp-miner.bin') {
+                  <div>
+                    <a style="text-decoration: underline;" target="_blank"
+                    [href]="asset.browser_download_url">esp-miner.bin</a>
+                  </div>
+                }
+                @if (asset.name == 'www.bin') {
+                  <div>
+                    <a style="text-decoration: underline;" target="_blank"
+                    [href]="asset.browser_download_url">www.bin</a>
+                  </div>
+                }
+              </div>
+            }
+            <a class="text-secondary underline block mt-3 cursor-pointer" (click)="releaseNotesModal.isVisible = true">
+              Release Notes
+            </a>
+            <app-modal #releaseNotesModal [headline]="latestRelease.name">
+              <div [innerHTML]="simpleMarkdownParser(latestRelease.body)"></div>
+            </app-modal>
+          }
+        }
 
-                <small>(esp-miner.bin)</small>
-            </div>
-        </div>
-        <div class="w-full lg:w-1/2 xl:w-1/3 px-2">
-            <div class="card h-full">
-                <h3>Custom Frontend</h3>
-
-                <div class="flex items-center gap-2 mb-2">
-                    <app-checkbox 
-                        inputId="customWWWToggle"
-                        [binary]="true"
-                        [ngModel]="(info$ | async)?.useCustomWWW === 1"
-                        (onChange)="toggleCustomWWW($event.checked)">
-                    </app-checkbox>
-                    <label for="customWWWToggle" class="font-medium cursor-pointer">Enable custom web UI</label>
-                </div>
-                <small class="text-orange-500 block mb-4">* A device restart is required to apply this change.</small>
-
-                <div *ngIf="(info$ | async)?.useCustomWWW === 1" class="rounded p-3 bg-white/5 border border-white/10">
-                    <h5 class="mt-0 mb-3 text-main">Upload Custom UI</h5>
-                    <label class="btn w-full text-center relative flex justify-center items-center gap-2 cursor-pointer my-2">
-                        <i class="pi pi-upload"></i>
-                        <span>Browse</span>
-                        <input #websiteUpload type="file" accept=".bin" (change)="onFileSelected($event, 'websiteUpload')" class="hidden">
-                    </label>
-                    <small class="block mt-1 text-secondary">(www.bin)</small>
-                </div>
-            </div>
-        </div>
+      </div>
     </div>
+    <div class="w-full lg:w-1/2 xl:w-1/3 px-2 mb-4 lg:mb-0">
+      <div class="card h-full">
+        <h3>Update Firmware</h3>
+        <label class="btn w-full text-center relative flex justify-center items-center gap-2 cursor-pointer my-2">
+          <i class="pi pi-upload"></i>
+          <span>Browse</span>
+          <input #firmwareUpload type="file" accept=".bin" (change)="onFileSelected($event, 'firmwareUpload')" class="hidden">
+        </label>
+
+        <small>(esp-miner.bin)</small>
+      </div>
+    </div>
+    <div class="w-full lg:w-1/2 xl:w-1/3 px-2">
+      <div class="card h-full">
+        <h3>Custom Frontend</h3>
+
+        <div class="flex items-center gap-2 mb-2">
+          <app-checkbox 
+            inputId="customWWWToggle"
+            [binary]="true"
+            [ngModel]="(info$ | async)?.useCustomWWW === 1"
+            (onChange)="toggleCustomWWW($event.checked)">
+          </app-checkbox>
+          <label for="customWWWToggle" class="font-medium cursor-pointer">Enable custom web UI</label>
+        </div>
+        <small class="text-orange-500 block mb-4">* A device restart is required to apply this change.</small>
+
+        @if ((info$ | async)?.useCustomWWW === 1) {
+          <div class="rounded p-3 bg-white/5 border border-white/10">
+            <h5 class="mt-0 mb-3 text-main">Upload Custom UI</h5>
+            <label class="btn w-full text-center relative flex justify-center items-center gap-2 cursor-pointer my-2">
+              <i class="pi pi-upload"></i>
+              <span>Browse</span>
+              <input #websiteUpload type="file" accept=".bin" (change)="onFileSelected($event, 'websiteUpload')" class="hidden">
+            </label>
+            <small class="block mt-1 text-secondary">(www.bin)</small>
+          </div>
+        }
+      </div>
+    </div>
+  </div>
 </div>
+
 <app-modal #progressModal [headline]="'Updating ' + updateTarget" [closable]="updateStatus !== 'progress'">
-    <div class="flex flex-col items-center justify-center p-4">
-        <ng-container *ngIf="updateStatus === 'progress'">
-            <div class="text-xl mb-3" *ngIf="updateTarget === 'AxeOS' && websiteUpdateProgress !== null">
-                Uploading... {{ websiteUpdateProgress }}%
-            </div>
-            <div class="text-xl mb-3" *ngIf="updateTarget === 'Firmware' && firmwareUpdateProgress !== null">
-                Uploading... {{ firmwareUpdateProgress }}%
-            </div>
-            <div class="text-xl mb-3" *ngIf="(updateTarget === 'AxeOS' && websiteUpdateProgress === null) || (updateTarget === 'Firmware' && firmwareUpdateProgress === null)">
-                Applying update...
-            </div>
-            
-            @let progressVal = (updateTarget === 'AxeOS' ? websiteUpdateProgress : firmwareUpdateProgress);
-            <div class="w-full bg-progressbar rounded-sm overflow-hidden h-6">
-                <div class="bg-progressbar-value h-full transition-all duration-300" [style.width.%]="progressVal"></div>
-            </div>
-            
-            <div class="text-center mt-3 text-secondary">
-                Please do not disconnect the power.
-            </div>
-        </ng-container>
+  <div class="flex flex-col items-center justify-center p-4">
+    @if (updateStatus === 'progress') {
+      @if (updateTarget === 'AxeOS' && websiteUpdateProgress !== null) {
+        <div class="text-xl mb-3">
+          Uploading... {{ websiteUpdateProgress }}%
+        </div>
+      }
+      @if (updateTarget === 'Firmware' && firmwareUpdateProgress !== null) {
+        <div class="text-xl mb-3">
+          Uploading... {{ firmwareUpdateProgress }}%
+        </div>
+      }
+      @if ((updateTarget === 'AxeOS' && websiteUpdateProgress === null) || (updateTarget === 'Firmware' && firmwareUpdateProgress === null)) {
+        <div class="text-xl mb-3">
+          Applying update...
+        </div>
+      }
+      @let progressVal = (updateTarget === 'AxeOS' ? websiteUpdateProgress : firmwareUpdateProgress);
+      <div class="w-full bg-progressbar rounded-sm overflow-hidden h-6">
+        <div class="bg-progressbar-value h-full transition-all duration-300" [style.width.%]="progressVal"></div>
+      </div>
+      <div class="text-center mt-3 text-secondary">
+        Please do not disconnect the power.
+      </div>
+    }
 
-        <ng-container *ngIf="updateStatus === 'success'">
-            <i class="pi pi-check-circle text-green-500" style="font-size: 3.5rem; margin-bottom: 1rem;"></i>
-            <div class="text-lg text-center">{{ updateMessage }}</div>
-            <div class="mt-4" *ngIf="updateTarget !== 'AxeOS'">
-                <button class="btn" (click)="progressModal.isVisible = false">Close</button>
-            </div>
-        </ng-container>
+    @if (updateStatus === 'success') {
+      <i class="pi pi-check-circle text-green-500" style="font-size: 3.5rem; margin-bottom: 1rem;"></i>
+      <div class="text-lg text-center">{{ updateMessage }}</div>
+      @if (updateTarget !== 'AxeOS') {
+        <div class="mt-4">
+          <button class="btn" (click)="progressModal.isVisible = false">Close</button>
+        </div>
+      }
+    }
 
-        <ng-container *ngIf="updateStatus === 'error'">
-            <i class="pi pi-times-circle text-red-500" style="font-size: 3.5rem; margin-bottom: 1rem;"></i>
-            <div class="text-lg text-center text-red-500">{{ updateMessage }}</div>
-             <div class="mt-4">
-                <button class="btn" (click)="progressModal.isVisible = false">Close</button>
-            </div>
-        </ng-container>
-    </div>
+    @if (updateStatus === 'error') {
+      <i class="pi pi-times-circle text-red-500" style="font-size: 3.5rem; margin-bottom: 1rem;"></i>
+      <div class="text-lg text-center text-red-500">{{ updateMessage }}</div>
+      <div class="mt-4">
+        <button class="btn" (click)="progressModal.isVisible = false">Close</button>
+      </div>
+    }
+  </div>
 </app-modal>
 
 <div class="card mt-4">
-    <h3 class="mb-4">Installed Firmware</h3>
-    
-    <div class="overflow-x-auto">
-        <table class="w-full">
-            <thead>
-                <tr>
-                    <th class="text-secondary font-medium pb-2 text-left w-1/4">Partition</th>
-                    <th class="text-secondary font-medium pb-2 text-left w-1/4">Version</th>
-                    <th class="text-secondary font-medium pb-2 text-left w-1/4">Build time</th>
-                    <th class="text-secondary font-medium pb-2 text-left w-1/4">Space</th>
-                    <th class="text-secondary font-medium pb-2 text-left">Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr *ngFor="let partition of (info$ | async)?.partitions" [ngClass]="{'active': partition.isCurrent}">
-                    <td>
-                        <i class="pi pi-box mr-2"></i>
-                        {{ partition.label }}
-                        <span *ngIf="partition.isCurrent" class="ml-2 px-2 py-0.5 text-xs font-semibold rounded bg-blue-500/20 text-blue-400 border border-blue-500/30">Active</span>
-                    </td>
-                    <td class="font-mono">
-                        {{ partition.version || 'N/A' }}
-                    </td>
-                    <td>
-                        <div class="font-medium text-sm">{{ partition.compileDate || 'N/A' }}</div>
-                        <div class="text-xs text-secondary mt-0.5" *ngIf="partition.compileDate">{{ partition.compileTime }}</div>
-                    </td>
-                    <td>
-                        <div *ngIf="partition.usagePercent !== undefined && partition.usagePercent !== null" class="flex items-center gap-2" style="max-width: 9rem;">
-                            <span class="font-mono text-sm">{{ partition.usagePercent }}%</span>
-                            <div class="rounded overflow-hidden w-full h-[6px]" style="background-color: rgba(255,255,255,0.15);">
-                                <div class="bg-primary h-full rounded" [style.width.%]="partition.usagePercent"></div>
-                            </div>
-                        </div>
-                        <span *ngIf="partition.usagePercent === undefined || partition.usagePercent === null" class="text-secondary italic text-sm">
-                            -
-                        </span>
-                    </td>
-                    <td class="text-left">
-                        <div class="flex gap-2 justify-start items-center">
-                            <button 
-                                *ngIf="!partition.isCurrent && partition.version" 
-                                (click)="switchPartition(partition.label)"
-                                class="btn btn-secondary py-1 px-3 text-sm">
-                                Activate
-                            </button>
-                        </div>
-                    </td>
-                </tr>
-            </tbody>
-        </table>
-    </div>
-    
-    <div class="flex justify-end mt-4">
-        <button 
-            (click)="restart()"
-            class="btn btn-danger py-1 px-3 text-sm flex items-center gap-1">
-            <i class="pi pi-refresh"></i>
-            <span>Restart Device</span>
-        </button>
-    </div>
+  <h3 class="mb-4">Installed Firmware</h3>
+
+  <div class="overflow-x-auto">
+    <table class="w-full">
+      <thead>
+        <tr>
+          <th class="text-secondary font-medium pb-2 text-left w-1/4">Partition</th>
+          <th class="text-secondary font-medium pb-2 text-left w-1/4">Version</th>
+          <th class="text-secondary font-medium pb-2 text-left w-1/4">Build time</th>
+          <th class="text-secondary font-medium pb-2 text-left w-1/4">Space</th>
+          <th class="text-secondary font-medium pb-2 text-left">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (partition of (info$ | async)?.partitions; track partition.label) {
+          <tr [class.active]="partition.isCurrent">
+            <td>
+              <i class="pi pi-box mr-2"></i>
+              {{ partition.label }}
+              @if (partition.isCurrent) {
+                <span class="ml-2 px-2 py-0.5 text-xs font-semibold rounded bg-blue-500/20 text-blue-400 border border-blue-500/30">Active</span>
+              }
+            </td>
+            <td class="font-mono">
+              {{ partition.version || 'N/A' }}
+            </td>
+            <td>
+              <div class="font-medium text-sm">{{ partition.compileDate || 'N/A' }}</div>
+              @if (partition.compileDate) {
+                <div class="text-xs text-secondary mt-0.5">{{ partition.compileTime }}</div>
+              }
+            </td>
+            <td>
+              @if (partition.usagePercent !== undefined && partition.usagePercent !== null) {
+                <div class="flex items-center gap-2" style="max-width: 9rem;">
+                  <span class="font-mono text-sm">{{ partition.usagePercent }}%</span>
+                  <div class="rounded overflow-hidden w-full h-[6px]" style="background-color: rgba(255,255,255,0.15);">
+                    <div class="bg-primary h-full rounded" [style.width.%]="partition.usagePercent"></div>
+                  </div>
+                </div>
+              } @else {
+                <span class="text-secondary italic text-sm">
+                  -
+                </span>
+              }
+            </td>
+            <td class="text-left">
+              <div class="flex gap-2 justify-start items-center">
+                @if (!partition.isCurrent && partition.version) {
+                  <button 
+                    (click)="switchPartition(partition.label)"
+                    class="btn btn-secondary py-1 px-3 text-sm">
+                    Activate
+                  </button>
+                }
+              </div>
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+
+  <div class="flex justify-end mt-4">
+    <button 
+      (click)="restart()"
+      class="btn btn-danger py-1 px-3 text-sm flex items-center gap-1">
+      <i class="pi pi-refresh"></i>
+      <span>Restart Device</span>
+    </button>
+  </div>
 </div>
