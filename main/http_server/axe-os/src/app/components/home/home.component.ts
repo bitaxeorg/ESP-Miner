@@ -2,7 +2,7 @@ import { Component, OnInit, ViewChild, Input, OnDestroy, ElementRef, HostListene
 import { map, Observable, shareReplay, Subscription, switchMap, tap, first, Subject, takeUntil, BehaviorSubject, filter, combineLatest } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
 import { getHttpErrorMessage } from 'src/app/utils/error-handler';
-import { FormBuilder, FormGroup } from '@angular/forms';
+import { FormBuilder, FormGroup, FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { ToastrService } from 'ngx-toastr';
 import { DateAgoPipe } from 'src/app/pipes/date-ago.pipe';
 import { HashSuffixPipe } from 'src/app/pipes/hash-suffix.pipe';
@@ -23,9 +23,17 @@ import { eChartLabel, ChartUnitGroups, chartLabelValue, chartLabelKey } from 'sr
 import { LocalStorageService } from 'src/app/local-storage.service';
 import { GridStack, GridItemHTMLElement } from 'gridstack';
 import { DashboardEditService, WidgetDef } from 'src/app/services/dashboard-edit.service';
+import { AsyncPipe, DecimalPipe } from '@angular/common';
+import { TooltipDirective } from '../../directives/tooltip.directive';
+import { TooltipTextIconComponent } from '../tooltip-text-icon/tooltip-text-icon.component';
+import { DropdownComponent } from '../dropdown/dropdown.component';
+import { ProgressbarComponent } from '../progressbar/progressbar.component';
+import { ConfettiComponent } from '../confetti/confetti.component';
+import { AddressPipe } from '../../pipes/address.pipe';
+import { SatsPipe } from '../../pipes/sats.pipe';
+import { NgTemplateOutlet } from '@angular/common';
 
 type PoolLabel = 'Primary' | 'Fallback';
-type ProtocolLabel = 'SV2 Standard Channel' | 'SV2 Extended Channel';
 type MessageType =
   | 'SYSTEM_INFO_ERROR'
   | 'MINING_PAUSED'
@@ -70,10 +78,27 @@ const WIDGET_DEFAULTS: WidgetDef[] = [
 ];
 
 @Component({
-    selector: 'app-home',
-    templateUrl: './home.component.html',
-    styleUrls: ['./home.component.scss'],
-    standalone: false
+  selector: 'app-home',
+  templateUrl: './home.component.html',
+  styleUrls: ['./home.component.scss'],
+  imports: [
+    TooltipDirective,
+    TooltipTextIconComponent,
+    NgTemplateOutlet,
+    FormsModule,
+    ReactiveFormsModule,
+    DropdownComponent,
+    AppChartComponent,
+    ProgressbarComponent,
+    ConfettiComponent,
+    AsyncPipe,
+    DecimalPipe,
+    DateAgoPipe,
+    HashSuffixPipe,
+    DiffSuffixPipe,
+    AddressPipe,
+    SatsPipe
+  ]
 })
 export class HomeComponent implements OnInit, OnDestroy {
   public messages: ISystemMessage[] = [];

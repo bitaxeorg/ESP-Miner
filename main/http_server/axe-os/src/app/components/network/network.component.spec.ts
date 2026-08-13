@@ -12,7 +12,7 @@ describe('NetworkComponent', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      declarations: [NetworkComponent, NetworkEditComponent],
+      imports: [NetworkComponent, NetworkEditComponent],
       providers: [provideHttpClient(), provideToastr(), DialogService]
     });
     fixture = TestBed.createComponent(NetworkComponent);
