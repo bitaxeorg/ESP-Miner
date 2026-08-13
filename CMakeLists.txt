@@ -27,9 +27,9 @@ add_custom_target(
     COMMENT "Creating merged binary: esp-miner-merged.bin"
 )
 
-# Config file to merge. Set with: idf.py -DMERGE_CONFIG_CVS=config-401.cvs
-# Default: config-401.cvs (standard Bitaxe config)
-set(MERGE_CONFIG_CVS "config-401.cvs" CACHE STRING "Config CSV file to include in merged binary (e.g. config-401.cvs)")
+# Config file to merge. Set with: idf.py -DMERGE_CONFIG_CVS=config-601.cvs
+# Default: config-601.cvs (standard Bitaxe config)
+set(MERGE_CONFIG_CVS "config-601.cvs" CACHE STRING "Config CSV file to include in merged binary (e.g. config-601.cvs)")
 
 # Generate config.bin from the selected .cvs file using ESP-IDF's nvs_partition_gen
 set(CONFIG_BIN_OUTPUT "${PROJECT_DIR}/config.bin")
