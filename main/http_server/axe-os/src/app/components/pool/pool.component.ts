@@ -7,6 +7,7 @@ import { LoadingService } from 'src/app/services/loading.service';
 import { SystemApiService } from 'src/app/services/system.service';
 import { LiveDataService } from 'src/app/services/live-data.service';
 import { first } from 'rxjs';
+import { I18nService } from 'src/app/i18n/i18n.service';
 
 interface ITlsOption {
   value: number;
@@ -47,21 +48,11 @@ export class PoolComponent implements OnInit {
   public showAdvancedOptions: boolean[] = [];
   public activeCardIndex: number | null = 0;
 
-  public tlsOptions: ITlsOption[] = [
-    { value: 0, label: 'No TLS' },
-    { value: 1, label: 'TLS (System certificate)' },
-    { value: 2, label: 'TLS (Custom CA certificate)' }
-  ];
+  public tlsOptions: ITlsOption[] = [];
 
-  public protocolOptions: IProtocolOption[] = [
-    { value: 'SV1', label: 'Stratum V1' },
-    { value: 'SV2', label: 'Stratum V2' }
-  ];
+  public protocolOptions: IProtocolOption[] = [];
 
-  public sv2ChannelOptions: IChannelOption[] = [
-    { value: 'extended', label: 'Extended Channels' },
-    { value: 'standard', label: 'Standard Channels' }
-  ];
+  public sv2ChannelOptions: IChannelOption[] = [];
 
   public asicModel: string = '';
 
@@ -72,8 +63,23 @@ export class PoolComponent implements OnInit {
     private systemService: SystemApiService,
     private liveDataService: LiveDataService,
     private toastr: ToastrService,
-    private loadingService: LoadingService
-  ) { }
+    private loadingService: LoadingService,
+    private i18n: I18nService,
+  ) {
+    this.tlsOptions = [
+      { value: 0, label: this.i18n.t('settings.pool.tls_none') },
+      { value: 1, label: this.i18n.t('settings.pool.tls_system') },
+      { value: 2, label: this.i18n.t('settings.pool.tls_custom') },
+    ];
+    this.protocolOptions = [
+      { value: 'SV1', label: 'Stratum V1' },
+      { value: 'SV2', label: 'Stratum V2' },
+    ];
+    this.sv2ChannelOptions = [
+      { value: 'extended', label: this.i18n.t('settings.pool.sv2_extended') },
+      { value: 'standard', label: this.i18n.t('settings.pool.sv2_standard') },
+    ];
+  }
 
   ngOnInit(): void {
     this.liveDataService.info$
@@ -209,7 +215,7 @@ export class PoolComponent implements OnInit {
       const id = control.get('id')?.value;
       const url = control.get('stratumURL')?.value || '';
       const proto = control.get('stratumProtocol')?.value || 'SV1';
-      const urlDisplay = url ? `${url} (${proto})` : '(not configured)';
+      const urlDisplay = url ? `${url} (${proto})` : this.i18n.t('settings.pool.not_configured');
       return {
         value: id,
         label: `Pool ${id + 1}: ${urlDisplay}`
@@ -301,7 +307,7 @@ export class PoolComponent implements OnInit {
     const prim = this.form.get('primaryPoolIndex')?.value;
     const sec = this.form.get('secondaryPoolIndex')?.value;
     if (id === prim || id === sec) {
-      this.toastr.error('Cannot delete a pool that is currently selected as primary or fallback.');
+      this.toastr.error(this.i18n.t('errors.pool_delete_active'));
       return;
     }
 
@@ -341,7 +347,7 @@ export class PoolComponent implements OnInit {
                     this.onSaveSuccess();
                   },
                   error: (err: HttpErrorResponse) => {
-                    this.toastr.error(`Saved settings, but failed to delete cleared pools: ${err.message}`);
+                    this.toastr.error(this.i18n.t('errors.pool_delete_failed', { error: err.message }));
                     this.onSaveSuccess();
                   }
                 });
@@ -351,15 +357,17 @@ export class PoolComponent implements OnInit {
           }
         },
         error: (err: HttpErrorResponse) => {
-          this.toastr.error(`Could not save pool settings. ${getHttpErrorMessage(err, this.uri)}`);
+          this.toastr.error(this.i18n.t('errors.pool_save_failed', { error: getHttpErrorMessage(err, this.uri) }));
           this.savedChanges = restartAlreadyPending;
         }
       });
   }
 
   private onSaveSuccess() {
-    const successMessage = this.uri ? `Saved pool settings for ${this.uri}` : 'Saved pool settings';
-    this.toastr.warning('You must restart this device after saving for changes to take effect.');
+    const successMessage = this.uri
+      ? this.i18n.t('messages.pool_saved_for', { uri: this.uri })
+      : this.i18n.t('messages.pool_saved');
+    this.toastr.warning(this.i18n.t('messages.restart_required'));
     this.toastr.success(successMessage);
     this.savedChanges = true;
     this.pendingDeletePoolIds = [];
@@ -371,12 +379,14 @@ export class PoolComponent implements OnInit {
       .pipe(this.loadingService.lockUIUntilComplete())
       .subscribe({
         next: () => {
-          const successMessage = this.uri ? `Device at ${this.uri} restarted` : 'Device restarted';
+          const successMessage = this.uri
+            ? this.i18n.t('messages.device_restarted_at', { uri: this.uri })
+            : this.i18n.t('messages.device_restarted');
           this.toastr.success(successMessage);
           this.savedChanges = false;
         },
         error: (err: HttpErrorResponse) => {
-          this.toastr.error(`Failed to restart device. ${getHttpErrorMessage(err, this.uri)}`);
+          this.toastr.error(this.i18n.t('errors.restart_failed', { error: getHttpErrorMessage(err, this.uri) }));
         }
       });
   }
@@ -442,7 +452,7 @@ export class PoolComponent implements OnInit {
       };
 
       reader.onerror = () => {
-        this.toastr.error('Failed to read certificate file');
+        this.toastr.error(this.i18n.t('errors.certificate_read_failed'));
         fileInput.value = '';
       };
 

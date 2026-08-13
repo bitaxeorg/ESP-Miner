@@ -45,6 +45,8 @@ import { DiffSuffixPipe } from './pipes/diff-suffix.pipe';
 import { AddressPipe } from './pipes/address.pipe';
 import { SatsPipe } from './pipes/sats.pipe';
 import { DialogService, DialogListComponent } from './services/dialog.service';
+import { TitleStrategy } from '@angular/router';
+import { I18nTitleStrategy } from './i18n/i18n-title.strategy';
 
 const components = [
   AppComponent,
@@ -101,6 +103,7 @@ const components = [
   ],
   providers: [
     { provide: LocationStrategy, useClass: HashLocationStrategy },
+    { provide: TitleStrategy, useClass: I18nTitleStrategy },
     { provide: ApiConfiguration, useValue: { rootUrl: '' } },
     Api,
     DialogService,

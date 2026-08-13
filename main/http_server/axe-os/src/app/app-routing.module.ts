@@ -14,8 +14,6 @@ import { PoolComponent } from './components/pool/pool.component';
 import { AppLayoutComponent } from './layout/app.layout.component';
 import { ApModeGuard } from './guards/ap-mode.guard';
 
-const TITLE_PREFIX = 'AxeOS';
-
 const routes: Routes = [
   {
       path: 'ap',
@@ -24,7 +22,7 @@ const routes: Routes = [
         {
           path: '',
           component: NetworkComponent,
-          title: `${TITLE_PREFIX} Network`,
+          title: 'nav.network',
         }
       ]
   },
@@ -36,52 +34,52 @@ const routes: Routes = [
       {
         path: '',
         component: HomeComponent,
-        title: TITLE_PREFIX,
+        title: 'common.app_name',
       },
       {
         path: 'logs',
         component: LogsComponent,
-        title: `${TITLE_PREFIX} Logs`,
+        title: 'nav.logs',
       },
       {
         path: 'system',
         component: SystemComponent,
-        title: `${TITLE_PREFIX} System`,
+        title: 'nav.system',
       },
       {
         path: 'update',
         component: UpdateComponent,
-        title: `${TITLE_PREFIX} Update`,
+        title: 'nav.update',
       },
       {
         path: 'network',
         component: NetworkComponent,
-        title: `${TITLE_PREFIX} Network`,
+        title: 'nav.network',
       },
       {
         path: 'settings',
         component: SettingsComponent,
-        title: `${TITLE_PREFIX} Settings`,
+        title: 'nav.settings',
       },
       {
         path: 'swarm',
         component: SwarmComponent,
-        title: `${TITLE_PREFIX} Swarm`,
+        title: 'nav.swarm',
       },
       {
         path: 'scoreboard',
         component: ScoreboardComponent,
-        title: `${TITLE_PREFIX} Scoreboard`,
+        title: 'nav.scoreboard',
       },
       {
         path: 'design',
         component: DesignComponent,
-        title: `${TITLE_PREFIX} Theme`,
+        title: 'nav.theme',
       },
       {
         path: 'pool',
         component: PoolComponent,
-        title: `${TITLE_PREFIX} Pool`,
+        title: 'nav.pool',
       }
     ]
   },

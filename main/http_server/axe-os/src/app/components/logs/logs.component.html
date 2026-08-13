@@ -4,7 +4,7 @@
     <form [formGroup]="form">
       <div class="flex justify-between flex-col md:items-center md:flex-row mb-3 gap-3">
         <h2 class="mb-0 h-12 flex items-center">
-          Realtime Logs
+          {{ 'logs.realtime_title' | t }}
         </h2>
         <nav class="flex gap-3 w-full md:w-1/2">
           <div class="relative w-full">
@@ -14,7 +14,7 @@
             <input
               type="text"
               autocomplete="off"
-              placeholder="Case-sensitive filter"
+              [placeholder]="'logs.case_sensitive_filter' | t"
               id="filter"
               formControlName="filter"
               class="w-full pl-9 pr-3 py-2.5 bg-transparent text-main border border-surface rounded outline-none focus:border-primary transition duration-150"
@@ -24,7 +24,7 @@
             type="button"
             class="btn btn-secondary p-3.5"
             (click)="stopScroll = !stopScroll"
-            appTooltip="{{stopScroll ? 'Start' : 'Stop'}} Scrolling"
+            [appTooltip]="(stopScroll ? 'actions.start_scrolling' : 'actions.stop_scrolling') | t"
             tooltipPosition="left">
             <i class="pi pi-{{stopScroll ? 'play' : 'pause'}} text-lg"></i>
           </button>
@@ -33,7 +33,7 @@
             class="btn btn-secondary p-3.5"
             [disabled]="loadingLogs"
             (click)="downloadLogs()"
-            appTooltip="Download Logs"
+            [appTooltip]="'actions.download_logs' | t"
             tooltipPosition="left">
             <i class="pi pi-{{loadingLogs ? 'spinner pi-spin' : 'download'}} text-lg"></i>
           </button>
@@ -41,7 +41,7 @@
             type="button"
             class="btn btn-secondary p-3.5"
             (click)="clearLogs()"
-            appTooltip="Clear Logs"
+            [appTooltip]="'actions.clear_logs' | t"
             tooltipPosition="left">
             <i class="pi pi-trash text-lg"></i>
           </button>

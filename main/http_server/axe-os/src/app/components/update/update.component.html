@@ -1,36 +1,36 @@
 <div class="card">
-  <h2>Update</h2>
+  <h2>{{ 'device.update.title' | t }}</h2>
 
   <div class="flex flex-wrap -mx-2">
     <div class="w-full xl:w-1/3 px-2 mb-4 xl:mb-0">
       <div class="card h-full">
-        <h5>Current Version: {{(info$ | async)?.version}}</h5>
+        <h5>{{ 'device.update.current_version' | t }}: {{(info$ | async)?.version}}</h5>
 
         @if (checkLatestRelease == false) {
-          <h3>Latest Release: <button class="btn text-sm ml-2" (click)="handleReleaseCheck()">Check</button></h3>
-          <app-modal #privacyModal [headline]="'Privacy Warning'">
+          <h3>{{ 'device.update.latest_release' | t }}: <button class="btn text-sm ml-2" (click)="handleReleaseCheck()">{{ 'actions.check' | t }}</button></h3>
+          <app-modal #privacyModal [headline]="'device.update.privacy_warning_title' | t">
             <p>
-              Please note, this will connect to <strong>github.com</strong> to check for the latest release.
+              {{ 'messages.release_check_notice_prefix' | t }} <strong>github.com</strong> {{ 'messages.release_check_notice_suffix' | t }}
             </p>
             <p class="flex items-center gap-2">
               <app-checkbox
                 [binary]="true"
                 inputId="ignoreWarning"
                 #ignoreWarning></app-checkbox>
-              <label for="ignoreWarning" class="cursor-pointer">Don't show again</label>
+              <label for="ignoreWarning" class="cursor-pointer">{{ 'common.dont_show_again' | t }}</label>
             </p>
             <div class="flex gap-3 mt-5">
-              <button class="btn" (click)="continueReleaseCheck(ignoreWarning.model)">Continue</button>
-              <button class="btn btn-secondary" (click)="privacyModal.isVisible = false">Cancel</button>
+              <button class="btn" (click)="continueReleaseCheck(ignoreWarning.model)">{{ 'actions.continue' | t }}</button>
+              <button class="btn btn-secondary" (click)="privacyModal.isVisible = false">{{ 'actions.cancel' | t }}</button>
             </div>
           </app-modal>
         } @else {
           @if (latestRelease$ | async; as latestRelease) {
-            <h3>Latest Release:
+            <h3>{{ 'device.update.latest_release' | t }}:
               <a style="text-decoration: underline;" target="_blank"
               [href]="latestRelease.html_url">{{latestRelease.name}}</a>
             </h3>
-            <div class="text-orange-500 mb-3">Download both files for update!</div>
+            <div class="text-orange-500 mb-3">{{ 'messages.update_download_both' | t }}</div>
             @for (asset of latestRelease.assets; track asset) {
               <div>
                 @if (asset.name == 'esp-miner.bin') {
@@ -48,7 +48,7 @@
               </div>
             }
             <a class="text-secondary underline block mt-3 cursor-pointer" (click)="releaseNotesModal.isVisible = true">
-              Release Notes
+              {{ 'device.update.release_notes' | t }}
             </a>
             <app-modal #releaseNotesModal [headline]="latestRelease.name">
               <div [innerHTML]="simpleMarkdownParser(latestRelease.body)"></div>
@@ -60,10 +60,10 @@
     </div>
     <div class="w-full lg:w-1/2 xl:w-1/3 px-2 mb-4 lg:mb-0">
       <div class="card h-full">
-        <h3>Update Firmware</h3>
+        <h3>{{ 'device.update.firmware' | t }}</h3>
         <label class="btn w-full text-center relative flex justify-center items-center gap-2 cursor-pointer my-2">
           <i class="pi pi-upload"></i>
-          <span>Browse</span>
+          <span>{{ 'actions.browse' | t }}</span>
           <input #firmwareUpload type="file" accept=".bin" (change)="onFileSelected($event, 'firmwareUpload')" class="hidden">
         </label>
 
@@ -72,7 +72,7 @@
     </div>
     <div class="w-full lg:w-1/2 xl:w-1/3 px-2">
       <div class="card h-full">
-        <h3>Custom Frontend</h3>
+        <h3>{{ 'device.update.custom_frontend' | t }}</h3>
 
         <div class="flex items-center gap-2 mb-2">
           <app-checkbox 
@@ -81,17 +81,17 @@
             [ngModel]="(info$ | async)?.useCustomWWW === 1"
             (onChange)="toggleCustomWWW($event.checked)">
           </app-checkbox>
-          <label for="customWWWToggle" class="font-medium cursor-pointer">Enable custom web UI</label>
+          <label for="customWWWToggle" class="font-medium cursor-pointer">{{ 'device.update.enable_custom_ui' | t }}</label>
         </div>
         <small class="text-orange-500 block mb-2">* A device restart is required to apply this change.</small>
         <small class="text-secondary block mb-4">If an incompatible custom UI is loaded, visit <a href="/recovery" target="_blank" class="underline">/recovery</a> to disable Custom Frondend.</small>
 
         @if ((info$ | async)?.useCustomWWW === 1) {
           <div class="rounded p-3 bg-white/5 border border-white/10">
-            <h5 class="mt-0 mb-3 text-main">Upload Custom UI</h5>
+            <h5 class="mt-0 mb-3 text-main">{{ 'device.update.upload_custom_ui' | t }}</h5>
             <label class="btn w-full text-center relative flex justify-center items-center gap-2 cursor-pointer my-2">
               <i class="pi pi-upload"></i>
-              <span>Browse</span>
+              <span>{{ 'actions.browse' | t }}</span>
               <input #websiteUpload type="file" accept=".bin" (change)="onFileSelected($event, 'websiteUpload')" class="hidden">
             </label>
             <small class="block mt-1 text-secondary">(www.bin)</small>
@@ -132,7 +132,7 @@
       <div class="text-lg text-center">{{ updateMessage }}</div>
       @if (updateTarget !== 'AxeOS') {
         <div class="mt-4">
-          <button class="btn" (click)="progressModal.isVisible = false">Close</button>
+          <button class="btn" (click)="progressModal.isVisible = false">{{ 'actions.close' | t }}</button>
         </div>
       }
     }
@@ -141,24 +141,24 @@
       <i class="pi pi-times-circle text-red-500" style="font-size: 3.5rem; margin-bottom: 1rem;"></i>
       <div class="text-lg text-center text-red-500">{{ updateMessage }}</div>
       <div class="mt-4">
-        <button class="btn" (click)="progressModal.isVisible = false">Close</button>
+        <button class="btn" (click)="progressModal.isVisible = false">{{ 'actions.close' | t }}</button>
       </div>
     }
   </div>
 </app-modal>
 
 <div class="card mt-4">
-  <h3 class="mb-4">Installed Firmware</h3>
+  <h3 class="mb-4">{{ 'device.update.installed_firmware' | t }}</h3>
 
   <div class="overflow-x-auto">
     <table class="w-full">
       <thead>
         <tr>
-          <th class="text-secondary font-medium pb-2 text-left w-1/4">Partition</th>
-          <th class="text-secondary font-medium pb-2 text-left w-1/4">Version</th>
-          <th class="text-secondary font-medium pb-2 text-left w-1/4">Build time</th>
-          <th class="text-secondary font-medium pb-2 text-left w-1/4">Space</th>
-          <th class="text-secondary font-medium pb-2 text-left">Actions</th>
+          <th class="text-secondary font-medium pb-2 text-left w-1/4">{{ 'device.update.partition' | t }}</th>
+          <th class="text-secondary font-medium pb-2 text-left w-1/4">{{ 'common.version' | t }}</th>
+          <th class="text-secondary font-medium pb-2 text-left w-1/4">{{ 'device.update.build_time' | t }}</th>
+          <th class="text-secondary font-medium pb-2 text-left w-1/4">{{ 'device.update.space' | t }}</th>
+          <th class="text-secondary font-medium pb-2 text-left">{{ 'device.update.actions' | t }}</th>
         </tr>
       </thead>
       <tbody>
@@ -200,7 +200,7 @@
                   <button 
                     (click)="switchPartition(partition.label)"
                     class="btn btn-secondary py-1 px-3 text-sm">
-                    Activate
+                    {{ 'actions.activate' | t }}
                   </button>
                 }
               </div>
@@ -216,7 +216,7 @@
       (click)="restart()"
       class="btn btn-danger py-1 px-3 text-sm flex items-center gap-1">
       <i class="pi pi-refresh"></i>
-      <span>Restart Device</span>
+      <span>{{ 'actions.restart_device' | t }}</span>
     </button>
   </div>
 </div>

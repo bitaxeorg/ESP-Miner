@@ -12,6 +12,7 @@ import { SystemApiService } from 'src/app/services/system.service';
 import { WifiNetwork } from 'src/app/generated/models';
 import { first } from 'rxjs/operators';
 import { ISystemUpdateResponse } from 'src/models/ISystemUpdateResponse';
+import { I18nService } from 'src/app/i18n/i18n.service';
 
 @Component({
     selector: 'app-network-edit',
@@ -36,7 +37,8 @@ export class NetworkEditComponent implements OnInit {
     private toastr: ToastrService,
     private loadingService: LoadingService,
     private http: HttpClient,
-    private dialogService: DialogService
+    private dialogService: DialogService,
+    private i18n: I18nService,
   ) {
 
   }
@@ -103,14 +105,14 @@ export class NetworkEditComponent implements OnInit {
 
            // Normal success handling
            if (restartRequired) {
-             this.toastr.warning('You must restart this device after saving for changes to take effect.');
+             this.toastr.warning(this.i18n.t('messages.restart_required'));
            }
-          this.toastr.success('Saved network settings');
+          this.toastr.success(this.i18n.t('messages.network_saved'));
           this.savedChanges = restartAlreadyPending || restartRequired;
           this.form.markAsPristine();
         },
         error: (err: HttpErrorResponse) => {
-          this.toastr.error(`Could not save. ${getHttpErrorMessage(err, this.uri)}`);
+          this.toastr.error(this.i18n.t('errors.save_failed', { error: getHttpErrorMessage(err, this.uri) }));
           this.savedChanges = restartAlreadyPending;
         }
       });
@@ -154,7 +156,7 @@ export class NetworkEditComponent implements OnInit {
           }));
 
           // Show dialog with network list
-          this.dialogService.open('Select Wi-Fi Network', dialogData)
+          this.dialogService.open(this.i18n.t('settings.network.select_wifi_title'), dialogData)
             .subscribe((selectedSsid: string) => {
               if (selectedSsid) {
                 this.form.patchValue({ ssid: selectedSsid });
@@ -163,7 +165,7 @@ export class NetworkEditComponent implements OnInit {
             });
         },
         error: (err) => {
-          this.toastr.error('Failed to scan Wi-Fi networks');
+          this.toastr.error(this.i18n.t('errors.wifi_scan_failed'));
         }
       });
   }
@@ -173,11 +175,11 @@ export class NetworkEditComponent implements OnInit {
       .pipe(this.loadingService.lockUIUntilComplete())
       .subscribe({
         next: () => {
-          this.toastr.success('Device restarted');
+          this.toastr.success(this.i18n.t('messages.device_restarted'));
           this.savedChanges = false;
         },
         error: (err: HttpErrorResponse) => {
-          this.toastr.error(`Could not restart. ${getHttpErrorMessage(err, this.uri)}`);
+          this.toastr.error(this.i18n.t('errors.restart_failed', { error: getHttpErrorMessage(err, this.uri) }));
         }
       });
   }

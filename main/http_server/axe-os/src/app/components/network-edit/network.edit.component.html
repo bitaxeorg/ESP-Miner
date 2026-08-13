@@ -4,8 +4,8 @@
       <div class="flex flex-col md:flex-row md:items-center mb-4 gap-2">
         <label for="hostname" class="w-full md:w-2/12 font-medium">
           <tooltip-text-icon
-            text="Hostname"
-            tooltip="Name of the device on your local network"
+            [text]="'common.hostname' | t"
+            [tooltip]="'settings.network.hostname_help' | t"
             />
         </label>
         <div class="w-full md:w-10/12">
@@ -13,7 +13,7 @@
         </div>
       </div>
       <div class="flex flex-col md:flex-row md:items-center mb-4 gap-2">
-        <label for="ssid" class="w-full md:w-2/12 font-medium">Wi-Fi SSID</label>
+        <label for="ssid" class="w-full md:w-2/12 font-medium">{{ 'settings.network.wifi_ssid' | t }}</label>
         <div class="w-full md:w-10/12 flex gap-2 items-center">
           <input class="input-text flex-grow" id="ssid" type="text" formControlName="ssid" />
           <button
@@ -21,19 +21,19 @@
             class="btn btn-secondary px-3.5 py-2.5 cursor-pointer"
             (click)="scanWifi()"
             [disabled]="scanning"
-            appTooltip="Scan Wi-Fi"
+            [appTooltip]="'actions.scan_wifi' | t"
             tooltipPosition="left">
             <i class="pi {{scanning ? 'pi-spinner pi-spin' : 'pi-search'}}"></i>
           </button>
         </div>
       </div>
       <div class="flex flex-col md:flex-row md:items-center mb-4 gap-2">
-        <label for="wifiPass" class="w-full md:w-2/12 font-medium">Wi-Fi Password</label>
+        <label for="wifiPass" class="w-full md:w-2/12 font-medium">{{ 'settings.network.wifi_password' | t }}</label>
         <div class="w-full md:w-10/12">
           <div class="relative w-full">
             <input class="input-text pr-10" id="wifiPass" formControlName="wifiPass"
               [type]="showWifiPassword ? 'text' : 'password'"
-              placeholder="Enter Wi-Fi password" />
+              [placeholder]="'settings.network.wifi_password_placeholder' | t" />
             @if (form.get('wifiPass')?.dirty) {
               <span class="absolute inset-y-0 right-0 flex items-center pr-3 cursor-pointer text-secondary hover:text-main"
                 (click)="toggleWifiPasswordVisibility()">
@@ -45,8 +45,8 @@
       </div>
       <div class="flex mt-5 gap-3">
         <button [disabled]="!form.dirty || form.invalid" (click)="updateSystem()"
-        class="btn">Save</button>
-        <button [disabled]="!savedChanges" (click)="restart()" class="btn" [class.btn-secondary]="!savedChanges">Restart</button>
+        class="btn">{{ 'actions.save' | t }}</button>
+        <button [disabled]="!savedChanges" (click)="restart()" class="btn" [class.btn-secondary]="!savedChanges">{{ 'actions.restart' | t }}</button>
       </div>
     </div>
   </form>

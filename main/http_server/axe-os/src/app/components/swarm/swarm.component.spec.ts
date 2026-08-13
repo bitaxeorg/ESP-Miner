@@ -16,6 +16,7 @@ import { DiffSuffixPipe } from 'src/app/pipes/diff-suffix.pipe';
 import { DateAgoPipe } from 'src/app/pipes/date-ago.pipe';
 import { AddressPipe } from 'src/app/pipes/address.pipe';
 import { SatsPipe } from 'src/app/pipes/sats.pipe';
+import { TranslatePipe } from 'src/app/i18n/translate.pipe';
 
 describe('SwarmComponent', () => {
   let component: SwarmComponent;
@@ -39,7 +40,8 @@ describe('SwarmComponent', () => {
         DiffSuffixPipe,
         DateAgoPipe,
         AddressPipe,
-        SatsPipe
+        SatsPipe,
+        TranslatePipe
       ],
       providers: [
         provideHttpClient(),

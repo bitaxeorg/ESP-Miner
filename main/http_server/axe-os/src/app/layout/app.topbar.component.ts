@@ -7,6 +7,7 @@ import { LayoutService } from './service/app.layout.service';
 import { SensitiveData } from 'src/app/services/sensitive-data.service';
 import { DashboardEditService } from 'src/app/services/dashboard-edit.service';
 import { SystemInfo as ISystemInfo } from 'src/app/generated/models';
+import { I18nService } from 'src/app/i18n/i18n.service';
 
 @Component({
     selector: 'app-topbar',
@@ -32,6 +33,7 @@ export class AppTopBarComponent implements OnInit, OnDestroy {
     private toastr: ToastrService,
     private sensitiveData: SensitiveData,
     public dashboardEdit: DashboardEditService,
+    private i18n: I18nService,
   ) {
     this.info$ = this.liveDataService.info$;
   }
@@ -69,15 +71,15 @@ export class AppTopBarComponent implements OnInit, OnDestroy {
         this.isMiningPaused = newPausedState;
         this.toastr.success(response.message);
       },
-      error: () => this.toastr.error('Failed to change mining state')
+      error: () => this.toastr.error(this.i18n.t('errors.mining_state_failed'))
     });
   }
 
   public restart() {
-    if (confirm('Are you sure you want to restart the device?')) {
+    if (confirm(this.i18n.t('confirm.restart_device'))) {
       this.systemService.restart().subscribe({
-        next: () => this.toastr.success('Device restarted'),
-        error: () => this.toastr.error('Restart failed')
+        next: () => this.toastr.success(this.i18n.t('messages.device_restarted')),
+        error: (err) => this.toastr.error(this.i18n.t('errors.restart_failed', { error: err?.message ?? '' }))
       });
     }
   }

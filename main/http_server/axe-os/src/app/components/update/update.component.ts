@@ -9,6 +9,7 @@ import { LiveDataService } from 'src/app/services/live-data.service';
 import { LocalStorageService } from 'src/app/local-storage.service';
 import { ModalComponent } from '../modal/modal.component';
 import { SystemInfo } from 'src/app/generated/models';
+import { I18nService } from 'src/app/i18n/i18n.service';
 
 const IGNORE_RELEASE_CHECK_WARNING = 'IGNORE_RELEASE_CHECK_WARNING';
 
@@ -46,6 +47,7 @@ export class UpdateComponent {
     private toastrService: ToastrService,
     private githubUpdateService: GithubUpdateService,
     private localStorageService: LocalStorageService,
+    private i18n: I18nService,
   ) {
     this.latestRelease$ = this.githubUpdateService.getReleases().pipe(map(releases => {
       return (releases as any)[0];
@@ -88,7 +90,7 @@ export class UpdateComponent {
     }
 
     if (file.name != 'esp-miner.bin') {
-      this.toastrService.error('Incorrect file, looking for esp-miner.bin.');
+      this.toastrService.error(this.i18n.t('errors.incorrect_file', { expected: 'esp-miner.bin' }));
       return;
     }
 
@@ -107,10 +109,10 @@ export class UpdateComponent {
           } else if (event.type === HttpEventType.Response) {
             if (event.ok) {
               this.updateStatus = 'success';
-              this.updateMessage = 'Firmware updated. The page will reload when the device comes back online.';
+              this.updateMessage = this.i18n.t('messages.firmware_updated_reload');
             } else {
               this.updateStatus = 'error';
-              this.updateMessage = event.statusText || 'An unknown error occurred.';
+              this.updateMessage = event.statusText || this.i18n.t('errors.unknown_error');
             }
           }
           else if (event instanceof HttpErrorResponse)
@@ -135,7 +137,7 @@ export class UpdateComponent {
     }
 
     if (file.name != 'www.bin') {
-      this.toastrService.error('Incorrect file, looking for www.bin.');
+      this.toastrService.error(this.i18n.t('errors.incorrect_file', { expected: 'www.bin' }));
       return;
     }
 
@@ -154,10 +156,10 @@ export class UpdateComponent {
           } else if (event.type === HttpEventType.Response) {
             if (event.ok) {
               this.updateStatus = 'success';
-              this.updateMessage = 'AxeOS updated. The page will reload when the device comes back online.';
+              this.updateMessage = this.i18n.t('messages.axeos_updated_reload');
             } else {
               this.updateStatus = 'error';
-              this.updateMessage = event.statusText || 'An unknown error occurred.';
+              this.updateMessage = event.statusText || this.i18n.t('errors.unknown_error');
             }
           }
           else if (event instanceof HttpErrorResponse)
@@ -216,26 +218,26 @@ export class UpdateComponent {
   }
 
   public switchPartition(label: string): void {
-    if (confirm(`Set ${label} as the next boot partition? The device will restart to apply this change.`)) {
+    if (confirm(this.i18n.t('confirm.switch_partition', { label }))) {
       this.systemService.switchBootPartition(label).subscribe({
         next: (resp) => {
           this.toastrService.success(resp.message);
         },
         error: (err) => {
-          this.toastrService.error(err.error?.message || err.message || 'Failed to switch partition');
+          this.toastrService.error(err.error?.message || err.message || this.i18n.t('errors.switch_partition_failed'));
         }
       });
     }
   }
 
   public restart(): void {
-    if (confirm('Are you sure you want to restart the device?')) {
+    if (confirm(this.i18n.t('confirm.restart_device'))) {
       this.systemService.restart().subscribe({
         next: () => {
-          this.toastrService.success('Restart command sent.');
+          this.toastrService.success(this.i18n.t('messages.restart_command_sent'));
         },
         error: (err) => {
-          this.toastrService.error(err.error?.message || err.message || 'Failed to restart device');
+          this.toastrService.error(err.error?.message || err.message || this.i18n.t('errors.restart_failed', { error: '' }));
         }
       });
     }
@@ -252,7 +254,7 @@ export class UpdateComponent {
         );
       },
       error: (err) => {
-        this.toastrService.error(`Failed to change Web UI source. ${getHttpErrorMessage(err)}`);
+        this.toastrService.error(this.i18n.t('errors.web_ui_source_failed', { error: getHttpErrorMessage(err) }));
       }
     });
   }

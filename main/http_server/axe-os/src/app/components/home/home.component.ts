@@ -23,6 +23,7 @@ import { eChartLabel, ChartUnitGroups, chartLabelValue, chartLabelKey } from 'sr
 import { LocalStorageService } from 'src/app/local-storage.service';
 import { GridStack, GridItemHTMLElement } from 'gridstack';
 import { DashboardEditService, WidgetDef } from 'src/app/services/dashboard-edit.service';
+import { I18nService } from 'src/app/i18n/i18n.service';
 
 type PoolLabel = 'Primary' | 'Fallback';
 type ProtocolLabel = 'SV2 Standard Channel' | 'SV2 Extended Channel';
@@ -140,7 +141,7 @@ export class HomeComponent implements OnInit, OnDestroy {
   }
   private grid!: GridStack;
   public editMode = false;
-  public widgetDefs = WIDGET_DEFAULTS;
+  public widgetDefs: WidgetDef[];
   public hiddenWidgets = new Set<string>();
   private stashedWidgets = new Map<string, HTMLElement>();
 
@@ -221,8 +222,27 @@ export class HomeComponent implements OnInit, OnDestroy {
     private shareRejectReasonsService: ShareRejectionExplanationService,
     private storageService: LocalStorageService,
     private dashboardEditService: DashboardEditService,
-    public layoutService: LayoutService
+    public layoutService: LayoutService,
+    private i18n: I18nService,
   ) {
+    const widgetLabelKeys: Record<string, string> = {
+      hashrate: 'miner.hashrate',
+      efficiency: 'miner.efficiency',
+      shares: 'miner.shares',
+      bestdiff: 'miner.best_difficulty',
+      chart: 'common.chart',
+      power: 'miner.power',
+      heat: 'miner.heat',
+      fan: 'miner.fan',
+      pool: 'miner.pool',
+      blockheader: 'miner.block_header',
+      registers: 'miner.hashrate_registers',
+      misc: 'common.misc',
+    };
+    this.widgetDefs = WIDGET_DEFAULTS.map(widget => ({
+      ...widget,
+      label: this.i18n.t(widgetLabelKeys[widget.id]),
+    }));
     this.initializeChart();
 
     effect(() => {
@@ -598,7 +618,10 @@ export class HomeComponent implements OnInit, OnDestroy {
           this.loadPreviousData();
         },
         error: (err: HttpErrorResponse) => {
-          this.toastr.error('Error.', `Could not save chart source. ${getHttpErrorMessage(err, this.uri)}`);
+          this.toastr.error(
+            this.i18n.t('errors.error_title'),
+            this.i18n.t('errors.chart_source_save_failed', { error: getHttpErrorMessage(err, this.uri) })
+          );
         }
       });
   }
@@ -1058,10 +1081,10 @@ export class HomeComponent implements OnInit, OnDestroy {
       .pipe(map(info => {
         const result: SelectOption<PoolLabel>[] = [];
         if (info.stratumURL) {
-          result.push({ label: 'Primary', value: 'Primary' });
+          result.push({ label: this.i18n.t('miner.pool_primary'), value: 'Primary' });
         }
         if (info.fallbackStratumURL) {
-          result.push({ label: 'Fallback', value: 'Fallback' });
+          result.push({ label: this.i18n.t('miner.pool_fallback'), value: 'Fallback' });
         }
         return result;
       }));
@@ -1081,10 +1104,10 @@ export class HomeComponent implements OnInit, OnDestroy {
       )
       .subscribe({
         next: () => {
-          this.toastr.success('Pool changed and device restarted');
+          this.toastr.success(this.i18n.t('messages.pool_changed_restart'));
         },
         error: (err: HttpErrorResponse) => {
-          this.toastr.error(`Error during pool change or device restart: ${getHttpErrorMessage(err, this.uri)}`);
+          this.toastr.error(this.i18n.t('errors.pool_change_failed', { error: getHttpErrorMessage(err, this.uri) }));
         }
       });
   }
@@ -1096,10 +1119,10 @@ export class HomeComponent implements OnInit, OnDestroy {
       )
       .subscribe({
         next: () => {
-          this.toastr.success('Block found notification dismissed');
+          this.toastr.success(this.i18n.t('messages.block_notification_dismissed'));
         },
         error: (err: HttpErrorResponse) => {
-          this.toastr.error(`Error dismissing notification: ${getHttpErrorMessage(err, this.uri)}`);
+          this.toastr.error(this.i18n.t('errors.dismiss_notification_failed', { error: getHttpErrorMessage(err, this.uri) }));
         }
       });
   }
@@ -1108,9 +1131,9 @@ export class HomeComponent implements OnInit, OnDestroy {
     const parts = [this.pageDefaultTitle];
 
     if (info.showNewBlock) {
-      parts.push('Block found 🎉');
+      parts.push(this.i18n.t('messages.block_found_title'));
     } else if (!!systemInfoError.duration) {
-      parts.push('Unable to reach the device');
+      parts.push(this.i18n.t('errors.device_unreachable'));
     } else {
       parts.push(
         info.hostname,
@@ -1186,17 +1209,17 @@ export class HomeComponent implements OnInit, OnDestroy {
       }
     };
 
-    updateMessage(!!systemInfoError.duration, 'SYSTEM_INFO_ERROR', 'error', `Unable to reach the device for ${DateAgoPipe.transform(systemInfoError.duration, { strict: true })}`);
-    updateMessage(!!(info as any).miningPaused, 'MINING_PAUSED', 'warn', 'Mining is paused');
-    updateMessage(!!info.overheat_mode, 'DEVICE_OVERHEAT', 'error', 'Device has overheated - See settings');
-    updateMessage(!!info.power_fault, 'POWER_FAULT', 'error', `${info.power_fault} Check your Power Supply.`);
+    updateMessage(!!systemInfoError.duration, 'SYSTEM_INFO_ERROR', 'error', this.i18n.t('errors.device_unreachable_for', { duration: DateAgoPipe.transform(systemInfoError.duration, { strict: true }) }));
+    updateMessage(!!(info as any).miningPaused, 'MINING_PAUSED', 'warn', this.i18n.t('messages.mining_paused'));
+    updateMessage(!!info.overheat_mode, 'DEVICE_OVERHEAT', 'error', this.i18n.t('messages.device_overheated'));
+    updateMessage(!!info.power_fault, 'POWER_FAULT', 'error', this.i18n.t('messages.power_fault_check', { fault: info.power_fault ?? '' }));
     updateMessage(!!info.hardware_fault, 'HARDWARE_FAULT', 'error', `${info.hardware_fault}`);
-    updateMessage(!info.frequency || info.frequency < 400, 'FREQUENCY_LOW', 'warn', 'Device frequency is set low - See settings');
-    updateMessage(!!info.isUsingFallbackStratum, 'FALLBACK_STRATUM', 'warn', 'Using fallback pool - Share stats reset. Check Pool Settings and / or reboot Device.');
+    updateMessage(!info.frequency || info.frequency < 400, 'FREQUENCY_LOW', 'warn', this.i18n.t('messages.frequency_low'));
+    updateMessage(!!info.isUsingFallbackStratum, 'FALLBACK_STRATUM', 'warn', this.i18n.t('messages.fallback_pool'));
     if (info.coinbaseOutputs && info.coinbaseOutputs.length > 0) {
       let percentage = this.getPayoutPercentage(info);
-      updateMessage(percentage > 0 && percentage < 95, 'NOT_SOLO_MINING', 'warn', `Your share of the mining reward is only ${percentage.toFixed(1)}%`);
-      updateMessage(percentage === 0, 'NO_MINING_REWARD', 'warn', `You don't have a share in the mining reward`);
+      updateMessage(percentage > 0 && percentage < 95, 'NOT_SOLO_MINING', 'warn', this.i18n.t('messages.mining_reward_share', { percentage: percentage.toFixed(1) }));
+      updateMessage(percentage === 0, 'NO_MINING_REWARD', 'warn', this.i18n.t('messages.no_mining_reward'));
     }
   }
 

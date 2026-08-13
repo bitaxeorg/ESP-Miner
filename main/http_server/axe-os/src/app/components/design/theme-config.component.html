@@ -1,28 +1,28 @@
 <div>
   <div class="flex flex-wrap -mx-2">
     <div class="w-full px-2 mb-6">
-      <h5 class="font-medium text-lg mb-2">Color Scheme</h5>
+      <h5 class="font-medium text-lg mb-2">{{ 'settings.theme.color_scheme' | t }}</h5>
       <div class="flex gap-3">
         <div class="flex items-center">
           <app-radio-button name="colorScheme" [value]="'dark'" [(ngModel)]="selectedScheme"
             (onClick)="changeColorScheme('dark')" inputId="dark"></app-radio-button>
-          <label for="dark" class="ml-2 cursor-pointer">Dark</label>
+          <label for="dark" class="ml-2 cursor-pointer">{{ 'settings.theme.dark' | t }}</label>
         </div>
         <div class="flex items-center">
           <app-radio-button name="colorScheme" [value]="'light'" [(ngModel)]="selectedScheme"
             (onClick)="changeColorScheme('light')" inputId="light"></app-radio-button>
-          <label for="light" class="ml-2 cursor-pointer">Light</label>
+          <label for="light" class="ml-2 cursor-pointer">{{ 'settings.theme.light' | t }}</label>
         </div>
         <div class="flex items-center">
           <app-radio-button name="colorScheme" [value]="'white'" [(ngModel)]="selectedScheme"
             (onClick)="changeColorScheme('white')" inputId="white"></app-radio-button>
-          <label for="white" class="ml-2 cursor-pointer">White</label>
+          <label for="white" class="ml-2 cursor-pointer">{{ 'settings.theme.white' | t }}</label>
         </div>
       </div>
     </div>
 
     <div class="w-full px-2 mb-6">
-      <h5 class="font-medium text-lg mb-2">Theme Color</h5>
+      <h5 class="font-medium text-lg mb-2">{{ 'settings.theme.theme_colors' | t }}</h5>
       <div class="flex flex-wrap gap-6">
         @for (theme of themes; track theme) {
           <div class="flex flex-col items-center text-center w-24">
@@ -42,7 +42,7 @@
     </div>
 
     <div class="w-full px-2">
-      <h5 class="font-medium text-lg mb-2">Custom Color</h5>
+      <h5 class="font-medium text-lg mb-2">{{ 'settings.theme.custom_color' | t }}</h5>
       <div class="flex items-center gap-3">
         <input type="color" [ngModel]="currentColor" (change)="onCustomColorChange($event)" 
                class="w-12 h-12 rounded-full border border-surface cursor-pointer bg-transparent p-0 overflow-hidden">

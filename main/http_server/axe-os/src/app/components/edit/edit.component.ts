@@ -1,6 +1,6 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { getHttpErrorMessage } from 'src/app/utils/error-handler';
-import { Component, Input, OnInit, OnDestroy, OnChanges, SimpleChanges } from '@angular/core';
+import { Component, EventEmitter, Input, OnInit, OnDestroy, OnChanges, Output, SimpleChanges } from '@angular/core';
 import { FormBuilder, FormGroup, FormControl, Validators, ReactiveFormsModule } from '@angular/forms';
 import { ToastrService } from 'ngx-toastr';
 import { forkJoin, startWith, Subject, takeUntil, pairwise, BehaviorSubject, Observable, first } from 'rxjs';
@@ -15,6 +15,8 @@ import { CommonModule } from '@angular/common';
 import { TooltipDirective } from '../../directives/tooltip.directive';
 import { CheckboxComponent } from '../checkbox/checkbox.component';
 import { SliderComponent } from '../slider/slider.component';
+import { I18nService } from 'src/app/i18n/i18n.service';
+import { TranslatePipe } from 'src/app/i18n/translate.pipe';
 
 const DISPLAY_TIMEOUT_STEPS = [0, 1, 2, 5, 15, 30, 60, 60 * 2, 60 * 4, 60* 8, -1];
 const STATS_FREQUENCY_STEPS = [0, 1, 2, 5, 10, 30, 60, 60 * 2, 60 * 6, 60 * 14, 60 * 28, 60 * 60];
@@ -31,6 +33,7 @@ const STATS_FREQUENCY_STEPS = [0, 1, 2, 5, 10, 30, 60, 60 * 2, 60 * 6, 60 * 14, 
         SliderComponent,
         TooltipDirective,
         DateAgoPipe,
+        TranslatePipe,
     ]
 })
 
@@ -44,6 +47,7 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
   public settingsUnlocked: boolean = false;
 
   @Input() uri = '';
+  @Output() saveRequested = new EventEmitter<void>();
 
   // Store frequency and voltage options from API
   public defaultFrequency: number = 0;
@@ -55,7 +59,7 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
 
   private destroy$ = new Subject<void>();
 
-  public displays = ["NONE", "SSD1306 (128x32)", "SSD1309 (128x64)", "SH1107 (64x128)", "SH1107 (128x128)"];
+  private readonly displayValues = ["NONE", "SSD1306 (128x32)", "SSD1309 (128x64)", "SH1107 (64x128)", "SH1107 (128x128)"];
   public rotations = [0, 90, 180, 270];
   public displayTimeoutControl: FormControl;
   public statsFrequencyControl: FormControl;
@@ -68,6 +72,7 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
     private toastr: ToastrService,
     private loadingService: LoadingService,
     private route: ActivatedRoute,
+    private i18n: I18nService,
   ) {
     // Check URL parameter for settings unlock
     this.route.queryParams.subscribe(params => {
@@ -262,16 +267,20 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
       .pipe(this.loadingService.lockUIUntilComplete())
       .subscribe({
         next: () => {
-          const successMessage = this.uri ? `Saved settings for ${this.uri}` : 'Saved settings';
+          const successMessage = this.uri
+            ? this.i18n.t('messages.settings_saved_for', { uri: this.uri })
+            : this.i18n.t('messages.settings_saved');
           if (restartRequired) {
-            this.toastr.warning('You must restart this device after saving for changes to take effect.');
+            this.toastr.warning(this.i18n.t('messages.restart_required'));
           }
           this.toastr.success(successMessage);
           this.form.markAsPristine();
           this.savedChanges = restartAlreadyPending || restartRequired;
         },
         error: (err: HttpErrorResponse) => {
-          const errorMessage = `Could not save settings. ${getHttpErrorMessage(err, this.uri)}`;
+          const errorMessage = this.uri
+            ? this.i18n.t('errors.save_failed_for', { uri: this.uri, error: getHttpErrorMessage(err, this.uri) })
+            : this.i18n.t('errors.save_failed', { error: getHttpErrorMessage(err) });
           this.toastr.error(errorMessage);
           this.savedChanges = restartAlreadyPending;
         }
@@ -302,12 +311,16 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
       .pipe(this.loadingService.lockUIUntilComplete())
       .subscribe({
         next: () => {
-          const successMessage = this.uri ? `Device at ${this.uri} restarted` : 'Device restarted';
+          const successMessage = this.uri
+            ? this.i18n.t('messages.device_restarted_at', { uri: this.uri })
+            : this.i18n.t('messages.device_restarted');
           this.toastr.success(successMessage);
           this.savedChanges = false;
         },
         error: (err: HttpErrorResponse) => {
-          const errorMessage = `Failed to restart device. ${getHttpErrorMessage(err, this.uri)}`;
+          const errorMessage = this.uri
+            ? this.i18n.t('errors.restart_failed_for', { uri: this.uri, error: getHttpErrorMessage(err, this.uri) })
+            : this.i18n.t('errors.restart_failed', { error: getHttpErrorMessage(err) });
           this.toastr.error(errorMessage);
         }
       });
@@ -319,7 +332,10 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
   }
 
   get displayOptions(): SelectOption[] {
-    return this.displays.map(display => ({ name: display, value: display }));
+    return this.displayValues.map(value => ({
+      name: value === 'NONE' ? this.i18n.t('settings.device.display.none') : value,
+      value,
+    }));
   }
 
   get rotationOptions(): SelectOption[] {
@@ -348,9 +364,11 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
     }
 
     // Convert options from API to select format
+    const defaultLabel = this.i18n.t('common.default');
+    const customLabel = this.i18n.t('common.custom');
     const options = apiOptions.map(option => {
       return {
-        name: defaultValue === option ? `${option} (Default)` : `${option}`,
+        name: defaultValue === option ? `${option} (${defaultLabel})` : `${option}`,
         value: option
       };
     });
@@ -361,7 +379,7 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
     // If current field value exists and isn't in the options
     if (currentValue && !options.some(opt => opt.value === currentValue)) {
       options.push({
-        name: `${currentValue} (Custom)`,
+        name: `${currentValue} (${customLabel})`,
         value: currentValue
       });
       // Sort options by value
@@ -387,5 +405,10 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
   get isRestartRequired(): boolean {
     return !! Object.entries(this.form.controls)
       .filter(([field, control]) => control.dirty && !this.noRestartFields.includes(field)).length
+  }
+
+  public onSaveClick() {
+    this.saveRequested.emit();
+    this.updateSystem();
   }
 }

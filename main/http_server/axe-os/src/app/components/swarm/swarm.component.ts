@@ -8,6 +8,7 @@ import { LayoutService } from "../../layout/service/app.layout.service";
 import { SystemApiService } from 'src/app/services/system.service';
 import { SystemInfo as ISystemInfo } from 'src/app/generated/models';
 import { ModalComponent } from '../modal/modal.component';
+import { I18nService } from 'src/app/i18n/i18n.service';
 
 const SWARM_DATA = 'SWARM_DATA';
 const SWARM_VERSION = 'SWARM_VERSION';
@@ -86,7 +87,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
 
   getSelectedSortLabel(): string {
     const selected = this.sortOptions.find(opt => opt.value.sortField === this.selectedSort.sortField && opt.value.sortDirection === this.selectedSort.sortDirection);
-    return selected ? selected.label : 'Sort';
+    return selected ? selected.label : this.i18n.t('common.sort');
   }
 
   selectSortOption(value: {sortField: string; sortDirection: string}) {
@@ -110,7 +111,8 @@ export class SwarmComponent implements OnInit, OnDestroy {
     private localStorageService: LocalStorageService,
     public layoutService: LayoutService,
     private systemService: SystemApiService,
-    private httpClient: HttpClient
+    private httpClient: HttpClient,
+    private i18n: I18nService,
   ) {
 
     this.form = this.fb.group({
@@ -331,7 +333,7 @@ private isIpAddress(value: string): boolean {
     forkJoin({
       info: this.httpClient.get<any>(`http://${address}/api/system/info`).pipe(catchError(error => {
         if (error.status === 401 || error.status === 0) {
-          this.toastr.warning(`Potential swarm peer detected at ${address} - upgrade its firmware to be able to add it.`);
+          this.toastr.warning(this.i18n.t('messages.swarm_peer_upgrade', { address }));
           return of({ _corsError: 401 });
         }
         throw error;
@@ -346,7 +348,7 @@ private isIpAddress(value: string): boolean {
       }
 
       if (this.swarm.some(item => item.connectionAddress === info['ipv4'])) {
-        this.toastr.warning('Device already added to the swarm.', `Device at ${address}`);
+        this.toastr.warning(this.i18n.t('messages.device_already_in_swarm'), this.i18n.t('messages.device_at', { ip: address }));
         return;
       }
 
@@ -371,7 +373,7 @@ private isIpAddress(value: string): boolean {
   }
 
   public postAction(device: any, action: string) {
-    if (action === 'restart' && !confirm('Are you sure you want to restart the device?')) {
+    if (action === 'restart' && !confirm(this.i18n.t('confirm.restart_device'))) {
       return;
     }
     this.httpClient.post(`http://${device.connectionAddress}/api/system/${action}`, {}, { responseType: 'text' }).pipe(
@@ -390,14 +392,14 @@ private isIpAddress(value: string): boolean {
         } else if (error.message) {
           errorMsg += `: ${error.message}`;
         }
-        this.toastr.error(errorMsg, `Device at ${this.getDeviceDisplayName(device)}`);
+        this.toastr.error(errorMsg, this.i18n.t('messages.device_at', { ip: this.getDeviceDisplayName(device) }));
         return of(null);
       })
     ).subscribe((res: any) => {
       if (res !== null) {
         let message = res;
         try { message = JSON.parse(res)?.message ?? res; } catch {}
-        this.toastr.success(message, `Device at ${this.getDeviceDisplayName(device)}`);
+        this.toastr.success(message, this.i18n.t('messages.device_at', { ip: this.getDeviceDisplayName(device) }));
         this.refreshList(false);
       }
     });
@@ -411,7 +413,7 @@ private isIpAddress(value: string): boolean {
 
   public refreshErrorHandler = (error: any, address: string) => {
     const errorMessage = error?.message || error?.statusText || error?.toString() || 'Unknown error';
-    this.toastr.error(`Failed to get info: ${errorMessage}`, `Device at ${address}`);
+    this.toastr.error(this.i18n.t('errors.device_info_failed', { error: errorMessage }), this.i18n.t('messages.device_at', { ip: address }));
     const existingDevice = this.swarm.find(axeOs => axeOs.connectionAddress === address);
     return of({
       ...existingDevice,
@@ -609,7 +611,7 @@ private isIpAddress(value: string): boolean {
   }
 
   public stringifyDeviceLabel(data: any): string {
-    const model = data.deviceModel || 'Other';
+    const model = data.deviceModel || this.i18n.t('common.other');
     const asicCountPart = data.asicCount > 1 ? data.asicCount + 'x ' : '';
     const asicModel = data.ASICModel || '';
 
@@ -623,26 +625,26 @@ private isIpAddress(value: string): boolean {
 
   get sortOptions() {
     return [
-      { label: 'Hostname', value: { sortField: 'hostname', sortDirection: 'desc' } },
-      { label: 'Hostname', value: { sortField: 'hostname', sortDirection: 'asc' } },
-      { label: 'Address', value: { sortField: 'address', sortDirection: 'desc' } },
-      { label: 'Address', value: { sortField: 'address', sortDirection: 'asc' } },
-      { label: 'Hashrate', value: { sortField: 'hashRate', sortDirection: 'desc' } },
-      { label: 'Hashrate', value: { sortField: 'hashRate', sortDirection: 'asc' } },
-      { label: 'Shares', value: { sortField: 'sharesAccepted', sortDirection: 'desc' } },
-      { label: 'Shares', value: { sortField: 'sharesAccepted', sortDirection: 'asc' } },
-      { label: 'Best Diff', value: { sortField: 'bestDiff', sortDirection: 'desc' } },
-      { label: 'Best Diff', value: { sortField: 'bestDiff', sortDirection: 'asc' } },
-      { label: 'Uptime', value: { sortField: 'uptimeSeconds', sortDirection: 'desc' } },
-      { label: 'Uptime', value: { sortField: 'uptimeSeconds', sortDirection: 'asc' } },
-      { label: 'Power', value: { sortField: 'power', sortDirection: 'desc' } },
-      { label: 'Power', value: { sortField: 'power', sortDirection: 'asc' } },
-      { label: 'Temp', value: { sortField: 'temp', sortDirection: 'desc' } },
-      { label: 'Temp', value: { sortField: 'temp', sortDirection: 'asc' } },
-      { label: 'Pool Diff', value: { sortField: 'poolDifficulty', sortDirection: 'desc' } },
-      { label: 'Pool Diff', value: { sortField: 'poolDifficulty', sortDirection: 'asc' } },
-      { label: 'Version', value: { sortField: 'version', sortDirection: 'desc' } },
-      { label: 'Version', value: { sortField: 'version', sortDirection: 'asc' } },
+      { label: this.i18n.t('common.hostname'), value: { sortField: 'hostname', sortDirection: 'desc' } },
+      { label: this.i18n.t('common.hostname'), value: { sortField: 'hostname', sortDirection: 'asc' } },
+      { label: this.i18n.t('common.address'), value: { sortField: 'address', sortDirection: 'desc' } },
+      { label: this.i18n.t('common.address'), value: { sortField: 'address', sortDirection: 'asc' } },
+      { label: this.i18n.t('miner.hashrate'), value: { sortField: 'hashRate', sortDirection: 'desc' } },
+      { label: this.i18n.t('miner.hashrate'), value: { sortField: 'hashRate', sortDirection: 'asc' } },
+      { label: this.i18n.t('miner.shares'), value: { sortField: 'sharesAccepted', sortDirection: 'desc' } },
+      { label: this.i18n.t('miner.shares'), value: { sortField: 'sharesAccepted', sortDirection: 'asc' } },
+      { label: this.i18n.t('miner.best_diff'), value: { sortField: 'bestDiff', sortDirection: 'desc' } },
+      { label: this.i18n.t('miner.best_diff'), value: { sortField: 'bestDiff', sortDirection: 'asc' } },
+      { label: this.i18n.t('common.uptime'), value: { sortField: 'uptimeSeconds', sortDirection: 'desc' } },
+      { label: this.i18n.t('common.uptime'), value: { sortField: 'uptimeSeconds', sortDirection: 'asc' } },
+      { label: this.i18n.t('miner.power'), value: { sortField: 'power', sortDirection: 'desc' } },
+      { label: this.i18n.t('miner.power'), value: { sortField: 'power', sortDirection: 'asc' } },
+      { label: this.i18n.t('miner.temp'), value: { sortField: 'temp', sortDirection: 'desc' } },
+      { label: this.i18n.t('miner.temp'), value: { sortField: 'temp', sortDirection: 'asc' } },
+      { label: this.i18n.t('miner.pool_diff'), value: { sortField: 'poolDifficulty', sortDirection: 'desc' } },
+      { label: this.i18n.t('miner.pool_diff'), value: { sortField: 'poolDifficulty', sortDirection: 'asc' } },
+      { label: this.i18n.t('common.version'), value: { sortField: 'version', sortDirection: 'desc' } },
+      { label: this.i18n.t('common.version'), value: { sortField: 'version', sortDirection: 'asc' } },
     ];
   }
 

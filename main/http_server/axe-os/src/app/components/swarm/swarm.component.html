@@ -1,6 +1,6 @@
 
 <div class="card">
-  <h2>Swarm</h2>
+  <h2>{{ 'nav.swarm' | t }}</h2>
 
   @if (swarm.length) {
     <div class="flex flex-wrap -mx-2 mb-4">
@@ -54,13 +54,13 @@
             type="text"
             class="w-full sm:w-48 lg:w-56 pl-9 pr-8 py-2.5 bg-transparent text-main border border-surface rounded outline-none focus:border-primary transition duration-150"
             autocomplete="off"
-            placeholder="Filter"
+            [placeholder]="'common.filter' | t"
             [(ngModel)]="filterText" />
           @if (filterText) {
             <button
               type="button"
               class="absolute right-2 top-1/2 -translate-y-1/2 flex items-center justify-center w-6 h-6 rounded hover:bg-bg-hover border-none bg-transparent cursor-pointer"
-              appTooltip="Clear"
+              [appTooltip]="'actions.clear' | t"
               tooltipPosition="top"
               (click)="filterText = ''">
               <i class="pi pi-times text-xs text-secondary"></i>
@@ -74,7 +74,7 @@
             [class.bg-bg-card]="!gridView"
             [class.shadow]="!gridView"
             [class.opacity-50]="gridView"
-            appTooltip="List View"
+            [appTooltip]="'actions.list_view' | t"
             tooltipPosition="top"
             (click)="toggleGridView(false)">
             <i class="pi pi-list"></i>
@@ -85,7 +85,7 @@
             [class.bg-bg-card]="gridView"
             [class.shadow]="gridView"
             [class.opacity-50]="!gridView"
-            appTooltip="Grid View"
+            [appTooltip]="'actions.grid_view' | t"
             tooltipPosition="top"
             (click)="toggleGridView(true)">
             <i class="pi pi-th-large"></i>
@@ -103,21 +103,21 @@
                   <div class="flex flex-col">
                     <div class="flex flex-col">
                       <div class="whitespace-nowrap">
-                        <a [href]="'http://' + getDeviceLink(axe)" target="_blank" appTooltip="Hostname" tooltipPosition="top" class="underline">
+                        <a [href]="'http://' + getDeviceLink(axe)" target="_blank" [appTooltip]="'common.hostname' | t" tooltipPosition="top" class="underline">
                           {{getDeviceDisplayName(axe)}}
                         </a>
                         <span class="ml-1 text-lg leading-none cursor-pointer" [ngStyle]="{color: axe.swarmColor}" appTooltip="{{stringifyDeviceLabel(axe)}}" tooltipPosition="top">
                           ●
                         </span>
                         @if (isThisDevice(axe)) {
-                          <span class="ml-1 cursor-pointer" appTooltip="This device" tooltipPosition="top">
+                          <span class="ml-1 cursor-pointer" [appTooltip]="'common.this_device' | t" tooltipPosition="top">
                             <i class="pi pi-star-fill text-xs text-yellow-500"></i>
                           </span>
                         }
                       </div>
                       <span class="text-secondary text-sm">{{axe.ipv4}}</span>
                     </div>
-                    <span class="text-secondary text-sm cursor-pointer mt-1" appTooltip="Version" tooltipPosition="top">
+                    <span class="text-secondary text-sm cursor-pointer mt-1" [appTooltip]="'common.version' | t" tooltipPosition="top">
                       {{axe.version}}
                     </span>
                     <span class="text-secondary text-sm cursor-pointer" appTooltip="Uptime: {{axe.uptimeSeconds | dateAgo}}" tooltipPosition="top">
@@ -128,7 +128,7 @@
                     <button
                       type="button"
                       class="btn btn-secondary p-2 text-sm cursor-pointer"
-                      appTooltip="Edit"
+                      [appTooltip]="'actions.edit' | t"
                       tooltipPosition="top"
                       (click)="edit(axe)">
                       <i class="pi pi-pencil"></i>
@@ -144,7 +144,7 @@
                     <button
                       type="button"
                       class="btn btn-secondary p-2 text-sm cursor-pointer"
-                      appTooltip="Restart"
+                      [appTooltip]="'actions.restart' | t"
                       tooltipPosition="top"
                       (click)="postAction(axe, 'restart')">
                       <i class="pi pi-refresh"></i>
@@ -152,7 +152,7 @@
                     <button
                       type="button"
                       class="btn btn-secondary p-2 text-sm cursor-pointer"
-                      appTooltip="Identify"
+                      [appTooltip]="'actions.identify' | t"
                       tooltipPosition="top"
                       (click)="postAction(axe, 'identify')">
                       <i class="pi pi-lightbulb"></i>
@@ -160,7 +160,7 @@
                     <button
                       type="button"
                       class="btn btn-secondary p-2 text-sm cursor-pointer hover:bg-red-500 hover:text-white"
-                      appTooltip="Remove"
+                      [appTooltip]="'actions.remove' | t"
                       tooltipPosition="top"
                       (click)="remove(axe)">
                       <i class="pi pi-trash"></i>
@@ -175,33 +175,33 @@
                   </div>
                 </div>
                 <div class="flex flex-col text-right whitespace-nowrap cursor-pointer">
-                  <span appTooltip="Hashrate" tooltipPosition="top" class="font-medium text-lg">
+                  <span [appTooltip]="'miner.hashrate' | t" tooltipPosition="top" class="font-medium text-lg">
                     {{axe.hashRate | hashSuffix}}
                   </span>
                   <div>
-                    <span class="text-secondary cursor-pointer mr-2" appTooltip="Shares Rejected" tooltipPosition="top">
+                    <span class="text-secondary cursor-pointer mr-2" [appTooltip]="'miner.shares_rejected' | t" tooltipPosition="top">
                       {{axe.sharesRejected | number: '1.0-0'}}
                     </span>
-                    <span class="cursor-pointer font-medium" appTooltip="Shares Accepted" tooltipPosition="top">
+                    <span class="cursor-pointer font-medium" [appTooltip]="'miner.shares_accepted' | t" tooltipPosition="top">
                       {{axe.sharesAccepted | number: '1.0-0'}}
                     </span>
                   </div>
                   <div>
-                    <span class="text-secondary cursor-pointer mr-2 text-xs" appTooltip="Best Session Diff" tooltipPosition="top">
+                    <span class="text-secondary cursor-pointer mr-2 text-xs" [appTooltip]="'miner.best_session_diff' | t" tooltipPosition="top">
                       {{axe.bestSessionDiff | diffSuffix}}
                     </span>
-                    <span class="cursor-pointer text-xs font-medium" appTooltip="Best Diff" tooltipPosition="top">
+                    <span class="cursor-pointer text-xs font-medium" [appTooltip]="'miner.best_diff' | t" tooltipPosition="top">
                       {{axe.bestDiff | diffSuffix}}
                     </span>
                   </div>
                   <div>
                     @if (axe.vrTemp) {
-                      <span class="text-secondary cursor-pointer mr-2" [ngClass]="{'text-red-500 font-bold': axe.vrTemp > 105}" appTooltip="Voltage Regulator Temperature" tooltipPosition="top">
+                      <span class="text-secondary cursor-pointer mr-2" [ngClass]="{'text-red-500 font-bold': axe.vrTemp > 105}" [appTooltip]="'miner.voltage_regulator_temperature' | t" tooltipPosition="top">
                         {{axe.vrTemp | number: '1.0-1'}} °C
                       </span>
                     }
                     @if (axe.temp2 > 0) {
-                      <span class="cursor-pointer mr-2" [ngClass]="{'text-red-500 font-bold': axe.temp2 > 70}" appTooltip="ASIC Temperature 2" tooltipPosition="top">
+                      <span class="cursor-pointer mr-2" [ngClass]="{'text-red-500 font-bold': axe.temp2 > 70}" [appTooltip]="'miner.asic_temperature_2' | t" tooltipPosition="top">
                         {{axe.temp2 | number: '1.0-1'}} °C
                       </span>
                     }
@@ -213,10 +213,10 @@
                       }
                     </span>
                   </div>
-                  <span class="cursor-pointer text-sm font-medium" appTooltip="Power" tooltipPosition="top">
+                  <span class="cursor-pointer text-sm font-medium" [appTooltip]="'miner.power' | t" tooltipPosition="top">
                     {{axe.power | number: '1.1-1'}} W
                   </span>
-                  <span class="cursor-pointer text-sm" appTooltip="Pool Diff" tooltipPosition="top">
+                  <span class="cursor-pointer text-sm" [appTooltip]="'miner.pool_diff' | t" tooltipPosition="top">
                     {{axe.poolDifficulty}}
                   </span>
                 </div>
@@ -408,8 +408,8 @@
       }
       <div class="md:ml-auto flex flex-col md:flex-row gap-3">
         <div class="flex items-stretch border border-surface rounded overflow-hidden">
-          <input placeholder="Add Device by Address" formControlName="manualAddAddress" type="text" class="px-3 py-2 bg-transparent text-main outline-none xl:w-80" />
-          <button [disabled]="form.invalid" (click)="add()" class="btn btn-primary border-none rounded-none px-4">Add</button>
+          <input [placeholder]="'common.add_device_by_ip' | t" formControlName="manualAddAddress" type="text" class="px-3 py-2 bg-transparent text-main outline-none xl:w-80" />
+          <button [disabled]="form.invalid" (click)="add()" class="btn btn-primary border-none rounded-none px-4">{{ 'actions.add' | t }}</button>
         </div>
         <button (click)="scanNetwork()" [disabled]="scanning" class="btn btn-secondary whitespace-nowrap w-full md:w-auto text-center">
           {{scanning ? 'Scanning...' : 'Auto Scan'}}

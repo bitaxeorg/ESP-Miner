@@ -8,6 +8,7 @@ import { ReactiveFormsModule } from '@angular/forms';
 import { provideToastr } from 'ngx-toastr';
 import { LogsComponent } from './logs.component';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { TranslatePipe } from 'src/app/i18n/translate.pipe';
 
 describe('LogsComponent', () => {
   let component: LogsComponent;
@@ -20,7 +21,8 @@ describe('LogsComponent', () => {
         CommonModule,
         ReactiveFormsModule,
         TooltipDirective,
-        ANSIPipe
+        ANSIPipe,
+        TranslatePipe
       ],
       providers: [
         provideRouter([]),

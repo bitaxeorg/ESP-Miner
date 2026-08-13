@@ -5,6 +5,7 @@ import { NetworkEditComponent } from '../network-edit/network.edit.component';
 import { provideHttpClient } from '@angular/common/http';
 import { provideToastr } from 'ngx-toastr';
 import { DialogService } from 'src/app/services/dialog.service';
+import { TranslatePipe } from 'src/app/i18n/translate.pipe';
 
 describe('NetworkComponent', () => {
   let component: NetworkComponent;
@@ -13,6 +14,7 @@ describe('NetworkComponent', () => {
   beforeEach(() => {
     TestBed.configureTestingModule({
       declarations: [NetworkComponent, NetworkEditComponent],
+      imports: [TranslatePipe],
       providers: [provideHttpClient(), provideToastr(), DialogService]
     });
     fixture = TestBed.createComponent(NetworkComponent);
@@ -24,4 +26,3 @@ describe('NetworkComponent', () => {
     expect(component).toBeTruthy();
   });
 });
-

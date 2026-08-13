@@ -4,6 +4,7 @@ import { Subscription } from 'rxjs';
 import { ToastrService } from 'ngx-toastr';
 import { WebsocketService } from 'src/app/services/web-socket.service';
 import { SystemApiService } from 'src/app/services/system.service';
+import { I18nService } from 'src/app/i18n/i18n.service';
 
 @Component({
     selector: 'app-logs',
@@ -32,6 +33,7 @@ export class LogsComponent implements OnInit, OnDestroy, AfterViewChecked {
     private websocketService: WebsocketService,
     private systemApiService: SystemApiService,
     private toastr: ToastrService,
+    private i18n: I18nService,
   ) {}
 
   ngOnInit(): void {
@@ -88,7 +90,7 @@ export class LogsComponent implements OnInit, OnDestroy, AfterViewChecked {
           }
         },
         error: (error) => {
-          this.toastr.error("Error opening websocket connection");
+          this.toastr.error(this.i18n.t('errors.websocket_connection_failed'));
         }
       })
   }
@@ -109,12 +111,12 @@ export class LogsComponent implements OnInit, OnDestroy, AfterViewChecked {
         document.body.appendChild(a);
         a.click();
         window.URL.revokeObjectURL(url);
-        this.toastr.success("Logs downloaded successfully");
+        this.toastr.success(this.i18n.t('messages.logs_downloaded'));
         this.loadingLogs = false;
       },
       error: (error) => {
         console.error('There was a problem with the log download:', error);
-        this.toastr.error("Failed to download logs");
+        this.toastr.error(this.i18n.t('errors.logs_download_failed'));
         this.loadingLogs = false;
       }
     });
