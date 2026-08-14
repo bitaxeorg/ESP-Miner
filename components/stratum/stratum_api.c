@@ -292,9 +292,19 @@ static bool parse_mining_notify(cJSON *json, StratumApiV1Message *message)
     }
 
     new_work->job_id = strdup(job_id_item->valuestring);
-    new_work->prev_block_hash = strdup(cJSON_GetArrayItem(params, 1)->valuestring);
-    new_work->coinbase_1 = strdup(cJSON_GetArrayItem(params, 2)->valuestring);
-    new_work->coinbase_2 = strdup(cJSON_GetArrayItem(params, 3)->valuestring);
+
+    cJSON *prev_block_hash_item = cJSON_GetArrayItem(params, 1);
+    cJSON *coinbase_1_item = cJSON_GetArrayItem(params, 2);
+    cJSON *coinbase_2_item = cJSON_GetArrayItem(params, 3);
+    if (!cJSON_IsString(prev_block_hash_item) || !cJSON_IsString(coinbase_1_item) || !cJSON_IsString(coinbase_2_item)) {
+        ESP_LOGE(TAG, "Invalid prev_block_hash/coinbase in mining.notify");
+        free(new_work->job_id);
+        free(new_work);
+        return false;
+    }
+    new_work->prev_block_hash = strdup(prev_block_hash_item->valuestring);
+    new_work->coinbase_1 = strdup(coinbase_1_item->valuestring);
+    new_work->coinbase_2 = strdup(coinbase_2_item->valuestring);
 
     cJSON *merkle_branch = cJSON_GetArrayItem(params, 4);
     if (!merkle_branch || !cJSON_IsArray(merkle_branch)) {
@@ -318,12 +328,36 @@ static bool parse_mining_notify(cJSON *json, StratumApiV1Message *message)
     }
     new_work->merkle_branches = malloc(HASH_SIZE * new_work->n_merkle_branches);
     for (size_t i = 0; i < new_work->n_merkle_branches; i++) {
-        hex2bin(cJSON_GetArrayItem(merkle_branch, i)->valuestring, new_work->merkle_branches + HASH_SIZE * i, HASH_SIZE);
+        cJSON *branch_item = cJSON_GetArrayItem(merkle_branch, i);
+        if (!cJSON_IsString(branch_item)) {
+            ESP_LOGE(TAG, "Invalid merkle branch %zu in mining.notify", i);
+            free(new_work->merkle_branches);
+            free(new_work->job_id);
+            free(new_work->prev_block_hash);
+            free(new_work->coinbase_1);
+            free(new_work->coinbase_2);
+            free(new_work);
+            return false;
+        }
+        hex2bin(branch_item->valuestring, new_work->merkle_branches + HASH_SIZE * i, HASH_SIZE);
     }
 
-    new_work->version = strtoul(cJSON_GetArrayItem(params, 5)->valuestring, NULL, 16);
-    new_work->target = strtoul(cJSON_GetArrayItem(params, 6)->valuestring, NULL, 16);
-    new_work->ntime = strtoul(cJSON_GetArrayItem(params, 7)->valuestring, NULL, 16);
+    cJSON *version_item = cJSON_GetArrayItem(params, 5);
+    cJSON *target_item = cJSON_GetArrayItem(params, 6);
+    cJSON *ntime_item = cJSON_GetArrayItem(params, 7);
+    if (!cJSON_IsString(version_item) || !cJSON_IsString(target_item) || !cJSON_IsString(ntime_item)) {
+        ESP_LOGE(TAG, "Invalid version/target/ntime in mining.notify");
+        free(new_work->merkle_branches);
+        free(new_work->job_id);
+        free(new_work->prev_block_hash);
+        free(new_work->coinbase_1);
+        free(new_work->coinbase_2);
+        free(new_work);
+        return false;
+    }
+    new_work->version = strtoul(version_item->valuestring, NULL, 16);
+    new_work->target = strtoul(target_item->valuestring, NULL, 16);
+    new_work->ntime = strtoul(ntime_item->valuestring, NULL, 16);
 
     // params can be variable length
     int paramsLength = cJSON_GetArraySize(params);
