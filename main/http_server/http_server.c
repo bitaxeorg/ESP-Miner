@@ -2152,7 +2152,6 @@ static void prometheus_write_metric(httpd_req_t *req, const char *name, const ch
 }
 
 static esp_err_t GET_system_metrics(httpd_req_t *req) {
-    ESP_LOGI(TAG, "GET_system_metrics handler called");
     char label_buf[512];
     httpd_resp_set_type(req, "text/plain; version=0.0.4; charset=utf-8");
 
