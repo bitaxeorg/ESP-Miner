@@ -76,6 +76,7 @@ static void parse_pool_config_json(const char *json_str, PoolConfig *cfg, int in
     cfg->tls = index == 0 ? CONFIG_STRATUM_TLS : 0;
     cfg->cert = strdup("");
     cfg->decode_coinbase_tx = true;
+    cfg->share_warning = true;
     cfg->sv2_channel_type = SV2_CHANNEL_EXTENDED;
     cfg->sv2_authority_pubkey = strdup("");
     cfg->sv2_require_auth = false;
@@ -144,6 +145,11 @@ static void parse_pool_config_json(const char *json_str, PoolConfig *cfg, int in
     item = cJSON_GetObjectItem(root, "stratumDecodeCoinbase");
     if (item && (cJSON_IsBool(item) || cJSON_IsNumber(item))) {
         cfg->decode_coinbase_tx = cJSON_IsTrue(item) || (cJSON_IsNumber(item) && item->valueint != 0);
+    }
+
+    item = cJSON_GetObjectItem(root, "stratumShareWarning");
+    if (item && (cJSON_IsBool(item) || cJSON_IsNumber(item))) {
+        cfg->share_warning = cJSON_IsTrue(item) || (cJSON_IsNumber(item) && item->valueint != 0);
     }
 
     item = cJSON_GetObjectItem(root, "stratumV2ChannelType");
@@ -485,6 +491,8 @@ void SYSTEM_notify_new_ntime(GlobalState * GLOBAL_STATE, uint32_t ntime)
 void SYSTEM_reset_coinbase_ui_state(GlobalState * GLOBAL_STATE, const char *scriptsig_msg)
 {
     GLOBAL_STATE->coinbase_output_count = 0;
+    GLOBAL_STATE->coinbase_others_count = 0;
+    GLOBAL_STATE->coinbase_others_value_satoshis = 0;
     GLOBAL_STATE->coinbase_value_total_satoshis = 0;
     GLOBAL_STATE->coinbase_value_user_satoshis = 0;
     if (scriptsig_msg) {
@@ -575,9 +583,13 @@ void SYSTEM_decode_and_apply_coinbase(GlobalState * GLOBAL_STATE, const miner_jo
              result->decode_coinbase_tx ? " sats" : "");
 
     if (result->output_count != GLOBAL_STATE->coinbase_output_count ||
+        result->others_count != GLOBAL_STATE->coinbase_others_count ||
+        result->others_value_satoshis != GLOBAL_STATE->coinbase_others_value_satoshis ||
         memcmp(result->outputs, GLOBAL_STATE->coinbase_outputs, sizeof(coinbase_output_t) * result->output_count) != 0) {
 
         GLOBAL_STATE->coinbase_output_count = result->output_count;
+        GLOBAL_STATE->coinbase_others_count = result->others_count;
+        GLOBAL_STATE->coinbase_others_value_satoshis = result->others_value_satoshis;
         memcpy(GLOBAL_STATE->coinbase_outputs, result->outputs, sizeof(coinbase_output_t) * result->output_count);
         GLOBAL_STATE->coinbase_value_user_satoshis = result->user_value_satoshis;
         for (int i = 0; i < result->output_count; i++) {
@@ -592,6 +604,9 @@ void SYSTEM_decode_and_apply_coinbase(GlobalState * GLOBAL_STATE, const miner_jo
             } else {
                 ESP_LOGI(TAG, "  Output %d: %s", i, result->outputs[i].address);
             }
+        }
+        if (result->others_count > 0) {
+            ESP_LOGI(TAG, "  + %d other output(s) aggregated (%llu sat)", result->others_count, result->others_value_satoshis);
         }
     }
 
