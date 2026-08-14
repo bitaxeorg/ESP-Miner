@@ -387,6 +387,10 @@ void stratum_v1_task(void *pvParameters)
                         ESP_LOGW(TAG, "Extranonce_2_len %d exceeds maximum %d, clamping to maximum",
                                  stratum_api_v1_message.extranonce_2_len, MAX_EXTRANONCE_2_LEN);
                         stratum_api_v1_message.extranonce_2_len = MAX_EXTRANONCE_2_LEN;
+                    } else if (stratum_api_v1_message.extranonce_2_len < 1) {
+                        ESP_LOGW(TAG, "Extranonce_2_len %d invalid, rejecting",
+                                 stratum_api_v1_message.extranonce_2_len);
+                        break;
                     }
                     ESP_LOGI(TAG, "Set extranonce: %s, extranonce_2_len: %d", stratum_api_v1_message.extranonce_str, stratum_api_v1_message.extranonce_2_len);
                     {

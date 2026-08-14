@@ -416,15 +416,18 @@ static bool parse_set_extranonce(cJSON *json, StratumApiV1Message *message)
         ESP_LOGE(TAG, "Invalid extranonce data in set_extranonce");
         return false;
     }
-    if (message->extranonce_str) free(message->extranonce_str);
-    message->extranonce_str = strdup(extranonce1->valuestring);
-    
     int extranonce_2_len = extranonce2_size->valueint;
+    if (extranonce_2_len < 1) {
+        ESP_LOGE(TAG, "Invalid extranonce_2_len %d in set_extranonce", extranonce_2_len);
+        return false;
+    }
     if (extranonce_2_len > MAX_EXTRANONCE_2_LEN) {
         ESP_LOGW(TAG, "Extranonce_2_len %d exceeds maximum %d, clamping to maximum",
                  extranonce_2_len, MAX_EXTRANONCE_2_LEN);
         extranonce_2_len = MAX_EXTRANONCE_2_LEN;
     }
+    if (message->extranonce_str) free(message->extranonce_str);
+    message->extranonce_str = strdup(extranonce1->valuestring);
     message->extranonce_2_len = extranonce_2_len;
     ESP_LOGI(TAG, "Set extranonce: %s, size: %d", message->extranonce_str, message->extranonce_2_len);
     return true;
@@ -475,15 +478,18 @@ static bool parse_subscribe_result(cJSON *json, StratumApiV1Message *message)
         return false;
     }
 
-    if (message->extranonce_str) free(message->extranonce_str);
-    message->extranonce_str = strdup(extranonce->valuestring);
-    
     int extranonce_2_len = extranonce2_len->valueint;
+    if (extranonce_2_len < 1) {
+        ESP_LOGE(TAG, "Invalid extranonce_2_len %d in subscribe result", extranonce_2_len);
+        return false;
+    }
     if (extranonce_2_len > MAX_EXTRANONCE_2_LEN) {
         ESP_LOGW(TAG, "Extranonce_2_len %d exceeds maximum %d, clamping to maximum", 
                  extranonce_2_len, MAX_EXTRANONCE_2_LEN);
         extranonce_2_len = MAX_EXTRANONCE_2_LEN;
     }
+    if (message->extranonce_str) free(message->extranonce_str);
+    message->extranonce_str = strdup(extranonce->valuestring);
     message->extranonce_2_len = extranonce_2_len;
     message->response_success = true;
     ESP_LOGI(TAG, "Subscribe result: extranonce=%s, extranonce2_len=%d",
