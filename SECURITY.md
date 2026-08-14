@@ -10,15 +10,15 @@ An esp-miner maintainer will send a response indicating the next steps in handli
 
 The following maintainers with merge permissions manage security reports and releases for esp-miner:
 
-| Maintainer | GitHub | Verification Keys (GPG / SSH) |
-|------------|--------|-------------------------------|
-| Skot | [@skot](https://github.com/skot) | SSH: [`skot.keys`](https://github.com/skot.keys) |
-| mutatrum | [@mutatrum](https://github.com/mutatrum) | SSH: [`mutatrum.keys`](https://github.com/mutatrum.keys) |
-| WantClue | [@WantClue](https://github.com/WantClue) | SSH: [`WantClue.keys`](https://github.com/WantClue.keys) |
-| johnny9 | [@johnny9](https://github.com/johnny9) | SSH: [`johnny9.keys`](https://github.com/johnny9.keys) |
-| Benjamin Wilson | [@wilsob12](https://github.com/wilsob12) | SSH: [`wilsob12.keys`](https://github.com/wilsob12.keys) |
-| Erik Olof Gunnar Andersson | [@eandersson](https://github.com/eandersson) | GPG: `06BA 5E6E E8A3 21AD 2996 0228 199A 0FFE 5AAA 0452`<br>SSH: [`eandersson.keys`](https://github.com/eandersson.keys) |
-| 0xf0xx0 | [@0xf0xx0](https://github.com/0xf0xx0) | GPG: [`0xf0xx0.gpg`](https://github.com/0xf0xx0.gpg) |
+| Maintainer | email | SSH | GPG |
+|------------|-------|-----|-----|
+| [skot](https://github.com/skot) | | [`skot.keys`](https://github.com/skot.keys) | |
+| [Johnny](https://github.com/johnny9) | | [`johnny9.keys`](https://github.com/johnny9.keys) | |
+| [Benjamin Wilson](https://github.com/benjamin-wilson) | | | |
+| [WantClue](https://github.com/WantClue) | | [`WantClue.keys`](https://github.com/WantClue.keys) | |
+| [mutatrum](https://github.com/mutatrum) | [mutatrum@gmail.com](mutatrum@gmail.com) | [`mutatrum.keys`](https://github.com/mutatrum.keys) | |
+| [Erik Olof Gunnar Andersson](https://github.com/eandersson) | | [`eandersson.keys`](https://github.com/eandersson.keys) | `06BA 5E6E E8A3 21AD 2996 0228 199A 0FFE 5AAA 0452` |
+| [0xf0xx0](https://github.com/0xf0xx0) | | | [`0xf0xx0.gpg`](https://github.com/0xf0xx0.gpg) |
 
 ### Verifying Signatures
 
