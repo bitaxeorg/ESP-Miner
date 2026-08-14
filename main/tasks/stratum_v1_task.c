@@ -170,32 +170,7 @@ static void decode_mining_notification(GlobalState * GLOBAL_STATE, const mining_
     }
 
     // Update coinbase outputs
-    // Safety guard: ensure output_count doesn't exceed array capacity
-    if (result->output_count > MAX_COINBASE_TX_OUTPUTS) {
-        result->output_count = MAX_COINBASE_TX_OUTPUTS;
-    }
-
-    GLOBAL_STATE->coinbase_value_total_satoshis = result->total_value_satoshis;
-    ESP_LOGI(TAG, "Coinbase outputs: %d, total value: %llu%s", result->output_count, result->total_value_satoshis, result->decode_coinbase_tx ? " sats" : "");
-
-    if (result->output_count != GLOBAL_STATE->coinbase_output_count ||
-        memcmp(result->outputs, GLOBAL_STATE->coinbase_outputs, sizeof(coinbase_output_t) * result->output_count) != 0) {
-
-        GLOBAL_STATE->coinbase_output_count = result->output_count;
-        memcpy(GLOBAL_STATE->coinbase_outputs, result->outputs, sizeof(coinbase_output_t) * result->output_count);
-        GLOBAL_STATE->coinbase_value_user_satoshis = result->user_value_satoshis;
-        for (int i = 0; i < result->output_count; i++) {
-            if (result->outputs[i].value_satoshis > 0) {
-                if (result->outputs[i].is_user_output) {
-                    ESP_LOGI(TAG, "  Output %d: %s (%llu sat) (Your payout address)", i, result->outputs[i].address, result->outputs[i].value_satoshis);
-                } else {
-                    ESP_LOGI(TAG, "  Output %d: %s (%llu sat)", i, result->outputs[i].address, result->outputs[i].value_satoshis);
-                }
-            } else {
-                ESP_LOGI(TAG, "  Output %d: %s", i, result->outputs[i].address);
-            }
-        }
-    }
+    SYSTEM_update_coinbase_outputs(GLOBAL_STATE, result);
 
     free(result);
 }

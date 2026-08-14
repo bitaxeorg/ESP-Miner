@@ -82,6 +82,9 @@ components:
         stratumDecodeCoinbase:
           type: boolean
           description: Enable pool coinbase transaction decoding
+        stratumShareWarning:
+          type: boolean
+          description: Warn on the dashboard when the payout share of the coinbase reward is low. Disable for pools that pay miners directly through many coinbase outputs.
         stratumV2ChannelType:
           type: string
           enum: [standard, extended]
@@ -237,6 +240,7 @@ components:
         - fallbackStratumTLS
         - fallbackStratumCert
         - fallbackStratumDecodeCoinbase
+        - fallbackStratumShareWarning
         - fanrpm
         - fan2rpm
         - fanspeed
@@ -294,6 +298,7 @@ components:
         - stratumTLS
         - stratumCert
         - stratumDecodeCoinbase
+        - stratumShareWarning
         - temp
         - temp2
         - uptimeSeconds
@@ -312,6 +317,8 @@ components:
         - blockFound
         - coinbaseValueTotalSatoshis
         - coinbaseValueUserSatoshis
+        - coinbaseOthersCount
+        - coinbaseOthersValueSatoshis
         - miningPaused
         - statsLimit
         - partitions
@@ -371,6 +378,9 @@ components:
         fallbackStratumDecodeCoinbase:
           type: boolean
           description: Enable fallback pool coinbase transaction decoding
+        fallbackStratumShareWarning:
+          type: boolean
+          description: Warn on the dashboard when the payout share of the coinbase reward is low, while mining on the fallback pool
         fallbackStratumProtocol:
           type: string
           enum: [SV1, SV2]
@@ -593,6 +603,9 @@ components:
         stratumDecodeCoinbase:
           type: boolean
           description: Enable primary pool coinbase transaction decoding
+        stratumShareWarning:
+          type: boolean
+          description: Warn on the dashboard when the payout share of the coinbase reward is low, while mining on the primary pool
         temp:
           type: number
           description: Average chip temperature
@@ -668,6 +681,12 @@ components:
         coinbaseValueUserSatoshis:
           type: integer
           description: User's portion of coinbase value in satoshis
+        coinbaseOthersCount:
+          type: integer
+          description: Number of payout outputs that did not fit in coinbaseOutputs
+        coinbaseOthersValueSatoshis:
+          type: integer
+          description: Summed value in satoshis of the outputs counted in coinbaseOthersCount
         hashrateMonitor:
           type: object
           required:

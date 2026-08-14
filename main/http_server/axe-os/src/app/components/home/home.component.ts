@@ -183,6 +183,8 @@ export class HomeComponent implements OnInit, OnDestroy {
   public expectedEfficiency: number = 0;
   public activePoolUserAddressPart: string = '';
   public activePoolUserSuffixPart: string = '';
+  public activePoolShareWarning: boolean = true;
+  public orderedCoinbaseOutputs: ISystemInfo['coinbaseOutputs'] = [];
   public sortedRejectionReasons: Array<{ message: string; count: number; percentage: number }> = [];
   public networkDifficultyPercentage: string = '0';
   public payoutPercentage: number = -1;
@@ -944,6 +946,7 @@ export class HomeComponent implements OnInit, OnDestroy {
         this.activePoolURL = isFallbackPool ? info.fallbackStratumURL : info.stratumURL;
         this.activePoolUser = isFallbackPool ? info.fallbackStratumUser : info.stratumUser;
         this.activePoolPort = isFallbackPool ? info.fallbackStratumPort : info.stratumPort;
+        this.activePoolShareWarning = !!(isFallbackPool ? info.fallbackStratumShareWarning : info.stratumShareWarning);
         const activeProtocol = isFallbackPool ? info.fallbackStratumProtocol : info.stratumProtocol;
         if (activeProtocol === 'SV2') {
           const channelType = isFallbackPool ? info.fallbackStratumV2ChannelType : info.stratumV2ChannelType;
@@ -955,6 +958,7 @@ export class HomeComponent implements OnInit, OnDestroy {
 
         this.activePoolUserAddressPart = this.getAddressPart(this.activePoolUser);
         this.activePoolUserSuffixPart = this.getSuffixPart(this.activePoolUser);
+        this.orderedCoinbaseOutputs = this.getOrderedCoinbaseOutputs(info);
 
         const totalShares = info.sharesAccepted + info.sharesRejected;
         this.sortedRejectionReasons = [...(info.sharesRejectedReasons ?? [])]
@@ -1154,6 +1158,19 @@ export class HomeComponent implements OnInit, OnDestroy {
     return index;
   }
 
+  // Pools that pay miners directly from the coinbase can push the user's own output far down
+  // the list, so lift it to the top. Outputs beyond the firmware's capacity are not in this
+  // array at all; they are summarised by coinbaseOthersCount / coinbaseOthersValueSatoshis.
+  getOrderedCoinbaseOutputs(info: ISystemInfo): ISystemInfo['coinbaseOutputs'] {
+    const outputs = info.coinbaseOutputs ?? [];
+    if (outputs.length <= 1 || !this.activePoolUserAddressPart) return outputs;
+
+    const userOutputs = outputs.filter(o => o.address === this.activePoolUserAddressPart);
+    if (!userOutputs.length) return outputs;
+
+    return [...userOutputs, ...outputs.filter(o => o.address !== this.activePoolUserAddressPart)];
+  }
+
   getPayoutPercentage(info: ISystemInfo) {
     if (info.coinbaseValueTotalSatoshis) {
       return (info.coinbaseValueUserSatoshis ?? 0) / info.coinbaseValueTotalSatoshis * 100;
@@ -1195,8 +1212,9 @@ export class HomeComponent implements OnInit, OnDestroy {
     updateMessage(!!info.isUsingFallbackStratum, 'FALLBACK_STRATUM', 'warn', 'Using fallback pool - Share stats reset. Check Pool Settings and / or reboot Device.');
     if (info.coinbaseOutputs && info.coinbaseOutputs.length > 0) {
       let percentage = this.getPayoutPercentage(info);
-      updateMessage(percentage > 0 && percentage < 95, 'NOT_SOLO_MINING', 'warn', `Your share of the mining reward is only ${percentage.toFixed(1)}%`);
-      updateMessage(percentage === 0, 'NO_MINING_REWARD', 'warn', `You don't have a share in the mining reward`);
+      const warn = this.activePoolShareWarning;
+      updateMessage(warn && percentage > 0 && percentage < 95, 'NOT_SOLO_MINING', 'warn', `Your share of the mining reward is only ${percentage.toFixed(1)}%`);
+      updateMessage(warn && percentage === 0, 'NO_MINING_REWARD', 'warn', `You don't have a share in the mining reward`);
     }
   }
 

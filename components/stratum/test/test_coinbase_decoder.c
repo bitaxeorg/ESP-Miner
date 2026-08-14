@@ -277,3 +277,61 @@ TEST_CASE("BIP-110 signaling expired", "[coinbase_decoder]")
     TEST_ASSERT_EQUAL(965664, result.block_height);
     TEST_ASSERT_FALSE(result.bip110_signaling);
 }
+
+// Coinbase with a scriptsig that ends inside coinbase_1, so the outputs start at the
+// beginning of coinbase_2. Payout address of the last output is 1DYwPTnC4NgEmoqbLbcRqoSzVeH3ehmGbV.
+#define TEST_COINBASE_1 "01000000010000000000000000000000000000000000000000000000000000000000000000ffffffff0a03a5020c2f746573742f"
+#define TEST_USER_ADDRESS "1DYwPTnC4NgEmoqbLbcRqoSzVeH3ehmGbV"
+
+TEST_CASE("Coinbase outputs below capacity are not aggregated", "[coinbase_decoder]")
+{
+    // 3 outputs: 1000, 2000 and 100 sat, the last one paying the user
+    mining_notify notify = { 0 };
+    notify.job_id = "test_job";
+    notify.coinbase_1 = TEST_COINBASE_1;
+    notify.coinbase_2 = "ffffffff03e8030000000000001976a914111111111111111111111111111111111111111188acd0070000000000001976a914222222222222222222222222222222222222222288ac64000000000000001976a91489abcdef0123456789abcdef0123456789abcdef88ac00000000";
+
+    mining_notification_result_t result = { 0 };
+
+    esp_err_t err = coinbase_process_notification(&notify, "01020304", 8, TEST_USER_ADDRESS, true, &result);
+    TEST_ASSERT_EQUAL(ESP_OK, err);
+    TEST_ASSERT_EQUAL_INT(3, result.output_count);
+    TEST_ASSERT_EQUAL_INT(0, result.others_count);
+    TEST_ASSERT_TRUE(0 == result.others_value_satoshis);
+    TEST_ASSERT_TRUE(3100 == result.total_value_satoshis);
+    TEST_ASSERT_TRUE(100 == result.user_value_satoshis);
+}
+
+TEST_CASE("Coinbase outputs beyond capacity are aggregated", "[coinbase_decoder]")
+{
+    // 8 outputs: 1000..7000 sat, plus a 100 sat payout to the user. The user's output is the
+    // smallest, so it only survives if it is allowed to evict a larger non-user output.
+    mining_notify notify = { 0 };
+    notify.job_id = "test_job";
+    notify.coinbase_1 = TEST_COINBASE_1;
+    notify.coinbase_2 = "ffffffff08e8030000000000001976a914111111111111111111111111111111111111111188acd0070000000000001976a914222222222222222222222222222222222222222288acb80b0000000000001976a914333333333333333333333333333333333333333388aca00f0000000000001976a914444444444444444444444444444444444444444488ac88130000000000001976a914555555555555555555555555555555555555555588ac70170000000000001976a914666666666666666666666666666666666666666688ac581b0000000000001976a914777777777777777777777777777777777777777788ac64000000000000001976a91489abcdef0123456789abcdef0123456789abcdef88ac00000000";
+
+    mining_notification_result_t result = { 0 };
+
+    esp_err_t err = coinbase_process_notification(&notify, "01020304", 8, TEST_USER_ADDRESS, true, &result);
+    TEST_ASSERT_EQUAL(ESP_OK, err);
+
+    // The array stays full, the two smallest non-user outputs (1000 and 2000 sat) are aggregated
+    TEST_ASSERT_EQUAL_INT(MAX_COINBASE_TX_OUTPUTS, result.output_count);
+    TEST_ASSERT_EQUAL_INT(2, result.others_count);
+    TEST_ASSERT_TRUE(3000 == result.others_value_satoshis);
+
+    // Totals are summed over every output, not just the stored ones
+    TEST_ASSERT_TRUE(28100 == result.total_value_satoshis);
+    TEST_ASSERT_TRUE(100 == result.user_value_satoshis);
+
+    bool user_output_kept = false;
+    for (int i = 0; i < result.output_count; i++) {
+        if (result.outputs[i].is_user_output) {
+            TEST_ASSERT_EQUAL_STRING(TEST_USER_ADDRESS, result.outputs[i].address);
+            TEST_ASSERT_TRUE(100 == result.outputs[i].value_satoshis);
+            user_output_kept = true;
+        }
+    }
+    TEST_ASSERT_TRUE(user_output_kept);
+}

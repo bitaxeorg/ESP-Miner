@@ -36,6 +36,7 @@ typedef struct PoolConfig
     uint16_t tls;
     char * cert;
     bool decode_coinbase_tx;
+    bool share_warning;
     uint16_t sv2_channel_type;
     char * sv2_authority_pubkey;
     bool sv2_require_auth;
@@ -198,6 +199,8 @@ typedef struct GlobalState
     char scriptsig[128];
     coinbase_output_t coinbase_outputs[MAX_COINBASE_TX_OUTPUTS];
     int coinbase_output_count;
+    int coinbase_others_count;
+    uint64_t coinbase_others_value_satoshis;
     uint64_t coinbase_value_total_satoshis;
     uint64_t coinbase_value_user_satoshis;
     uint64_t network_nonce_diff;
