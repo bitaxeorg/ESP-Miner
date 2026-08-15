@@ -234,6 +234,13 @@ static void generate_work(GlobalState *GLOBAL_STATE, mining_notify *notification
 
     next_job->extranonce2 = strdup(extranonce_2_str);
     next_job->jobid = strdup(notification->job_id);
+    if (next_job->extranonce2 == NULL || next_job->jobid == NULL) {
+        ESP_LOGE(TAG, "Failed to allocate V1 job metadata");
+        free(next_job->jobid);
+        free(next_job->extranonce2);
+        free(next_job);
+        return;
+    }
     next_job->version_mask = GLOBAL_STATE->version_mask;
 
     // Check if ASIC is initialized before trying to send work
