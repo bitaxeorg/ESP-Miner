@@ -7,6 +7,10 @@
 
 #define QUEUE_SIZE 12
 
+typedef struct mining_notify mining_notify;
+typedef struct sv2_job sv2_job_t;
+typedef struct sv2_ext_job sv2_ext_job_t;
+
 typedef enum
 {
     WORK_ITEM_NONE = 0,
@@ -15,11 +19,22 @@ typedef enum
     WORK_ITEM_STRATUM_V2_EXTENDED,
 } work_item_kind_t;
 
-typedef struct
+typedef union
 {
     void *data;
+    mining_notify *v1;
+    sv2_job_t *sv2_standard;
+    sv2_ext_job_t *sv2_extended;
+} work_item_data_t;
+
+typedef struct
+{
     work_item_kind_t kind;
+    // Generation of the active source. Items from an earlier generation are
+    // stale even when the protocol kind is unchanged (for example clean_jobs).
+    // The counter wraps naturally; zero is a valid generation.
     uint32_t source_epoch;
+    work_item_data_t job;
     void (*free_fn)(void *);
 } work_queue_item_t;
 
@@ -43,8 +58,9 @@ typedef struct
 } work_queue;
 
 void queue_init(work_queue *queue);
-work_queue_item_t work_queue_item_create(work_queue *queue, void *data,
+work_queue_item_t work_queue_item_create(work_queue *queue,
                                          work_item_kind_t kind,
+                                         work_item_data_t job,
                                          void (*free_fn)(void *));
 void work_queue_item_free(work_queue_item_t *item);
 void queue_set_source(work_queue *queue, work_item_kind_t kind);

@@ -35,7 +35,9 @@ static work_queue_item_t make_item(work_queue *queue, work_item_kind_t kind,
     work_item_kind_t *stored_kind = malloc(sizeof(*stored_kind));
     TEST_ASSERT_NOT_NULL(stored_kind);
     *stored_kind = kind;
-    return work_queue_item_create(queue, stored_kind, kind, free_fn);
+    return work_queue_item_create(queue, kind,
+                                  (work_item_data_t) {.data = stored_kind},
+                                  free_fn);
 }
 
 TEST_CASE("work queue binds ownership to source kind and epoch", "[work_queue]")
@@ -57,11 +59,11 @@ TEST_CASE("work queue binds ownership to source kind and epoch", "[work_queue]")
     work_queue_item_t item = queue_dequeue(&queue);
     TEST_ASSERT_EQUAL(WORK_ITEM_STRATUM_V1, item.kind);
     TEST_ASSERT_EQUAL(WORK_ITEM_STRATUM_V1,
-                      *(work_item_kind_t *)item.data);
+                      *(work_item_kind_t *)item.job.data);
     TEST_ASSERT_EQUAL_UINT32(v1_source.epoch, item.source_epoch);
     work_queue_item_free(&item);
 
-    TEST_ASSERT_NULL(item.data);
+    TEST_ASSERT_NULL(item.job.data);
     TEST_ASSERT_EQUAL(WORK_ITEM_NONE, item.kind);
     TEST_ASSERT_NULL(item.free_fn);
 
@@ -97,7 +99,37 @@ TEST_CASE("work queue replaces oldest item and timeout is empty", "[work_queue]"
     TEST_ASSERT_EQUAL_INT(QUEUE_SIZE + 1, freed_v1);
 
     work_queue_item_t item = queue_dequeue_timeout(&queue, 0);
-    TEST_ASSERT_NULL(item.data);
+    TEST_ASSERT_NULL(item.job.data);
     TEST_ASSERT_EQUAL(WORK_ITEM_NONE, item.kind);
     TEST_ASSERT_NULL(item.free_fn);
+
+    item = queue_dequeue_timeout(&queue, 1);
+    TEST_ASSERT_NULL(item.job.data);
+    TEST_ASSERT_EQUAL(WORK_ITEM_NONE, item.kind);
+    TEST_ASSERT_NULL(item.free_fn);
+}
+
+TEST_CASE("work queue accepts epoch zero after generation wrap", "[work_queue]")
+{
+    work_queue queue;
+    queue_init(&queue);
+    freed_v1 = 0;
+
+    pthread_mutex_lock(&queue.lock);
+    queue.source_epoch = UINT32_MAX;
+    pthread_mutex_unlock(&queue.lock);
+
+    queue_set_source(&queue, WORK_ITEM_STRATUM_V1);
+    work_queue_source_t source = queue_get_source(&queue);
+    TEST_ASSERT_EQUAL_UINT32(0, source.epoch);
+
+    work_queue_item_t item =
+        make_item(&queue, WORK_ITEM_STRATUM_V1, free_v1);
+    TEST_ASSERT_EQUAL_UINT32(0, item.source_epoch);
+    TEST_ASSERT_TRUE(queue_enqueue(&queue, item));
+
+    item = queue_dequeue(&queue);
+    TEST_ASSERT_EQUAL_UINT32(0, item.source_epoch);
+    work_queue_item_free(&item);
+    TEST_ASSERT_EQUAL_INT(1, freed_v1);
 }

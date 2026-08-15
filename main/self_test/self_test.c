@@ -536,7 +536,10 @@ void self_test_task(void * pvParameters)
         queue_enqueue(
             &GLOBAL_STATE->stratum_queue,
             work_queue_item_create(&GLOBAL_STATE->stratum_queue,
-                                   msg.mining_notification, WORK_ITEM_STRATUM_V1,
+                                   WORK_ITEM_STRATUM_V1,
+                                   (work_item_data_t) {
+                                       .v1 = msg.mining_notification,
+                                   },
                                    self_test_free_v1_work));
     } else {
         ESP_LOGE(TAG, "Failed to parse mock mining notification");

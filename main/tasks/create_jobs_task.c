@@ -43,7 +43,7 @@ static const char *work_item_kind_name(work_item_kind_t kind)
 static bool work_item_matches_source(const work_queue_item_t *item,
                                      work_queue_source_t source)
 {
-    return item->data != NULL && item->kind == source.kind &&
+    return item->job.data != NULL && item->kind == source.kind &&
            item->source_epoch == source.epoch;
 }
 
@@ -76,7 +76,7 @@ void create_jobs_task(void *pvParameters)
 
         work_queue_source_t source = queue_get_source(&GLOBAL_STATE->stratum_queue);
 
-        if (current_work.data != NULL &&
+        if (current_work.job.data != NULL &&
             !work_item_matches_source(&current_work, source)) {
             ESP_LOGI(TAG, "Work source switched from %s to %s, discarding current work",
                      work_item_kind_name(current_work.kind),
@@ -84,12 +84,17 @@ void create_jobs_task(void *pvParameters)
             work_queue_item_free(&current_work);
         }
 
-        uint64_t start_time = esp_timer_get_time();
+        int64_t wait_started_at_us = esp_timer_get_time();
         work_queue_item_t new_work =
             queue_dequeue_timeout(&GLOBAL_STATE->stratum_queue, timeout_ms);
-        timeout_ms -= (esp_timer_get_time() - start_time) / 1000;
+        int64_t elapsed_ms = (esp_timer_get_time() - wait_started_at_us) / 1000;
+        if (elapsed_ms >= timeout_ms) {
+            timeout_ms = 0;
+        } else if (elapsed_ms > 0) {
+            timeout_ms -= (int)elapsed_ms;
+        }
 
-        if (new_work.data != NULL) {
+        if (new_work.job.data != NULL) {
             source = queue_get_source(&GLOBAL_STATE->stratum_queue);
 
             if (!work_item_matches_source(&new_work, source)) {
@@ -106,15 +111,15 @@ void create_jobs_task(void *pvParameters)
             switch (new_work.kind) {
                 case WORK_ITEM_STRATUM_V2_EXTENDED:
                     ESP_LOGI(TAG, "New Work Dequeued SV2 ext job %lu",
-                             ((sv2_ext_job_t *)new_work.data)->job_id);
+                             new_work.job.sv2_extended->job_id);
                     break;
                 case WORK_ITEM_STRATUM_V2_STANDARD:
                     ESP_LOGI(TAG, "New Work Dequeued SV2 job %lu",
-                             ((sv2_job_t *)new_work.data)->job_id);
+                             new_work.job.sv2_standard->job_id);
                     break;
                 case WORK_ITEM_STRATUM_V1:
                     ESP_LOGI(TAG, "New Work Dequeued %s",
-                             ((mining_notify *)new_work.data)->job_id);
+                             new_work.job.v1->job_id);
                     break;
                 default:
                     work_queue_item_free(&new_work);
@@ -142,13 +147,13 @@ void create_jobs_task(void *pvParameters)
             bool clean;
             switch (current_work.kind) {
                 case WORK_ITEM_STRATUM_V2_EXTENDED:
-                    clean = ((sv2_ext_job_t *)current_work.data)->clean_jobs;
+                    clean = current_work.job.sv2_extended->clean_jobs;
                     break;
                 case WORK_ITEM_STRATUM_V2_STANDARD:
-                    clean = ((sv2_job_t *)current_work.data)->clean_jobs;
+                    clean = current_work.job.sv2_standard->clean_jobs;
                     break;
                 case WORK_ITEM_STRATUM_V1:
-                    clean = ((mining_notify *)current_work.data)->clean_jobs;
+                    clean = current_work.job.v1->clean_jobs;
                     break;
                 default:
                     work_queue_item_free(&current_work);
@@ -158,7 +163,7 @@ void create_jobs_task(void *pvParameters)
                 continue;
             }
         } else {
-            if (current_work.data == NULL) {
+            if (current_work.job.data == NULL) {
                 vTaskDelay(100 / portTICK_PERIOD_MS);
                 continue;
             }
@@ -185,15 +190,15 @@ void create_jobs_task(void *pvParameters)
         // protocol/channel state.
         switch (current_work.kind) {
             case WORK_ITEM_STRATUM_V2_EXTENDED:
-                generate_work_sv2_ext(GLOBAL_STATE, (sv2_ext_job_t *)current_work.data,
+                generate_work_sv2_ext(GLOBAL_STATE, current_work.job.sv2_extended,
                                       difficulty, extranonce_2);
                 extranonce_2++;
                 break;
             case WORK_ITEM_STRATUM_V2_STANDARD:
-                generate_work_sv2(GLOBAL_STATE, (sv2_job_t *)current_work.data, difficulty);
+                generate_work_sv2(GLOBAL_STATE, current_work.job.sv2_standard, difficulty);
                 break;
             case WORK_ITEM_STRATUM_V1:
-                generate_work(GLOBAL_STATE, (mining_notify *)current_work.data,
+                generate_work(GLOBAL_STATE, current_work.job.v1,
                               extranonce_2, difficulty);
                 extranonce_2++;
                 break;

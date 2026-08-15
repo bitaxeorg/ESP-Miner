@@ -1,5 +1,6 @@
 #include "work_queue.h"
 #include "esp_log.h"
+#include <errno.h>
 #include <stdlib.h>
 #include <time.h>
 
@@ -15,13 +16,14 @@ void queue_init(work_queue *queue)
     pthread_cond_init(&queue->not_full, NULL);
 }
 
-work_queue_item_t work_queue_item_create(work_queue *queue, void *data,
+work_queue_item_t work_queue_item_create(work_queue *queue,
                                          work_item_kind_t kind,
+                                         work_item_data_t job,
                                          void (*free_fn)(void *))
 {
     work_queue_item_t item = {
-        .data = data,
         .kind = kind,
+        .job = job,
         .free_fn = free_fn,
     };
 
@@ -37,11 +39,11 @@ void work_queue_item_free(work_queue_item_t *item)
         return;
     }
 
-    if (item->data != NULL) {
+    if (item->job.data != NULL) {
         if (item->free_fn != NULL) {
-            item->free_fn(item->data);
+            item->free_fn(item->job.data);
         } else {
-            free(item->data);
+            free(item->job.data);
         }
     }
 
@@ -64,9 +66,6 @@ void queue_set_source(work_queue *queue, work_item_kind_t kind)
     queue_clear_locked(queue);
     queue->source_kind = kind;
     queue->source_epoch++;
-    if (queue->source_epoch == 0) {
-        queue->source_epoch = 1;
-    }
     pthread_cond_broadcast(&queue->not_empty);
     pthread_cond_broadcast(&queue->not_full);
     pthread_mutex_unlock(&queue->lock);
@@ -151,7 +150,11 @@ work_queue_item_t queue_dequeue_timeout(work_queue *queue, int timeout_ms)
 
     while (queue->count == 0) {
         int result = pthread_cond_timedwait(&queue->not_empty, &queue->lock, &timeout_time);
-        if (queue->source_epoch != starting_epoch || result != 0) {
+        if (queue->source_epoch != starting_epoch || result == ETIMEDOUT) {
+            pthread_mutex_unlock(&queue->lock);
+            return (work_queue_item_t) {0};
+        }
+        if (result != 0) {
             pthread_mutex_unlock(&queue->lock);
             return (work_queue_item_t) {0};
         }

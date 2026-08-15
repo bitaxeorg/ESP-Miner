@@ -404,8 +404,12 @@ void stratum_v1_task(void *pvParameters)
                             }
                             queue_enqueue(
                                 &GLOBAL_STATE->stratum_queue,
-                                work_queue_item_create(&GLOBAL_STATE->stratum_queue, notify,
-                                    WORK_ITEM_STRATUM_V1, stratum_v1_free_work));
+                                work_queue_item_create(
+                                    &GLOBAL_STATE->stratum_queue, WORK_ITEM_STRATUM_V1,
+                                    (work_item_data_t) {
+                                        .v1 = notify,
+                                    },
+                                    stratum_v1_free_work));
                             decode_mining_notification(GLOBAL_STATE, notify);
                             stratum_api_v1_message.mining_notification = NULL;
                         }

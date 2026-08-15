@@ -252,8 +252,9 @@ static void stratum_v2_enqueue_job(GlobalState *GLOBAL_STATE, sv2_conn_t *conn,
     }
 
     queue_enqueue(&GLOBAL_STATE->stratum_queue,
-                  work_queue_item_create(&GLOBAL_STATE->stratum_queue, job,
-                                         WORK_ITEM_STRATUM_V2_STANDARD, free));
+                  work_queue_item_create(
+                      &GLOBAL_STATE->stratum_queue, WORK_ITEM_STRATUM_V2_STANDARD,
+                      (work_item_data_t) {.sv2_standard = job}, free));
 }
 
 // Enqueue an sv2_ext_job_t onto the stratum queue (extended channels)
@@ -292,8 +293,9 @@ static void stratum_v2_enqueue_ext_job(GlobalState *GLOBAL_STATE, sv2_conn_t *co
 
     queue_enqueue(
         &GLOBAL_STATE->stratum_queue,
-        work_queue_item_create(&GLOBAL_STATE->stratum_queue, job,
+        work_queue_item_create(&GLOBAL_STATE->stratum_queue,
                                WORK_ITEM_STRATUM_V2_EXTENDED,
+                               (work_item_data_t) {.sv2_extended = job},
                                stratum_v2_free_extended_work));
 }
 
