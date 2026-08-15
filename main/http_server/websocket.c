@@ -12,16 +12,13 @@
 #include "websocket_log.h"
 #include "websocket_api.h"
 #include "http_server.h"
-#include "log_buffer.h"
 #include "websocket_internal.h"
-
-#define WS_LOG_SCRATCH_SIZE 2048
 
 static const char * TAG = "websocket";
 
 typedef struct {
     int fd;
-    uint32_t type;
+    WebSocketClientType type;
 } ws_client_t;
 
 static ws_client_t clients[MAX_WEBSOCKET_CLIENTS];
@@ -29,11 +26,6 @@ static int type_counts[WS_TYPE_MAX] = {0};
 static SemaphoreHandle_t clients_mutex = NULL;
 static httpd_handle_t server_handle = NULL;
 static TaskHandle_t s_websocket_log_task_handle = NULL;
-
-WEBSOCKET_STATIC bool websocket_payload_fits(size_t payload_len)
-{
-    return payload_len <= WS_MAX_WEBSOCKET_PAYLOAD_SIZE;
-}
 
 WEBSOCKET_STATIC bool websocket_origin_matches_host(const char *origin, const char *host)
 {
@@ -71,16 +63,13 @@ WEBSOCKET_STATIC bool websocket_has_free_slot(void)
         return false;
     }
 
-    bool has_free_slot = false;
-    for (int i = 0; i < MAX_WEBSOCKET_CLIENTS; i++) {
-        if (clients[i].fd == -1) {
-            has_free_slot = true;
-            break;
-        }
+    int active_clients = 0;
+    for (int i = 0; i < WS_TYPE_MAX; i++) {
+        active_clients += type_counts[i];
     }
 
     xSemaphoreGive(clients_mutex);
-    return has_free_slot;
+    return active_clients < MAX_WEBSOCKET_CLIENTS;
 }
 
 WEBSOCKET_STATIC esp_err_t websocket_origin_is_allowed(httpd_req_t *req)
@@ -134,6 +123,11 @@ void websocket_log_notify(void)
 
 esp_err_t websocket_add_client(int fd, WebSocketClientType type)
 {
+    if (type < 0 || type >= WS_TYPE_MAX) {
+        ESP_LOGE(TAG, "Cannot add WebSocket client with invalid type: %d", (int)type);
+        return ESP_ERR_INVALID_ARG;
+    }
+
     if (xSemaphoreTake(clients_mutex, pdMS_TO_TICKS(100)) != pdTRUE) {
         ESP_LOGE(TAG, "Failed to acquire mutex for adding client");
         return ESP_FAIL;
@@ -144,11 +138,11 @@ esp_err_t websocket_add_client(int fd, WebSocketClientType type)
         if (clients[i].fd == -1) {
             clients[i].fd = fd;
             clients[i].type = type;
-            if (type >= 0 && type < WS_TYPE_MAX) type_counts[type]++;
+            type_counts[type]++;
 
             ESP_LOGI(TAG, "Added WebSocket %s client, fd: %d, slot: %d, type_count: %d",
                      type == WS_TYPE_LOGS ? "log" : "api", fd, i,
-                     (type >= 0 && type < WS_TYPE_MAX) ? type_counts[type] : -1);
+                     type_counts[type]);
 
             ret = ESP_OK;
             if (type == WS_TYPE_LOGS && s_websocket_log_task_handle) {
@@ -174,14 +168,14 @@ void websocket_remove_client(int fd)
 
     for (int i = 0; i < MAX_WEBSOCKET_CLIENTS; i++) {
         if (clients[i].fd == fd) {
-            WebSocketClientType type = (WebSocketClientType)clients[i].type;
+            WebSocketClientType type = clients[i].type;
             clients[i].fd = -1;
-            clients[i].type = 0;
-            if (type >= 0 && type < WS_TYPE_MAX) type_counts[type]--;
+            clients[i].type = WS_TYPE_API;
+            type_counts[type]--;
 
             ESP_LOGI(TAG, "Removed WebSocket %s client, fd: %d, slot: %d, type_count: %d",
                      type == WS_TYPE_LOGS ? "log" : "api", fd, i,
-                     (type >= 0 && type < WS_TYPE_MAX) ? type_counts[type] : -1);
+                     type_counts[type]);
 
             break;
         }
@@ -250,15 +244,23 @@ void websocket_close_fn(httpd_handle_t hd, int fd)
 
 void websocket_init(httpd_handle_t server)
 {
-    server_handle = server;
-    for (int i = 0; i < MAX_WEBSOCKET_CLIENTS; i++) {
-        clients[i].fd = -1;
-        clients[i].type = 0;
-    }
-
     if (clients_mutex == NULL) {
         clients_mutex = xSemaphoreCreateMutex();
     }
+    if (clients_mutex == NULL ||
+        xSemaphoreTake(clients_mutex, pdMS_TO_TICKS(100)) != pdTRUE) {
+        ESP_LOGE(TAG, "Failed to initialize WebSocket client state");
+        return;
+    }
+
+    server_handle = server;
+    memset(type_counts, 0, sizeof(type_counts));
+    for (int i = 0; i < MAX_WEBSOCKET_CLIENTS; i++) {
+        clients[i].fd = -1;
+        clients[i].type = WS_TYPE_API;
+    }
+
+    xSemaphoreGive(clients_mutex);
 }
 
 esp_err_t websocket_pre_handshake(httpd_req_t *req)
@@ -324,7 +326,7 @@ esp_err_t websocket_handler(httpd_req_t *req)
     // WebSocket stream synchronized. Never allocate based on a peer-provided
     // frame length.
     if (ws_pkt.len > 0) {
-        if (!websocket_payload_fits(ws_pkt.len)) {
+        if (ws_pkt.len > WS_MAX_WEBSOCKET_PAYLOAD_SIZE) {
             ESP_LOGW(TAG, "Rejecting oversized WebSocket frame: %zu bytes", ws_pkt.len);
             return ESP_ERR_INVALID_SIZE;
         }
