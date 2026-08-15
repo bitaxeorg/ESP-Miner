@@ -434,11 +434,23 @@ void stratum_v1_task(void *pvParameters)
                     }
                     break;
 
-                case MINING_SET_DIFFICULTY:
-                    ESP_LOGI(TAG, "Set pool difficulty: %.2f", stratum_api_v1_message.new_difficulty);
-                    GLOBAL_STATE->pool_difficulty = stratum_api_v1_message.new_difficulty;
+                case MINING_SET_DIFFICULTY: {
+                    double requested_difficulty =
+                        stratum_api_v1_message.new_difficulty;
+                    double asic_difficulty =
+                        GLOBAL_STATE->DEVICE_CONFIG.family.asic.difficulty;
+                    // The ASIC does not report nonces below its hardware ticket
+                    // threshold, so expose and validate against the effective floor.
+                    GLOBAL_STATE->pool_difficulty =
+                        requested_difficulty < asic_difficulty
+                            ? asic_difficulty
+                            : requested_difficulty;
+                    ESP_LOGI(TAG, "Set effective pool difficulty: %.2f (requested %.2f)",
+                             GLOBAL_STATE->pool_difficulty,
+                             requested_difficulty);
                     GLOBAL_STATE->new_set_mining_difficulty_msg = true;
                     break;
+                }
 
                 case MINING_SET_VERSION_MASK:
                     ESP_LOGI(TAG, "Set version mask: %08lx", stratum_api_v1_message.version_mask);
