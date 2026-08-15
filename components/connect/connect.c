@@ -368,9 +368,6 @@ esp_err_t wifi_scan(wifi_ap_record_simple_t *ap_records, size_t records_capacity
     }
 
     size_t records_to_copy = ap_number;
-    if (records_to_copy > WIFI_SCAN_MAX_AP_COUNT) {
-        records_to_copy = WIFI_SCAN_MAX_AP_COUNT;
-    }
     if (records_to_copy > records_capacity) {
         records_to_copy = records_capacity;
     }
@@ -405,25 +402,20 @@ static void event_handler(void * arg, esp_event_base_t event_base, int32_t event
     if (event_base == WIFI_EVENT)
     {
         if (event_id == WIFI_EVENT_SCAN_DONE) {
-            uint16_t total_found = 0;
-            uint16_t records_capacity =
-                (uint16_t)(sizeof(ap_info) / sizeof(ap_info[0]));
-
-            esp_err_t scan_err = esp_wifi_scan_get_ap_num(&total_found);
+            esp_err_t scan_err = esp_wifi_scan_get_ap_num(&ap_number);
             if (scan_err != ESP_OK) {
                 ESP_LOGW(TAG, "Failed to get Wi-Fi scan count: %s", esp_err_to_name(scan_err));
                 ap_number = 0;
             } else {
-                ESP_LOGI(TAG, "Wi-Fi Scan Done: %u network(s) found", total_found);
-                scan_err = esp_wifi_scan_get_ap_records(&records_capacity, ap_info);
+                ESP_LOGI(TAG, "Wi-Fi Scan Done: %u network(s) found", ap_number);
+                if (ap_number > WIFI_SCAN_MAX_AP_COUNT) {
+                    ap_number = WIFI_SCAN_MAX_AP_COUNT;
+                }
+
+                scan_err = esp_wifi_scan_get_ap_records(&ap_number, ap_info);
                 if (scan_err != ESP_OK) {
                     ESP_LOGW(TAG, "Failed to get Wi-Fi scan records: %s", esp_err_to_name(scan_err));
                     ap_number = 0;
-                } else {
-                    if (records_capacity > WIFI_SCAN_MAX_AP_COUNT) {
-                        records_capacity = WIFI_SCAN_MAX_AP_COUNT;
-                    }
-                    ap_number = records_capacity;
                 }
             }
             is_scanning = false;
