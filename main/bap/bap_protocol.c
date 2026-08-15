@@ -91,10 +91,12 @@ bool BAP_format_message(char *message, size_t message_size, bap_command_t cmd,
     char sentence_body[BAP_MAX_MESSAGE_LEN];
     int formatted_len;
 
-    if (message_len != NULL) {
-        *message_len = 0;
+    if (message_len == NULL) {
+        return false;
     }
-    if (message == NULL || message_size == 0 || parameter == NULL || message_len == NULL) {
+    *message_len = 0;
+
+    if (message == NULL || message_size == 0 || parameter == NULL) {
         return false;
     }
 

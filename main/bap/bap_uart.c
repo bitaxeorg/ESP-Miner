@@ -175,8 +175,7 @@ static void uart_send_task(void *pvParameters) {
                     xSemaphoreGive(bap_uart_send_mutex);
                 } else {
                     int bytes_sent = uart_write_bytes(BAP_UART_NUM, msg.message, msg.length);
-                    if (bytes_sent >= 0 && (size_t)bytes_sent == msg.length) {
-                    } else {
+                    if (bytes_sent < 0 || (size_t)bytes_sent != msg.length) {
                         ESP_LOGW(TAG, "UART send failed or partial: %d of %zu bytes", bytes_sent, msg.length);
                     }
                     xSemaphoreGive(bap_uart_send_mutex);
