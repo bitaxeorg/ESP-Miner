@@ -29,8 +29,8 @@
 #define SV2_MSG_SET_TARGET                              0x21
 
 #define SV2_MAX_MERKLE_BRANCHES 20
-#define SV2_MIN_EXTRANONCE_SIZE 2U
-#define SV2_MAX_EXTRANONCE_SIZE 32U
+#define SV2_MIN_EXTRANONCE_SIZE 2
+#define SV2_MAX_EXTRANONCE_SIZE 32
 
 // Extension type flag for channel messages
 #define SV2_CHANNEL_MSG_FLAG 0x8000
@@ -178,7 +178,7 @@ int sv2_parse_submit_shares_error(const uint8_t *payload, uint32_t len,
 
 int sv2_build_open_extended_mining_channel(uint8_t *buf, size_t buf_len,
                                            uint32_t request_id, const char *user_identity,
-                                           float nominal_hash_rate, uint16_t min_extranonce_size);
+                                           float nominal_hash_rate);
 
 int sv2_build_submit_shares_extended(uint8_t *buf, size_t buf_len,
                                      uint32_t channel_id, uint32_t sequence_number,

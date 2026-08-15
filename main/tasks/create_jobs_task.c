@@ -312,13 +312,6 @@ static void generate_work_sv2_ext(GlobalState *GLOBAL_STATE, sv2_ext_job_t *ext_
     sv2_conn_t *conn = GLOBAL_STATE->sv2_conn;
     if (!conn) return;
 
-    uint8_t extranonce_2_len = conn->extranonce_size;
-    if (extranonce_2_len < SV2_MIN_EXTRANONCE_SIZE ||
-        extranonce_2_len > SV2_MAX_EXTRANONCE_SIZE) {
-        ESP_LOGE(TAG, "Invalid SV2 extranonce size: %u", extranonce_2_len);
-        return;
-    }
-
     bm_job *next_job = malloc(sizeof(bm_job));
     if (!next_job) {
         ESP_LOGE(TAG, "Failed to allocate memory for SV2 ext job");
@@ -329,6 +322,7 @@ static void generate_work_sv2_ext(GlobalState *GLOBAL_STATE, sv2_ext_job_t *ext_
 
     // Derive extranonce_2 from counter
     // SV2 spec: extranonce_size is the miner's rollable portion (not total)
+    uint8_t extranonce_2_len = conn->extranonce_size;
     uint8_t extranonce_2[SV2_MAX_EXTRANONCE_SIZE];
     memset(extranonce_2, 0, sizeof(extranonce_2));
     // Encode counter as big-endian bytes

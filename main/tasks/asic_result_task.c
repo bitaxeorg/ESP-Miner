@@ -85,9 +85,16 @@ void ASIC_result_task(void *pvParameters)
 
                 if (stratum_v2_is_extended_channel(GLOBAL_STATE)) {
                     sv2_conn_t *conn = GLOBAL_STATE->sv2_conn;
+                    if (conn == NULL) {
+                        ESP_LOGW(TAG, "No SV2 connection, dropping extended share");
+                        free(active_job->jobid);
+                        free(active_job->extranonce2);
+                        continue;
+                    }
+
                     // SV2 spec: extranonce_size is the miner's rollable portion.
                     // The pool prepends its extranonce_prefix separately.
-                    uint8_t en2_len = conn != NULL ? conn->extranonce_size : 0;
+                    uint8_t en2_len = conn->extranonce_size;
                     uint8_t extranonce_2[SV2_MAX_EXTRANONCE_SIZE];
                     if (en2_len < SV2_MIN_EXTRANONCE_SIZE ||
                         en2_len > sizeof(extranonce_2) ||

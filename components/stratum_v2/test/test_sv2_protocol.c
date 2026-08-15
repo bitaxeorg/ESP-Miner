@@ -72,24 +72,3 @@ TEST_CASE("SV2 extended channel rejects invalid prefix framing", "[sv2]")
     payload[len] = 0;
     TEST_ASSERT_EQUAL_INT(-1, parse_open_extended_success(payload, len + 1U));
 }
-
-TEST_CASE("SV2 extended channel request enforces local extranonce limits", "[sv2]")
-{
-    uint8_t frame[128];
-
-    TEST_ASSERT_GREATER_THAN(0, sv2_build_open_extended_mining_channel(
-                                    frame, sizeof(frame), 1, "miner", 1e12f,
-                                    SV2_MIN_EXTRANONCE_SIZE));
-    TEST_ASSERT_GREATER_THAN(0, sv2_build_open_extended_mining_channel(
-                                    frame, sizeof(frame), 1, "miner", 1e12f,
-                                    SV2_MAX_EXTRANONCE_SIZE));
-    TEST_ASSERT_EQUAL_INT(-1, sv2_build_open_extended_mining_channel(
-                                  frame, sizeof(frame), 1, "miner", 1e12f, 0));
-    TEST_ASSERT_EQUAL_INT(-1, sv2_build_open_extended_mining_channel(
-                                  frame, sizeof(frame), 1, "miner", 1e12f, 1));
-    TEST_ASSERT_EQUAL_INT(-1, sv2_build_open_extended_mining_channel(
-                                  frame, sizeof(frame), 1, "miner", 1e12f, 33));
-    TEST_ASSERT_EQUAL_INT(-1, sv2_build_open_extended_mining_channel(
-                                  frame, sizeof(frame), 1, "miner", 1e12f,
-                                  UINT16_MAX));
-}

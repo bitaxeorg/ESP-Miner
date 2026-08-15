@@ -341,13 +341,8 @@ int sv2_parse_submit_shares_error(const uint8_t *payload, uint32_t len,
 
 int sv2_build_open_extended_mining_channel(uint8_t *buf, size_t buf_len,
                                            uint32_t request_id, const char *user_identity,
-                                           float nominal_hash_rate, uint16_t min_extranonce_size)
+                                           float nominal_hash_rate)
 {
-    if (min_extranonce_size < SV2_MIN_EXTRANONCE_SIZE ||
-        min_extranonce_size > SV2_MAX_EXTRANONCE_SIZE) {
-        return -1;
-    }
-
     uint8_t payload[512];
     int pos = 0;
 
@@ -371,7 +366,7 @@ int sv2_build_open_extended_mining_channel(uint8_t *buf, size_t buf_len,
     pos += 32;
 
     // min_extranonce_size: u16 LE
-    write_u16_le(payload + pos, min_extranonce_size);
+    write_u16_le(payload + pos, SV2_MIN_EXTRANONCE_SIZE);
     pos += 2;
 
     int total = SV2_FRAME_HEADER_SIZE + pos;
