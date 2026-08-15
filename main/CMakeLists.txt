@@ -67,6 +67,7 @@ INCLUDE_DIRS
     "${CMAKE_CURRENT_BINARY_DIR}"
 
 REQUIRES
+    "api_rx"
     "asic"
     "connect"
     "dns_server"
