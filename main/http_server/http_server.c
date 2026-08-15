@@ -45,6 +45,7 @@
 #include "log_buffer.h"
 #include "cjson_utils.h"
 #include "utils.h"
+#include "http_rx.h"
 
 static const char * TAG = "http_server";
 static const char * CORS_TAG = "CORS";
@@ -176,22 +177,27 @@ esp_err_t HTTP_send_json(httpd_req_t * req, const cJSON * item, int * prebuffer_
 esp_err_t HTTP_receive_request_body(httpd_req_t *req, char *buffer,
                                     size_t buffer_size)
 {
-    if (req == NULL || buffer == NULL || buffer_size < 2) {
+    if (req == NULL || buffer == NULL) {
         if (req != NULL) {
             httpd_resp_send_500(req);
         }
         return ESP_FAIL;
     }
 
-    if (req->content_len == 0) {
-        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Empty request body");
-        return ESP_FAIL;
-    }
-
-    if (req->content_len >= buffer_size) {
-        httpd_resp_send_err(req, HTTPD_413_CONTENT_TOO_LARGE,
-                            "Request body is too large");
-        return ESP_FAIL;
+    switch (http_rx_body_size_result(req->content_len, buffer_size)) {
+        case HTTP_RX_BODY_SIZE_INVALID:
+            httpd_resp_send_500(req);
+            return ESP_FAIL;
+        case HTTP_RX_BODY_SIZE_EMPTY:
+            httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST,
+                                "Empty request body");
+            return ESP_FAIL;
+        case HTTP_RX_BODY_SIZE_TOO_LARGE:
+            httpd_resp_send_err(req, HTTPD_413_CONTENT_TOO_LARGE,
+                                "Request body is too large");
+            return ESP_FAIL;
+        case HTTP_RX_BODY_SIZE_OK:
+            break;
     }
 
     size_t received_total = 0;
@@ -199,27 +205,22 @@ esp_err_t HTTP_receive_request_body(httpd_req_t *req, char *buffer,
     while (received_total < req->content_len) {
         int received = httpd_req_recv(req, buffer + received_total,
                                       req->content_len - received_total);
-        if (received > 0) {
-            received_total += (size_t)received;
-            if (received_total < req->content_len &&
-                esp_timer_get_time() >= deadline) {
-                httpd_resp_send_err(req, HTTPD_408_REQ_TIMEOUT,
-                                    "Request body timed out");
-                return ESP_FAIL;
-            }
+        http_rx_body_read_result_t result = http_rx_body_read_update(
+            req->content_len, &received_total, received,
+            HTTPD_SOCK_ERR_TIMEOUT, esp_timer_get_time(), deadline);
+        if (result == HTTP_RX_BODY_READ_COMPLETE) {
+            break;
+        }
+        if (result == HTTP_RX_BODY_READ_CONTINUE) {
             continue;
         }
-
-        if (received == HTTPD_SOCK_ERR_TIMEOUT &&
-            esp_timer_get_time() < deadline) {
-            continue;
+        if (result == HTTP_RX_BODY_READ_TIMEOUT) {
+            httpd_resp_send_err(req, HTTPD_408_REQ_TIMEOUT,
+                                "Request body timed out");
+        } else {
+            httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST,
+                                "Incomplete request body");
         }
-
-        httpd_resp_send_err(req,
-                            received == HTTPD_SOCK_ERR_TIMEOUT ?
-                                HTTPD_408_REQ_TIMEOUT : HTTPD_400_BAD_REQUEST,
-                            received == HTTPD_SOCK_ERR_TIMEOUT ?
-                                "Request body timed out" : "Incomplete request body");
         return ESP_FAIL;
     }
 
@@ -234,8 +235,9 @@ static int HTTP_receive_upload_chunk(httpd_req_t *req, char *buffer,
 {
     while (true) {
         int64_t now = esp_timer_get_time();
-        if (now - started_at >= HTTP_UPLOAD_TOTAL_TIMEOUT_US ||
-            now - *last_progress_at >= HTTP_UPLOAD_STALL_TIMEOUT_US) {
+        if (http_rx_upload_deadline_expired(
+                now, started_at, *last_progress_at,
+                HTTP_UPLOAD_TOTAL_TIMEOUT_US, HTTP_UPLOAD_STALL_TIMEOUT_US)) {
             return HTTPD_SOCK_ERR_TIMEOUT;
         }
 
