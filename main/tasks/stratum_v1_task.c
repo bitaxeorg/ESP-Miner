@@ -402,6 +402,11 @@ void stratum_v1_task(void *pvParameters)
                             if (notify->clean_jobs) {
                                 SYSTEM_set_work_source(GLOBAL_STATE, WORK_ITEM_STRATUM_V1);
                             }
+
+                            // Finish all producer-side reads before enqueueing. The queue
+                            // owns the payload after this point and may immediately free it
+                            // if the active source changes or the consumer replaces it.
+                            decode_mining_notification(GLOBAL_STATE, notify);
                             queue_enqueue(
                                 &GLOBAL_STATE->stratum_queue,
                                 work_queue_item_create(
@@ -410,7 +415,6 @@ void stratum_v1_task(void *pvParameters)
                                         .v1 = notify,
                                     },
                                     stratum_v1_free_work));
-                            decode_mining_notification(GLOBAL_STATE, notify);
                             stratum_api_v1_message.mining_notification = NULL;
                         }
                     }
