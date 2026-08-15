@@ -4,6 +4,7 @@ SRCS
     "bm1368.c"
     "bm1366.c"
     "bm1397.c"
+    "bm1720.c"
     "serial.c"
     "crc.c"
     "asic_common.c"
