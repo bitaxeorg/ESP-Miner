@@ -25,4 +25,14 @@ void hashrate_monitor_reset_measurements(void *pvParameters);
 
 void update_hashrate(measurement_t * measurement, uint32_t value);
 void update_hash_counter(measurement_t * measurement, uint32_t value, uint64_t time_us);
+
+/**
+ * Monitor hashrate for anomalies and trigger ASIC recovery or reboot.
+ *
+ * After warmup, if hashrate stays below 75% or above 150% of expected
+ * for multiple consecutive polls, ASICs are reinitialized. A full reboot
+ * is triggered if recovery fails or after repeated attempts.
+ */
+void check_hashrate_anomaly(void *pvParameters, float current_hashrate);
+
 #endif /* HASHRATE_MONITOR_TASK_H_ */
