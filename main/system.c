@@ -410,10 +410,9 @@ esp_err_t SYSTEM_init_peripherals(GlobalState * GLOBAL_STATE) {
     return ESP_OK;
 }
 
-void SYSTEM_clean_jobs_queue(GlobalState * GLOBAL_STATE)
+static void system_reset_work_state(GlobalState *GLOBAL_STATE, work_item_kind_t kind)
 {
-    ESP_LOGI(TAG, "Clean Jobs: clearing queue");
-    queue_clear(&GLOBAL_STATE->stratum_queue);
+    queue_set_source(&GLOBAL_STATE->stratum_queue, kind);
 
     pthread_mutex_lock(&GLOBAL_STATE->valid_jobs_lock);
     for (int i = 0; i < 128; i = i + 4) {
@@ -423,6 +422,18 @@ void SYSTEM_clean_jobs_queue(GlobalState * GLOBAL_STATE)
 
     // Reset hashrate measurements to prevent a spike on reconnection
     hashrate_monitor_reset_measurements(GLOBAL_STATE);
+}
+
+void SYSTEM_clean_jobs_queue(GlobalState *GLOBAL_STATE)
+{
+    ESP_LOGI(TAG, "Clean Jobs: clearing queue");
+    system_reset_work_state(GLOBAL_STATE, WORK_ITEM_NONE);
+}
+
+void SYSTEM_set_work_source(GlobalState *GLOBAL_STATE, work_item_kind_t kind)
+{
+    ESP_LOGI(TAG, "Activating work source %d", kind);
+    system_reset_work_state(GLOBAL_STATE, kind);
 }
 
 void SYSTEM_notify_accepted_share(GlobalState * GLOBAL_STATE)

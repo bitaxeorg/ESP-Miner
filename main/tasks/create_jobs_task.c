@@ -26,19 +26,25 @@ static void generate_work(GlobalState *GLOBAL_STATE, mining_notify *notification
 static void generate_work_sv2(GlobalState *GLOBAL_STATE, sv2_job_t *job, double difficulty);
 static void generate_work_sv2_ext(GlobalState *GLOBAL_STATE, sv2_ext_job_t *job, double difficulty, uint64_t extranonce_2_counter);
 
-// Free a work item using the correct free function for the protocol it was created under
-static void free_work_item(GlobalState *GLOBAL_STATE, void *work, stratum_protocol_t protocol)
+static const char *work_item_kind_name(work_item_kind_t kind)
 {
-    if (!work) return;
-    if (protocol == STRATUM_PROTOCOL_V2) {
-        if (stratum_v2_is_extended_channel(GLOBAL_STATE)) {
-            sv2_ext_job_free((sv2_ext_job_t *)work);
-        } else {
-            free(work);  // sv2_job_t is flat
-        }
-    } else {
-        STRATUM_V1_free_mining_notify(work);
+    switch (kind) {
+        case WORK_ITEM_STRATUM_V1:
+            return "Stratum V1";
+        case WORK_ITEM_STRATUM_V2_STANDARD:
+            return "SV2 standard";
+        case WORK_ITEM_STRATUM_V2_EXTENDED:
+            return "SV2 extended";
+        default:
+            return "none";
     }
+}
+
+static bool work_item_matches_source(const work_queue_item_t *item,
+                                     work_queue_source_t source)
+{
+    return item->job.data != NULL && item->kind == source.kind &&
+           item->source_epoch == source.epoch;
 }
 
 void create_jobs_task(void *pvParameters)
@@ -54,8 +60,7 @@ void create_jobs_task(void *pvParameters)
     }
 
     double difficulty = GLOBAL_STATE->pool_difficulty;
-    void *current_work = NULL;
-    stratum_protocol_t current_work_protocol = GLOBAL_STATE->stratum_protocol;
+    work_queue_item_t current_work = {0};
     uint64_t extranonce_2 = 0;
     int timeout_ms = ASIC_get_asic_job_frequency_ms(GLOBAL_STATE);
 
@@ -69,56 +74,57 @@ void create_jobs_task(void *pvParameters)
             GLOBAL_STATE->reset_extranonce2 = false;
         }
 
-        // Read protocol dynamically each iteration (coordinator may have switched it)
-        stratum_protocol_t active_protocol = GLOBAL_STATE->stratum_protocol;
+        work_queue_source_t source = queue_get_source(&GLOBAL_STATE->stratum_queue);
 
-        // If protocol changed, discard current_work (it belongs to the old protocol)
-        // Always update current_work_protocol so the post-dequeue check doesn't
-        // incorrectly discard the first valid work item from the new protocol.
-        if (active_protocol != current_work_protocol) {
-            if (current_work != NULL) {
-                ESP_LOGI(TAG, "Protocol switched from %s to %s, discarding current work",
-                         current_work_protocol == STRATUM_PROTOCOL_V2 ? STRATUM_V2 : STRATUM_V1,
-                         active_protocol == STRATUM_PROTOCOL_V2 ? STRATUM_V2 : STRATUM_V1);
-                free_work_item(GLOBAL_STATE, current_work, current_work_protocol);
-                current_work = NULL;
-            }
-            current_work_protocol = active_protocol;
+        if (current_work.job.data != NULL &&
+            !work_item_matches_source(&current_work, source)) {
+            ESP_LOGI(TAG, "Work source switched from %s to %s, discarding current work",
+                     work_item_kind_name(current_work.kind),
+                     work_item_kind_name(source.kind));
+            work_queue_item_free(&current_work);
         }
 
-        uint64_t start_time = esp_timer_get_time();
-        void *new_work = queue_dequeue_timeout(&GLOBAL_STATE->stratum_queue, timeout_ms);
-        timeout_ms -= (esp_timer_get_time() - start_time) / 1000;
+        int64_t wait_started_at_us = esp_timer_get_time();
+        work_queue_item_t new_work =
+            queue_dequeue_timeout(&GLOBAL_STATE->stratum_queue, timeout_ms);
+        int64_t elapsed_ms = (esp_timer_get_time() - wait_started_at_us) / 1000;
+        if (elapsed_ms >= timeout_ms) {
+            timeout_ms = 0;
+        } else if (elapsed_ms > 0) {
+            timeout_ms -= (int)elapsed_ms;
+        }
 
-        if (new_work != NULL) {
-            active_protocol = GLOBAL_STATE->stratum_protocol;
+        if (new_work.job.data != NULL) {
+            source = queue_get_source(&GLOBAL_STATE->stratum_queue);
 
-            // Free previous work using the protocol it was created under
-            free_work_item(GLOBAL_STATE, current_work, current_work_protocol);
-            current_work = NULL;
-
-            if (active_protocol != current_work_protocol) {
-                // Protocol switched during our blocking dequeue.
-                // The dequeued item may be from either the old or new protocol —
-                // we cannot safely determine which type it is, so discard it.
-                // free() is safe for both sv2_job_t (flat) and mining_notify (malloc'd;
-                // internal strings leak but this is a rare protocol-switch event).
-                ESP_LOGW(TAG, "Protocol switch detected during dequeue, discarding stale item");
-                free(new_work);
-                current_work_protocol = active_protocol;
+            if (!work_item_matches_source(&new_work, source)) {
+                ESP_LOGW(TAG, "Discarding stale %s work while %s is active",
+                         work_item_kind_name(new_work.kind),
+                         work_item_kind_name(source.kind));
+                work_queue_item_free(&new_work);
                 timeout_ms = ASIC_get_asic_job_frequency_ms(GLOBAL_STATE);
                 continue;
             }
 
-            // Protocol unchanged — item matches current_work_protocol. Safe to cast.
-            if (current_work_protocol == STRATUM_PROTOCOL_V2) {
-                if (stratum_v2_is_extended_channel(GLOBAL_STATE)) {
-                    ESP_LOGI(TAG, "New Work Dequeued SV2 ext job %lu", ((sv2_ext_job_t *)new_work)->job_id);
-                } else {
-                    ESP_LOGI(TAG, "New Work Dequeued SV2 job %lu", ((sv2_job_t *)new_work)->job_id);
-                }
-            } else {
-                ESP_LOGI(TAG, "New Work Dequeued %s", ((mining_notify *)new_work)->job_id);
+            work_queue_item_free(&current_work);
+
+            switch (new_work.kind) {
+                case WORK_ITEM_STRATUM_V2_EXTENDED:
+                    ESP_LOGI(TAG, "New Work Dequeued SV2 ext job %lu",
+                             new_work.job.sv2_extended->job_id);
+                    break;
+                case WORK_ITEM_STRATUM_V2_STANDARD:
+                    ESP_LOGI(TAG, "New Work Dequeued SV2 job %lu",
+                             new_work.job.sv2_standard->job_id);
+                    break;
+                case WORK_ITEM_STRATUM_V1:
+                    ESP_LOGI(TAG, "New Work Dequeued %s",
+                             new_work.job.v1->job_id);
+                    break;
+                default:
+                    work_queue_item_free(&new_work);
+                    timeout_ms = ASIC_get_asic_job_frequency_ms(GLOBAL_STATE);
+                    continue;
             }
 
             current_work = new_work;
@@ -139,20 +145,25 @@ void create_jobs_task(void *pvParameters)
 
             // Check clean_jobs flag
             bool clean;
-            if (current_work_protocol == STRATUM_PROTOCOL_V2) {
-                if (stratum_v2_is_extended_channel(GLOBAL_STATE)) {
-                    clean = ((sv2_ext_job_t *)current_work)->clean_jobs;
-                } else {
-                    clean = ((sv2_job_t *)current_work)->clean_jobs;
-                }
-            } else {
-                clean = ((mining_notify *)current_work)->clean_jobs;
+            switch (current_work.kind) {
+                case WORK_ITEM_STRATUM_V2_EXTENDED:
+                    clean = current_work.job.sv2_extended->clean_jobs;
+                    break;
+                case WORK_ITEM_STRATUM_V2_STANDARD:
+                    clean = current_work.job.sv2_standard->clean_jobs;
+                    break;
+                case WORK_ITEM_STRATUM_V1:
+                    clean = current_work.job.v1->clean_jobs;
+                    break;
+                default:
+                    work_queue_item_free(&current_work);
+                    continue;
             }
             if (!clean) {
                 continue;
             }
         } else {
-            if (current_work == NULL) {
+            if (current_work.job.data == NULL) {
                 vTaskDelay(100 / portTICK_PERIOD_MS);
                 continue;
             }
@@ -161,34 +172,38 @@ void create_jobs_task(void *pvParameters)
             // Re-sending the same job restarts the nonce search from 0 and
             // produces duplicate shares. Only send work on new jobs.
             // (V1 and SV2 extended are fine — extranonce_2 gives unique work each time.)
-            if (active_protocol == STRATUM_PROTOCOL_V2 && !stratum_v2_is_extended_channel(GLOBAL_STATE)) {
+            if (current_work.kind == WORK_ITEM_STRATUM_V2_STANDARD) {
                 timeout_ms = ASIC_get_asic_job_frequency_ms(GLOBAL_STATE);
                 continue;
             }
         }
 
-        // Final protocol check before generating work — protocol may have switched
-        // during a timeout dequeue while we still hold stale current_work
-        active_protocol = GLOBAL_STATE->stratum_protocol;
-        if (active_protocol != current_work_protocol) {
-            free_work_item(GLOBAL_STATE, current_work, current_work_protocol);
-            current_work = NULL;
-            current_work_protocol = active_protocol;
+        // The source may have switched during the dequeue or job preparation.
+        source = queue_get_source(&GLOBAL_STATE->stratum_queue);
+        if (!work_item_matches_source(&current_work, source)) {
+            work_queue_item_free(&current_work);
             timeout_ms = ASIC_get_asic_job_frequency_ms(GLOBAL_STATE);
             continue;
         }
 
-        // Generate and send job
-        if (active_protocol == STRATUM_PROTOCOL_V2) {
-            if (stratum_v2_is_extended_channel(GLOBAL_STATE)) {
-                generate_work_sv2_ext(GLOBAL_STATE, (sv2_ext_job_t *)current_work, difficulty, extranonce_2);
+        // Generate according to the immutable allocation type, never mutable
+        // protocol/channel state.
+        switch (current_work.kind) {
+            case WORK_ITEM_STRATUM_V2_EXTENDED:
+                generate_work_sv2_ext(GLOBAL_STATE, current_work.job.sv2_extended,
+                                      difficulty, extranonce_2);
                 extranonce_2++;
-            } else {
-                generate_work_sv2(GLOBAL_STATE, (sv2_job_t *)current_work, difficulty);
-            }
-        } else {
-            generate_work(GLOBAL_STATE, (mining_notify *)current_work, extranonce_2, difficulty);
-            extranonce_2++;
+                break;
+            case WORK_ITEM_STRATUM_V2_STANDARD:
+                generate_work_sv2(GLOBAL_STATE, current_work.job.sv2_standard, difficulty);
+                break;
+            case WORK_ITEM_STRATUM_V1:
+                generate_work(GLOBAL_STATE, current_work.job.v1,
+                              extranonce_2, difficulty);
+                extranonce_2++;
+                break;
+            default:
+                break;
         }
         timeout_ms = ASIC_get_asic_job_frequency_ms(GLOBAL_STATE);
     }
@@ -315,8 +330,11 @@ static void generate_work_sv2(GlobalState *GLOBAL_STATE, sv2_job_t *sv2_job, dou
 static void generate_work_sv2_ext(GlobalState *GLOBAL_STATE, sv2_ext_job_t *ext_job,
                                    double difficulty, uint64_t extranonce_2_counter)
 {
-    sv2_conn_t *conn = GLOBAL_STATE->sv2_conn;
-    if (!conn) return;
+    if (ext_job->extranonce_size < 2 || ext_job->extranonce_size > 32 ||
+        ext_job->extranonce_prefix_len > sizeof(ext_job->extranonce_prefix)) {
+        ESP_LOGE(TAG, "Invalid extended-channel extranonce parameters");
+        return;
+    }
 
     bm_job *next_job = malloc(sizeof(bm_job));
     if (!next_job) {
@@ -328,7 +346,7 @@ static void generate_work_sv2_ext(GlobalState *GLOBAL_STATE, sv2_ext_job_t *ext_
 
     // Derive extranonce_2 from counter
     // SV2 spec: extranonce_size is the miner's rollable portion (not total)
-    uint8_t extranonce_2_len = conn->extranonce_size;
+    uint8_t extranonce_2_len = ext_job->extranonce_size;
     uint8_t extranonce_2[32];
     memset(extranonce_2, 0, sizeof(extranonce_2));
     // Encode counter as big-endian bytes
@@ -341,7 +359,7 @@ static void generate_work_sv2_ext(GlobalState *GLOBAL_STATE, sv2_ext_job_t *ext_
     uint8_t coinbase_tx_hash[32];
     calculate_coinbase_tx_hash_bin(
         ext_job->coinbase_prefix, ext_job->coinbase_prefix_len,
-        conn->extranonce_prefix, conn->extranonce_prefix_len,
+        ext_job->extranonce_prefix, ext_job->extranonce_prefix_len,
         extranonce_2, extranonce_2_len,
         ext_job->coinbase_suffix, ext_job->coinbase_suffix_len,
         coinbase_tx_hash);

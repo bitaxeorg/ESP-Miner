@@ -51,7 +51,7 @@ typedef struct {
 } sv2_frame_header_t;
 
 // Complete SV2 job (NewMiningJob + SetNewPrevHash combined)
-typedef struct {
+typedef struct sv2_job {
     uint32_t job_id;
     uint32_t version;
     uint8_t merkle_root[32]; // Internal byte order (as received from SV2)
@@ -70,7 +70,7 @@ typedef struct {
 } sv2_pending_job_t;
 
 // Extended mining job (heap-allocated, owns coinbase pointers)
-typedef struct {
+typedef struct sv2_ext_job {
     uint32_t job_id;
     uint32_t version;
     bool     version_rolling_allowed;
@@ -84,6 +84,9 @@ typedef struct {
     uint16_t coinbase_prefix_len;
     uint8_t *coinbase_suffix;     // heap
     uint16_t coinbase_suffix_len;
+    uint8_t  extranonce_prefix[32];
+    uint8_t  extranonce_prefix_len;
+    uint8_t  extranonce_size;
 } sv2_ext_job_t;
 
 #define SV2_PENDING_JOBS_SIZE 8

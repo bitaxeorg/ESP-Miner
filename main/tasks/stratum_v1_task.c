@@ -78,6 +78,11 @@ static void clear_active_job_ids(char **active_job_ids, int *count)
 
 static StratumApiV1Message stratum_api_v1_message = {};
 
+static void stratum_v1_free_work(void *work)
+{
+    STRATUM_V1_free_mining_notify((mining_notify *)work);
+}
+
 static int stratum_get_next_uid(GlobalState * GLOBAL_STATE)
 {
     taskENTER_CRITICAL(&GLOBAL_STATE->stratum_mux);
@@ -208,9 +213,6 @@ void stratum_v1_task(void *pvParameters)
     char *stratum_url = GLOBAL_STATE->SYSTEM_MODULE.pools[pool_idx].url;
     uint16_t port = GLOBAL_STATE->SYSTEM_MODULE.pools[pool_idx].port;
 
-    // Set V1-specific free function for the work queue
-    GLOBAL_STATE->stratum_queue.free_fn = (void (*)(void *))STRATUM_V1_free_mining_notify;
-
     STRATUM_V1_initialize_buffer();
     int retry_attempts = 0;
     int retry_critical_attempts = 0;
@@ -322,7 +324,7 @@ void stratum_v1_task(void *pvParameters)
                  "%s%s", protocol, tls_status);
 
         stratum_v1_reset_uid(GLOBAL_STATE);
-        SYSTEM_clean_jobs_queue(GLOBAL_STATE);
+        SYSTEM_set_work_source(GLOBAL_STATE, WORK_ITEM_STRATUM_V1);
 
         ///// Start Stratum Action
         // mining.configure - ID: 1
@@ -384,29 +386,35 @@ void stratum_v1_task(void *pvParameters)
                 case MINING_NOTIFY:
                     {
                         mining_notify *notify = stratum_api_v1_message.mining_notification;
-                        bool is_duplicate = false;
-                        if (notify && notify->job_id) {
-                            if (notify->clean_jobs) {
-                                clear_active_job_ids(active_job_ids, &active_job_ids_count);
-                            }
-                            is_duplicate = !add_active_job_id(active_job_ids, &active_job_ids_count, notify->job_id);
+                        if (notify && notify->job_id && notify->clean_jobs) {
+                            clear_active_job_ids(active_job_ids, &active_job_ids_count);
                         }
 
+                        bool is_duplicate = notify && notify->job_id &&
+                            !add_active_job_id(active_job_ids, &active_job_ids_count,
+                                               notify->job_id);
                         if (is_duplicate) {
-                            ESP_LOGW(TAG, "Ignoring duplicate notify for job %s", notify ? notify->job_id : "unknown");
+                            ESP_LOGW(TAG, "Ignoring duplicate notify for job %s",
+                                     notify->job_id);
                         } else {
                             GLOBAL_STATE->SYSTEM_MODULE.work_received++;
-                            SYSTEM_notify_new_ntime(GLOBAL_STATE, stratum_api_v1_message.mining_notification->ntime);
-                            if (stratum_api_v1_message.mining_notification->clean_jobs &&
-                                (GLOBAL_STATE->stratum_queue.count > 0)) {
-                                SYSTEM_clean_jobs_queue(GLOBAL_STATE);
+                            SYSTEM_notify_new_ntime(GLOBAL_STATE, notify->ntime);
+                            if (notify->clean_jobs) {
+                                SYSTEM_set_work_source(GLOBAL_STATE, WORK_ITEM_STRATUM_V1);
                             }
-                            if (GLOBAL_STATE->stratum_queue.count == QUEUE_SIZE) {
-                                mining_notify *next_notify_json_str = (mining_notify *) queue_dequeue(&GLOBAL_STATE->stratum_queue);
-                                STRATUM_V1_free_mining_notify(next_notify_json_str);
-                            }
-                            queue_enqueue(&GLOBAL_STATE->stratum_queue, stratum_api_v1_message.mining_notification);
-                            decode_mining_notification(GLOBAL_STATE, stratum_api_v1_message.mining_notification);
+
+                            // Finish all producer-side reads before enqueueing. The queue
+                            // owns the payload after this point and may immediately free it
+                            // if the active source changes or the consumer replaces it.
+                            decode_mining_notification(GLOBAL_STATE, notify);
+                            queue_enqueue(
+                                &GLOBAL_STATE->stratum_queue,
+                                work_queue_item_create(
+                                    &GLOBAL_STATE->stratum_queue, WORK_ITEM_STRATUM_V1,
+                                    (work_item_data_t) {
+                                        .v1 = notify,
+                                    },
+                                    stratum_v1_free_work));
                             stratum_api_v1_message.mining_notification = NULL;
                         }
                     }
