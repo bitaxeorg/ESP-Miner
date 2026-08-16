@@ -25,6 +25,7 @@
 #define SV2_MSG_SUBMIT_SHARES_EXTENDED                  0x1b
 #define SV2_MSG_SUBMIT_SHARES_SUCCESS                   0x1c
 #define SV2_MSG_SUBMIT_SHARES_ERROR                     0x1d
+#define SV2_MSG_SET_EXTRANONCE_PREFIX                   0x19
 #define SV2_MSG_SET_NEW_PREV_HASH                       0x20
 #define SV2_MSG_SET_TARGET                              0x21
 
@@ -84,6 +85,12 @@ typedef struct {
     uint16_t coinbase_prefix_len;
     uint8_t *coinbase_suffix;     // heap
     uint16_t coinbase_suffix_len;
+    // Extranonce prefix in force when this job arrived. Spec 5.3.10: a
+    // SetExtranoncePrefix applies to jobs sent after it, and work is generated
+    // from a job long after it arrived (and repeatedly, once per extranonce_2),
+    // so the value cannot be read from the connection at that point.
+    uint8_t  extranonce_prefix[32];
+    uint8_t  extranonce_prefix_len;
 } sv2_ext_job_t;
 
 #define SV2_PENDING_JOBS_SIZE 8
@@ -166,6 +173,12 @@ int sv2_parse_set_new_prev_hash(const uint8_t *payload, uint32_t len,
                                 uint32_t *channel_id, uint32_t *job_id,
                                 uint8_t prev_hash[32],
                                 uint32_t *min_ntime, uint32_t *nbits);
+
+// Parse SetExtranoncePrefix: channel_id U32 + extranonce_prefix B0_32.
+int sv2_parse_set_extranonce_prefix(const uint8_t *payload, uint32_t len,
+                                    uint32_t *channel_id,
+                                    uint8_t *extranonce_prefix,
+                                    uint8_t *extranonce_prefix_len);
 
 int sv2_parse_set_target(const uint8_t *payload, uint32_t len,
                          uint32_t *channel_id, uint8_t max_target[32]);
