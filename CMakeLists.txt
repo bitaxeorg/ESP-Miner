@@ -16,7 +16,6 @@ project(esp-miner)
 # ─────────────────────────────────────────────────────────────────────────────
 
 set(ESPTOOL_CHIP esp32s3)
-set(ESPTOOL_FLASH_ARGS --flash_mode dio --flash_size 16MB --flash_freq 80m)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Partition layout — single source of truth for merge & flash targets
@@ -43,7 +42,7 @@ set(MERGE_OUTPUT "esp-miner-merged.bin" CACHE STRING "Output filename for the me
 add_custom_target(
     merge_bin_target
     COMMAND ${CMAKE_COMMAND} -E echo "Creating merged binary: ${MERGE_OUTPUT}"
-    COMMAND ${PYTHON} -m esptool --chip ${ESPTOOL_CHIP} merge_bin ${ESPTOOL_FLASH_ARGS}
+    COMMAND ${PYTHON} -m esptool --chip ${ESPTOOL_CHIP} merge_bin
         ${PARTITION_ADDR_BOOTLOADER} ${PARTITION_FILE_BOOTLOADER}
         ${PARTITION_ADDR_PARTITION_TABLE} ${PARTITION_FILE_PARTITION_TABLE}
         ${PARTITION_ADDR_APP} ${PARTITION_FILE_APP}
@@ -73,7 +72,7 @@ add_custom_command(
 add_custom_target(
     merge_bin_target_with_config
     COMMAND ${CMAKE_COMMAND} -E echo "Creating merged binary with config from: ${MERGE_CONFIG_CVS}"
-    COMMAND ${PYTHON} -m esptool --chip ${ESPTOOL_CHIP} merge_bin ${ESPTOOL_FLASH_ARGS}
+    COMMAND ${PYTHON} -m esptool --chip ${ESPTOOL_CHIP} merge_bin
         ${PARTITION_ADDR_BOOTLOADER} ${PARTITION_FILE_BOOTLOADER}
         ${PARTITION_ADDR_PARTITION_TABLE} ${PARTITION_FILE_PARTITION_TABLE}
         ${PARTITION_ADDR_CONFIG} ${CONFIG_BIN_OUTPUT}
@@ -89,7 +88,7 @@ add_custom_target(
 add_custom_target(
     merge_bin_target_update
     COMMAND ${CMAKE_COMMAND} -E echo "Creating update binary: esp-miner-update.bin"
-    COMMAND ${PYTHON} -m esptool --chip ${ESPTOOL_CHIP} merge_bin ${ESPTOOL_FLASH_ARGS} --format hex
+    COMMAND ${PYTHON} -m esptool --chip ${ESPTOOL_CHIP} merge_bin --format hex
         ${PARTITION_ADDR_APP} ${PARTITION_FILE_APP}
         ${PARTITION_ADDR_OTA} ${PARTITION_FILE_OTA}
         -o esp-miner-update.bin
@@ -182,7 +181,6 @@ for cfg in sorted(configs):
     out = cfg.replace('.bin', '-merged.bin')
     cmd = [
         sys.executable, '-m', 'esptool', '--chip', '${ESPTOOL_CHIP}', 'merge_bin',
-        ${ESPTOOL_FLASH_ARGS},
         '${PARTITION_ADDR_BOOTLOADER}', '${PARTITION_FILE_BOOTLOADER}',
         '${PARTITION_ADDR_PARTITION_TABLE}', '${PARTITION_FILE_PARTITION_TABLE}',
         '${PARTITION_ADDR_CONFIG}', cfg,
