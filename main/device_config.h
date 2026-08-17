@@ -85,6 +85,7 @@ typedef struct DeviceConfig {
     bool TPS546  : 1;
     // test values
     uint16_t power_consumption_target;
+    uint16_t power_consumption_margin;
 } DeviceConfig;
 
 static const uint16_t BM1397_FREQUENCY_OPTIONS[]   = {400, 425, 450, 475, 485, 500, 525, 550, 575, 600, 0};
@@ -161,7 +162,7 @@ static const DeviceConfig default_configs[] = {
     { .board_version = "701",  .family = FAMILY_SUPRA_HEX,   .EMC2302 = true, .TMP1075 = true,                                            .temp_offset = 10,  .TPS546 = true,                                                           .power_consumption_target = 90, },
     { .board_version = "702",  .family = FAMILY_SUPRA_HEX,   .EMC2302 = true, .TMP1075 = true,                                            .temp_offset = 10,  .TPS546 = true,                                                           .power_consumption_target = 90, },
     { .board_version = "801",  .family = FAMILY_GAMMA_TURBO, .EMC2103 = true,                                          .temp_flip = true, .temp_offset = 0,   .TPS546 = true,                                                           .power_consumption_target = 36, },
-    { .board_version = "1201", .family = FAMILY_NAJA_DUO,    .asic_enable = true, .asic_enable_active_high = true, .disable_bap = true, .i2c_sda = 44, .i2c_scl = 43, .EMC2103 = true, .emc_ideality_factor = 0x17, .emc_beta_compensation = 0x10, .temp_offset = 0, .TPS546 = true, .power_consumption_target = 50, },
+    { .board_version = "1201", .family = FAMILY_NAJA_DUO,    .asic_enable = true, .asic_enable_active_high = true, .disable_bap = true, .i2c_sda = 44, .i2c_scl = 43, .EMC2103 = true, .emc_ideality_factor = 0x17, .emc_beta_compensation = 0x10, .temp_offset = 0, .TPS546 = true, .power_consumption_target = 50, .power_consumption_margin = 10, },
 };
 
 esp_err_t device_config_init(GlobalState * GLOBAL_STATE);
