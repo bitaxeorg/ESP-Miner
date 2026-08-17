@@ -11,16 +11,40 @@ include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 
 project(esp-miner)
 
+# ─────────────────────────────────────────────────────────────────────────────
+# esptool configuration — change these to adapt to a different board
+# ─────────────────────────────────────────────────────────────────────────────
+
+set(ESPTOOL_CHIP esp32s3)
+set(ESPTOOL_FLASH_ARGS --flash_mode dio --flash_size 16MB --flash_freq 80m)
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Partition layout — single source of truth for merge & flash targets
+# ─────────────────────────────────────────────────────────────────────────────
+set(PARTITION_ADDR_BOOTLOADER 0x0)
+set(PARTITION_ADDR_PARTITION_TABLE 0x8000)
+set(PARTITION_ADDR_CONFIG 0x9000)
+set(PARTITION_ADDR_APP 0x10000)
+set(PARTITION_ADDR_OTA 0xf10000)
+
+set(PARTITION_FILE_BOOTLOADER build/bootloader/bootloader.bin)
+set(PARTITION_FILE_PARTITION_TABLE build/partition_table/partition-table.bin)
+set(PARTITION_FILE_APP build/esp-miner.bin)
+set(PARTITION_FILE_OTA build/ota_data_initial.bin)
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Merge binary targets
+# ─────────────────────────────────────────────────────────────────────────────
+
 # Post-build step: automatically create merged binary (esp-miner-merged.bin)
 add_custom_target(
     merge_bin_target
     COMMAND ${CMAKE_COMMAND} -E echo "Creating merged binary: esp-miner-merged.bin"
-    COMMAND ${PYTHON} -m esptool --chip esp32s3 merge_bin
-        --flash_mode dio --flash_size 16MB --flash_freq 80m
-        0x0 build/bootloader/bootloader.bin
-        0x8000 build/partition_table/partition-table.bin
-        0x10000 build/esp-miner.bin
-        0xf10000 build/ota_data_initial.bin
+    COMMAND ${PYTHON} -m esptool --chip ${ESPTOOL_CHIP} merge_bin ${ESPTOOL_FLASH_ARGS}
+        ${PARTITION_ADDR_BOOTLOADER} ${PARTITION_FILE_BOOTLOADER}
+        ${PARTITION_ADDR_PARTITION_TABLE} ${PARTITION_FILE_PARTITION_TABLE}
+        ${PARTITION_ADDR_APP} ${PARTITION_FILE_APP}
+        ${PARTITION_ADDR_OTA} ${PARTITION_FILE_OTA}
         -o esp-miner-merged.bin
     WORKING_DIRECTORY ${PROJECT_DIR}
     DEPENDS app
@@ -46,13 +70,12 @@ add_custom_command(
 add_custom_target(
     merge_bin_target_with_config
     COMMAND ${CMAKE_COMMAND} -E echo "Creating merged binary with config from: ${MERGE_CONFIG_CVS}"
-    COMMAND ${PYTHON} -m esptool --chip esp32s3 merge_bin
-        --flash_mode dio --flash_size 16MB --flash_freq 80m
-        0x0 build/bootloader/bootloader.bin
-        0x8000 build/partition_table/partition-table.bin
-        0x9000 ${CONFIG_BIN_OUTPUT}
-        0x10000 build/esp-miner.bin
-        0xf10000 build/ota_data_initial.bin
+    COMMAND ${PYTHON} -m esptool --chip ${ESPTOOL_CHIP} merge_bin ${ESPTOOL_FLASH_ARGS}
+        ${PARTITION_ADDR_BOOTLOADER} ${PARTITION_FILE_BOOTLOADER}
+        ${PARTITION_ADDR_PARTITION_TABLE} ${PARTITION_FILE_PARTITION_TABLE}
+        ${PARTITION_ADDR_CONFIG} ${CONFIG_BIN_OUTPUT}
+        ${PARTITION_ADDR_APP} ${PARTITION_FILE_APP}
+        ${PARTITION_ADDR_OTA} ${PARTITION_FILE_OTA}
         -o esp-miner-merged-with-config.bin
     WORKING_DIRECTORY ${PROJECT_DIR}
     DEPENDS app ${CONFIG_BIN_OUTPUT}
@@ -63,30 +86,31 @@ add_custom_target(
 add_custom_target(
     merge_bin_target_update
     COMMAND ${CMAKE_COMMAND} -E echo "Creating update binary: esp-miner-update.bin"
-    COMMAND ${PYTHON} -m esptool --chip esp32s3 merge_bin
-        --flash_mode dio --flash_size 16MB --flash_freq 80m --format hex
-        0x10000 build/esp-miner.bin
-        0xf10000 build/ota_data_initial.bin
+    COMMAND ${PYTHON} -m esptool --chip ${ESPTOOL_CHIP} merge_bin ${ESPTOOL_FLASH_ARGS} --format hex
+        ${PARTITION_ADDR_APP} ${PARTITION_FILE_APP}
+        ${PARTITION_ADDR_OTA} ${PARTITION_FILE_OTA}
         -o esp-miner-update.bin
     WORKING_DIRECTORY ${PROJECT_DIR}
     DEPENDS app
     COMMENT "Creating update binary: esp-miner-update.bin"
 )
 
+# ─────────────────────────────────────────────────────────────────────────────
 # Flash targets with selective erase ranges
-# NOTE: These write individual components instead of a merged binary so esptool
-# only erases the specific partition areas being updated, not the entire chip.
+# NOTE: These write individual components so esptool only erases the specific
+# partition areas being updated, not the entire chip.
+# ─────────────────────────────────────────────────────────────────────────────
 
 # Full chip erase + flash (factory reset, first installation)
 # Erases everything: bootloader, partitions, config, firmware, OTA
 add_custom_target(
     flash_factory
-    COMMAND ${PYTHON} -m esptool --chip esp32s3 erase_flash
-    COMMAND ${PYTHON} -m esptool --chip esp32s3 write_flash
-        0x0 build/bootloader/bootloader.bin
-        0x8000 build/partition_table/partition-table.bin
-        0x10000 build/esp-miner.bin
-        0xf10000 build/ota_data_initial.bin
+    COMMAND ${PYTHON} -m esptool --chip ${ESPTOOL_CHIP} erase_flash
+    COMMAND ${PYTHON} -m esptool --chip ${ESPTOOL_CHIP} write_flash
+        ${PARTITION_ADDR_BOOTLOADER} ${PARTITION_FILE_BOOTLOADER}
+        ${PARTITION_ADDR_PARTITION_TABLE} ${PARTITION_FILE_PARTITION_TABLE}
+        ${PARTITION_ADDR_APP} ${PARTITION_FILE_APP}
+        ${PARTITION_ADDR_OTA} ${PARTITION_FILE_OTA}
     WORKING_DIRECTORY ${PROJECT_DIR}
     DEPENDS app
     COMMENT "Factory flash: full erase + write all partitions"
@@ -96,11 +120,11 @@ add_custom_target(
 # Each write_flash only erases its own partition range.
 add_custom_target(
     flash_update_keep_config
-    COMMAND ${PYTHON} -m esptool --chip esp32s3 write_flash
-        0x0 build/bootloader/bootloader.bin
-        0x8000 build/partition_table/partition-table.bin
-        0x10000 build/esp-miner.bin
-        0xf10000 build/ota_data_initial.bin
+    COMMAND ${PYTHON} -m esptool --chip ${ESPTOOL_CHIP} write_flash
+        ${PARTITION_ADDR_BOOTLOADER} ${PARTITION_FILE_BOOTLOADER}
+        ${PARTITION_ADDR_PARTITION_TABLE} ${PARTITION_FILE_PARTITION_TABLE}
+        ${PARTITION_ADDR_APP} ${PARTITION_FILE_APP}
+        ${PARTITION_ADDR_OTA} ${PARTITION_FILE_OTA}
     WORKING_DIRECTORY ${PROJECT_DIR}
     DEPENDS app
     COMMENT "Update flash: writes firmware only, preserves NVS config at 0x9000"
@@ -109,12 +133,12 @@ add_custom_target(
 # Flash with config: includes config.bin, keeps other partitions (OTA, www)
 add_custom_target(
     flash_with_config
-    COMMAND ${PYTHON} -m esptool --chip esp32s3 write_flash
-        0x0 build/bootloader/bootloader.bin
-        0x8000 build/partition_table/partition-table.bin
-        0x9000 ${CONFIG_BIN_OUTPUT}
-        0x10000 build/esp-miner.bin
-        0xf10000 build/ota_data_initial.bin
+    COMMAND ${PYTHON} -m esptool --chip ${ESPTOOL_CHIP} write_flash
+        ${PARTITION_ADDR_BOOTLOADER} ${PARTITION_FILE_BOOTLOADER}
+        ${PARTITION_ADDR_PARTITION_TABLE} ${PARTITION_FILE_PARTITION_TABLE}
+        ${PARTITION_ADDR_CONFIG} ${CONFIG_BIN_OUTPUT}
+        ${PARTITION_ADDR_APP} ${PARTITION_FILE_APP}
+        ${PARTITION_ADDR_OTA} ${PARTITION_FILE_OTA}
     WORKING_DIRECTORY ${PROJECT_DIR}
     DEPENDS app ${CONFIG_BIN_OUTPUT}
     COMMENT "Flash with config: writes all including config from ${MERGE_CONFIG_CVS}, preserves OTA/www"
@@ -123,8 +147,8 @@ add_custom_target(
 # Erase only NVS config partition (0x9000 - 0x10000, 24KB) then write config
 add_custom_target(
     flash_config_only
-    COMMAND ${PYTHON} -m esptool --chip esp32s3 erase_region 0x9000 0x7000
-    COMMAND ${PYTHON} -m esptool --chip esp32s3 write_flash 0x9000 ${CONFIG_BIN_OUTPUT}
+    COMMAND ${PYTHON} -m esptool --chip ${ESPTOOL_CHIP} erase_region ${PARTITION_ADDR_CONFIG} 0x7000
+    COMMAND ${PYTHON} -m esptool --chip ${ESPTOOL_CHIP} write_flash ${PARTITION_ADDR_CONFIG} ${CONFIG_BIN_OUTPUT}
     WORKING_DIRECTORY ${PROJECT_DIR}
     DEPENDS ${CONFIG_BIN_OUTPUT}
     COMMENT "Config only: erase + write NVS config from ${MERGE_CONFIG_CVS}"
@@ -133,14 +157,16 @@ add_custom_target(
 # Erase factory app only (0x10000 - 0x500000) then write firmware
 add_custom_target(
     flash_app_only
-    COMMAND ${PYTHON} -m esptool --chip esp32s3 erase_region 0x10000 0x400000
-    COMMAND ${PYTHON} -m esptool --chip esp32s3 write_flash 0x10000 build/esp-miner.bin
+    COMMAND ${PYTHON} -m esptool --chip ${ESPTOOL_CHIP} erase_region ${PARTITION_ADDR_APP} 0x400000
+    COMMAND ${PYTHON} -m esptool --chip ${ESPTOOL_CHIP} write_flash ${PARTITION_ADDR_APP} ${PARTITION_FILE_APP}
     WORKING_DIRECTORY ${PROJECT_DIR}
     DEPENDS app
     COMMENT "App only: erase + write firmware, keeps bootloader, partition, config intact"
 )
 
-# Generate merged binaries for all config-*.bin files (like merge_bin_all.sh -c)
+# ─────────────────────────────────────────────────────────────────────────────
+# Merge all config-*.bin files (like merge_bin_all.sh -c)
+# ─────────────────────────────────────────────────────────────────────────────
 file(GLOB CONFIG_BINS "${PROJECT_DIR}/config-*.bin")
 if(CONFIG_BINS)
     add_custom_target(
@@ -152,13 +178,13 @@ configs = glob.glob('config-*.bin')
 for cfg in sorted(configs):
     out = cfg.replace('.bin', '-merged.bin')
     cmd = [
-        sys.executable, '-m', 'esptool', '--chip', 'esp32s3', 'merge_bin',
-        '--flash_mode', 'dio', '--flash_size', '16MB', '--flash_freq', '80m',
-        '0x0', 'build/bootloader/bootloader.bin',
-        '0x8000', 'build/partition_table/partition-table.bin',
-        '0x9000', cfg,
-        '0x10000', 'build/esp-miner.bin',
-        '0xf10000', 'build/ota_data_initial.bin',
+        sys.executable, '-m', 'esptool', '--chip', '${ESPTOOL_CHIP}', 'merge_bin',
+        ${ESPTOOL_FLASH_ARGS},
+        '${PARTITION_ADDR_BOOTLOADER}', '${PARTITION_FILE_BOOTLOADER}',
+        '${PARTITION_ADDR_PARTITION_TABLE}', '${PARTITION_FILE_PARTITION_TABLE}',
+        '${PARTITION_ADDR_CONFIG}', cfg,
+        '${PARTITION_ADDR_APP}', '${PARTITION_FILE_APP}',
+        '${PARTITION_ADDR_OTA}', '${PARTITION_FILE_OTA}',
         '-o', out
     ]
     print(f'Creating {out}')
@@ -170,4 +196,3 @@ print('All merged binaries created.')
         COMMENT "Creating merged binaries for all config-*.bin files"
     )
 endif()
-
