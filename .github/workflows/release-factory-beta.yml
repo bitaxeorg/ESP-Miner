@@ -54,7 +54,7 @@ jobs:
           cache: 'pip'
       - run: pip install esptool
       - name: "Create factory image for ${{ matrix.build_type }}-${{ github.ref_name }}"
-        run: "./merge_bin.sh -c esp-miner-factory-${{ matrix.build_type }}-${{ github.ref_name }}.bin"
+        run: "idf.py -DMERGE_OUTPUT=esp-miner-factory-${{ matrix.build_type }}-${{ github.ref_name }}.bin merge_bin_target_with_config"
       - name: Release esp-miner.bin
         uses: softprops/action-gh-release@v2.4.2
         if: startsWith(github.ref, 'refs/tags/')

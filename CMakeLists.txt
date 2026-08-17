@@ -36,19 +36,22 @@ set(PARTITION_FILE_OTA build/ota_data_initial.bin)
 # Merge binary targets
 # ─────────────────────────────────────────────────────────────────────────────
 
-# Post-build step: automatically create merged binary (esp-miner-merged.bin)
+# Output filename for the merged binary. Override with: idf.py -DMERGE_OUTPUT=custom.bin merge_bin_target
+set(MERGE_OUTPUT "esp-miner-merged.bin" CACHE STRING "Output filename for the merged binary")
+
+# Post-build step: automatically create merged binary
 add_custom_target(
     merge_bin_target
-    COMMAND ${CMAKE_COMMAND} -E echo "Creating merged binary: esp-miner-merged.bin"
+    COMMAND ${CMAKE_COMMAND} -E echo "Creating merged binary: ${MERGE_OUTPUT}"
     COMMAND ${PYTHON} -m esptool --chip ${ESPTOOL_CHIP} merge_bin ${ESPTOOL_FLASH_ARGS}
         ${PARTITION_ADDR_BOOTLOADER} ${PARTITION_FILE_BOOTLOADER}
         ${PARTITION_ADDR_PARTITION_TABLE} ${PARTITION_FILE_PARTITION_TABLE}
         ${PARTITION_ADDR_APP} ${PARTITION_FILE_APP}
         ${PARTITION_ADDR_OTA} ${PARTITION_FILE_OTA}
-        -o esp-miner-merged.bin
+        -o ${MERGE_OUTPUT}
     WORKING_DIRECTORY ${PROJECT_DIR}
     DEPENDS app
-    COMMENT "Creating merged binary: esp-miner-merged.bin"
+    COMMENT "Creating merged binary: ${MERGE_OUTPUT}"
 )
 
 # Config file to merge. Set with: idf.py -DMERGE_CONFIG_CVS=config-601.cvs
@@ -165,7 +168,7 @@ add_custom_target(
 )
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Merge all config-*.bin files (like merge_bin_all.sh -c)
+# Merge all config-*.bin files
 # ─────────────────────────────────────────────────────────────────────────────
 file(GLOB CONFIG_BINS "${PROJECT_DIR}/config-*.bin")
 if(CONFIG_BINS)

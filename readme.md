@@ -408,13 +408,7 @@ idf.py flash_app_only
 | `flash_config_only` | NVS config (0x9000-0x10000) | Everything else |
 | `flash_app_only` | Firmware (0x10000-0x500000) | Bootloader, config, OTA |
 
-**Shell script (legacy):**
-```
-./merge_bin.sh ./esp-miner-merged.bin
-./merge_bin.sh -c ./esp-miner-merged.bin  # with config.bin
-```
-
-Note: the merge_bin tools combine the bootloader, partition table, application binary, and OTA data into a single file that can be flashed to the device at 0x0.
+Note: the merge targets combine the bootloader, partition table, application binary, and OTA data into a single file that can be flashed to the device at 0x0.
 
 Note: if using VSCode, you may have to configure the settings.json file to match your esp hardware version. For example, if your bitaxe has something other than an esp32-s3, you will need to change the version in the `.vscode/settings.json` file.
 
