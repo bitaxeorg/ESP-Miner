@@ -198,6 +198,14 @@ void app_main(void)
 
     queue_init(&GLOBAL_STATE.stratum_queue);
 
+    // The self-test feeds create_jobs_task a hardcoded stratum V1 mock job.
+    // SYSTEM_init_system() picked the protocol from the configured pool, so pin
+    // V1 here — before create_jobs_task latches it — or an SV2-configured device
+    // would cast the mock mining_notify to sv2_job_t.
+    if (GLOBAL_STATE.SELF_TEST_MODULE.is_active) {
+        GLOBAL_STATE.stratum_protocol = STRATUM_PROTOCOL_V1;
+    }
+
     if (system_init_ret == ESP_OK) {
         if (asic_initialize(&GLOBAL_STATE, ASIC_INIT_COLD_BOOT, 0) == 0) {
             if (!GLOBAL_STATE.SELF_TEST_MODULE.is_active) {
@@ -223,9 +231,11 @@ void app_main(void)
         }
     }
 
-    protocol_coordinator_init(&GLOBAL_STATE);
-    if (xTaskCreateWithCaps(protocol_coordinator_task, "protocol coord", 3072, (void *) &GLOBAL_STATE, 5, NULL, MALLOC_CAP_SPIRAM) != pdPASS) {
-        ESP_LOGE(TAG, "Error creating protocol coordinator task");
+    if (!GLOBAL_STATE.SELF_TEST_MODULE.is_active) {
+        protocol_coordinator_init(&GLOBAL_STATE);
+        if (xTaskCreateWithCaps(protocol_coordinator_task, "protocol coord", 3072, (void *) &GLOBAL_STATE, 5, NULL, MALLOC_CAP_SPIRAM) != pdPASS) {
+            ESP_LOGE(TAG, "Error creating protocol coordinator task");
+        }
     }
 
     if (GLOBAL_STATE.SELF_TEST_MODULE.is_active) {
