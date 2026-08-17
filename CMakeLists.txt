@@ -62,7 +62,7 @@ set(CONFIG_BIN_OUTPUT "${PROJECT_DIR}/config.bin")
 add_custom_command(
     OUTPUT ${CONFIG_BIN_OUTPUT}
     COMMAND ${PYTHON} "$ENV{IDF_PATH}/components/nvs_flash/nvs_partition_generator/nvs_partition_gen.py"
-        generate ${MERGE_CONFIG_CVS} ${CONFIG_BIN_OUTPUT} --size 0x1000
+        generate ${MERGE_CONFIG_CVS} ${CONFIG_BIN_OUTPUT} 0x6000
     WORKING_DIRECTORY ${PROJECT_DIR}
     DEPENDS ${PROJECT_DIR}/${MERGE_CONFIG_CVS}
     COMMENT "Generating config.bin from ${MERGE_CONFIG_CVS}"
@@ -78,7 +78,7 @@ add_custom_target(
         ${PARTITION_ADDR_CONFIG} ${CONFIG_BIN_OUTPUT}
         ${PARTITION_ADDR_APP} ${PARTITION_FILE_APP}
         ${PARTITION_ADDR_OTA} ${PARTITION_FILE_OTA}
-        -o esp-miner-merged-with-config.bin
+        -o ${MERGE_OUTPUT}
     WORKING_DIRECTORY ${PROJECT_DIR}
     DEPENDS app ${CONFIG_BIN_OUTPUT}
     COMMENT "Creating merged binary with config from ${MERGE_CONFIG_CVS}"

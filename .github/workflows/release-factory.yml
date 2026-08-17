@@ -46,7 +46,7 @@ jobs:
         with:
           esp_idf_version: v6.0.2
           target: esp32s3
-          command: /opt/esp/idf/components/nvs_flash/nvs_partition_generator/nvs_partition_gen.py generate config-${{ matrix.build_type }}.cvs config.bin 0x6000 && idf.py -DMERGE_OUTPUT=esp-miner-factory-${{ matrix.build_type }}-${{ github.ref_name }}.bin merge_bin_target_with_config
+          command: /opt/esp/idf/components/nvs_flash/nvs_partition_generator/nvs_partition_gen.py generate config-${{ matrix.build_type }}.cvs config.bin 0x6000 && idf.py -DMERGE_OUTPUT=esp-miner-factory-${{ matrix.build_type }}-${{ github.ref_name }}.bin -DMERGE_CONFIG_CVS=config-${{ matrix.build_type }}.cvs merge_bin_target_with_config
           path: '.'
       - name: Release esp-miner.bin
         uses: softprops/action-gh-release@v2.4.2
