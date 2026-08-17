@@ -17,6 +17,7 @@
 #define GPIO_ASIC_ENABLE CONFIG_GPIO_ASIC_ENABLE
 #define GPIO_PLUG_SENSE CONFIG_GPIO_PLUG_SENSE
 #define TPS546_DUAL_PHASE_STACK_CONFIG 0x0001
+#define TPS546_FOUR_PHASE_STACK_CONFIG 0x0003
 
 static const char *TAG = "vcore";
 static bool vcore_initialized = false;
@@ -28,6 +29,32 @@ static TPS546_CONFIG get_tps546_config(const FamilyConfig * family)
 
     // Set family-specific parameters
     switch (family->id) {
+    case GAMMA_HEX:
+        if (family->voltage_domains != GAMMA_HEX_VOLTAGE_DOMAINS) {
+            ESP_LOGE(TAG, "GammaHex must be configured for %u voltage domains",
+                     GAMMA_HEX_VOLTAGE_DOMAINS);
+            return config;
+        }
+        config.TPS546_INIT_PHASE = TPS546_INIT_PHASE_MULTI;
+        config.TPS546_INIT_VIN_ON = 11.0;
+        config.TPS546_INIT_VIN_OFF = 10.5;
+        config.TPS546_INIT_VIN_UV_WARN_LIMIT = 11.0;
+        config.TPS546_INIT_VIN_OV_FAULT_LIMIT = 14.0;
+        config.TPS546_INIT_SCALE_LOOP = 0.125;
+        config.TPS546_INIT_VOUT_MIN = 2.0;
+        config.TPS546_INIT_VOUT_MAX = 3.0;
+        config.TPS546_INIT_VOUT_COMMAND = 2.4;
+        config.TPS546_INIT_IOUT_OC_WARN_LIMIT = 150.0;
+        config.TPS546_INIT_IOUT_OC_FAULT_LIMIT = 160.0;
+        config.TPS546_INIT_STACK_CONFIG = TPS546_FOUR_PHASE_STACK_CONFIG;
+        config.TPS546_INIT_SYNC_CONFIG = 0xD0;
+        config.TPS546_INIT_COMPENSATION_CONFIG[0] = 0x02;
+        config.TPS546_INIT_COMPENSATION_CONFIG[1] = 0x64;
+        config.TPS546_INIT_COMPENSATION_CONFIG[2] = 0x82;
+        config.TPS546_INIT_COMPENSATION_CONFIG[3] = 0x11;
+        config.TPS546_INIT_COMPENSATION_CONFIG[4] = 0x06;
+        break;
+
     case NAJA_DUO:
         if (family->voltage_domains != NAJA_DUO_VOLTAGE_DOMAINS) {
             ESP_LOGE(TAG, "NajaDuo must be configured for %u voltage domains",

@@ -28,7 +28,11 @@ esp_err_t Thermal_init(DeviceConfig * DEVICE_CONFIG)
         }
     }
     if (DEVICE_CONFIG->EMC2103) {
-        ESP_RETURN_ON_ERROR(EMC2103_init(DEVICE_CONFIG->temp_offset, DEVICE_CONFIG->temp_flip), TAG, "Failed to initialise EMC2103");
+        ESP_RETURN_ON_ERROR(EMC2103_init(DEVICE_CONFIG->temp_offset,
+                                         DEVICE_CONFIG->temp_flip,
+                                         DEVICE_CONFIG->emc_direct_pwm),
+                            TAG,
+                            "Failed to initialise EMC2103");
         if (DEVICE_CONFIG->emc_ideality_factor != 0x00) {
             ESP_RETURN_ON_ERROR(EMC2103_set_ideality_factor(DEVICE_CONFIG->emc_ideality_factor),
                                 TAG, "Failed to set EMC2103 ideality factor");

@@ -82,13 +82,14 @@ static void my_log_cb(lv_log_level_t level, const char * buf);
 
 static bool family_has_i80_st7789_display(Family family)
 {
-    return family == NAJA_DUO;
+    return family == NAJA_DUO || family == GAMMA_HEX;
 }
 
 static const St7789I80Pins *get_st7789_i80_pins(Family family)
 {
     switch (family) {
         case NAJA_DUO:
+        case GAMMA_HEX:
             return &ST7789_NAJA_DUO_PINS;
         default:
             return NULL;

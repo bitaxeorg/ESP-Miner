@@ -7,6 +7,7 @@
 
 #define THERMAL_MAX_SENSORS 2
 #define NAJA_DUO_VOLTAGE_DOMAINS 2
+#define GAMMA_HEX_VOLTAGE_DOMAINS 2
 
 typedef struct GlobalState GlobalState;
 
@@ -46,6 +47,7 @@ typedef enum
     GAMMA,
     GAMMA_DUO,
     SUPRA_HEX,
+    GAMMA_HEX,
     GAMMA_TURBO,
     NAJA_DUO,
 } Family;
@@ -74,6 +76,7 @@ typedef struct DeviceConfig {
     bool EMC2101 : 1;
     bool EMC2103 : 1;
     bool EMC2302 : 1;
+    bool emc_direct_pwm : 1;
     bool emc_internal_temp : 1;
     bool TMP1075 : 1;
     uint8_t emc_ideality_factor;
@@ -91,7 +94,7 @@ typedef struct DeviceConfig {
 static const uint16_t BM1397_FREQUENCY_OPTIONS[]   = {400, 425, 450, 475, 485, 500, 525, 550, 575, 600, 0};
 static const uint16_t BM1366_FREQUENCY_OPTIONS[]   = {400, 425, 450, 475, 485, 500, 525, 550, 575,      0};
 static const uint16_t BM1368_FREQUENCY_OPTIONS[]   = {400, 425, 450, 475, 485, 490, 500, 525, 550, 575, 0};
-static const uint16_t BM1370_FREQUENCY_OPTIONS[]   = {400, 490, 525, 550, 600, 625,                     0};
+static const uint16_t BM1370_FREQUENCY_OPTIONS[]   = {400, 490, 525, 550, 600, 625, 690,                0};
 static const uint16_t BM1373_FREQUENCY_OPTIONS[]   = {327, 350, 375, 380, 400, 410,                     0};
 static const uint16_t BM1370_FRQUENCY_XP_OPTIONS[] = {350, 375, 380, 400, 410,                        0};
 
@@ -106,6 +109,7 @@ static const AsicConfig ASIC_BM1366 = { .id = BM1366, .name = "BM1366", .chip_id
 static const AsicConfig ASIC_BM1368 = { .id = BM1368, .name = "BM1368", .chip_id = 1368, .default_frequency_mhz = 490, .frequency_options = BM1368_FREQUENCY_OPTIONS, .default_voltage_mv = 1166, .voltage_options = BM1368_VOLTAGE_OPTIONS, .difficulty = 256, .core_count =  80, .small_core_count = 1276, .hash_domains = 4, .hashrate_test_percentage_target = 0.80, .default_asic_timeout = 500};
 static const AsicConfig ASIC_BM1370 = { .id = BM1370, .name = "BM1370", .chip_id = 1370, .default_frequency_mhz = 525, .frequency_options = BM1370_FREQUENCY_OPTIONS, .default_voltage_mv = 1150, .voltage_options = BM1370_VOLTAGE_OPTIONS, .difficulty = 256, .core_count = 128, .small_core_count = 2040, .hash_domains = 4, .hashrate_test_percentage_target = 0.85, .default_asic_timeout = 500};
 static const AsicConfig ASIC_BM1370XP = { .id = BM1370, .name = "BM1370", .chip_id = 1370, .default_frequency_mhz = 400, .frequency_options = BM1370_FRQUENCY_XP_OPTIONS, .default_voltage_mv = 1150, .voltage_options = BM1370_VOLTAGE_OPTIONS, .difficulty = 256, .core_count = 128, .small_core_count = 2040, .hash_domains = 4, .hashrate_test_percentage_target = 0.85, .default_asic_timeout = 500};
+static const AsicConfig ASIC_BM1370_HEX = { .id = BM1370, .name = "BM1370", .chip_id = 1370, .default_frequency_mhz = 690, .frequency_options = BM1370_FREQUENCY_OPTIONS, .default_voltage_mv = 1200, .voltage_options = BM1370_VOLTAGE_OPTIONS, .difficulty = 256, .core_count = 128, .small_core_count = 2040, .hash_domains = 4, .hashrate_test_percentage_target = 0.85, .default_asic_timeout = 500};
 static const AsicConfig ASIC_BM1373 = { .id = BM1373, .name = "BM1372/BM1373", .chip_id = 1372, .default_frequency_mhz = 327, .frequency_options = BM1373_FREQUENCY_OPTIONS, .default_voltage_mv = 1000, .voltage_options = BM1373_VOLTAGE_OPTIONS, .difficulty = 256, .core_count = 128, .small_core_count = 6725, .hash_domains = 4, .hashrate_test_percentage_target = 0.85, .default_asic_timeout = 500};
 
 static const AsicConfig default_asic_configs[] = {
@@ -124,6 +128,7 @@ static const FamilyConfig FAMILY_SUPRA       = { .id = SUPRA,       .name = "Sup
 static const FamilyConfig FAMILY_GAMMA       = { .id = GAMMA,       .name = "Gamma",      .asic = ASIC_BM1370,   .asic_count = 1, .max_power =  40, .power_offset = 5,  .nominal_voltage = 5,  .voltage_domains = 1, .swarm_color = "green",    };
 static const FamilyConfig FAMILY_GAMMA_DUO   = { .id = GAMMA_DUO,   .name = "GammaDuo",   .asic = ASIC_BM1370XP, .asic_count = 2, .max_power =  40, .power_offset = 5,  .nominal_voltage = 5,  .voltage_domains = 1, .swarm_color = "green",    };
 static const FamilyConfig FAMILY_SUPRA_HEX   = { .id = SUPRA_HEX,   .name = "SupraHex",   .asic = ASIC_BM1368,   .asic_count = 6, .max_power = 120, .power_offset = 25, .nominal_voltage = 12, .voltage_domains = 3, .swarm_color = "darkblue", };
+static const FamilyConfig FAMILY_GAMMA_HEX   = { .id = GAMMA_HEX,   .name = "GammaHex",   .asic = ASIC_BM1370_HEX, .asic_count = 6, .max_power = 180, .power_offset = 25, .nominal_voltage = 12, .voltage_domains = GAMMA_HEX_VOLTAGE_DOMAINS, .swarm_color = "cyan", };
 static const FamilyConfig FAMILY_GAMMA_TURBO = { .id = GAMMA_TURBO, .name = "GammaTurbo", .asic = ASIC_BM1370,   .asic_count = 2, .max_power =  60, .power_offset = 10, .nominal_voltage = 12, .voltage_domains = 1, .swarm_color = "cyan",     };
 static const FamilyConfig FAMILY_NAJA_DUO    = { .id = NAJA_DUO,    .name = "NajaDuo",    .asic = ASIC_BM1373,   .asic_count = 2, .max_power =  60, .power_offset = 0,  .nominal_voltage = 12, .voltage_domains = NAJA_DUO_VOLTAGE_DOMAINS, .swarm_color = "magenta",  };
 
@@ -134,6 +139,7 @@ static const FamilyConfig default_families[] = {
     FAMILY_SUPRA,
     FAMILY_GAMMA,
     FAMILY_SUPRA_HEX,
+    FAMILY_GAMMA_HEX,
     FAMILY_GAMMA_TURBO,
     FAMILY_NAJA_DUO,
 };
@@ -162,6 +168,7 @@ static const DeviceConfig default_configs[] = {
     { .board_version = "701",  .family = FAMILY_SUPRA_HEX,   .EMC2302 = true, .TMP1075 = true,                                            .temp_offset = 10,  .TPS546 = true,                                                           .power_consumption_target = 90, },
     { .board_version = "702",  .family = FAMILY_SUPRA_HEX,   .EMC2302 = true, .TMP1075 = true,                                            .temp_offset = 10,  .TPS546 = true,                                                           .power_consumption_target = 90, },
     { .board_version = "801",  .family = FAMILY_GAMMA_TURBO, .EMC2103 = true,                                          .temp_flip = true, .temp_offset = 0,   .TPS546 = true,                                                           .power_consumption_target = 36, },
+    { .board_version = "1300", .family = FAMILY_GAMMA_HEX,   .asic_enable = true, .asic_enable_active_high = true, .disable_bap = true, .i2c_sda = 44, .i2c_scl = 43, .EMC2103 = true, .emc_direct_pwm = true, .temp_flip = true, .temp_offset = 0, .TPS546 = true, .power_consumption_target = 140, .power_consumption_margin = 21, },
     { .board_version = "1201", .family = FAMILY_NAJA_DUO,    .asic_enable = true, .asic_enable_active_high = true, .disable_bap = true, .i2c_sda = 44, .i2c_scl = 43, .EMC2103 = true, .emc_ideality_factor = 0x17, .emc_beta_compensation = 0x10, .temp_offset = 0, .TPS546 = true, .power_consumption_target = 50, .power_consumption_margin = 10, },
 };
 
