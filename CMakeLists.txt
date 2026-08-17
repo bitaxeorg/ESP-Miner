@@ -61,7 +61,7 @@ set(MERGE_CONFIG_CVS "config-601.cvs" CACHE STRING "Config CSV file to include i
 set(CONFIG_BIN_OUTPUT "${PROJECT_DIR}/config.bin")
 add_custom_command(
     OUTPUT ${CONFIG_BIN_OUTPUT}
-    COMMAND ${PYTHON} "$ENV{IDF_PATH}/components/nvs_flash/tools/nvs_partition_gen.py"
+    COMMAND ${PYTHON} "$ENV{IDF_PATH}/components/nvs_flash/nvs_partition_generator/nvs_partition_gen.py"
         generate ${MERGE_CONFIG_CVS} ${CONFIG_BIN_OUTPUT} --size 0x1000
     WORKING_DIRECTORY ${PROJECT_DIR}
     DEPENDS ${PROJECT_DIR}/${MERGE_CONFIG_CVS}
