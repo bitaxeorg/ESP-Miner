@@ -4,6 +4,15 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "esp_err.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+
+#define ASIC_INIT_CORE_REGISTER_DELAY_MS 10
+
+static inline void asic_init_core_register_delay(void)
+{
+    vTaskDelay(pdMS_TO_TICKS(ASIC_INIT_CORE_REGISTER_DELAY_MS));
+}
 
 static const double NONCE_SPACE = 4294967296.0; //  2^32
 

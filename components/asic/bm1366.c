@@ -88,7 +88,12 @@ static void _send_BM1366(uint8_t header, uint8_t * data, uint8_t data_len, bool 
     packet_type_t packet_type = (header & TYPE_JOB) ? JOB_PACKET : CMD_PACKET;
     uint8_t total_length = (packet_type == JOB_PACKET) ? (data_len + 6) : (data_len + 5);
 
-    uint8_t buf[total_length];
+    if (total_length > 128) {
+        ESP_LOGE(TAG, "Packet length %d exceeds maximum buffer size", total_length);
+        return;
+    }
+
+    uint8_t buf[128];
 
     // add the preamble
     buf[0] = 0x55;
@@ -118,7 +123,12 @@ static void _send_BM1366(uint8_t header, uint8_t * data, uint8_t data_len, bool 
 
 static void _send_simple(uint8_t * data, uint8_t total_length)
 {
-    uint8_t buf[total_length];
+    if (total_length > 128) {
+        ESP_LOGE(TAG, "Packet length %d exceeds maximum buffer size", total_length);
+        return;
+    }
+
+    uint8_t buf[128];
     memcpy(buf, data, total_length);
     SERIAL_send(buf, total_length, BM1366_SERIALTX_DEBUG);
 }
@@ -386,13 +396,21 @@ task_result * BM1366_process_work(GlobalState * GLOBAL_STATE)
     return &result;
 }
 
-void BM1366_read_registers(void)
+void BM1366_read_registers(GlobalState * GLOBAL_STATE)
 {
+    uint16_t asic_count = GLOBAL_STATE->DEVICE_CONFIG.family.asic_count;
+    if (asic_count == 0 || address_interval <= 0) {
+        return;
+    }
+
     int size = sizeof(REGISTER_MAP) / sizeof(REGISTER_MAP[0]);
-    for (int reg = 0; reg < size; reg++) {
-        if (REGISTER_MAP[reg] != REGISTER_INVALID) {
-            _send_BM1366((TYPE_CMD | GROUP_ALL | CMD_READ), (uint8_t[]){0x00, reg}, 2, BM1366_SERIALTX_DEBUG);
-            vTaskDelay(1 / portTICK_PERIOD_MS);
+    for (uint8_t chip = 0; chip < asic_count; chip++) {
+        uint8_t chip_addr = chip * address_interval;
+        for (int reg = 0; reg < size; reg++) {
+            if (REGISTER_MAP[reg] != REGISTER_INVALID) {
+                _send_BM1366((TYPE_CMD | GROUP_SINGLE | CMD_READ), (uint8_t[]){chip_addr, reg}, 2, BM1366_SERIALTX_DEBUG);
+                vTaskDelay(pdMS_TO_TICKS(1));
+            }
         }
     }
 }
