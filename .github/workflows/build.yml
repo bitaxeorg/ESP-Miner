@@ -24,7 +24,7 @@ jobs:
       with:
         esp_idf_version: v6.0.2
         target: esp32s3
-        command: GITHUB_ACTIONS="true" idf.py build merge_bin_target
+        command: GITHUB_ACTIONS="true" idf.py build && idf.py merge_bin_target
         path: '.'
     - name: upload esp-miner-merged.bin
       uses: actions/upload-artifact@v4
