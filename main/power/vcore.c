@@ -19,6 +19,7 @@
 #define TPS546_DUAL_PHASE_STACK_CONFIG 0x0001
 
 static const char *TAG = "vcore";
+static bool vcore_initialized = false;
 
 static TPS546_CONFIG get_tps546_config(const FamilyConfig * family)
 {
@@ -190,6 +191,7 @@ static void configure_asic_power_enable(GlobalState * GLOBAL_STATE)
 
 esp_err_t VCORE_init(GlobalState * GLOBAL_STATE)
 {
+    vcore_initialized = false;
     ESP_RETURN_ON_FALSE(GLOBAL_STATE->DEVICE_CONFIG.family.voltage_domains != 0, ESP_FAIL, TAG, "voltage_domains not defined");
 
     configure_asic_power_enable(GLOBAL_STATE);
@@ -205,7 +207,13 @@ esp_err_t VCORE_init(GlobalState * GLOBAL_STATE)
         ESP_RETURN_ON_ERROR(TPS546_init(tps_config), TAG, "TPS546 init failed!");
     }
 
+    vcore_initialized = true;
     return ESP_OK;
+}
+
+bool VCORE_is_initialized(void)
+{
+    return vcore_initialized;
 }
 
 esp_err_t VCORE_set_voltage(GlobalState * GLOBAL_STATE, float core_voltage)

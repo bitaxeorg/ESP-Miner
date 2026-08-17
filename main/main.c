@@ -167,7 +167,8 @@ void app_main(void)
             }
         }
     } else {
-        ESP_LOGE(TAG, "Critical peripheral initialization failure (%s). Entering degraded mode.", esp_err_to_name(GLOBAL_STATE.SELF_TEST_MODULE.system_init_ret));
+        ESP_LOGE(TAG, "Critical peripheral initialization failure (%s). Entering degraded mode.",
+                 esp_err_to_name(system_init_ret));
     }
     
     // Read version info (from SPIFFS if custom WWW is active)

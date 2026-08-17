@@ -24,5 +24,6 @@ rotation,data,u16,0
 autofanspeed,data,u16,1
 temptarget,data,u16,50
 fanspeed,data,u16,100
-selftest,data,u16,0
+selftest,data,u16,1
+selftest_warm,data,u16,45
 overheat_mode,data,u16,0
