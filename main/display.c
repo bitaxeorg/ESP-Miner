@@ -18,7 +18,7 @@
 #include "driver/i2c_types.h"
 #include "esp_lcd_panel_ssd1306.h"
 #include "esp_lcd_sh1107.h"
-#include "utils.h"
+#include "array.h"
 
 #define DISPLAY_I2C_ADDRESS    0x3C
 

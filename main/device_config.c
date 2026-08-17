@@ -3,7 +3,7 @@
 #include "nvs_config.h"
 #include "global_state.h"
 #include "esp_log.h"
-#include "utils.h"
+#include "array.h"
 
 static const char * TAG = "device_config";
 
