@@ -75,12 +75,14 @@ jobs:
       - name: Generate config.bin and merge factory image
         run: |
           python3 -m esp_idf_nvs_partition_gen generate config-${{ matrix.build_type }}.cvs config.bin 0x6000
-          python3 -m esptool --chip esp32s3 merge_bin \
-            0x0 build/bootloader/bootloader.bin \
-            0x8000 build/partition_table/partition-table.bin \
+          # NOTE: actions/upload-artifact strips the common parent dir (build/),
+          # so the downloaded firmware files sit at the workspace root.
+          python3 -m esptool --chip esp32s3 merge-bin \
+            0x0 bootloader/bootloader.bin \
+            0x8000 partition_table/partition-table.bin \
             0x9000 config.bin \
-            0x10000 build/esp-miner.bin \
-            0xf10000 build/ota_data_initial.bin \
+            0x10000 esp-miner.bin \
+            0xf10000 ota_data_initial.bin \
             -o esp-miner-factory-${{ matrix.build_type }}-${{ github.ref_name }}.bin
 
       - name: Release esp-miner.bin
