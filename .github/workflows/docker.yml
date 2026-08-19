@@ -6,8 +6,6 @@ on:
       - '.devcontainer/**'
     branches: [ master ]
   workflow_dispatch:
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 permissions:
   contents: read
@@ -16,9 +14,7 @@ permissions:
 jobs:
   build-base:
     runs-on: ubuntu-latest
-    outputs:
-      base_tags: ${{ steps.meta.outputs.tags }}
-      base_labels: ${{ steps.meta.outputs.labels }}
+    timeout-minutes: 60
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -48,10 +44,13 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
   build-qemu:
     needs: build-base
     runs-on: ubuntu-latest
+    timeout-minutes: 90
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -81,3 +80,5 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

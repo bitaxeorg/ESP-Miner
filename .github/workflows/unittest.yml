@@ -1,14 +1,21 @@
 name: Unit Test
-on: [push, pull_request]
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
 
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     steps:
       - name: Checkout repo
         uses: actions/checkout@v6
@@ -20,7 +27,7 @@ jobs:
         with:
           esp_idf_version: v6.0.2
           target: esp32s3
-          command: GITHUB_ACTIONS="true" idf.py build
+          command: idf.py build
           path: 'test-ci'
 
       - name: Run tests
@@ -35,11 +42,12 @@ jobs:
           path: ${{ github.event_path }}
 
       - name: Upload test results
-        if: always()
+        if: always() && hashFiles('report.xml') != ''
         uses: actions/upload-artifact@v4
         with:
           name: test-results
           path: report.xml
+          retention-days: 7
 
       - name: Check for test failures
         if: always()
@@ -52,6 +60,7 @@ jobs:
 
   frontend-test:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
       - name: Checkout repo
         uses: actions/checkout@v6
@@ -62,6 +71,8 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: '24.14.0'
+          cache: 'npm'
+          cache-dependency-path: main/http_server/axe-os/package-lock.json
 
       - name: Run frontend tests
         working-directory: ./main/http_server/axe-os
@@ -70,8 +81,9 @@ jobs:
           npm run test:ci
 
       - name: Upload test results
-        if: always()
+        if: always() && hashFiles('main/http_server/axe-os/report.xml') != ''
         uses: actions/upload-artifact@v4
         with:
           name: frontend-test-results
           path: main/http_server/axe-os/report.xml
+          retention-days: 7
