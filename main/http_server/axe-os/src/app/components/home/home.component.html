@@ -258,7 +258,8 @@
               [value]="((info.voltage / (info.nominalVoltage + .5)) * 100)"
               [markers]="[{ value: (info.nominalVoltage / (info.nominalVoltage + .5)) * 100, label: info.nominalVoltage + ' V' }]">
             </app-progressbar>
-            @if (info.voltage < (info.nominalVoltage + .5) * 0.87) {
+            <!-- Adding 0.949 because we want to give it the 5mV headroom for weak psu's  -->
+            @if (info.voltage < (info.nominalVoltage) * 0.949) {
               <strong class="text-red-500">
                 Danger: Low Voltage
               </strong>

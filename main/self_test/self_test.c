@@ -527,6 +527,9 @@ void self_test_task(void * pvParameters)
 
     if (msg.method == MINING_NOTIFY) {
         ESP_LOGI(TAG, "Enqueuing mock work into stratum_queue");
+        // No stratum task runs during self-test, so set the V1 free function
+        // ourselves for the mock job we are about to enqueue.
+        GLOBAL_STATE->stratum_queue.free_fn = (void (*)(void *)) STRATUM_V1_free_mining_notify;
         queue_enqueue(&GLOBAL_STATE->stratum_queue, msg.mining_notification);
     } else {
         ESP_LOGE(TAG, "Failed to parse mock mining notification");

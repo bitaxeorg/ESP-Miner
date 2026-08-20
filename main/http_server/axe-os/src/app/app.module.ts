@@ -44,6 +44,7 @@ import { HashSuffixPipe } from './pipes/hash-suffix.pipe';
 import { DiffSuffixPipe } from './pipes/diff-suffix.pipe';
 import { AddressPipe } from './pipes/address.pipe';
 import { SatsPipe } from './pipes/sats.pipe';
+import { HeatmapLightnessPipe } from './pipes/heatmap-lightness.pipe';
 import { DialogService, DialogListComponent } from './services/dialog.service';
 
 const components = [
@@ -98,6 +99,7 @@ const components = [
     DiffSuffixPipe,
     AddressPipe,
     SatsPipe,
+    HeatmapLightnessPipe,
   ],
   providers: [
     { provide: LocationStrategy, useClass: HashLocationStrategy },

@@ -1,4 +1,4 @@
-import { Component, ElementRef, Input, OnChanges, OnDestroy, SimpleChanges, ViewChild } from '@angular/core';
+import { Component, ElementRef, Input, NgZone, OnChanges, OnDestroy, SimpleChanges, ViewChild } from '@angular/core';
 import { Chart, registerables } from 'chart.js';
 
 Chart.register(...registerables);
@@ -25,6 +25,8 @@ export class AppChartComponent implements OnChanges, OnDestroy {
 
   public chart: Chart | null = null;
 
+  constructor(private ngZone: NgZone) {}
+
   ngOnChanges(changes: SimpleChanges) {
     if (changes['data'] || changes['options'] || changes['type']) {
       this.updateChart();
@@ -37,23 +39,27 @@ export class AppChartComponent implements OnChanges, OnDestroy {
 
   private destroyChart() {
     if (this.chart) {
-      this.chart.destroy();
-      this.chart = null;
+      this.ngZone.runOutsideAngular(() => {
+        this.chart?.destroy();
+        this.chart = null;
+      });
     }
   }
 
   private updateChart() {
     if (!this.canvas) return;
 
-    if (this.chart) {
-      this.chart.data = this.data;
-      if (this.options) {
-        this.chart.options = this.options;
+    this.ngZone.runOutsideAngular(() => {
+      if (this.chart) {
+        this.chart.data = this.data;
+        if (this.options) {
+          this.chart.options = this.options;
+        }
+        this.chart.update();
+      } else {
+        this.initChart();
       }
-      this.chart.update();
-    } else {
-      this.initChart();
-    }
+    });
   }
 
   private initChart() {
@@ -61,10 +67,12 @@ export class AppChartComponent implements OnChanges, OnDestroy {
     const ctx = this.canvas.nativeElement.getContext('2d');
     if (!ctx) return;
 
-    this.chart = new Chart(ctx, {
-      type: this.type as any,
-      data: this.data,
-      options: this.options
+    this.ngZone.runOutsideAngular(() => {
+      this.chart = new Chart(ctx, {
+        type: this.type as any,
+        data: this.data,
+        options: this.options
+      });
     });
   }
 

@@ -11,7 +11,7 @@
 
 #define EPSILON 0.0001f
 
-#define HASHRATE_UNIT 0x100000uLL // Hashrate register unit (2^24 hashes)
+#define HASHRATE_UNIT 0x100000uLL // Hashrate register unit (2^20 hashes)
 
 #define POLL_RATE 1000
 #define HASHRATE_1M_SIZE (60000 / POLL_RATE)  // 12
