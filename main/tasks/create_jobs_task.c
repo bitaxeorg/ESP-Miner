@@ -329,7 +329,7 @@ static void generate_work_sv2_ext(GlobalState *GLOBAL_STATE, sv2_ext_job_t *ext_
     // Derive extranonce_2 from counter
     // SV2 spec: extranonce_size is the miner's rollable portion (not total)
     uint8_t extranonce_2_len = conn->extranonce_size;
-    uint8_t extranonce_2[32];
+    uint8_t extranonce_2[SV2_MAX_EXTRANONCE_SIZE];
     memset(extranonce_2, 0, sizeof(extranonce_2));
     // Encode counter as big-endian bytes
     for (int i = extranonce_2_len - 1; i >= 0 && extranonce_2_counter > 0; i--) {
