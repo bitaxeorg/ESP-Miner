@@ -121,6 +121,19 @@ int bm1720_set_address(struct bm1720_chain *chain, uint8_t chip_addr)
 			       0, NULL, 0);
 }
 
+/* Round n up to the next power of two (n in 1..128). The A3 uses this to
+ * space chip addresses: calculate_address_interval @0x417c8 rounds the chip
+ * count up to a power of two before dividing 256 by it. */
+static int bm1720_next_pow2(int n)
+{
+	int p = 1;
+
+	while (p < n)
+		p <<= 1;
+
+	return p;
+}
+
 int bm1720_enumerate(struct bm1720_chain *chain)
 {
 	int i;
@@ -128,7 +141,7 @@ int bm1720_enumerate(struct bm1720_chain *chain)
 	if (!chain || chain->chip_count <= 0 || chain->chip_count > 256)
 		return -1;
 	if (chain->addr_interval <= 0)
-		chain->addr_interval = 256 / chain->chip_count;
+		chain->addr_interval = 256 / bm1720_next_pow2(chain->chip_count);
 	if (chain->chip_count * chain->addr_interval > 256)
 		return -1;
 
@@ -296,6 +309,64 @@ int bm1720_read_register(struct bm1720_chain *chain, uint8_t chip, uint8_t reg,
 }
 
 /* ------------------------------------------------------------------ *
+ * Work / job
+ * ------------------------------------------------------------------ */
+
+int bm1720_build_job(uint8_t *buf, size_t buf_len,
+		     const uint8_t *header, uint8_t work_id)
+{
+	uint16_t crc;
+	int i;
+
+	if (!buf || !header || buf_len < BM1720_JOB_FRAME_LEN)
+		return -1;
+
+	buf[0] = BM1720_JOB_TYPE;
+	buf[1] = (uint8_t)(work_id & BM1720_JOB_ID_MASK);
+
+	/* The header ships as 20 big-endian 32-bit words: each host word is
+	 * emitted most-significant byte first. */
+	for (i = 0; i < BM1720_JOB_HEADER_LEN; i += 4) {
+		buf[2 + i + 0] = header[i + 3];
+		buf[2 + i + 1] = header[i + 2];
+		buf[2 + i + 2] = header[i + 1];
+		buf[2 + i + 3] = header[i + 0];
+	}
+
+	/* CRC16/CCITT-FALSE over the type byte, the id byte and the 80 header
+	 * bytes (buf[0..81]); the A3 folds the 0x20 type byte in first. The
+	 * result is transmitted high byte first. */
+	crc = bm1720_crc16(buf, 2 + BM1720_JOB_HEADER_LEN);
+	buf[82] = (uint8_t)(crc >> 8);
+	buf[83] = (uint8_t)crc;
+
+	return BM1720_JOB_FRAME_LEN;
+}
+
+int bm1720_send_work(struct bm1720_chain *chain,
+		     const uint8_t *header, uint8_t work_id)
+{
+	uint8_t buf[2 + BM1720_JOB_FRAME_LEN];
+	uint8_t *frame = buf + 2;
+	int len;
+
+	if (!chain || !chain->tp.write)
+		return -1;
+
+	len = bm1720_build_job(frame, BM1720_JOB_FRAME_LEN, header, work_id);
+	if (len < 0)
+		return -1;
+
+	if (chain->uart_preamble) {
+		buf[0] = BM1720_PREAMBLE_0;
+		buf[1] = BM1720_PREAMBLE_1;
+		return chain->tp.write(chain->tp.ctx, buf, (size_t)len + 2);
+	}
+
+	return chain->tp.write(chain->tp.ctx, frame, (size_t)len);
+}
+
+/* ------------------------------------------------------------------ *
  * Response / nonce return
  * ------------------------------------------------------------------ */
 
@@ -304,9 +375,10 @@ int bm1720_parse_nonce(const uint8_t *buf, size_t len, struct bm1720_nonce *out)
 	if (!buf || !out || len < BM1720_RESP_LEN)
 		return -1;
 
-	/* The firmware rejects responses whose first two bytes are not the
-	 * 0x55 0xAA preamble before doing anything else with them. */
-	if (buf[0] != BM1720_PREAMBLE_0 || buf[1] != BM1720_PREAMBLE_1)
+	/* The chip's responses begin 0xAA 0x55 - the mirror of the 0x55 0xAA
+	 * TX preamble. The A3 receive collector syncs on this order; a parser
+	 * hunting 0x55-then-0xAA never locks onto a real frame. */
+	if (buf[0] != BM1720_RESP_PREAMBLE_0 || buf[1] != BM1720_RESP_PREAMBLE_1)
 		return -1;
 
 	/* Flagged responses are routed separately by the firmware without
@@ -323,8 +395,8 @@ int bm1720_parse_nonce(const uint8_t *buf, size_t len, struct bm1720_nonce *out)
 
 	out->nonce = ((uint32_t)buf[2] << 24) | ((uint32_t)buf[3] << 16) |
 		     ((uint32_t)buf[4] << 8) | (uint32_t)buf[5];
-	out->chip = buf[6];
-	out->reg = buf[7];
+	out->diff = buf[6];
+	out->wc = (uint8_t)(buf[7] & BM1720_JOB_ID_MASK);
 	out->flags = (uint8_t)(buf[8] >> 5);
 
 	return 0;

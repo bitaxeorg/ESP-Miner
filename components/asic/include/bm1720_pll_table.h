@@ -1,21 +1,23 @@
 /* bm1720_pll_table.h - PLL frequency table for the Bitmain BM1720.
  *
  * GENERATED - do not edit by hand.
- * Source: usr/bin/cgminer from AntRouterR3LTCSIADASH20180815.bin,
- *         rodata table at file offset 0x10b5ac (vaddr 0x51b5ac in the
- *         second LOAD segment; a byte-identical second copy sits at file
- *         offset 0x10bbdc). get_plldata() selects one copy each for
- *         chiptype 1720 and 1760 (dispatch at 0x44cadc..0x44cb04).
+ * Source: usr/bin/cgminer from the Antminer A3 (cgminer-sia, ARM), rodata
+ *         freq->PLL table at vaddr 0x5a10c: 125 entries of {u32 freq_MHz,
+ *         u32 pll_word}, consumed by get_plldata() (vaddr 0x3b6bc) as a plain
+ *         linear search on the integer MHz key. This REPLACES the earlier
+ *         99-entry table lifted from the AntRouter R3 (MIPS) binary, which is
+ *         NOT byte-identical to what A3 silicon expects.
  *
- * Every entry satisfies, with a 25 MHz reference clock:
- *     freq     = 25 * fbdiv / (refdiv * postdiv1 * postdiv2)
- *     fildiv1  = (fbdiv    << 12) | 0x40
- *     fildiv2  = (postdiv1 <<  8) | 0x20
- *     vilpll   = (fbdiv << 16) | (refdiv << 8) | (postdiv1 << 4) | postdiv2
- * with the label the truncated MHz value; verified for all 99 entries,
- * which were compared byte-exact against both firmware copies (see
- * VALIDATION.md). Across the whole table refdiv is always 2, postdiv1 is
- * only ever 2, 3 or 4, and postdiv2 is always 1.
+ * Each entry satisfies, with a 25 MHz reference clock:
+ *     freq(approx MHz) = 25 * fbdiv / (refdiv * postdiv1 * postdiv2)
+ *     vilpll = (fbdiv << 16) | (refdiv << 8) | (postdiv1 << 4) | postdiv2
+ * vilpll is the ONLY word the A3 transmits (register 0x0c, PLL_PARAMETER,
+ * big-endian). Across the A3 table refdiv is always 2, postdiv1 ranges 1..7
+ * and postdiv2 is 1 or 2 (the low-frequency rows use the non-canonical
+ * doubled-fbdiv / postdiv2=2 encoding). fildiv1/fildiv2 are legacy R3
+ * "fixed-instruction" PLL words that the A3 does not use; they are derived
+ * here from each row's fbdiv/postdiv1 purely to keep the struct shape and are
+ * not read on the A3 wire.
  */
 
 #ifndef BM1720_PLL_TABLE_H
@@ -23,86 +25,111 @@
 
 struct bm1720_freq_pll {
 	const char *freq;   /* label, MHz, as stored in the firmware   */
-	unsigned int fildiv1;   /* legacy fixed-instruction PLL word 1  */
-	unsigned int fildiv2;   /* legacy fixed-instruction PLL word 2  */
+	unsigned int fildiv1;   /* legacy R3 PLL word 1 (unused on A3)  */
+	unsigned int fildiv2;   /* legacy R3 PLL word 2 (unused on A3)  */
 	unsigned int vilpll;    /* PLL register value (reg 0x0c)        */
 };
 
 static const struct bm1720_freq_pll bm1720_freq_pll_table[] = {
-    { "100", 0x020040, 0x0420, 0x200241 },
-    { "125", 0x028040, 0x0420, 0x280241 },
-    { "150", 0x030040, 0x0420, 0x300241 },
-    { "175", 0x038040, 0x0420, 0x380241 },
+    { "100", 0x040040, 0x0420, 0x400242 },
+    { "106", 0x044040, 0x0420, 0x440242 },
+    { "112", 0x048040, 0x0420, 0x480242 },
+    { "118", 0x042040, 0x0720, 0x420271 },
+    { "125", 0x046040, 0x0720, 0x460271 },
+    { "131", 0x03f040, 0x0620, 0x3f0261 },
+    { "137", 0x042040, 0x0320, 0x420232 },
+    { "142", 0x044040, 0x0620, 0x440261 },
+    { "148", 0x047040, 0x0620, 0x470261 },
+    { "154", 0x04a040, 0x0620, 0x4a0261 },
+    { "160", 0x04d040, 0x0320, 0x4d0232 },
+    { "166", 0x05d040, 0x0720, 0x5d0271 },
+    { "172", 0x045040, 0x0520, 0x450251 },
+    { "178", 0x047040, 0x0520, 0x470251 },
+    { "184", 0x067040, 0x0720, 0x670271 },
+    { "190", 0x05b040, 0x0320, 0x5b0232 },
+    { "196", 0x05e040, 0x0620, 0x5e0261 },
     { "200", 0x040040, 0x0420, 0x400241 },
-    { "225", 0x048040, 0x0420, 0x480241 },
-    { "250", 0x050040, 0x0420, 0x500241 },
-    { "275", 0x058040, 0x0420, 0x580241 },
+    { "206", 0x042040, 0x0420, 0x420241 },
+    { "212", 0x044040, 0x0420, 0x440241 },
+    { "217", 0x057040, 0x0520, 0x570251 },
+    { "223", 0x06b040, 0x0320, 0x6b0232 },
+    { "229", 0x06e040, 0x0620, 0x6e0261 },
+    { "235", 0x071040, 0x0320, 0x710232 },
+    { "242", 0x061040, 0x0520, 0x610251 },
+    { "248", 0x077040, 0x0320, 0x770232 },
+    { "254", 0x07a040, 0x0320, 0x7a0232 },
+    { "260", 0x07d040, 0x0320, 0x7d0232 },
+    { "267", 0x06b040, 0x0520, 0x6b0251 },
+    { "273", 0x06d040, 0x0520, 0x6d0251 },
+    { "279", 0x043040, 0x0320, 0x430231 },
+    { "285", 0x072040, 0x0520, 0x720251 },
+    { "294", 0x02f040, 0x0220, 0x2f0221 },
     { "300", 0x060040, 0x0420, 0x600241 },
-    { "325", 0x068040, 0x0420, 0x680241 },
-    { "350", 0x070040, 0x0420, 0x700241 },
-    { "375", 0x078040, 0x0420, 0x780241 },
-    { "400", 0x080040, 0x0420, 0x800241 },
-    { "404", 0x061040, 0x0320, 0x610231 },
+    { "306", 0x031040, 0x0220, 0x310221 },
+    { "312", 0x064040, 0x0420, 0x640241 },
+    { "319", 0x066040, 0x0420, 0x660241 },
+    { "325", 0x04e040, 0x0320, 0x4e0231 },
+    { "331", 0x06a040, 0x0420, 0x6a0241 },
+    { "338", 0x051040, 0x0320, 0x510231 },
+    { "344", 0x06e040, 0x0420, 0x6e0241 },
+    { "350", 0x054040, 0x0320, 0x540231 },
+    { "353", 0x071040, 0x0420, 0x710241 },
+    { "356", 0x072040, 0x0420, 0x720241 },
+    { "359", 0x073040, 0x0420, 0x730241 },
+    { "362", 0x057040, 0x0320, 0x570231 },
+    { "366", 0x075040, 0x0420, 0x750241 },
+    { "369", 0x076040, 0x0420, 0x760241 },
+    { "375", 0x05a040, 0x0320, 0x5a0231 },
+    { "378", 0x079040, 0x0420, 0x790241 },
+    { "381", 0x03d040, 0x0220, 0x3d0221 },
+    { "384", 0x07b040, 0x0420, 0x7b0241 },
+    { "387", 0x05d040, 0x0320, 0x5d0231 },
+    { "391", 0x07d040, 0x0420, 0x7d0241 },
+    { "394", 0x03f040, 0x0220, 0x3f0221 },
+    { "397", 0x07f040, 0x0420, 0x7f0241 },
+    { "400", 0x060040, 0x0320, 0x600231 },
     { "406", 0x041040, 0x0220, 0x410221 },
-    { "408", 0x062040, 0x0320, 0x620231 },
     { "412", 0x042040, 0x0220, 0x420221 },
-    { "416", 0x064040, 0x0320, 0x640231 },
-    { "418", 0x043040, 0x0220, 0x430221 },
-    { "420", 0x065040, 0x0320, 0x650231 },
+    { "419", 0x043040, 0x0220, 0x430221 },
     { "425", 0x044040, 0x0220, 0x440221 },
-    { "429", 0x067040, 0x0320, 0x670231 },
     { "431", 0x045040, 0x0220, 0x450221 },
-    { "433", 0x068040, 0x0320, 0x680231 },
     { "437", 0x046040, 0x0220, 0x460221 },
-    { "441", 0x06a040, 0x0320, 0x6a0231 },
-    { "443", 0x047040, 0x0220, 0x470221 },
-    { "445", 0x06b040, 0x0320, 0x6b0231 },
+    { "438", 0x046040, 0x0220, 0x460221 },
+    { "444", 0x047040, 0x0220, 0x470221 },
     { "450", 0x048040, 0x0220, 0x480221 },
-    { "454", 0x06d040, 0x0320, 0x6d0231 },
     { "456", 0x049040, 0x0220, 0x490221 },
-    { "458", 0x06e040, 0x0320, 0x6e0231 },
     { "462", 0x04a040, 0x0220, 0x4a0221 },
-    { "466", 0x070040, 0x0320, 0x700231 },
-    { "468", 0x04b040, 0x0220, 0x4b0221 },
-    { "470", 0x071040, 0x0320, 0x710231 },
+    { "469", 0x04b040, 0x0220, 0x4b0221 },
     { "475", 0x04c040, 0x0220, 0x4c0221 },
-    { "479", 0x073040, 0x0320, 0x730231 },
     { "481", 0x04d040, 0x0220, 0x4d0221 },
-    { "483", 0x074040, 0x0320, 0x740231 },
     { "487", 0x04e040, 0x0220, 0x4e0221 },
-    { "491", 0x076040, 0x0320, 0x760231 },
-    { "493", 0x04f040, 0x0220, 0x4f0221 },
-    { "495", 0x077040, 0x0320, 0x770231 },
+    { "494", 0x04f040, 0x0220, 0x4f0221 },
     { "500", 0x050040, 0x0220, 0x500221 },
-    { "504", 0x079040, 0x0320, 0x790231 },
     { "506", 0x051040, 0x0220, 0x510221 },
-    { "508", 0x07a040, 0x0320, 0x7a0231 },
     { "512", 0x052040, 0x0220, 0x520221 },
-    { "516", 0x07c040, 0x0320, 0x7c0231 },
-    { "518", 0x053040, 0x0220, 0x530221 },
-    { "520", 0x07d040, 0x0320, 0x7d0231 },
+    { "519", 0x053040, 0x0220, 0x530221 },
     { "525", 0x054040, 0x0220, 0x540221 },
-    { "529", 0x07f040, 0x0320, 0x7f0231 },
     { "531", 0x055040, 0x0220, 0x550221 },
-    { "533", 0x080040, 0x0320, 0x800231 },
     { "537", 0x056040, 0x0220, 0x560221 },
-    { "543", 0x057040, 0x0220, 0x570221 },
+    { "544", 0x057040, 0x0220, 0x570221 },
     { "550", 0x058040, 0x0220, 0x580221 },
     { "556", 0x059040, 0x0220, 0x590221 },
     { "562", 0x05a040, 0x0220, 0x5a0221 },
-    { "568", 0x05b040, 0x0220, 0x5b0221 },
+    { "569", 0x05b040, 0x0220, 0x5b0221 },
     { "575", 0x05c040, 0x0220, 0x5c0221 },
     { "581", 0x05d040, 0x0220, 0x5d0221 },
     { "587", 0x05e040, 0x0220, 0x5e0221 },
-    { "593", 0x05f040, 0x0220, 0x5f0221 },
+    { "588", 0x05e040, 0x0220, 0x5e0221 },
+    { "594", 0x05f040, 0x0220, 0x5f0221 },
     { "600", 0x060040, 0x0220, 0x600221 },
     { "606", 0x061040, 0x0220, 0x610221 },
     { "612", 0x062040, 0x0220, 0x620221 },
-    { "618", 0x063040, 0x0220, 0x630221 },
+    { "619", 0x063040, 0x0220, 0x630221 },
     { "625", 0x064040, 0x0220, 0x640221 },
     { "631", 0x065040, 0x0220, 0x650221 },
     { "637", 0x066040, 0x0220, 0x660221 },
-    { "643", 0x067040, 0x0220, 0x670221 },
+    { "638", 0x066040, 0x0220, 0x660221 },
+    { "644", 0x067040, 0x0220, 0x670221 },
     { "650", 0x068040, 0x0220, 0x680221 },
     { "656", 0x069040, 0x0220, 0x690221 },
     { "662", 0x06a040, 0x0220, 0x6a0221 },
@@ -128,6 +155,7 @@ static const struct bm1720_freq_pll bm1720_freq_pll_table[] = {
     { "787", 0x07e040, 0x0220, 0x7e0221 },
     { "793", 0x07f040, 0x0220, 0x7f0221 },
     { "800", 0x080040, 0x0220, 0x800221 },
+    { "825", 0x042040, 0x0120, 0x420211 },
 };
 
 #define BM1720_FREQ_PLL_COUNT \

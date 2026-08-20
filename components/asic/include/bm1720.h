@@ -68,6 +68,7 @@
 
 #define BM1720_VIL_TYPE            0x40  /* high nibble marks a command    */
 #define BM1720_VIL_ALL             0x10  /* broadcast to every chip        */
+#define BM1720_JOB_TYPE            0x20  /* CONFIRMED (A3): work/job frame */
 
 #define BM1720_CMD_SET_ADDRESS     0x00  /* CONFIRMED (R3 + A3)            */
 #define BM1720_CMD_WRITE_REG       0x01  /* CONFIRMED (R3 + A3)            */
@@ -78,43 +79,75 @@
 #define BM1720_VIL_LEN_SHORT       5   /* no payload: addr, inactive, read */
 #define BM1720_VIL_LEN_REG         9   /* 4-byte register payload          */
 
-/* UART responses are 9 bytes: a 2-byte 0x55 0xAA preamble followed by a
- * 7-byte body [data(4), byte5, byte6, flags|crc5]. CONFIRMED from the R3
- * response validator (@0x44f078): CRC5 runs over the first 51 bits of the
- * body and lives in the low 5 bits of the final byte; bit 7 of that byte
- * flags a non-data response. */
+/* Work/job frame (CONFIRMED against the A3 send-work thread @0x41c90):
+ *   [0]      BM1720_JOB_TYPE (0x20)
+ *   [1]      work id, 7 bits (work->id & 0x7f)
+ *   [2..81]  the 80-byte Sia/Blake2b block header, each 32-bit word byte-
+ *            swapped to big-endian
+ *   [82..83] CRC16/CCITT-FALSE (poly 0x1021, init 0xffff) over bytes [0..81],
+ *            transmitted high byte first
+ * The chip hashes the raw header (no host midstate) and enumerates the nonce
+ * itself; the frame carries no chip address, so it is broadcast to the whole
+ * chain and each ASIC self-partitions the nonce space set at enumeration. */
+#define BM1720_JOB_HEADER_LEN      80  /* Sia block header bytes           */
+#define BM1720_JOB_ID_MASK         0x7f
+#define BM1720_JOB_FRAME_LEN       84  /* type + id + header + CRC16        */
+
+/* UART responses are 9 bytes: a 2-byte 0xAA 0x55 preamble (mirror of the TX
+ * 0x55 0xAA) followed by a 7-byte body [nonce(4), byte5, byte6, flags|crc5].
+ * CONFIRMED from the A3 receive collector (@0x46978) and CRC check: CRC5 runs
+ * over the first 51 bits of the body and lives in the low 5 bits of the final
+ * byte; bit 7 of that byte flags a non-data response. */
 #define BM1720_RESP_LEN            9
 
 /* Registers addressed by WRITE_REG / READ_REG.
- * PLL_PARAM and TICKET_MASK are CONFIRMED in both firmwares (R3 @0x454940
- * and @0x454e74; A3 @0x61708 and @0x6189c). The A3 additionally writes
- * registers 0x28 and 0x2c broadcast during bring-up (@0x61378/0x613bc);
- * their function is unknown. The remaining offsets are INFERRED from the
- * BM1387/BM1485 register map - treat as a starting point to probe. */
-#define BM1720_REG_CHIP_ADDR       0x00  /* INFERRED                       */
+ * All five are now CONFIRMED against the A3 cgminer-sia binary: the register
+ * addresses are proven both from the write-frame builder (0x42320, reg byte
+ * in the frame) and from the read-back dispatcher (0x4729c), which switches
+ * on the register-address byte the chip echoes and selects a matching log
+ * string ("CHIP_ADDR", "PLL_PARAMETER", "MISC_CONTROL", "TICK_MASK",
+ * "GENERAL_I2C_COMMAND"). MISC_CONTROL (0x1c) and GENERAL_I2C (0x20) were
+ * originally guessed from the BM1387 map and turn out to be exactly right.
+ * The A3 additionally writes registers 0x28 and 0x2c broadcast during
+ * bring-up; their function is still unknown. */
+#define BM1720_REG_CHIP_ADDR       0x00  /* CONFIRMED (A3)                 */
+#define BM1720_REG_HASH_RATE       0x08  /* CONFIRMED read-back (A3), status */
 #define BM1720_REG_PLL_PARAM       0x0c  /* CONFIRMED                      */
 #define BM1720_REG_TICKET_MASK     0x14  /* CONFIRMED                      */
-#define BM1720_REG_MISC_CONTROL    0x1c  /* INFERRED                       */
-#define BM1720_REG_GENERAL_I2C     0x20  /* INFERRED                       */
+#define BM1720_REG_MISC_CONTROL    0x1c  /* CONFIRMED (A3)                 */
+#define BM1720_REG_GENERAL_I2C     0x20  /* CONFIRMED (A3)                 */
+#define BM1720_REG_CORE_MUX_SELECT 0x40  /* CONFIRMED (A3): temp/vdd mux   */
+
+/* Bring-up registers written broadcast by the A3, function not yet known. */
+#define BM1720_REG_UNKNOWN_28      0x28  /* CONFIRMED write (A3)           */
+#define BM1720_REG_UNKNOWN_2C      0x2c  /* CONFIRMED write (A3)           */
 
 /* ------------------------------------------------------------------ *
  * Transport
  * ------------------------------------------------------------------ *
  *
- * Two transports appear across the two firmware images that carry this chip:
- * a plain UART on the AntRouter R3 (CONFIRMED: 115200 or 57600 baud, rejected
- * otherwise by the option parser) and a memory-mapped FPGA bridge on the
- * Antminer A3. Only the framing above is shared, so the transport is a
- * vtable rather than being baked into the command layer.
+ * Both firmware images that carry this chip drive it over a plain UART, not
+ * an FPGA bridge: the A3 opens a per-chain tty (open/tcsetattr/write with
+ * flock serialization, send helper @0x41b94) exactly like the R3 does.
+ * CONFIRMED baud: 115200 or 57600 (the A3 baud->termios mapper @0x41918
+ * accepts both). The transport is a vtable so the same command layer can sit
+ * on whatever tty/driver the host provides.
  *
- * CONFIRMED: on the R3's UART, every command frame is prepended with the
- * two preamble bytes 0x55 0xAA before it hits the wire (set_pll, set_addr
- * and chain_inactive builders all do this). The A3's FPGA bridge takes the
- * bare frame. Set uart_preamble accordingly.
+ * CONFIRMED (both R3 and A3): every TX frame is prepended with the two
+ * preamble bytes 0x55 0xAA before it hits the wire. The earlier note that
+ * the A3 took bare frames was wrong - set uart_preamble = true for the A3
+ * too.
+ *
+ * NOTE the RX direction uses the MIRRORED preamble: responses from the chip
+ * begin 0xAA 0x55 (byte 0xAA first), not 0x55 0xAA. The A3 receive collector
+ * (@0x46978) syncs on 0xAA-then-0x55. bm1720_parse_nonce() checks for that
+ * order; do not confuse it with the TX preamble above.
  */
 
-#define BM1720_PREAMBLE_0          0x55
-#define BM1720_PREAMBLE_1          0xaa
+#define BM1720_PREAMBLE_0          0x55  /* TX: first byte on the wire     */
+#define BM1720_PREAMBLE_1          0xaa  /* TX: second byte                */
+#define BM1720_RESP_PREAMBLE_0     0xaa  /* RX: responses start 0xAA ...   */
+#define BM1720_RESP_PREAMBLE_1     0x55  /* RX: ... then 0x55              */
 
 struct bm1720_transport {
 	int (*write)(void *ctx, const uint8_t *buf, size_t len);
@@ -127,7 +160,7 @@ struct bm1720_chain {
 	int chip_count;       /* chips enumerated by bm1720_enumerate()      */
 	int addr_interval;    /* address step between chips on the chain     */
 	int freq_mhz;         /* frequency last programmed                   */
-	bool uart_preamble;   /* prepend 0x55 0xAA to every TX frame (R3)    */
+	bool uart_preamble;   /* prepend 0x55 0xAA to every TX frame         */
 };
 
 /* ------------------------------------------------------------------ *
@@ -163,8 +196,9 @@ int bm1720_send_vil(struct bm1720_chain *chain, uint8_t cmd, bool all,
 
 /* Chain bring-up: broadcast CHAIN_INACTIVE, then walk the chain handing out
  * addresses in steps of addr_interval. If addr_interval is 0 or negative it
- * defaults to 256 / chip_count, which is what the R3 firmware computes
- * (@0x4563ec). */
+ * defaults to 256 / next_pow2(chip_count), which is what the A3 firmware
+ * computes (calculate_address_interval @0x417c8: it rounds the chip count up
+ * to a power of two before dividing 256 by it). */
 int bm1720_chain_inactive(struct bm1720_chain *chain);
 int bm1720_set_address(struct bm1720_chain *chain, uint8_t chip_addr);
 int bm1720_enumerate(struct bm1720_chain *chain);
@@ -174,10 +208,14 @@ int bm1720_enumerate(struct bm1720_chain *chain);
 int bm1720_lookup_pll(int freq_mhz, uint32_t *vilpll, uint32_t *fildiv1,
 		      uint32_t *fildiv2);
 
-/* Compute PLL words for an arbitrary frequency instead of looking one up.
- * Searches only divider combinations the shipped table actually uses
- * (refdiv 2, postdiv1 2..4, postdiv2 1) and refuses requests more than
- * about 2% away from anything reachable. */
+/* Compute PLL words for an arbitrary frequency not present in the table.
+ * The A3 itself only does exact table lookups (get_plldata @0x3b6bc); this is
+ * a convenience fallback that stays inside the table's clean high-frequency
+ * operating envelope (refdiv 2, postdiv1 2..4, postdiv2 1 - the encoding used
+ * by every table row at and above ~200 MHz) and refuses requests more than
+ * about 2% away from anything reachable. For exact-silicon fidelity prefer
+ * bm1720_lookup_pll(); the low-frequency rows use a different divider
+ * encoding that this fallback deliberately does not synthesise. */
 int bm1720_compute_pll(int freq_mhz, uint32_t *vilpll, uint32_t *fildiv1,
 		       uint32_t *fildiv2);
 
@@ -190,25 +228,42 @@ int bm1720_set_ticket_mask(struct bm1720_chain *chain, uint32_t mask);
 
 /* Read a register back from one chip. buf must hold at least
  * BM1720_RESP_LEN bytes; on a UART transport the response arrives with its
- * 0x55 0xAA preamble included. */
+ * 0xAA 0x55 preamble included. */
 int bm1720_read_register(struct bm1720_chain *chain, uint8_t chip, uint8_t reg,
 			 uint8_t *buf, int timeout_ms);
+
+/* Build a work/job frame into buf (which must hold at least
+ * BM1720_JOB_FRAME_LEN bytes) and stamp the trailing CRC16. header is the
+ * 80-byte Sia/Blake2b block header in host byte order; each 32-bit word is
+ * byte-swapped to big-endian as it is copied in. work_id is masked to 7 bits.
+ * Returns the frame length (BM1720_JOB_FRAME_LEN) or -1 on bad arguments. */
+int bm1720_build_job(uint8_t *buf, size_t buf_len,
+		     const uint8_t *header, uint8_t work_id);
+
+/* Broadcast one work item to the whole chain. header is the 80-byte Sia
+ * header in host byte order; work_id tags the nonces the chip returns for it
+ * (see bm1720_parse_nonce, the wc field). */
+int bm1720_send_work(struct bm1720_chain *chain,
+		     const uint8_t *header, uint8_t work_id);
 
 /* ------------------------------------------------------------------ *
  * Response / nonce return
  * ------------------------------------------------------------------ */
 
 /* A decoded 9-byte response.
- * CONFIRMED (R3 @0x44f53c/@0x44f078): responses start 0x55 0xAA, carry a
- * 32-bit big-endian data word (the nonce, or the register value on reads),
- * and end in a byte whose low 5 bits are a CRC5 over the body's first 51
- * bits and whose bit 7 flags a non-data response. On register reads byte 6
- * is the chip address and byte 7 the register address; their meaning inside
- * nonce returns is INFERRED. */
+ * CONFIRMED against the A3 receive collector (@0x46978) and nonce consumer
+ * (bitmain_scanhash @0x3c604): responses start 0xAA 0x55, carry a 32-bit
+ * big-endian nonce (or register value on reads), and end in a byte whose low
+ * 5 bits are a CRC5 over the body's first 51 bits and whose bit 7 flags a
+ * non-data (register-read) response. Byte 6 is a difficulty/status byte and
+ * byte 7 (masked to 7 bits) is the work index "wc" that selects which queued
+ * job the nonce solves - the chain id is taken from the receiving UART, not
+ * the frame. The 64-bit Sia header nonce is completed host-side (stratum
+ * extranonce); the chip only ever returns this 32-bit field. */
 struct bm1720_nonce {
 	uint32_t nonce;   /* bytes 2..5, big-endian                         */
-	uint8_t chip;     /* byte 6: chip address on register reads         */
-	uint8_t reg;      /* byte 7: register address on register reads     */
+	uint8_t diff;     /* byte 6: difficulty/status byte                 */
+	uint8_t wc;       /* byte 7 & 0x7f: work index the nonce solves     */
 	uint8_t flags;    /* byte 8 bits 7..5                               */
 };
 

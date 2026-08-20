@@ -8,6 +8,7 @@
  */
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "bm1720.h"
@@ -108,10 +109,10 @@ int main(void)
 
 	/* -- response parsing ------------------------------------------- */
 
-	/* forge a valid response the way the R3 validator (@0x44f078)
-	 * checks it: 55 AA preamble, CRC5 over the body's first 51 bits in
-	 * the low 5 bits of the last byte */
-	resp[0] = 0x55; resp[1] = 0xaa;
+	/* forge a valid response the way the A3 collector (@0x46978) checks
+	 * it: AA 55 preamble (mirror of the TX 55 AA), CRC5 over the body's
+	 * first 51 bits in the low 5 bits of the last byte */
+	resp[0] = 0xaa; resp[1] = 0x55;
 	resp[2] = 0x12; resp[3] = 0x34; resp[4] = 0x56; resp[5] = 0x78;
 	resp[6] = 0x04; resp[7] = 0x0c; resp[8] = 0;
 	resp[8] = bm1720_crc5(resp + 2, 51);
@@ -119,8 +120,8 @@ int main(void)
 	CHECK(bm1720_parse_nonce(resp, sizeof(resp), &nn) == 0,
 	      "parse_nonce: valid frame rejected");
 	CHECK(nn.nonce == 0x12345678, "parse_nonce: nonce 0x%08x", nn.nonce);
-	CHECK(nn.chip == 0x04 && nn.reg == 0x0c,
-	      "parse_nonce: chip/reg %02x/%02x", nn.chip, nn.reg);
+	CHECK(nn.diff == 0x04 && nn.wc == 0x0c,
+	      "parse_nonce: diff/wc %02x/%02x", nn.diff, nn.wc);
 
 	resp[8] ^= 0x01;	/* corrupt CRC */
 	CHECK(bm1720_parse_nonce(resp, sizeof(resp), &nn) == -1,
@@ -132,7 +133,7 @@ int main(void)
 	      "parse_nonce: flagged frame not reported");
 	resp[8] &= 0x7f;
 
-	resp[0] = 0xaa; resp[1] = 0x55;		/* reversed header */
+	resp[0] = 0x55; resp[1] = 0xaa;		/* TX order = wrong for RX */
 	CHECK(bm1720_parse_nonce(resp, sizeof(resp), &nn) == -1,
 	      "parse_nonce: reversed header accepted");
 
@@ -149,8 +150,17 @@ int main(void)
 		      "table[%zu]: fildiv1", i);
 		CHECK(e->fildiv2 == ((p1 << 8) | 0x20),
 		      "table[%zu]: fildiv2", i);
-		CHECK(rd == 2 && p2 == 1 && p1 >= 2 && p1 <= 4,
+		/* A3 envelope: refdiv always 2, postdiv1 1..7, postdiv2 1..2
+		 * (the low-frequency rows use the doubled-fbdiv encoding). */
+		CHECK(rd == 2 && (p2 == 1 || p2 == 2) && p1 >= 1 && p1 <= 7,
 		      "table[%zu]: divider envelope", i);
+		/* label is the (rounded) MHz the dividers produce off 25 MHz. */
+		{
+			double f = 25.0 * fb / (rd * p1 * p2);
+			int lbl = atoi(e->freq);
+			double d = f - lbl;
+			CHECK(d < 1.0 && d > -1.0, "table[%zu]: freq label", i);
+		}
 	}
 
 	CHECK(bm1720_lookup_pll(500, &v, NULL, NULL) >= 0 && v == 0x500221,
@@ -164,6 +174,36 @@ int main(void)
 
 	CHECK(bm1720_crc16((const uint8_t *)"123456789", 9) == 0x29b1,
 	      "crc16 check vector");
+
+	/* -- work/job frame (A3 send-work @0x41c90) --------------------- */
+	{
+		uint8_t header[BM1720_JOB_HEADER_LEN];
+		uint8_t job[BM1720_JOB_FRAME_LEN];
+		uint16_t jcrc;
+		int rc, k;
+
+		for (k = 0; k < BM1720_JOB_HEADER_LEN; k++)
+			header[k] = (uint8_t)k;
+
+		rc = bm1720_build_job(job, sizeof(job), header, 0x93);
+		CHECK(rc == BM1720_JOB_FRAME_LEN, "build_job: len %d", rc);
+		CHECK(job[0] == BM1720_JOB_TYPE, "build_job: type %02x", job[0]);
+		/* work id is masked to 7 bits: 0x93 & 0x7f = 0x13 */
+		CHECK(job[1] == 0x13, "build_job: work_id %02x", job[1]);
+		/* first header word {00,01,02,03} ships big-endian {03,02,01,00} */
+		CHECK(job[2] == 0x03 && job[3] == 0x02 &&
+		      job[4] == 0x01 && job[5] == 0x00,
+		      "build_job: header word 0 byteswap");
+		/* last header word {4c,4d,4e,4f} -> {4f,4e,4d,4c} at buf[78..81] */
+		CHECK(job[78] == 0x4f && job[79] == 0x4e &&
+		      job[80] == 0x4d && job[81] == 0x4c,
+		      "build_job: header word 19 byteswap");
+		/* CRC16 covers buf[0..81] (type + id + 80 header bytes), stored
+		 * high byte first at buf[82..83] */
+		jcrc = bm1720_crc16(job, 2 + BM1720_JOB_HEADER_LEN);
+		CHECK(job[82] == (uint8_t)(jcrc >> 8) && job[83] == (uint8_t)jcrc,
+		      "build_job: crc16 %04x", jcrc);
+	}
 
 	if (failures) {
 		printf("%d FAILURE(S)\n", failures);
