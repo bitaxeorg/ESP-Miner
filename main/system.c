@@ -466,12 +466,84 @@ void SYSTEM_notify_rejected_share(GlobalState * GLOBAL_STATE, char * error_msg)
     }    
 }
 
+// Pool-supplied ntime used to drive settimeofday() with no
+// plausibility band and a rate limiter that compared against the
+// supplied value itself. The device has no RTC/NTP, so the pool fully owned
+// the system clock — which is also the clock TLS certificate expiry (and the
+// SV2 certificate validity window) is judged against.
+//
+// Policy implemented here:
+//  - floor: ntime must not predate the firmware build time;
+//  - backward moves are rejected (small 5 min tolerance for pool jitter);
+//  - forward jumps are capped at 4 hours per accepted update;
+//  - the hourly rate limiter measures against the *current* system clock,
+//    not the supplied value, so a far-future set is no longer sticky.
+#define NTIME_BACKWARD_TOLERANCE_SEC (5 * 60)
+#define NTIME_MAX_FORWARD_JUMP_SEC (4 * 60 * 60)
+#define NTIME_MIN_SYNC_INTERVAL_SEC (60 * 60)
+// Cap for the very first clock set after boot (no trusted reference yet):
+// firmware build time + 400 days. Devices older than that simply skip clock
+// sync (mining is unaffected) rather than accepting an arbitrary epoch.
+#define NTIME_MAX_INITIAL_AGE_SEC (400LL * 24 * 60 * 60)
+
+// Epoch of firmware build, from the compiler's __DATE__/__TIME__ ("Mmm dd yyyy").
+// The device default timezone is UTC, so mktime() is UTC-based here.
+static time_t system_build_epoch(void)
+{
+    static const char month_names[] = "JanFebMarAprMayJunJulAugSepOctNovDec";
+    char mon[4] = {0};
+    int day = 0, year = 0, hour = 0, min = 0, sec = 0;
+    if (sscanf(__DATE__, "%3s %d %d", mon, &day, &year) != 3 ||
+        sscanf(__TIME__, "%d:%d:%d", &hour, &min, &sec) != 3) {
+        return 0;
+    }
+    const char *hit = strstr(month_names, mon);
+    if (hit == NULL) {
+        return 0;
+    }
+    struct tm build = {0};
+    build.tm_mon = (int) ((hit - month_names) / 3);
+    build.tm_mday = day;
+    build.tm_year = year - 1900;
+    build.tm_hour = hour;
+    build.tm_min = min;
+    build.tm_sec = sec;
+    return mktime(&build);
+}
+
 void SYSTEM_notify_new_ntime(GlobalState * GLOBAL_STATE, uint32_t ntime)
 {
     SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
 
-    // Hourly clock sync
-    if (module->lastClockSync + (60 * 60) > ntime) {
+    time_t now = time(NULL);
+    time_t floor = system_build_epoch();
+
+    if (floor > 0 && (int64_t) ntime < (int64_t) floor) {
+        ESP_LOGW(TAG, "Rejecting ntime %lu: predates firmware build time", (unsigned long) ntime);
+        return;
+    }
+
+    if (floor > 0 && now >= floor) {
+        int64_t delta = (int64_t) ntime - (int64_t) now;
+        if (delta < -NTIME_BACKWARD_TOLERANCE_SEC) {
+            ESP_LOGW(TAG, "Rejecting ntime %lu: backward jump of %lld s", (unsigned long) ntime, (long long) -delta);
+            return;
+        }
+        if (delta > NTIME_MAX_FORWARD_JUMP_SEC) {
+            ESP_LOGW(TAG, "Rejecting ntime %lu: forward jump of %lld s exceeds %d s",
+                     (unsigned long) ntime, (long long) delta, NTIME_MAX_FORWARD_JUMP_SEC);
+            return;
+        }
+    } else if (floor > 0) {
+        // Clock not set yet: accept only a plausible "now" relative to build time
+        if ((int64_t) ntime > (int64_t) floor + NTIME_MAX_INITIAL_AGE_SEC) {
+            ESP_LOGW(TAG, "Rejecting initial ntime %lu: too far past firmware build time", (unsigned long) ntime);
+            return;
+        }
+    }
+
+    // Hourly clock sync, measured against the current system clock
+    if (module->lastClockSync != 0 && (int64_t) now - (int64_t) module->lastClockSync < NTIME_MIN_SYNC_INTERVAL_SEC) {
         return;
     }
     ESP_LOGI(TAG, "Syncing clock");
