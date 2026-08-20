@@ -18,6 +18,7 @@
 #define I2C_RETRY_DELAY_MS 10
 
 static i2c_master_bus_handle_t i2c_bus_handle;
+static SemaphoreHandle_t s_i2c_mutex = NULL;
 
 static const char * TAG = "i2c_bitaxe";
 
@@ -38,13 +39,23 @@ static esp_err_t i2c_transfer_with_retries(i2c_master_dev_handle_t dev_handle,
     esp_err_t err = ESP_FAIL;
 
     for (int i = 0; i < I2C_RETRY_COUNT; i++) {
+        if (s_i2c_mutex) {
+            xSemaphoreTake(s_i2c_mutex, portMAX_DELAY);
+        }
+
         if (read_buf && read_len > 0) {
             err = i2c_master_transmit_receive(dev_handle, write_buf, write_len, read_buf, read_len, I2C_MASTER_TIMEOUT_MS);
         } else {
             err = i2c_master_transmit(dev_handle, write_buf, write_len, I2C_MASTER_TIMEOUT_MS);
         }
 
-        if (err == ESP_OK) return ESP_OK;
+        if (s_i2c_mutex) {
+            xSemaphoreGive(s_i2c_mutex);
+        }
+
+        if (err == ESP_OK) {
+            return ESP_OK;
+        }
 
         vTaskDelay(pdMS_TO_TICKS(I2C_RETRY_DELAY_MS));
     }
@@ -65,6 +76,10 @@ static esp_err_t i2c_transfer_with_retries(i2c_master_dev_handle_t dev_handle,
  */
 esp_err_t i2c_bitaxe_init(void)
 {
+    if (!s_i2c_mutex) {
+        s_i2c_mutex = xSemaphoreCreateMutex();
+    }
+
     i2c_master_bus_config_t i2c_bus_config = {
         .clk_source = I2C_CLK_SRC_DEFAULT,
         .i2c_port = I2C_MASTER_NUM,
