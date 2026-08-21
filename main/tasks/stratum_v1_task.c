@@ -67,6 +67,16 @@ static bool add_active_job_id(char **active_job_ids, int *count, const char *job
     return true;
 }
 
+static bool active_job_id_exists(char *const *active_job_ids, int count, const char *job_id)
+{
+    for (int i = 0; i < count; i++) {
+        if (active_job_ids[i] && strcmp(active_job_ids[i], job_id) == 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
 static void clear_active_job_ids(char **active_job_ids, int *count)
 {
     for (int i = 0; i < *count; i++) {
@@ -110,12 +120,13 @@ void stratum_v1_close_connection(GlobalState *GLOBAL_STATE)
     vTaskDelay(1000 / portTICK_PERIOD_MS);
 }
 
-static void decode_mining_notification(GlobalState * GLOBAL_STATE, const mining_notify *mining_notification)
+static bool decode_mining_notification(GlobalState * GLOBAL_STATE,
+                                       const mining_notify *mining_notification)
 {
     mining_notification_result_t *result = heap_caps_malloc(sizeof(mining_notification_result_t), MALLOC_CAP_SPIRAM);
     if (!result) {
         ESP_LOGE(TAG, "Failed to allocate result in PSRAM");
-        return;
+        return false;
     }
     memset(result, 0, sizeof(mining_notification_result_t));
 
@@ -131,7 +142,7 @@ static void decode_mining_notification(GlobalState * GLOBAL_STATE, const mining_
                                      result) != ESP_OK) {
         ESP_LOGE(TAG, "Failed to process mining notification");
         free(result);
-        return;
+        return false;
     }
 
     // Update network difficulty
@@ -198,6 +209,7 @@ static void decode_mining_notification(GlobalState * GLOBAL_STATE, const mining_
     }
 
     free(result);
+    return true;
 }
 
 void stratum_v1_task(void *pvParameters)
@@ -211,7 +223,12 @@ void stratum_v1_task(void *pvParameters)
     // Set V1-specific free function for the work queue
     GLOBAL_STATE->stratum_queue.free_fn = (void (*)(void *))STRATUM_V1_free_mining_notify;
 
-    STRATUM_V1_initialize_buffer();
+    if (!STRATUM_V1_initialize_buffer()) {
+        ESP_LOGE(TAG, "Failed to initialize Stratum V1 receive state");
+        protocol_coordinator_notify_failure();
+        vTaskDelete(NULL);
+        return;
+    }
     int retry_attempts = 0;
     int retry_critical_attempts = 0;
 
@@ -384,39 +401,56 @@ void stratum_v1_task(void *pvParameters)
                 case MINING_NOTIFY:
                     {
                         mining_notify *notify = stratum_api_v1_message.mining_notification;
-                        bool is_duplicate = false;
-                        if (notify && notify->job_id) {
-                            if (notify->clean_jobs) {
-                                clear_active_job_ids(active_job_ids, &active_job_ids_count);
-                            }
-                            is_duplicate = !add_active_job_id(active_job_ids, &active_job_ids_count, notify->job_id);
-                        }
+                        bool is_duplicate = notify && notify->job_id && !notify->clean_jobs &&
+                                            active_job_id_exists(active_job_ids, active_job_ids_count,
+                                                                 notify->job_id);
 
                         if (is_duplicate) {
-                            ESP_LOGW(TAG, "Ignoring duplicate notify for job %s", notify ? notify->job_id : "unknown");
+                            ESP_LOGW(TAG, "Ignoring duplicate notify for job %s", notify->job_id);
+                        } else if (!decode_mining_notification(GLOBAL_STATE, notify)) {
+                            ESP_LOGE(TAG, "Rejecting malformed mining notification");
                         } else {
+                            if (notify->job_id) {
+                                if (notify->clean_jobs) {
+                                    clear_active_job_ids(active_job_ids, &active_job_ids_count);
+                                }
+                                (void)add_active_job_id(active_job_ids, &active_job_ids_count,
+                                                        notify->job_id);
+                            }
+
                             GLOBAL_STATE->SYSTEM_MODULE.work_received++;
-                            SYSTEM_notify_new_ntime(GLOBAL_STATE, stratum_api_v1_message.mining_notification->ntime);
-                            if (stratum_api_v1_message.mining_notification->clean_jobs &&
-                                (GLOBAL_STATE->stratum_queue.count > 0)) {
+                            SYSTEM_notify_new_ntime(GLOBAL_STATE, notify->ntime);
+                            if (notify->clean_jobs && GLOBAL_STATE->stratum_queue.count > 0) {
                                 SYSTEM_clean_jobs_queue(GLOBAL_STATE);
                             }
                             if (GLOBAL_STATE->stratum_queue.count == QUEUE_SIZE) {
-                                mining_notify *next_notify_json_str = (mining_notify *) queue_dequeue(&GLOBAL_STATE->stratum_queue);
-                                STRATUM_V1_free_mining_notify(next_notify_json_str);
+                                mining_notify *queued_notify =
+                                    (mining_notify *)queue_dequeue(&GLOBAL_STATE->stratum_queue);
+                                STRATUM_V1_free_mining_notify(queued_notify);
                             }
-                            queue_enqueue(&GLOBAL_STATE->stratum_queue, stratum_api_v1_message.mining_notification);
-                            decode_mining_notification(GLOBAL_STATE, stratum_api_v1_message.mining_notification);
+                            queue_enqueue(&GLOBAL_STATE->stratum_queue, notify);
                             stratum_api_v1_message.mining_notification = NULL;
                         }
                     }
                     break;
 
-                case MINING_SET_DIFFICULTY:
-                    ESP_LOGI(TAG, "Set pool difficulty: %.2f", stratum_api_v1_message.new_difficulty);
-                    GLOBAL_STATE->pool_difficulty = stratum_api_v1_message.new_difficulty;
+                case MINING_SET_DIFFICULTY: {
+                    double requested_difficulty =
+                        stratum_api_v1_message.new_difficulty;
+                    double asic_difficulty =
+                        GLOBAL_STATE->DEVICE_CONFIG.family.asic.difficulty;
+                    // The ASIC does not report nonces below its hardware ticket
+                    // threshold, so expose and validate against the effective floor.
+                    GLOBAL_STATE->pool_difficulty =
+                        requested_difficulty < asic_difficulty
+                            ? asic_difficulty
+                            : requested_difficulty;
+                    ESP_LOGI(TAG, "Set effective pool difficulty: %.2f (requested %.2f)",
+                             GLOBAL_STATE->pool_difficulty,
+                             requested_difficulty);
                     GLOBAL_STATE->new_set_mining_difficulty_msg = true;
                     break;
+                }
 
                 case MINING_SET_VERSION_MASK:
                     ESP_LOGI(TAG, "Set version mask: %08lx", stratum_api_v1_message.version_mask);

@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include "unity.h"
 #include "coinbase_decoder.h"
@@ -7,8 +8,9 @@
 TEST_CASE("Varint decode single byte", "[coinbase_decoder]")
 {
     uint8_t data[] = {0x42};
-    int offset = 0;
-    uint64_t result = coinbase_decode_varint(data, &offset);
+    size_t offset = 0;
+    uint64_t result = 0;
+    TEST_ASSERT_TRUE(coinbase_decode_varint(data, sizeof(data), &offset, &result));
     TEST_ASSERT_TRUE(0x42 == result);
     TEST_ASSERT_EQUAL_INT(1, offset);
 }
@@ -16,8 +18,9 @@ TEST_CASE("Varint decode single byte", "[coinbase_decoder]")
 TEST_CASE("Varint decode FD format", "[coinbase_decoder]")
 {
     uint8_t data[] = {0xFD, 0x34, 0x12};  // 0x1234 in little-endian
-    int offset = 0;
-    uint64_t result = coinbase_decode_varint(data, &offset);
+    size_t offset = 0;
+    uint64_t result = 0;
+    TEST_ASSERT_TRUE(coinbase_decode_varint(data, sizeof(data), &offset, &result));
     TEST_ASSERT_TRUE(0x1234 == result);
     TEST_ASSERT_EQUAL_INT(3, offset);
 }
@@ -25,8 +28,9 @@ TEST_CASE("Varint decode FD format", "[coinbase_decoder]")
 TEST_CASE("Varint decode FE format", "[coinbase_decoder]")
 {
     uint8_t data[] = {0xFE, 0x78, 0x56, 0x34, 0x12};  // 0x12345678 in little-endian
-    int offset = 0;
-    uint64_t result = coinbase_decode_varint(data, &offset);
+    size_t offset = 0;
+    uint64_t result = 0;
+    TEST_ASSERT_TRUE(coinbase_decode_varint(data, sizeof(data), &offset, &result));
     TEST_ASSERT_TRUE(0x12345678 == result);
     TEST_ASSERT_EQUAL_INT(5, offset);
 }
@@ -34,10 +38,32 @@ TEST_CASE("Varint decode FE format", "[coinbase_decoder]")
 TEST_CASE("Varint decode FF format", "[coinbase_decoder]")
 {
     uint8_t data[] = {0xFF, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08};
-    int offset = 0;
-    uint64_t result = coinbase_decode_varint(data, &offset);
+    size_t offset = 0;
+    uint64_t result = 0;
+    TEST_ASSERT_TRUE(coinbase_decode_varint(data, sizeof(data), &offset, &result));
     TEST_ASSERT_TRUE(0x0807060504030201ULL == result);
     TEST_ASSERT_EQUAL_INT(9, offset);
+}
+
+TEST_CASE("Varint decode rejects truncated encodings", "[coinbase_decoder]")
+{
+    const uint8_t truncated_fd[] = {0xFD, 0x34};
+    const uint8_t truncated_fe[] = {0xFE, 0x78, 0x56, 0x34};
+    const uint8_t truncated_ff[] = {0xFF, 1, 2, 3, 4, 5, 6, 7};
+    uint64_t result = 0;
+    size_t offset = 0;
+
+    TEST_ASSERT_FALSE(coinbase_decode_varint(
+        truncated_fd, sizeof(truncated_fd), &offset, &result));
+    TEST_ASSERT_EQUAL_size_t(0, offset);
+
+    TEST_ASSERT_FALSE(coinbase_decode_varint(
+        truncated_fe, sizeof(truncated_fe), &offset, &result));
+    TEST_ASSERT_EQUAL_size_t(0, offset);
+
+    TEST_ASSERT_FALSE(coinbase_decode_varint(
+        truncated_ff, sizeof(truncated_ff), &offset, &result));
+    TEST_ASSERT_EQUAL_size_t(0, offset);
 }
 
 TEST_CASE("Decode P2PKH address", "[coinbase_decoder]")
@@ -208,6 +234,48 @@ TEST_CASE("Decode regtest P2WPKH address", "[coinbase_decoder]")
 // integration-level — the detection logic is tested implicitly through
 // the address prefix matching in the full processing pipeline.
 
+TEST_CASE("Coinbase decoder requires exactly one locktime", "[coinbase_decoder][security]")
+{
+    const char *coinbase_1 =
+        "0100000001000000000000000000000000000000000000000000000000000000"
+        "0000000000ffffffff4b03a5020cfabe6d6d379ae882651f6469f2ed6b8b40a4"
+        "f9a4b41fd838a3ad6de8cba775f4e8f1d3080100000000000000";
+    const char *valid_coinbase_2 =
+        "41903d4c1b2f736c7573682f0000000003ca890d27000000001976a9147c154e"
+        "d1dc59609e3d26abb2df2ea3d587cd8c4188ac00000000000000002c6a4c2952"
+        "534b424c4f434b3a4cb4cb2ddfc37c41baf5ef6b6b4899e3253a8f1dfc7e5dd"
+        "68a5b5b27005014ef0000000000000000266a24aa21a9ed5caa249f1af9fbf71"
+        "c986fea8e076ca34ae3514fb2f86400561b28c7b15949bf00000000";
+    mining_notify notify = {
+        .version = 0x20000000,
+        .coinbase_1 = (char *)coinbase_1,
+    };
+    mining_notification_result_t result = { 0 };
+
+    char *missing_locktime = strdup(valid_coinbase_2);
+    TEST_ASSERT_NOT_NULL(missing_locktime);
+    missing_locktime[strlen(missing_locktime) - 8U] = '\0';
+    notify.coinbase_2 = missing_locktime;
+    TEST_ASSERT_EQUAL(ESP_ERR_INVALID_ARG,
+                      coinbase_process_notification(
+                          &notify, "01020304050607", 8, "", true, &result));
+    free(result.scriptsig);
+    free(missing_locktime);
+
+    size_t valid_length = strlen(valid_coinbase_2);
+    char *trailing_byte = malloc(valid_length + 3U);
+    TEST_ASSERT_NOT_NULL(trailing_byte);
+    memcpy(trailing_byte, valid_coinbase_2, valid_length);
+    memcpy(trailing_byte + valid_length, "00", 3U);
+    notify.coinbase_2 = trailing_byte;
+    memset(&result, 0, sizeof(result));
+    TEST_ASSERT_EQUAL(ESP_ERR_INVALID_ARG,
+                      coinbase_process_notification(
+                          &notify, "01020304050607", 8, "", true, &result));
+    free(result.scriptsig);
+    free(trailing_byte);
+}
+
 TEST_CASE("BIP-110 signaling not detected", "[coinbase_decoder]")
 {
     // Create a mining_notify without BIP-110 bit set
@@ -219,10 +287,12 @@ TEST_CASE("BIP-110 signaling not detected", "[coinbase_decoder]")
     
     mining_notification_result_t result = { 0 };
     
-    // Use valid extranonce1 (8 hex chars = 4 bytes)
-    esp_err_t err = coinbase_process_notification(&notify, "01020304", 8, "", true, &result);
+    // This captured template reserves 15 scriptSig bytes for extranonces.
+    esp_err_t err = coinbase_process_notification(&notify, "01020304050607", 8, "", true, &result);
     TEST_ASSERT_EQUAL(ESP_OK, err);
+    TEST_ASSERT_EQUAL_INT(3, result.output_count);
     TEST_ASSERT_FALSE(result.bip110_signaling);
+    free(result.scriptsig);
 }
 
 TEST_CASE("BIP-110 signaling detected", "[coinbase_decoder]")
@@ -236,10 +306,12 @@ TEST_CASE("BIP-110 signaling detected", "[coinbase_decoder]")
     
     mining_notification_result_t result = { 0 };
     
-    // Use valid extranonce1 (8 hex chars = 4 bytes)
-    esp_err_t err = coinbase_process_notification(&notify, "01020304", 8, "", true, &result);
+    // This captured template reserves 15 scriptSig bytes for extranonces.
+    esp_err_t err = coinbase_process_notification(&notify, "01020304050607", 8, "", true, &result);
     TEST_ASSERT_EQUAL(ESP_OK, err);
+    TEST_ASSERT_EQUAL_INT(3, result.output_count);
     TEST_ASSERT_TRUE(result.bip110_signaling);
+    free(result.scriptsig);
 }
 
 TEST_CASE("BIP-110 signaling last block", "[coinbase_decoder]")
@@ -253,11 +325,13 @@ TEST_CASE("BIP-110 signaling last block", "[coinbase_decoder]")
     
     mining_notification_result_t result = { 0 };
     
-    // Use valid extranonce1 (8 hex chars = 4 bytes)
-    esp_err_t err = coinbase_process_notification(&notify, "01020304", 8, "", true, &result);
+    // This captured template reserves 15 scriptSig bytes for extranonces.
+    esp_err_t err = coinbase_process_notification(&notify, "01020304050607", 8, "", true, &result);
     TEST_ASSERT_EQUAL(ESP_OK, err);
+    TEST_ASSERT_EQUAL_INT(3, result.output_count);
     TEST_ASSERT_EQUAL(965663, result.block_height);
     TEST_ASSERT_TRUE(result.bip110_signaling);
+    free(result.scriptsig);
 }
 
 TEST_CASE("BIP-110 signaling expired", "[coinbase_decoder]")
@@ -271,9 +345,11 @@ TEST_CASE("BIP-110 signaling expired", "[coinbase_decoder]")
     
     mining_notification_result_t result = { 0 };
     
-    // Use valid extranonce1 (8 hex chars = 4 bytes)
-    esp_err_t err = coinbase_process_notification(&notify, "01020304", 8, "", true, &result);
+    // This captured template reserves 15 scriptSig bytes for extranonces.
+    esp_err_t err = coinbase_process_notification(&notify, "01020304050607", 8, "", true, &result);
     TEST_ASSERT_EQUAL(ESP_OK, err);
+    TEST_ASSERT_EQUAL_INT(3, result.output_count);
     TEST_ASSERT_EQUAL(965664, result.block_height);
     TEST_ASSERT_FALSE(result.bip110_signaling);
+    free(result.scriptsig);
 }

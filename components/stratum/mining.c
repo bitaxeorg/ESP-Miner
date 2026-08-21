@@ -1,6 +1,8 @@
 #include <string.h>
 #include <stdio.h>
 #include <limits.h>
+#include <stdlib.h>
+#include "psa/crypto.h"
 #include "mining.h"
 #include "stratum_api.h"
 #include "utils.h"
@@ -12,24 +14,96 @@ void free_bm_job(bm_job *job)
     free(job);
 }
 
-void calculate_coinbase_tx_hash(const char *coinbase_1, const char *coinbase_2, const char *extranonce, const char *extranonce_2, uint8_t dest[32])
+#define MAX_EXTRANONCE_2_BYTES 32
+#define MAX_COINBASE_TX_BYTES (STRATUM_V1_MAX_JSON_LINE_SIZE / 2)
+#define HEX_HASH_CHUNK_BYTES 128
+
+static int hex_nibble(unsigned char character)
 {
-    size_t len1 = strlen(coinbase_1);
-    size_t len2 = strlen(extranonce);
-    size_t len3 = strlen(extranonce_2);
-    size_t len4 = strlen(coinbase_2);
+    if (character >= '0' && character <= '9') {
+        return character - '0';
+    }
+    if (character >= 'a' && character <= 'f') {
+        return character - 'a' + 10;
+    }
+    if (character >= 'A' && character <= 'F') {
+        return character - 'A' + 10;
+    }
+    return -1;
+}
 
-    size_t coinbase_tx_bin_len = (len1 + len2 + len3 + len4) / 2;
+static bool hash_hex_string(psa_hash_operation_t *operation, const char *hex,
+                            size_t *total_bytes)
+{
+    if (hex == NULL) {
+        return false;
+    }
 
-    uint8_t coinbase_tx_bin[coinbase_tx_bin_len];
+    uint8_t decoded[HEX_HASH_CHUNK_BYTES];
+    size_t decoded_len = 0;
 
-    size_t bin_offset = 0;
-    bin_offset += hex2bin(coinbase_1, coinbase_tx_bin + bin_offset, coinbase_tx_bin_len - bin_offset);
-    bin_offset += hex2bin(extranonce, coinbase_tx_bin + bin_offset, coinbase_tx_bin_len - bin_offset);
-    bin_offset += hex2bin(extranonce_2, coinbase_tx_bin + bin_offset, coinbase_tx_bin_len - bin_offset);
-    bin_offset += hex2bin(coinbase_2, coinbase_tx_bin + bin_offset, coinbase_tx_bin_len - bin_offset);
+    while (*hex != '\0') {
+        if (hex[1] == '\0') {
+            return false;
+        }
 
-    double_sha256_bin(coinbase_tx_bin, coinbase_tx_bin_len, dest);
+        int high = hex_nibble((unsigned char)hex[0]);
+        int low = hex_nibble((unsigned char)hex[1]);
+        if (high < 0 || low < 0 ||
+            *total_bytes >= MAX_COINBASE_TX_BYTES) {
+            return false;
+        }
+
+        decoded[decoded_len++] = (uint8_t)((high << 4) | low);
+        (*total_bytes)++;
+        hex += 2;
+
+        if (decoded_len == sizeof(decoded)) {
+            if (psa_hash_update(operation, decoded, decoded_len) != PSA_SUCCESS) {
+                return false;
+            }
+            decoded_len = 0;
+        }
+    }
+
+    return decoded_len == 0 ||
+           psa_hash_update(operation, decoded, decoded_len) == PSA_SUCCESS;
+}
+
+bool calculate_coinbase_tx_hash(const char *coinbase_1, const char *coinbase_2,
+                                const char *extranonce, const char *extranonce_2,
+                                uint8_t dest[32])
+{
+    if (dest == NULL) {
+        return false;
+    }
+
+    psa_hash_operation_t operation = PSA_HASH_OPERATION_INIT;
+    if (psa_hash_setup(&operation, PSA_ALG_SHA_256) != PSA_SUCCESS) {
+        return false;
+    }
+
+    size_t total_bytes = 0;
+    uint8_t first_hash[32];
+    size_t first_hash_len = 0;
+    bool valid = hash_hex_string(&operation, coinbase_1, &total_bytes) &&
+                 hash_hex_string(&operation, extranonce, &total_bytes) &&
+                 hash_hex_string(&operation, extranonce_2, &total_bytes) &&
+                 hash_hex_string(&operation, coinbase_2, &total_bytes) &&
+                 total_bytes > 0 &&
+                 psa_hash_finish(&operation, first_hash, sizeof(first_hash),
+                                 &first_hash_len) == PSA_SUCCESS &&
+                 first_hash_len == sizeof(first_hash);
+
+    if (!valid) {
+        psa_hash_abort(&operation);
+        return false;
+    }
+
+    size_t output_len = 0;
+    return psa_hash_compute(PSA_ALG_SHA_256, first_hash, sizeof(first_hash),
+                            dest, 32, &output_len) == PSA_SUCCESS &&
+           output_len == 32;
 }
 
 void calculate_coinbase_tx_hash_bin(const uint8_t *prefix, size_t prefix_len,
@@ -115,10 +189,15 @@ void construct_bm_job(mining_notify *params, const uint8_t merkle_root[32], cons
     }
 }
 
-void extranonce_2_generate(uint64_t extranonce_2, uint32_t length, char dest[static length * 2 + 1])
+bool extranonce_2_generate(uint64_t extranonce_2, uint32_t length,
+                           char *dest, size_t dest_len)
 {
-    // Allocate buffer to hold the extranonce_2 value in bytes
-    uint8_t extranonce_2_bytes[length];
+    if (dest == NULL || length > MAX_EXTRANONCE_2_BYTES ||
+        dest_len < (size_t)length * 2U + 1U) {
+        return false;
+    }
+
+    uint8_t extranonce_2_bytes[MAX_EXTRANONCE_2_BYTES];
     memset(extranonce_2_bytes, 0, length);
     
     // Copy the extranonce_2 value into the buffer, handling endianness
@@ -127,7 +206,8 @@ void extranonce_2_generate(uint64_t extranonce_2, uint32_t length, char dest[sta
     memcpy(extranonce_2_bytes, &extranonce_2, copy_len);
     
     // Convert the bytes to hex string
-    bin2hex(extranonce_2_bytes, length, dest, length * 2 + 1);
+    return bin2hex(extranonce_2_bytes, length, dest, dest_len) ==
+           (size_t)length * 2U;
 }
 
 double hash_to_pdiff(const uint8_t hash[32])
