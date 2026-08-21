@@ -1,7 +1,7 @@
 import 'chartjs-adapter-moment';
 
 import { CommonModule, HashLocationStrategy, LocationStrategy } from '@angular/common';
-import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { NgModule } from '@angular/core';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { BrowserModule } from '@angular/platform-browser';
@@ -46,6 +46,8 @@ import { AddressPipe } from './pipes/address.pipe';
 import { SatsPipe } from './pipes/sats.pipe';
 import { HeatmapLightnessPipe } from './pipes/heatmap-lightness.pipe';
 import { DialogService, DialogListComponent } from './services/dialog.service';
+import { authInterceptor } from './services/auth.interceptor';
+import { LoginModalComponent } from './components/login-modal/login-modal.component';
 
 const components = [
   AppComponent,
@@ -71,7 +73,8 @@ const components = [
     ScoreboardComponent,
     ThemeConfigComponent,
     DesignComponent,
-    DialogListComponent
+    DialogListComponent,
+    LoginModalComponent
   ],
   imports: [
     BrowserModule,
@@ -106,7 +109,7 @@ const components = [
     { provide: ApiConfiguration, useValue: { rootUrl: '' } },
     Api,
     DialogService,
-    provideHttpClient()
+    provideHttpClient(withInterceptors([authInterceptor]))
   ],
   bootstrap: [AppComponent]
 })

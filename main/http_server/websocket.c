@@ -9,6 +9,8 @@
 #include "websocket_log.h"
 #include "websocket_api.h"
 #include "http_server.h"
+#include "http_auth.h"
+#include "http_cors.h"
 #include "log_buffer.h"
 
 #define WS_LOG_SCRATCH_SIZE 2048
@@ -175,8 +177,11 @@ void websocket_init(httpd_handle_t server)
 
 esp_err_t websocket_pre_handshake(httpd_req_t *req)
 {
-    if (is_network_allowed(req) != ESP_OK) {
-        httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+    if (http_cors_check(req) != ESP_OK) {
+        return ESP_FAIL;
+    }
+
+    if (http_auth_websocket_validate(req) != ESP_OK) {
         return ESP_FAIL;
     }
 

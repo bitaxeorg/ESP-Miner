@@ -190,6 +190,8 @@ export class SystemApiService {
         boardtemp2: 40,
         overheat_mode: 0,
         statsLimit: 720,
+        authEnabled: 0,
+        authReadRequired: 0,
 
         partitions: [
           { label: 'factory', version: 'v2.11.0', compileDate: 'Jul 10 2026', compileTime: '12:00:00', isCurrent: false, isFactory: true, usagePercent: 58 },
