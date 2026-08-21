@@ -3,6 +3,7 @@
 
 #include "esp_err.h"
 
+#include "coinbase_decoder.h"
 #include "sv2_protocol.h"
 
 typedef struct GlobalState GlobalState;
@@ -28,6 +29,10 @@ esp_err_t SYSTEM_init_peripherals(GlobalState * GLOBAL_STATE);
 // and reset hashrate measurements so reconnects don't spike the average.
 // Shared by the SV1 and SV2 tasks.
 void SYSTEM_clean_jobs_queue(GlobalState * GLOBAL_STATE);
+
+// Copy the decoded coinbase outputs into the global state and log them when they change.
+// Shared by the SV1 and SV2 tasks.
+void SYSTEM_update_coinbase_outputs(GlobalState * GLOBAL_STATE, mining_notification_result_t * result);
 
 void SYSTEM_notify_accepted_share(GlobalState * GLOBAL_STATE);
 void SYSTEM_notify_rejected_share(GlobalState * GLOBAL_STATE, char * error_msg);

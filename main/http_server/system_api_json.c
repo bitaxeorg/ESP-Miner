@@ -183,6 +183,7 @@ static void system_api_add_config(cJSON *root, GlobalState *g) {
             cJSON_AddNumberToObject(p_obj, "stratumTLS", p->tls);
             cJSON_AddStringToObject(p_obj, "stratumCert", p->cert ? p->cert : "");
             cJSON_AddBoolToObject(p_obj, "stratumDecodeCoinbase", p->decode_coinbase_tx);
+            cJSON_AddBoolToObject(p_obj, "stratumShareWarning", p->share_warning);
             cJSON_AddStringToObject(p_obj, "stratumV2ChannelType", p->sv2_channel_type == SV2_CHANNEL_STANDARD ? SV2_CHANNEL_TYPE_STANDARD : SV2_CHANNEL_TYPE_EXTENDED);
             cJSON_AddStringToObject(p_obj, "stratumV2AuthorityPubkey", p->sv2_authority_pubkey ? p->sv2_authority_pubkey : "");
             cJSON_AddBoolToObject(p_obj, "stratumV2RequireAuth", p->sv2_require_auth);
@@ -203,6 +204,7 @@ static void system_api_add_config(cJSON *root, GlobalState *g) {
     cJSON_AddNumberToObject(root, "stratumTLS", prim_pool->tls);
     cJSON_AddStringToObject(root, "stratumCert", prim_pool->cert ? prim_pool->cert : "");
     cJSON_AddBoolToObject(root, "stratumDecodeCoinbase", prim_pool->decode_coinbase_tx);
+    cJSON_AddBoolToObject(root, "stratumShareWarning", prim_pool->share_warning);
     cJSON_AddStringToObject(root, "stratumProtocol", prim_pool->protocol == STRATUM_PROTOCOL_V2 ? STRATUM_V2 : STRATUM_V1);
     cJSON_AddStringToObject(root, "stratumV2AuthorityPubkey", prim_pool->sv2_authority_pubkey ? prim_pool->sv2_authority_pubkey : "");
     cJSON_AddStringToObject(root, "stratumV2ChannelType", prim_pool->sv2_channel_type == SV2_CHANNEL_STANDARD ? SV2_CHANNEL_TYPE_STANDARD : SV2_CHANNEL_TYPE_EXTENDED);
@@ -215,6 +217,7 @@ static void system_api_add_config(cJSON *root, GlobalState *g) {
     cJSON_AddNumberToObject(root, "fallbackStratumTLS", sec_pool->tls);
     cJSON_AddStringToObject(root, "fallbackStratumCert", sec_pool->cert ? sec_pool->cert : "");
     cJSON_AddBoolToObject(root, "fallbackStratumDecodeCoinbase", sec_pool->decode_coinbase_tx);
+    cJSON_AddBoolToObject(root, "fallbackStratumShareWarning", sec_pool->share_warning);
     cJSON_AddStringToObject(root, "fallbackStratumProtocol", sec_pool->protocol == STRATUM_PROTOCOL_V2 ? STRATUM_V2 : STRATUM_V1);
     cJSON_AddStringToObject(root, "fallbackStratumV2AuthorityPubkey", sec_pool->sv2_authority_pubkey ? sec_pool->sv2_authority_pubkey : "");
     cJSON_AddStringToObject(root, "fallbackStratumV2ChannelType", sec_pool->sv2_channel_type == SV2_CHANNEL_STANDARD ? SV2_CHANNEL_TYPE_STANDARD : SV2_CHANNEL_TYPE_EXTENDED);
@@ -304,6 +307,10 @@ static void system_api_add_block_info(cJSON *root, GlobalState *g) {
         }
         cJSON_AddItemToObject(root, "coinbaseOutputs", outputs);
     }
+
+    // Outputs beyond the capacity of coinbaseOutputs, aggregated into a single entry
+    cJSON_AddNumberToObject(root, "coinbaseOthersCount", g->coinbase_others_count);
+    cJSON_AddNumberToObject(root, "coinbaseOthersValueSatoshis", g->coinbase_others_value_satoshis);
 }
 
 static void system_api_add_partitions(cJSON *root, GlobalState * GLOBAL_STATE) {

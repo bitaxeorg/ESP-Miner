@@ -97,6 +97,7 @@ export class PoolComponent implements OnInit {
             stratumTLS: 0,
             stratumCert: '',
             stratumDecodeCoinbase: true,
+            stratumShareWarning: true,
             stratumV2ChannelType: 'extended',
             stratumV2AuthorityPubkey: '',
             stratumV2RequireAuth: false
@@ -117,6 +118,7 @@ export class PoolComponent implements OnInit {
             stratumTLS: 0,
             stratumCert: '',
             stratumDecodeCoinbase: true,
+            stratumShareWarning: true,
             stratumV2ChannelType: 'extended',
             stratumV2AuthorityPubkey: '',
             stratumV2RequireAuth: false
@@ -150,6 +152,7 @@ export class PoolComponent implements OnInit {
             stratumTLS: [pool.stratumTLS || 0],
             stratumCert: [pool.stratumCert || ''],
             stratumDecodeCoinbase: [pool.stratumDecodeCoinbase == true, [Validators.required]],
+            stratumShareWarning: [pool.stratumShareWarning == true, [Validators.required]],
             stratumV2ChannelType: [pool.stratumV2ChannelType || 'extended'],
             stratumV2AuthorityPubkey: [pool.stratumV2AuthorityPubkey || '', [this.base58Validator()]],
             stratumV2RequireAuth: [pool.stratumV2RequireAuth == true]
@@ -275,6 +278,7 @@ export class PoolComponent implements OnInit {
         stratumTLS: [0],
         stratumCert: [''],
         stratumDecodeCoinbase: [true, [Validators.required]],
+        stratumShareWarning: [true, [Validators.required]],
         stratumV2ChannelType: ['extended'],
         stratumV2AuthorityPubkey: ['', [this.base58Validator()]],
         stratumV2RequireAuth: [false]
