@@ -180,10 +180,10 @@ static esp_err_t GET_wifi_scan(httpd_req_t *req)
     // Give some time for the connected flag to take effect
     vTaskDelay(100 / portTICK_PERIOD_MS);
     
-    wifi_ap_record_simple_t ap_records[20];
+    wifi_ap_record_simple_t ap_records[WIFI_SCAN_MAX_AP_COUNT];
     uint16_t ap_count = 0;
 
-    esp_err_t err = wifi_scan(ap_records, &ap_count);
+    esp_err_t err = wifi_scan(ap_records, sizeof(ap_records) / sizeof(ap_records[0]), &ap_count);
     if (err != ESP_OK) {
         httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "WiFi scan failed");
         return ESP_OK;
