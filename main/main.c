@@ -207,7 +207,10 @@ void app_main(void)
 
     int retry = 15;
     while (esp_netif_sntp_sync_wait(2000 / portTICK_PERIOD_MS) == ESP_ERR_TIMEOUT && --retry >= 0) {
-        ESP_LOGI(TAG, "Waiting for system time to be set... (%d attempts remaining)", retry);
+        ESP_LOGI(TAG, "Waiting for NTP... (%d attempts remaining)", retry);
+    }
+    if (retry == -1) {
+        ESP_LOGW(TAG, "Failed to get NTP time! Certificate validation may fail!");
     }
 
     queue_init(&GLOBAL_STATE.stratum_queue);
