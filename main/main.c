@@ -205,10 +205,9 @@ void app_main(void)
     // Connected to WiFi: tear down the setup BLE service to free the radio.
     setup_ble_stop();
 
-    int retry = 0;
-    const int retry_count = 15;
-    while (esp_netif_sntp_sync_wait(2000 / portTICK_PERIOD_MS) == ESP_ERR_TIMEOUT && ++retry < retry_count) {
-        ESP_LOGI(TAG, "Waiting for system time to be set... (%d/%d)", retry, retry_count);
+    int retry = 15;
+    while (esp_netif_sntp_sync_wait(2000 / portTICK_PERIOD_MS) == ESP_ERR_TIMEOUT && --retry >= 0) {
+        ESP_LOGI(TAG, "Waiting for system time to be set... (%d attempts remaining)", retry);
     }
 
     queue_init(&GLOBAL_STATE.stratum_queue);
