@@ -106,7 +106,8 @@ const mockSystemInfo: ISystemInfo = {
   fallbackStratumUser: 'worker.fallback',
   fallbackStratumPort: 3333,
   fallbackStratumProtocol: 'SV1',
-  isUsingFallbackStratum: false
+  isUsingFallbackStratum: false,
+  useFallbackStratum: 0
 } as any;
 
 const mockSystemStatistics: ISystemStatistics = {

@@ -19,6 +19,8 @@
 #include "PID.h"
 #include "self_test.h"
 #include "stratum_api.h"
+#include "miner_job.h"
+#include "utils.h"
 
 #define GPIO_ASIC_ENABLE CONFIG_GPIO_ASIC_ENABLE
 
@@ -302,14 +304,6 @@ esp_err_t self_test_init(GlobalState * GLOBAL_STATE)
         GLOBAL_STATE->DEVICE_CONFIG.family.asic.difficulty = DIFFICULTY;
         GLOBAL_STATE->SYSTEM_MODULE.is_connected = true;
 
-        // TODO: This might work here instead of the setup json messages
-    // GLOBAL_STATE->extranonce_str = "12905085617eff8e";
-    // GLOBAL_STATE->extranonce_2_len = 8;
-    // GLOBAL_STATE->pool_difficulty = 0xffffffff;
-    // GLOBAL_STATE->new_set_mining_difficulty_msg = true;
-    
-    // vTaskDelay(1000 / portTICK_PERIOD_MS);
-
     // No need to set version_mask, it uses default mask which is fine
     // GLOBAL_STATE->version_mask = 0xffffffff;
     // GLOBAL_STATE->new_stratum_version_rolling_msg = true;        
@@ -489,15 +483,26 @@ void self_test_task(void * pvParameters)
 
     // setup and test hashrate
     StratumApiV1Message msg = {0};
+    uint8_t extranonce1_bin[32] = {0};
+    uint8_t e1_len = 0;
+    uint8_t e2_len = 8;
+    double mock_diff = 4294967295.0;
+    uint32_t mock_version_mask = 0xffffffff;
 
     // 1. Mock set_extranonce
     const char *extranonce_json = "{\"id\":null,\"method\":\"mining.set_extranonce\",\"params\":[\"12905085617eff8e\",8]}";
     STRATUM_V1_parse(&msg, extranonce_json);
     if (msg.method == MINING_SET_EXTRANONCE) {
-        if (GLOBAL_STATE->extranonce_str) free(GLOBAL_STATE->extranonce_str);
-        GLOBAL_STATE->extranonce_str = msg.extranonce_str;
-        GLOBAL_STATE->extranonce_2_len = msg.extranonce_2_len;
-        ESP_LOGI(TAG, "Self-test: Applied mock extranonce %s, len %d", GLOBAL_STATE->extranonce_str, GLOBAL_STATE->extranonce_2_len);
+        if (msg.extranonce_str && msg.extranonce_str[0] != '\0') {
+            size_t slen = strlen(msg.extranonce_str) / 2;
+            if (slen > sizeof(extranonce1_bin)) slen = sizeof(extranonce1_bin);
+            hex2bin(msg.extranonce_str, extranonce1_bin, slen);
+            e1_len = (uint8_t)slen;
+            free(msg.extranonce_str);
+            msg.extranonce_str = NULL;
+        }
+        e2_len = (uint8_t)msg.extranonce_2_len;
+        ESP_LOGI(TAG, "Self-test: Applied mock extranonce len %d, e2_len %d", e1_len, e2_len);
     }
 
     // 2. Mock set_difficulty
@@ -505,9 +510,9 @@ void self_test_task(void * pvParameters)
     const char *difficulty_json = "{\"id\":null,\"method\":\"mining.set_difficulty\",\"params\":[4294967295]}";
     STRATUM_V1_parse(&msg, difficulty_json);
     if (msg.method == MINING_SET_DIFFICULTY) {
-        GLOBAL_STATE->pool_difficulty = msg.new_difficulty;
-        GLOBAL_STATE->new_set_mining_difficulty_msg = true;
-        ESP_LOGI(TAG, "Self-test: Applied mock difficulty %lu", (unsigned long)GLOBAL_STATE->pool_difficulty);
+        mock_diff = msg.new_difficulty;
+        GLOBAL_STATE->SYSTEM_MODULE.pool_difficulty = mock_diff;
+        ESP_LOGI(TAG, "Self-test: Applied mock difficulty %lu", (unsigned long)mock_diff);
     }
 
     // 3. Mock set_version_mask
@@ -515,9 +520,8 @@ void self_test_task(void * pvParameters)
     const char *version_mask_json = "{\"id\":null,\"method\":\"mining.set_version_mask\",\"params\":[\"ffffffff\"]}";
     STRATUM_V1_parse(&msg, version_mask_json);
     if (msg.method == MINING_SET_VERSION_MASK) {
-        GLOBAL_STATE->version_mask = msg.version_mask;
-        GLOBAL_STATE->new_stratum_version_rolling_msg = true;
-        ESP_LOGI(TAG, "Self-test: Applied mock version mask %08lx", GLOBAL_STATE->version_mask);
+        mock_version_mask = msg.version_mask;
+        ESP_LOGI(TAG, "Self-test: Applied mock version mask %08lx", mock_version_mask);
     }
 
     // 4. Mock mining.notify
@@ -527,10 +531,17 @@ void self_test_task(void * pvParameters)
 
     if (msg.method == MINING_NOTIFY) {
         ESP_LOGI(TAG, "Enqueuing mock work into stratum_queue");
-        // No stratum task runs during self-test, so set the V1 free function
-        // ourselves for the mock job we are about to enqueue.
-        GLOBAL_STATE->stratum_queue.free_fn = (void (*)(void *)) STRATUM_V1_free_mining_notify;
-        queue_enqueue(&GLOBAL_STATE->stratum_queue, msg.mining_notification);
+        miner_job_t *job = miner_job_pool_next();
+        *job = msg.mining_notification;
+        job->pool_id = 0;
+        job->pool_diff = mock_diff;
+        job->version_mask = mock_version_mask;
+        job->extranonce1_len = (uint8_t)e1_len;
+        if (e1_len > 0) {
+            memcpy(job->extranonce1, extranonce1_bin, e1_len);
+        }
+        job->extranonce2_len = (uint8_t)e2_len;
+        queue_enqueue(&GLOBAL_STATE->stratum_queue, job);
     } else {
         ESP_LOGE(TAG, "Failed to parse mock mining notification");
         tests_done(GLOBAL_STATE, false);

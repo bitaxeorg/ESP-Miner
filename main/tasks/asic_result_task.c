@@ -7,10 +7,7 @@
 #include "utils.h"
 #include "global_state.h"
 #include "mining.h"
-#include "stratum_api.h"
-#include "stratum_v1_task.h"
-#include "stratum_v2_task.h"
-#include "sv2_protocol.h"
+#include "stratum_task.h"
 #include "hashrate_monitor_task.h"
 #include "asic.h"
 #include "freertos/task.h"
@@ -51,19 +48,19 @@ void ASIC_result_task(void *pvParameters)
         // share submit below; keeping a pointer into it is a use-after-free. The
         // bm_job body is inline and safe to copy by value — deep-copy the two
         // heap-owned strings so the snapshot stays valid after we unlock.
-        pthread_mutex_lock(&GLOBAL_STATE->valid_jobs_lock);
-        bool valid = (GLOBAL_STATE->valid_jobs[job_id] != 0) &&
+        pthread_mutex_lock(&GLOBAL_STATE->ASIC_TASK_MODULE.valid_jobs_lock);
+        bool valid = (GLOBAL_STATE->ASIC_TASK_MODULE.valid_jobs[job_id] != 0) &&
                      (GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[job_id] != NULL);
         if (!valid)
         {
-            pthread_mutex_unlock(&GLOBAL_STATE->valid_jobs_lock);
+            pthread_mutex_unlock(&GLOBAL_STATE->ASIC_TASK_MODULE.valid_jobs_lock);
             ESP_LOGW(TAG, "Invalid job nonce found, 0x%02X", job_id);
             continue;
         }
         bm_job active_job_snapshot = *GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[job_id];
         active_job_snapshot.jobid = active_job_snapshot.jobid ? strdup(active_job_snapshot.jobid) : NULL;
         active_job_snapshot.extranonce2 = active_job_snapshot.extranonce2 ? strdup(active_job_snapshot.extranonce2) : NULL;
-        pthread_mutex_unlock(&GLOBAL_STATE->valid_jobs_lock);
+        pthread_mutex_unlock(&GLOBAL_STATE->ASIC_TASK_MODULE.valid_jobs_lock);
         bm_job *active_job = &active_job_snapshot;
         // check the nonce difficulty
         double nonce_diff = test_nonce_value(active_job, asic_result->nonce, asic_result->rolled_version);
@@ -78,68 +75,12 @@ void ASIC_result_task(void *pvParameters)
         uint32_t version_bits = asic_result->rolled_version ^ active_job->version;
         if (nonce_diff >= active_job->pool_diff)
         {
-            if (GLOBAL_STATE->stratum_protocol == STRATUM_PROTOCOL_V2) {
-                // SV2: submit with binary protocol
-                int ret;
-                uint32_t sv2_job_id = (uint32_t)strtoul(active_job->jobid, NULL, 10);
-
-                if (stratum_v2_is_extended_channel(GLOBAL_STATE)) {
-                    sv2_conn_t *conn = GLOBAL_STATE->sv2_conn;
-                    // SV2 spec: extranonce_size is the miner's rollable portion.
-                    // The pool prepends its extranonce_prefix separately.
-                    uint8_t en2_len = conn->extranonce_size;
-                    uint8_t extranonce_2[32];
-                    hex2bin(active_job->extranonce2, extranonce_2, en2_len);
-                    ret = stratum_v2_submit_share_extended(GLOBAL_STATE, sv2_job_id,
-                                                           asic_result->nonce,
-                                                           active_job->ntime,
-                                                           asic_result->rolled_version,
-                                                           extranonce_2, en2_len);
-                } else {
-                    ret = stratum_v2_submit_share(GLOBAL_STATE, sv2_job_id,
-                                                   asic_result->nonce,
-                                                   active_job->ntime,
-                                                   asic_result->rolled_version);
-                }
-
-                if (ret < 0) {
-                    ESP_LOGW(TAG, "Failed to submit SV2 share (ret=%d, errno=%d: %s)",
-                             ret, errno, strerror(errno));
-                }
-            } else {
-                // V1: submit with JSON-RPC
-                uint16_t active_idx = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback ? GLOBAL_STATE->SYSTEM_MODULE.secondary_pool_index : GLOBAL_STATE->SYSTEM_MODULE.primary_pool_index;
-                char * user = GLOBAL_STATE->SYSTEM_MODULE.pools[active_idx].user;
-
-                taskENTER_CRITICAL(&GLOBAL_STATE->stratum_mux);
-                esp_transport_handle_t transport = GLOBAL_STATE->transport;
-                int uid = GLOBAL_STATE->send_uid++;
-                taskEXIT_CRITICAL(&GLOBAL_STATE->stratum_mux);
-
-                if (transport == NULL) {
-                    ESP_LOGW(TAG, "No stratum connection, dropping share (job 0x%02X)", job_id);
-                } else {
-                    uint64_t sent_time_us = 0;
-                    int ret = STRATUM_V1_submit_share(
-                        transport,
-                        uid,
-                        user,
-                        active_job->jobid,
-                        active_job->extranonce2,
-                        active_job->ntime,
-                        asic_result->nonce,
-                        version_bits,
-                        &sent_time_us);
-
-                    if (ret < 0) {
-                        ESP_LOGW(TAG, "Unable to write share to socket (ret: %d, errno %d: %s)", ret, errno, strerror(errno));
-                        // stratum_task recv loop will detect a broken connection on its next read and handle reconnection
-                    }
-
-                    float process_time = (sent_time_us - asic_result->timestamp_us) / 1000.0f;
-                    GLOBAL_STATE->SYSTEM_MODULE.process_time = process_time;
-                    ESP_LOGI(TAG, "Processing time: %0.1f ms", process_time);
-                }
+            uint64_t sent_time_us = 0;
+            int ret = stratum_submit_share(GLOBAL_STATE, active_job, asic_result->nonce, asic_result->rolled_version, &sent_time_us);
+            if (ret >= 0 && sent_time_us > 0) {
+                float process_time = (sent_time_us - asic_result->timestamp_us) / 1000.0f;
+                GLOBAL_STATE->SYSTEM_MODULE.process_time = process_time;
+                ESP_LOGI(TAG, "Processing time: %0.1f ms", process_time);
             }
         }
 

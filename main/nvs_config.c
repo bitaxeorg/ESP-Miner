@@ -203,7 +203,7 @@ static void migrate_legacy_pools(void) {
     bool p_xnsub = read_legacy_bool(handle, "stratumxnsub", STRATUM_EXTRANONCE_SUBSCRIBE);
     uint16_t p_tls = read_legacy_u16(handle, "stratumtls", CONFIG_STRATUM_TLS);
     char *p_cert = read_legacy_str(handle, "stratumcert", CONFIG_STRATUM_CERT);
-    char *p_sv2chan = read_legacy_str(handle, "sv2chantype", SV2_CHANNEL_TYPE_EXTENDED);
+    char *p_sv2chan = read_legacy_str(handle, "sv2chantype", sv2_channel_type_to_string(SV2_CHANNEL_EXTENDED));
     char *p_sv2pubkey = read_legacy_str(handle, "sv2authpubkey", "");
     bool p_decode = read_legacy_bool(handle, "stratumdecode", true);
 
@@ -239,7 +239,7 @@ static void migrate_legacy_pools(void) {
     bool f_xnsub = read_legacy_bool(handle, "stratumfbxnsub", FALLBACK_STRATUM_EXTRANONCE_SUBSCRIBE);
     uint16_t f_tls = read_legacy_u16(handle, "fbstratumtls", CONFIG_FALLBACK_STRATUM_TLS);
     char *f_cert = read_legacy_str(handle, "fbstratumcert", CONFIG_FALLBACK_STRATUM_CERT);
-    char *f_sv2chan = read_legacy_str(handle, "fbsv2chantype", SV2_CHANNEL_TYPE_EXTENDED);
+    char *f_sv2chan = read_legacy_str(handle, "fbsv2chantype", sv2_channel_type_to_string(SV2_CHANNEL_EXTENDED));
     char *f_sv2pubkey = read_legacy_str(handle, "fbsv2authpubk", "");
     bool f_decode = read_legacy_bool(handle, "fbstratumdecode", true);
 

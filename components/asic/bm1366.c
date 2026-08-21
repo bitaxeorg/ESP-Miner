@@ -193,7 +193,7 @@ uint8_t BM1366_init(GlobalState * GLOBAL_STATE)
 {
     // set version mask
     for (int i = 0; i < 3; i++) {
-        BM1366_set_version_mask(STRATUM_DEFAULT_VERSION_MASK);
+        BM1366_set_version_mask(BIP320_VERSION_ROLLING_MASK);
     }
 
     // read register 00 on all chips
@@ -321,13 +321,13 @@ void BM1366_send_work(GlobalState * GLOBAL_STATE, bm_job * next_bm_job)
     // (which snapshots active_jobs[job_id] under the same lock) can never observe
     // or copy a slot we are freeing/replacing here. valid_jobs is set inside the
     // same critical section so validity and the pointer stay consistent.
-    pthread_mutex_lock(&GLOBAL_STATE->valid_jobs_lock);
+    pthread_mutex_lock(&GLOBAL_STATE->ASIC_TASK_MODULE.valid_jobs_lock);
     if (GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[job.job_id] != NULL) {
         free_bm_job(GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[job.job_id]);
     }
     GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[job.job_id] = next_bm_job;
-    GLOBAL_STATE->valid_jobs[job.job_id] = 1;
-    pthread_mutex_unlock(&GLOBAL_STATE->valid_jobs_lock);
+    GLOBAL_STATE->ASIC_TASK_MODULE.valid_jobs[job.job_id] = 1;
+    pthread_mutex_unlock(&GLOBAL_STATE->ASIC_TASK_MODULE.valid_jobs_lock);
 
     //debug sent jobs - this can get crazy if the interval is short
     #if BM1366_DEBUG_JOBS
@@ -367,14 +367,14 @@ task_result * BM1366_process_work(GlobalState * GLOBAL_STATE)
     uint32_t version_bits = (ntohs(asic_result.job.version) << 13); // shift the 16 bit value left 13
 
     // Read active_jobs[job_id] under the lock
-    pthread_mutex_lock(&GLOBAL_STATE->valid_jobs_lock);
-    if (GLOBAL_STATE->valid_jobs[job_id] == 0 || GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[job_id] == NULL) {
-        pthread_mutex_unlock(&GLOBAL_STATE->valid_jobs_lock);
+    pthread_mutex_lock(&GLOBAL_STATE->ASIC_TASK_MODULE.valid_jobs_lock);
+    if (GLOBAL_STATE->ASIC_TASK_MODULE.valid_jobs[job_id] == 0 || GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[job_id] == NULL) {
+        pthread_mutex_unlock(&GLOBAL_STATE->ASIC_TASK_MODULE.valid_jobs_lock);
         ESP_LOGW(TAG, "Invalid job nonce found, 0x%02X", job_id);
         return NULL;
     }
     uint32_t rolled_version = GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[job_id]->version | version_bits;
-    pthread_mutex_unlock(&GLOBAL_STATE->valid_jobs_lock);
+    pthread_mutex_unlock(&GLOBAL_STATE->ASIC_TASK_MODULE.valid_jobs_lock);
 
     result.job_id = job_id;
     result.nonce = asic_result.job.nonce;

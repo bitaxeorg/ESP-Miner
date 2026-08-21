@@ -97,8 +97,6 @@ void queue_clear(work_queue *queue)
         void *next_work = queue->buffer[queue->head];
         if (queue->free_fn) {
             queue->free_fn(next_work);
-        } else {
-            free(next_work);
         }
         queue->head = (queue->head + 1) % QUEUE_SIZE;
         queue->count--;

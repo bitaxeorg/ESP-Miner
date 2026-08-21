@@ -563,7 +563,10 @@ static void screen_update_cb(lv_timer_t * timer)
         current_chip_temp = power_management->chip_temp_avg;
     }
 
-    if (GLOBAL_STATE->stratum_protocol == STRATUM_PROTOCOL_V2) {
+    uint16_t active_pool_idx = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback
+                               ? GLOBAL_STATE->SYSTEM_MODULE.secondary_pool_index
+                               : GLOBAL_STATE->SYSTEM_MODULE.primary_pool_index;
+    if (GLOBAL_STATE->SYSTEM_MODULE.pools[active_pool_idx].protocol == STRATUM_PROTOCOL_V2) {
         // SV2 standard channel: no coinbase data, so no block height or scriptsig
         lv_label_set_text(mining_block_height_label, "Protocol: SV2");
         lv_obj_add_flag(mining_scriptsig_title_label, LV_OBJ_FLAG_HIDDEN);

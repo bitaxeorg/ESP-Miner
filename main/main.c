@@ -14,7 +14,7 @@
 #include "global_state.h"
 #include "system.h"
 #include "http_server.h"
-#include "protocol_coordinator.h"
+#include "stratum_task.h"
 #include "i2c_bitaxe.h"
 #include "adc.h"
 #include "nvs_config.h"
@@ -153,7 +153,7 @@ void app_main(void)
             ESP_LOGE(TAG, "Error creating power management task");
         }
         if (!GLOBAL_STATE.SELF_TEST_MODULE.is_active) {
-            if (xTaskCreate(FAN_CONTROLLER_task, "fan_controller", 8192, (void *) &GLOBAL_STATE, 5, NULL) != pdPASS) {
+            if (xTaskCreate(FAN_CONTROLLER_task, "fan_controller", 8192, (void *) &GLOBAL_STATE, 10, NULL) != pdPASS) {
                 ESP_LOGE(TAG, "Error creating fan controller task");
             }
         }
@@ -198,14 +198,6 @@ void app_main(void)
 
     queue_init(&GLOBAL_STATE.stratum_queue);
 
-    // The self-test feeds create_jobs_task a hardcoded stratum V1 mock job.
-    // SYSTEM_init_system() picked the protocol from the configured pool, so pin
-    // V1 here — before create_jobs_task latches it — or an SV2-configured device
-    // would cast the mock mining_notify to sv2_job_t.
-    if (GLOBAL_STATE.SELF_TEST_MODULE.is_active) {
-        GLOBAL_STATE.stratum_protocol = STRATUM_PROTOCOL_V1;
-    }
-
     if (system_init_ret == ESP_OK) {
         if (asic_initialize(&GLOBAL_STATE, ASIC_INIT_COLD_BOOT, 0) == 0) {
             if (!GLOBAL_STATE.SELF_TEST_MODULE.is_active) {
@@ -232,9 +224,8 @@ void app_main(void)
     }
 
     if (!GLOBAL_STATE.SELF_TEST_MODULE.is_active) {
-        protocol_coordinator_init(&GLOBAL_STATE);
-        if (xTaskCreateWithCaps(protocol_coordinator_task, "protocol coord", 3072, (void *) &GLOBAL_STATE, 5, NULL, MALLOC_CAP_SPIRAM) != pdPASS) {
-            ESP_LOGE(TAG, "Error creating protocol coordinator task");
+        if (xTaskCreateWithCaps(stratum_task, "stratum", 16384, (void *) &GLOBAL_STATE, 5, NULL, MALLOC_CAP_SPIRAM) != pdPASS) {
+            ESP_LOGE(TAG, "Error creating stratum task");
         }
     }
 

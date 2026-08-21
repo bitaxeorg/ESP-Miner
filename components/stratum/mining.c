@@ -1,9 +1,12 @@
 #include <string.h>
 #include <stdio.h>
 #include <limits.h>
+#include "esp_log.h"
 #include "mining.h"
 #include "stratum_api.h"
 #include "utils.h"
+
+static const char *TAG = "mining";
 
 void free_bm_job(bm_job *job)
 {
@@ -12,25 +15,6 @@ void free_bm_job(bm_job *job)
     free(job);
 }
 
-void calculate_coinbase_tx_hash(const char *coinbase_1, const char *coinbase_2, const char *extranonce, const char *extranonce_2, uint8_t dest[32])
-{
-    size_t len1 = strlen(coinbase_1);
-    size_t len2 = strlen(extranonce);
-    size_t len3 = strlen(extranonce_2);
-    size_t len4 = strlen(coinbase_2);
-
-    size_t coinbase_tx_bin_len = (len1 + len2 + len3 + len4) / 2;
-
-    uint8_t coinbase_tx_bin[coinbase_tx_bin_len];
-
-    size_t bin_offset = 0;
-    bin_offset += hex2bin(coinbase_1, coinbase_tx_bin + bin_offset, coinbase_tx_bin_len - bin_offset);
-    bin_offset += hex2bin(extranonce, coinbase_tx_bin + bin_offset, coinbase_tx_bin_len - bin_offset);
-    bin_offset += hex2bin(extranonce_2, coinbase_tx_bin + bin_offset, coinbase_tx_bin_len - bin_offset);
-    bin_offset += hex2bin(coinbase_2, coinbase_tx_bin + bin_offset, coinbase_tx_bin_len - bin_offset);
-
-    double_sha256_bin(coinbase_tx_bin, coinbase_tx_bin_len, dest);
-}
 
 void calculate_coinbase_tx_hash_bin(const uint8_t *prefix, size_t prefix_len,
                                     const uint8_t *extranonce_prefix, size_t ep_len,
@@ -39,17 +23,81 @@ void calculate_coinbase_tx_hash_bin(const uint8_t *prefix, size_t prefix_len,
                                     uint8_t dest[32])
 {
     size_t total_len = prefix_len + ep_len + e2_len + suffix_len;
-    uint8_t *buf = malloc(total_len);
-    if (!buf) return;
+    uint8_t stack_buf[1024];
+    uint8_t *buf = (total_len <= sizeof(stack_buf)) ? stack_buf : malloc(total_len);
+    if (!buf) {
+        ESP_LOGE(TAG, "Failed to allocate memory for coinbase tx (%zu bytes)", total_len);
+        if (dest) memset(dest, 0, 32);
+        return;
+    }
 
     size_t offset = 0;
-    memcpy(buf + offset, prefix, prefix_len);   offset += prefix_len;
-    memcpy(buf + offset, extranonce_prefix, ep_len); offset += ep_len;
-    memcpy(buf + offset, extranonce_2, e2_len); offset += e2_len;
-    memcpy(buf + offset, suffix, suffix_len);
+    if (prefix && prefix_len > 0) {
+        memcpy(buf + offset, prefix, prefix_len);
+        offset += prefix_len;
+    }
+    if (extranonce_prefix && ep_len > 0) {
+        memcpy(buf + offset, extranonce_prefix, ep_len);
+        offset += ep_len;
+    }
+    if (extranonce_2 && e2_len > 0) {
+        memcpy(buf + offset, extranonce_2, e2_len);
+        offset += e2_len;
+    }
+    if (suffix && suffix_len > 0) {
+        memcpy(buf + offset, suffix, suffix_len);
+        offset += suffix_len;
+    }
 
     double_sha256_bin(buf, total_len, dest);
-    free(buf);
+    if (buf != stack_buf) {
+        free(buf);
+    }
+}
+
+void construct_bm_job_from_miner_job(const miner_job_t *job, const uint8_t merkle_root[32], const uint32_t version_mask, const double difficulty, const uint8_t software_midstates, bm_job *new_job)
+{
+    new_job->version = job->version;
+    new_job->target = job->nbits;
+    new_job->ntime = job->ntime;
+    new_job->starting_nonce = 0;
+    new_job->pool_diff = (job->pool_diff > 0) ? job->pool_diff : difficulty;
+    new_job->pool_id = job->pool_id;
+    new_job->job_type = job->type;
+    uint32_t effective_mask = (job->version_mask != 0) ? job->version_mask : version_mask;
+    new_job->version_mask = effective_mask;
+    new_job->num_midstates = 0;
+    reverse_32bit_words(merkle_root, new_job->merkle_root);
+    reverse_32bit_words(job->prev_hash, new_job->prev_block_hash);
+
+    if (software_midstates == 0)
+    {
+        return;
+    }
+
+    // make the midstate hash
+    uint8_t midstate_data[64];
+    memcpy(midstate_data + 4, job->prev_hash, 32);
+    memcpy(midstate_data + 36, merkle_root, 28);
+
+    uint32_t current_ver = new_job->version;
+    uint8_t midstate[32];
+
+    for (int i = 0; i < software_midstates && i < BM_JOB_MAX_MIDSTATES; i++)
+    {
+        if (i > 0)
+        {
+            if (effective_mask == 0)
+            {
+                break;
+            }
+            current_ver = increment_bitmask(current_ver, effective_mask);
+        }
+        memcpy(midstate_data, &current_ver, 4);
+        midstate_sha256_bin(midstate_data, 64, midstate);
+        reverse_32bit_words(midstate, new_job->midstates[i]);
+        new_job->num_midstates++;
+    }
 }
 
 void calculate_merkle_root_hash(const uint8_t coinbase_tx_hash[32], const uint8_t merkle_branches[][32], const int num_merkle_branches, uint8_t dest[32])
@@ -64,77 +112,17 @@ void calculate_merkle_root_hash(const uint8_t coinbase_tx_hash[32], const uint8_
     memcpy(dest, both_merkles, 32);
 }
 
-// take a mining_notify struct with ascii hex strings and convert it to a bm_job struct
-void construct_bm_job(mining_notify *params, const uint8_t merkle_root[32], const uint32_t version_mask, const double difficulty, bm_job *new_job)
-{
-    new_job->version = params->version;
-    new_job->target = params->target;
-    new_job->ntime = params->ntime;
-    new_job->starting_nonce = 0;
-    new_job->pool_diff = difficulty;
-    reverse_32bit_words(merkle_root, new_job->merkle_root);
 
-    uint8_t prev_block_hash[32];
-    hex2bin(params->prev_block_hash, prev_block_hash, 32);
-    reverse_endianness_per_word(prev_block_hash);
-    reverse_32bit_words(prev_block_hash, new_job->prev_block_hash);
-
-    // make the midstate hash
-    uint8_t midstate_data[64];
-
-    // copy 64 bytes header data into midstate (and deal with endianess)
-    memcpy(midstate_data, &new_job->version, 4);      // copy version
-    memcpy(midstate_data + 4, prev_block_hash, 32);   // copy prev_block_hash
-    memcpy(midstate_data + 36, merkle_root, 28);      // copy merkle_root
-
-    uint8_t midstate[32];
-    midstate_sha256_bin(midstate_data, 64, midstate); // make the midstate hash
-    reverse_32bit_words(midstate, new_job->midstate); // reverse the midstate words for the BM job packet
-
-    if (version_mask != 0)
-    {
-        uint32_t rolled_version = increment_bitmask(new_job->version, version_mask);
-        memcpy(midstate_data, &rolled_version, 4);
-        midstate_sha256_bin(midstate_data, 64, midstate);
-        reverse_32bit_words(midstate, new_job->midstate1);
-
-        rolled_version = increment_bitmask(rolled_version, version_mask);
-        memcpy(midstate_data, &rolled_version, 4);
-        midstate_sha256_bin(midstate_data, 64, midstate);
-        reverse_32bit_words(midstate, new_job->midstate2);
-
-        rolled_version = increment_bitmask(rolled_version, version_mask);
-        memcpy(midstate_data, &rolled_version, 4);
-        midstate_sha256_bin(midstate_data, 64, midstate);
-        reverse_32bit_words(midstate, new_job->midstate3);
-        new_job->num_midstates = 4;
-    }
-    else
-    {
-        new_job->num_midstates = 1;
-    }
-}
-
-void extranonce_2_generate(uint64_t extranonce_2, uint32_t length, char dest[static length * 2 + 1])
-{
-    // Allocate buffer to hold the extranonce_2 value in bytes
-    uint8_t extranonce_2_bytes[length];
-    memset(extranonce_2_bytes, 0, length);
-    
-    // Copy the extranonce_2 value into the buffer, handling endianness
-    // Copy up to the size of uint64_t or the requested length, whichever is smaller
-    size_t copy_len = (length < sizeof(uint64_t)) ? length : sizeof(uint64_t);
-    memcpy(extranonce_2_bytes, &extranonce_2, copy_len);
-    
-    // Convert the bytes to hex string
-    bin2hex(extranonce_2_bytes, length, dest, length * 2 + 1);
-}
+#include <math.h>
 
 double hash_to_pdiff(const uint8_t hash[32])
 {
+    if (!hash) return (double)UINT32_MAX;
     double s64 = le256todouble(hash);
-    if (s64 == 0.0) return (double)UINT32_MAX;
-    return truediffone / s64;
+    if (s64 <= 0.0 || isnan(s64) || isinf(s64)) return (double)UINT32_MAX;
+    double diff = truediffone / s64;
+    if (isnan(diff) || isinf(diff) || diff <= 0.0) return (double)UINT32_MAX;
+    return diff;
 }
 
 ///////cgminer nonce testing

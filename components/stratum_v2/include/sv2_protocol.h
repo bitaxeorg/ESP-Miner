@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <stddef.h>
+#include "miner_job.h"
 
 // Frame header size (extension_type[2] + msg_type[1] + msg_length[3])
 #define SV2_FRAME_HEADER_SIZE 6
@@ -30,6 +31,10 @@
 
 #define SV2_MAX_MERKLE_BRANCHES 20
 
+// Submit shares frame sizing (6-byte header + 24-byte payload + optional 1-byte len + 32-byte extranonce)
+#define SV2_SUBMIT_SHARES_PAYLOAD_SIZE 24
+#define SV2_SUBMIT_SHARES_MAX_FRAME_SIZE (SV2_FRAME_HEADER_SIZE + SV2_SUBMIT_SHARES_PAYLOAD_SIZE + 1 + 32)
+
 // Extension type flag for channel messages
 #define SV2_CHANNEL_MSG_FLAG 0x8000
 
@@ -40,8 +45,8 @@ typedef enum {
     SV2_CHANNEL_EXTENDED = 2,
 } sv2_channel_type_t;
 
-#define SV2_CHANNEL_TYPE_STANDARD "standard"
-#define SV2_CHANNEL_TYPE_EXTENDED "extended"
+sv2_channel_type_t sv2_channel_type_from_string(const char *s);
+const char *sv2_channel_type_to_string(sv2_channel_type_t t);
 
 // Frame header (parsed)
 typedef struct {
@@ -50,56 +55,27 @@ typedef struct {
     uint32_t msg_length; // 24-bit value stored in 32-bit
 } sv2_frame_header_t;
 
-// Complete SV2 job (NewMiningJob + SetNewPrevHash combined)
-typedef struct {
-    uint32_t job_id;
-    uint32_t version;
-    uint8_t merkle_root[32]; // Internal byte order (as received from SV2)
-    uint8_t prev_hash[32];   // Internal byte order (as received from SV2)
-    uint32_t ntime;
-    uint32_t nbits;
-    bool clean_jobs;
-} sv2_job_t;
-
-// Pending future job (waiting for SetNewPrevHash)
-typedef struct {
-    uint32_t job_id;
-    uint32_t version;
-    uint8_t merkle_root[32];
-    bool valid;
-} sv2_pending_job_t;
-
-// Extended mining job (heap-allocated, owns coinbase pointers)
-typedef struct {
-    uint32_t job_id;
-    uint32_t version;
-    bool     version_rolling_allowed;
-    uint8_t  prev_hash[32];
-    uint32_t ntime;
-    uint32_t nbits;
-    bool     clean_jobs;
-    uint8_t  merkle_path[SV2_MAX_MERKLE_BRANCHES][32];
-    uint8_t  merkle_path_count;
-    uint8_t *coinbase_prefix;     // heap
-    uint16_t coinbase_prefix_len;
-    uint8_t *coinbase_suffix;     // heap
-    uint16_t coinbase_suffix_len;
-} sv2_ext_job_t;
-
 #define SV2_PENDING_JOBS_SIZE 8
+_Static_assert(SV2_PENDING_JOBS_SIZE <= 16, "SV2_PENDING_JOBS_SIZE must fit in uint16_t bitmask");
 
 #define SV2_MAX_ACTIVE_JOB_IDS 16
 
+struct sv2_noise_ctx;
+
 // SV2 connection state
 typedef struct sv2_conn {
+    struct sv2_noise_ctx *noise_ctx;
     uint32_t channel_id;
+    uint32_t version_mask;
     uint32_t sequence_number;       // also the count of shares submitted
     uint32_t resolved_shares;       // shares the pool has accepted or rejected
     uint8_t target[32]; // U256 LE target
+    uint8_t pool_idx;
     bool channel_opened;
 
-    // Pending future jobs ring buffer (standard channels)
-    sv2_pending_job_t pending_jobs[SV2_PENDING_JOBS_SIZE];
+    // Pending future candidate jobs ring buffer (both standard and extended channels)
+    miner_job_t pending_jobs[SV2_PENDING_JOBS_SIZE];
+    uint16_t    pending_jobs_valid; // bitmask of valid slots
 
     // Latest prev_hash state
     uint8_t prev_hash[32];
@@ -112,7 +88,6 @@ typedef struct sv2_conn {
     uint8_t  extranonce_prefix[32];
     uint8_t  extranonce_prefix_len;
     uint8_t  extranonce_size;              // total extranonce bytes assigned by pool
-    sv2_ext_job_t *ext_pending_jobs[SV2_PENDING_JOBS_SIZE];
 
     // Active job IDs tracking for duplicate detection
     uint32_t active_job_ids[SV2_MAX_ACTIVE_JOB_IDS];
@@ -140,10 +115,11 @@ int sv2_build_open_standard_mining_channel(uint8_t *buf, size_t buf_len,
                                            const char *user_identity,
                                            float nominal_hash_rate);
 
-int sv2_build_submit_shares_standard(uint8_t *buf, size_t buf_len,
-                                     uint32_t channel_id, uint32_t sequence_number,
-                                     uint32_t job_id, uint32_t nonce,
-                                     uint32_t ntime, uint32_t version);
+int sv2_build_submit_shares(uint8_t *buf, size_t buf_len,
+                            uint32_t channel_id, uint32_t sequence_number,
+                            uint32_t job_id, uint32_t nonce, uint32_t ntime,
+                            uint32_t version, const uint8_t *extranonce,
+                            uint8_t extranonce_len);
 
 // --- Message parsers (return 0 on success, -1 on error) ---
 
@@ -184,12 +160,6 @@ int sv2_build_open_extended_mining_channel(uint8_t *buf, size_t buf_len,
                                            uint32_t request_id, const char *user_identity,
                                            float nominal_hash_rate, uint16_t min_extranonce_size);
 
-int sv2_build_submit_shares_extended(uint8_t *buf, size_t buf_len,
-                                     uint32_t channel_id, uint32_t sequence_number,
-                                     uint32_t job_id, uint32_t nonce, uint32_t ntime,
-                                     uint32_t version, const uint8_t *extranonce,
-                                     uint8_t extranonce_len);
-
 int sv2_parse_open_extended_channel_success(const uint8_t *payload, uint32_t len,
                                             uint32_t *request_id, uint32_t *channel_id,
                                             uint8_t target[32], uint16_t *extranonce_size,
@@ -197,9 +167,8 @@ int sv2_parse_open_extended_channel_success(const uint8_t *payload, uint32_t len
                                             uint8_t *extranonce_prefix_len,
                                             uint32_t *group_channel_id);
 
-sv2_ext_job_t *sv2_parse_new_extended_mining_job(const uint8_t *payload, uint32_t len,
-                                                  uint32_t *channel_id_out);
-
-void sv2_ext_job_free(sv2_ext_job_t *job);
+int sv2_parse_new_extended_mining_job(const uint8_t *payload, uint32_t len,
+                                      uint32_t *channel_id_out, miner_job_t *job_out,
+                                      bool *has_min_ntime_out);
 
 #endif /* SV2_PROTOCOL_H */

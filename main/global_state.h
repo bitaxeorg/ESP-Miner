@@ -18,11 +18,6 @@
 #include "system.h"
 
 typedef struct bm_job bm_job;
-typedef struct sv2_conn sv2_conn;
-typedef struct sv2_noise_ctx sv2_noise_ctx;
-
-#define STRATUM_USER CONFIG_STRATUM_USER
-#define FALLBACK_STRATUM_USER CONFIG_FALLBACK_STRATUM_USER
 
 typedef struct PoolConfig
 {
@@ -41,7 +36,6 @@ typedef struct PoolConfig
     bool sv2_require_auth;
 } PoolConfig;
 
-#define HISTORY_LENGTH 100
 #define DIFF_STRING_SIZE 10
 #define MAX_BLOCK_SIGNALS 8
 #define MAX_BLOCK_SIGNAL_LEN 16
@@ -100,6 +94,7 @@ typedef struct SystemModule
     uint16_t response_share_batch;
     float process_time;
     float cpu_usage;
+    double pool_difficulty;
     char pool_connection_info[64];
     bool overheat_mode;
     bool mining_paused;
@@ -149,10 +144,8 @@ typedef struct AsicTaskModule
     // it also may return a previous nonce under some circumstances
     // so we keep a list of jobs indexed by the job id
     bm_job **active_jobs;
-    // Current job to be processed (replaces ASIC_jobs_queue)
-    bm_job *current_job;
-    //semaphone
-    SemaphoreHandle_t semaphore;
+    uint8_t *valid_jobs;
+    pthread_mutex_t valid_jobs_lock;
 } AsicTaskModule;
 
 typedef struct GlobalState
@@ -167,28 +160,8 @@ typedef struct GlobalState
     SelfTestModule SELF_TEST_MODULE;
     HashrateMonitorModule HASHRATE_MONITOR_MODULE;
 
-    char * extranonce_str;
-    int extranonce_2_len;
-
-    uint8_t * valid_jobs;
-    pthread_mutex_t valid_jobs_lock;
-
-    double pool_difficulty;
-    bool new_set_mining_difficulty_msg;
-    uint32_t version_mask;
-    bool new_stratum_version_rolling_msg;
-    bool reset_extranonce2;
-
     esp_transport_handle_t transport;
     portMUX_TYPE stratum_mux;
-    
-    // A message ID that must be unique per request that expects a response.
-    // For requests not expecting a response (called notifications), this is null.
-    int send_uid;
-
-    stratum_protocol_t stratum_protocol;
-    struct sv2_conn *sv2_conn;
-    struct sv2_noise_ctx *sv2_noise_ctx;
 
     bool ASIC_initalized;
     bool psram_is_available;

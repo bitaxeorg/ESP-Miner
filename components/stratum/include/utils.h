@@ -37,6 +37,6 @@ void url_decode(char *dst, const char *src);
 
 char *strdup_psram(const char *str);
 
-#define STRATUM_DEFAULT_VERSION_MASK 0x1fffe000
+#define BIP320_VERSION_ROLLING_MASK 0x1fffe000U
 
 #endif // STRATUM_UTILS_H

@@ -5,8 +5,7 @@
 #include <stddef.h>
 #include <stdbool.h>
 #include "esp_err.h"
-
-typedef struct mining_notify mining_notify;
+#include "miner_job.h"
 
 #define MAX_ADDRESS_STRING_LEN 128
 #define MAX_COINBASE_TX_OUTPUTS 6
@@ -27,10 +26,11 @@ typedef struct mining_notify mining_notify;
  * @brief Decode Bitcoin varint from binary data
  * 
  * @param data Binary data containing the varint
+ * @param data_len Total length of data buffer
  * @param offset Pointer to current offset, will be updated after reading
  * @return Decoded varint value
  */
-uint64_t coinbase_decode_varint(const uint8_t *data, int *offset);
+uint64_t coinbase_decode_varint(const uint8_t *data, size_t data_len, int *offset);
 
 /**
  * @brief Decode Bitcoin address from scriptPubKey
@@ -62,7 +62,6 @@ typedef struct {
  * @brief Result structure for full mining notification processing
  */
 typedef struct {
-    double network_difficulty;
     uint32_t block_height;
     char *scriptsig; // Allocated, must be freed by caller
     coinbase_output_t outputs[MAX_COINBASE_TX_OUTPUTS];
@@ -75,21 +74,17 @@ typedef struct {
 } mining_notification_result_t;
 
 /**
- * @brief Process a mining notification to extract all relevant data
+ * @brief Process a miner job (V1 or V2) to extract coinbase and block data
  * 
- * @param notification Pointer to the mining notification
- * @param extranonce1 Hex string of extranonce1
- * @param extranonce2_len Length of extranonce2 in bytes
+ * @param job Pointer to the polymorphic miner_job_t
  * @param user_address Payout address of the user
  * @param decode_coinbase_tx Enable coinbase tx decoding
  * @param result Pointer to store the results
  * @return esp_err_t
  */
-esp_err_t coinbase_process_notification(const mining_notify *notification,
-                                 const char *extranonce1,
-                                 int extranonce2_len,
-                                 const char *user_address,
-                                 bool decode_coinbase_tx,
-                                 mining_notification_result_t *result);
+esp_err_t coinbase_process_miner_job(const miner_job_t *job,
+                                     const char *user_address,
+                                     bool decode_coinbase_tx,
+                                     mining_notification_result_t *result);
 
 #endif // COINBASE_DECODER_H

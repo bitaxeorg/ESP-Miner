@@ -1,5 +1,6 @@
 #include "unity.h"
 #include "utils.h"
+#include "mining.h"
 #include <string.h>
 
 TEST_CASE("Test double_sha256_bin", "[utils]")
@@ -80,4 +81,21 @@ TEST_CASE("networkDifficulty", "[utils]")
     double expected = 155973032196071.9;
 
     TEST_ASSERT_EQUAL_DOUBLE(expected, actual);
+}
+
+TEST_CASE("hash_to_pdiff safety", "[mining]")
+{
+    // 1. NULL pointer
+    TEST_ASSERT_EQUAL_DOUBLE((double)UINT32_MAX, hash_to_pdiff(NULL));
+
+    // 2. All zero target (division by zero guard)
+    uint8_t zero_target[32] = {0};
+    TEST_ASSERT_EQUAL_DOUBLE((double)UINT32_MAX, hash_to_pdiff(zero_target));
+
+    // 3. Max difficulty 1 target (0x00000000ffff0000...00)
+    uint8_t diff1_target[32] = {0};
+    diff1_target[26] = 0xff;
+    diff1_target[27] = 0xff;
+    double d1 = hash_to_pdiff(diff1_target);
+    TEST_ASSERT_TRUE(d1 >= 0.99 && d1 <= 1.01);
 }
