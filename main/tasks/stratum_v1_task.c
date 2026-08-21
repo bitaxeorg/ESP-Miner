@@ -396,7 +396,6 @@ void stratum_v1_task(void *pvParameters)
                             ESP_LOGW(TAG, "Ignoring duplicate notify for job %s", notify ? notify->job_id : "unknown");
                         } else {
                             GLOBAL_STATE->SYSTEM_MODULE.work_received++;
-                            SYSTEM_notify_new_ntime(GLOBAL_STATE, stratum_api_v1_message.mining_notification->ntime);
                             if (stratum_api_v1_message.mining_notification->clean_jobs &&
                                 (GLOBAL_STATE->stratum_queue.count > 0)) {
                                 SYSTEM_clean_jobs_queue(GLOBAL_STATE);

@@ -32,7 +32,6 @@ void SYSTEM_clean_jobs_queue(GlobalState * GLOBAL_STATE);
 void SYSTEM_notify_accepted_share(GlobalState * GLOBAL_STATE);
 void SYSTEM_notify_rejected_share(GlobalState * GLOBAL_STATE, char * error_msg);
 void SYSTEM_notify_found_nonce(GlobalState * GLOBAL_STATE, double diff, uint32_t target);
-void SYSTEM_notify_new_ntime(GlobalState * GLOBAL_STATE, uint32_t ntime);
 
 void SYSTEM_noinit_update(SystemModule * SYSTEM_MODULE);
 uint64_t SYSTEM_noinit_get_total_uptime_seconds();
