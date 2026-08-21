@@ -60,7 +60,13 @@ static Settings settings[NVS_CONFIG_COUNT] = {
     [NVS_CONFIG_SECONDARY_POOL_INDEX]                  = {.nvs_key_name = "sec_idx",         .type = TYPE_U16,   .default_value = {.u16 = 1},                                           .rest_name = "secondaryPoolIndex",                 .min = 0,  .max = MAX_POOLS - 1},
     [NVS_CONFIG_USE_FALLBACK_STRATUM]                  = {.nvs_key_name = "usefbstartum",    .type = TYPE_BOOL,                                                                         .rest_name = "useFallbackStratum",                 .min = 0,  .max = 1},
 
-    [NVS_CONFIG_ASIC_FREQUENCY]                        = {.nvs_key_name = "asicfrequency_f", .type = TYPE_FLOAT, .default_value = {.f   = CONFIG_ASIC_FREQUENCY},                       .rest_name = "frequency",                          .min = 1,  .max = UINT16_MAX},
+    // Clamp frequency to 100-1200 MHz. The PLL solver (components/asic/pll.c)
+    // searches feedback dividers 144-235 and silently returns zeros when no
+    // solution exists; those zeros are written to the ASIC registers
+    // unchecked. The ceiling keeps intentional overclocking (AxeOS ?oc mode)
+    // working while rejecting values no BM13xx PLL can express. Note the BAP
+    // UART/display path enforces its own tighter 100-800 MHz bound.
+    [NVS_CONFIG_ASIC_FREQUENCY]                        = {.nvs_key_name = "asicfrequency_f", .type = TYPE_FLOAT, .default_value = {.f   = CONFIG_ASIC_FREQUENCY},                       .rest_name = "frequency",                          .min = 100,  .max = 1200},
     [NVS_CONFIG_ASIC_VOLTAGE]                          = {.nvs_key_name = "asicvoltage",     .type = TYPE_U16,   .default_value = {.u16 = CONFIG_ASIC_VOLTAGE},                         .rest_name = "coreVoltage",                        .min = 1,  .max = UINT16_MAX},
     [NVS_CONFIG_OVERCLOCK_ENABLED]                     = {.nvs_key_name = "oc_enabled",      .type = TYPE_BOOL,                                                                         .rest_name = "overclockEnabled",                   .min = 0,  .max = 1},
     
