@@ -45,6 +45,7 @@
 #include "log_buffer.h"
 #include "cjson_utils.h"
 #include "utils.h"
+#include "http_rx.h"
 
 static const char * TAG = "http_server";
 static const char * CORS_TAG = "CORS";
@@ -73,6 +74,11 @@ static int system_info_prebuffer_len = 256;
 static int system_statistics_prebuffer_len = 256;
 static int system_wifi_scan_prebuffer_len = 256;
 static int api_common_prebuffer_len = 256;
+
+#define HTTP_BODY_READ_TIMEOUT_US (15LL * 1000LL * 1000LL)
+#define HTTP_UPLOAD_STALL_TIMEOUT_US (20LL * 1000LL * 1000LL)
+#define HTTP_UPLOAD_TOTAL_TIMEOUT_US (10LL * 60LL * 1000LL * 1000LL)
+#define STATISTICS_QUERY_MAX_LENGTH 512U
 
 typedef enum
 {
@@ -166,6 +172,86 @@ esp_err_t HTTP_send_json(httpd_req_t * req, const cJSON * item, int * prebuffer_
         return res;
     }
     return ESP_ERR_NO_MEM;
+}
+
+esp_err_t HTTP_receive_request_body(httpd_req_t *req, char *buffer,
+                                    size_t buffer_size)
+{
+    if (req == NULL || buffer == NULL) {
+        if (req != NULL) {
+            httpd_resp_send_500(req);
+        }
+        return ESP_FAIL;
+    }
+
+    switch (http_rx_body_size_result(req->content_len, buffer_size)) {
+        case HTTP_RX_BODY_SIZE_INVALID:
+            httpd_resp_send_500(req);
+            return ESP_FAIL;
+        case HTTP_RX_BODY_SIZE_EMPTY:
+            httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST,
+                                "Empty request body");
+            return ESP_FAIL;
+        case HTTP_RX_BODY_SIZE_TOO_LARGE:
+            httpd_resp_send_err(req, HTTPD_413_CONTENT_TOO_LARGE,
+                                "Request body is too large");
+            return ESP_FAIL;
+        case HTTP_RX_BODY_SIZE_OK:
+            break;
+    }
+
+    size_t received_total = 0;
+    int64_t deadline = esp_timer_get_time() + HTTP_BODY_READ_TIMEOUT_US;
+    while (received_total < req->content_len) {
+        int received = httpd_req_recv(req, buffer + received_total,
+                                      req->content_len - received_total);
+        http_rx_body_read_result_t result = http_rx_body_read_update(
+            req->content_len, &received_total, received,
+            HTTPD_SOCK_ERR_TIMEOUT, esp_timer_get_time(), deadline);
+        if (result == HTTP_RX_BODY_READ_COMPLETE) {
+            break;
+        }
+        if (result == HTTP_RX_BODY_READ_CONTINUE) {
+            continue;
+        }
+        if (result == HTTP_RX_BODY_READ_TIMEOUT) {
+            httpd_resp_send_err(req, HTTPD_408_REQ_TIMEOUT,
+                                "Request body timed out");
+        } else {
+            httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST,
+                                "Incomplete request body");
+        }
+        return ESP_FAIL;
+    }
+
+    buffer[received_total] = '\0';
+    return ESP_OK;
+}
+
+static int HTTP_receive_upload_chunk(httpd_req_t *req, char *buffer,
+                                     size_t buffer_size, size_t remaining,
+                                     int64_t started_at,
+                                     int64_t *last_progress_at)
+{
+    while (true) {
+        int64_t now = esp_timer_get_time();
+        if (http_rx_upload_deadline_expired(
+                now, started_at, *last_progress_at,
+                HTTP_UPLOAD_TOTAL_TIMEOUT_US, HTTP_UPLOAD_STALL_TIMEOUT_US)) {
+            return HTTPD_SOCK_ERR_TIMEOUT;
+        }
+
+        int received = httpd_req_recv(req, buffer,
+                                      MIN(remaining, buffer_size));
+        if (received > 0) {
+            *last_progress_at = esp_timer_get_time();
+            return received;
+        }
+
+        if (received != HTTPD_SOCK_ERR_TIMEOUT) {
+            return received;
+        }
+    }
 }
 
 /* Handler for WiFi scan endpoint */
@@ -1045,27 +1131,12 @@ static esp_err_t PATCH_update_settings(httpd_req_t * req)
         return ESP_OK;
     }
 
-    int total_len = req->content_len;
-    int cur_len = 0;
-    char * buf = ((rest_server_context_t *) (req->user_ctx))->scratch;
-    int received = 0;
-    if (total_len >= SCRATCH_BUFSIZE) {
-        /* Respond with 500 Internal Server Error */
-        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "content too long");
-        return ESP_OK;
+    char *buf = ((rest_server_context_t *)(req->user_ctx))->scratch;
+    if (HTTP_receive_request_body(req, buf, SCRATCH_BUFSIZE) != ESP_OK) {
+        return ESP_FAIL;
     }
-    while (cur_len < total_len) {
-        received = httpd_req_recv(req, buf + cur_len, total_len);
-        if (received <= 0) {
-            /* Respond with 500 Internal Server Error */
-            httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to post control value");
-            return ESP_OK;
-        }
-        cur_len += received;
-    }
-    buf[total_len] = '\0';
 
-    cJSON * root = cJSON_Parse(buf);
+    cJSON * root = cJSON_ParseWithOpts(buf, NULL, true);
     if (root == NULL) {
         httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid JSON");
         return ESP_OK;
@@ -1248,19 +1319,12 @@ static esp_err_t PUT_system_pool(httpd_req_t *req)
         return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid pool index");
     }
 
-    int total_len = req->content_len;
-    if (total_len <= 0 || total_len >= SCRATCH_BUFSIZE) {
-        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid request length");
-    }
-
     char *buf = ((rest_server_context_t *)(req->user_ctx))->scratch;
-    int received = httpd_req_recv(req, buf, total_len);
-    if (received <= 0) {
-        return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to receive request data");
+    if (HTTP_receive_request_body(req, buf, SCRATCH_BUFSIZE) != ESP_OK) {
+        return ESP_FAIL;
     }
-    buf[received] = '\0';
 
-    cJSON *root = cJSON_Parse(buf);
+    cJSON *root = cJSON_ParseWithOpts(buf, NULL, true);
     if (!root) {
         return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid JSON");
     }
@@ -1430,25 +1494,12 @@ static esp_err_t POST_system_boot(httpd_req_t *req)
         return ESP_OK;
     }
 
-    size_t total_len = req->content_len;
-    if (total_len == 0) {
-        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Empty request body");
+    char buf[256];
+    if (HTTP_receive_request_body(req, buf, sizeof(buf)) != ESP_OK) {
+        return ESP_FAIL;
     }
 
-    char *buf = malloc(total_len + 1);
-    if (!buf) {
-        return httpd_resp_send_500(req);
-    }
-
-    int ret = httpd_req_recv(req, buf, total_len);
-    if (ret <= 0) {
-        free(buf);
-        return httpd_resp_send_500(req);
-    }
-    buf[ret] = '\0';
-
-    cJSON *root = cJSON_Parse(buf);
-    free(buf);
+    cJSON *root = cJSON_ParseWithOpts(buf, NULL, true);
     if (!root) {
         return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid JSON");
     }
@@ -1510,23 +1561,29 @@ static esp_err_t GET_system_statistics(httpd_req_t * req)
         return ESP_OK;
     }
 
-    size_t bufLen = httpd_req_get_url_query_len(req) + 1;
     bool dataSelection[SRC_NONE] = {false};
     bool selectionCheck = false;
+    size_t query_len = httpd_req_get_url_query_len(req);
+
+    if (query_len > STATISTICS_QUERY_MAX_LENGTH) {
+        return httpd_resp_send_err(req, HTTPD_414_URI_TOO_LONG,
+                                   "Statistics query is too long");
+    }
 
     // Check query parameters
-    if (1 < bufLen) {
-        char buf[bufLen];
-        if (httpd_req_get_url_query_str(req, buf, bufLen) == ESP_OK) {
-            char columns_enc[bufLen];
-            if (httpd_query_key_value(buf, "columns", columns_enc, bufLen) == ESP_OK) {
-                char columns[bufLen];
+    if (query_len > 0) {
+        char query[STATISTICS_QUERY_MAX_LENGTH + 1];
+        char columns_enc[STATISTICS_QUERY_MAX_LENGTH + 1];
+        char columns[STATISTICS_QUERY_MAX_LENGTH + 1];
+        if (httpd_req_get_url_query_str(req, query, sizeof(query)) == ESP_OK) {
+            if (httpd_query_key_value(query, "columns", columns_enc,
+                                      sizeof(columns_enc)) == ESP_OK) {
                 url_decode(columns, columns_enc);
-                char * param = strtok(columns, ",");
-                while (NULL != param) {
-                    DataSource sourceParam = strToDataSource(param);
-                    if (SRC_NONE != sourceParam) {
-                        dataSelection[sourceParam] = true;
+                char *param = strtok(columns, ",");
+                while (param != NULL) {
+                    DataSource source = strToDataSource(param);
+                    if (source != SRC_NONE) {
+                        dataSelection[source] = true;
                         selectionCheck = true;
                     }
                     param = strtok(NULL, ",");
@@ -1666,66 +1723,88 @@ esp_err_t POST_WWW_update(httpd_req_t * req)
     if (mode == WIFI_MODE_AP || mode == WIFI_MODE_APSTA)
     {
         HTTP_send_json_error(req, "500 Internal Server Error", "Not allowed in AP mode");
-        return ESP_OK;
+        return ESP_FAIL;
+    }
+
+    const esp_partition_t * www_partition =
+        esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_SPIFFS, "www");
+    if (www_partition == NULL) {
+        HTTP_send_json_error(req, "500 Internal Server Error", "WWW partition not found");
+        return ESP_FAIL;
+    }
+
+    if (req->content_len == 0) {
+        HTTP_send_json_error(req, "400 Bad Request", "Empty upload");
+        return ESP_FAIL;
+    }
+
+    // Don't attempt to write more than what can be stored in the partition
+    if (req->content_len > www_partition->size) {
+        HTTP_send_json_error(req, "413 Payload Too Large",
+                             "File provided is too large for device");
+        return ESP_FAIL;
     }
 
     GLOBAL_STATE->SYSTEM_MODULE.is_firmware_update = true;
     snprintf(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_filename, 20, "www.bin");
     snprintf(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_status, 20, "Starting...");
 
-    char buf[1000];
-    int remaining = req->content_len;
-
-    const esp_partition_t * www_partition =
-        esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_SPIFFS, "www");
-    if (www_partition == NULL) {
-        HTTP_send_json_error(req, "500 Internal Server Error", "WWW partition not found");
-        return ESP_OK;
-    }
-
-    // Don't attempt to write more than what can be stored in the partition
-    if (remaining > www_partition->size) {
-        HTTP_send_json_error(req, "400 Bad Request", "File provided is too large for device");
-        return ESP_OK;
-    }
-
     // Erase the entire www partition before writing, in chunks to prevent WDT timeout
     size_t erase_size = 65536; // 64KB chunks
     for (size_t offset = 0; offset < www_partition->size; offset += erase_size) {
         size_t size_to_erase = MIN(erase_size, www_partition->size - offset);
-        ESP_ERROR_CHECK(esp_partition_erase_range(www_partition, offset, size_to_erase));
+        if (esp_partition_erase_range(www_partition, offset, size_to_erase) != ESP_OK) {
+            snprintf(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_status, 20, "Erase Error");
+            GLOBAL_STATE->SYSTEM_MODULE.is_firmware_update = false;
+            HTTP_send_json_error(req, "500 Internal Server Error", "Erase Error");
+            return ESP_FAIL;
+        }
         vTaskDelay(10 / portTICK_PERIOD_MS);
     }
 
+    char buf[1000];
+    size_t remaining = req->content_len;
+    size_t written = 0;
     int chunks = 0;
+    int64_t started_at = esp_timer_get_time();
+    int64_t last_progress_at = started_at;
     while (remaining > 0) {
-        int recv_len = httpd_req_recv(req, buf, MIN(remaining, sizeof(buf)));
+        int recv_len = HTTP_receive_upload_chunk(req, buf, sizeof(buf), remaining,
+                                                 started_at, &last_progress_at);
 
         if (recv_len == HTTPD_SOCK_ERR_TIMEOUT) {
-            continue;
+            snprintf(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_status, 20, "Receive Timeout");
+            GLOBAL_STATE->SYSTEM_MODULE.is_firmware_update = false;
+            HTTP_send_json_error(req, "408 Request Timeout", "Upload timed out");
+            return ESP_FAIL;
         } else if (recv_len <= 0) {
             snprintf(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_status, 20, "Protocol Error");
-            HTTP_send_json_error(req, "500 Internal Server Error", "Protocol Error");
+            GLOBAL_STATE->SYSTEM_MODULE.is_firmware_update = false;
+            HTTP_send_json_error(req, "400 Bad Request", "Incomplete upload");
             return ESP_FAIL;
         }
 
-        if (esp_partition_write(www_partition, www_partition->size - remaining, (const void *) buf, recv_len) != ESP_OK) {
+        if (esp_partition_write(www_partition, written, (const void *)buf,
+                                (size_t)recv_len) != ESP_OK) {
             snprintf(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_status, 20, "Write Error");
+            GLOBAL_STATE->SYSTEM_MODULE.is_firmware_update = false;
             HTTP_send_json_error(req, "500 Internal Server Error", "Write Error");
             return ESP_FAIL;
         }
 
-
-        uint8_t percentage = 100 - ((remaining * 100 / req->content_len));
-        snprintf(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_status, 20, "Working (%d%%)", percentage);
-
-        remaining -= recv_len;
+        remaining -= (size_t)recv_len;
+        written += (size_t)recv_len;
+        unsigned int percentage =
+            (unsigned int)(((uint64_t)written * 100U) / req->content_len);
+        snprintf(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_status, 20,
+                 "Working (%u%%)", percentage);
 
         chunks++;
         if (chunks % 16 == 0) {
             vTaskDelay(10 / portTICK_PERIOD_MS);
         }
     }
+
     httpd_resp_set_type(req, "text/plain");
     httpd_resp_sendstr(req, "WWW update complete, rebooting now!\n");
     nvs_config_set_bool(NVS_CONFIG_USE_CUSTOM_WWW, true);
@@ -1752,48 +1831,77 @@ esp_err_t POST_OTA_update(httpd_req_t * req)
     if (mode == WIFI_MODE_AP || mode == WIFI_MODE_APSTA)
     {
         HTTP_send_json_error(req, "500 Internal Server Error", "Not allowed in AP mode");
-        return ESP_OK;
+        return ESP_FAIL;
     }
-    
+
+    const esp_partition_t *ota_partition = esp_ota_get_next_update_partition(NULL);
+    if (ota_partition == NULL) {
+        HTTP_send_json_error(req, "500 Internal Server Error",
+                             "OTA partition not found");
+        return ESP_FAIL;
+    }
+
+    if (req->content_len == 0) {
+        HTTP_send_json_error(req, "400 Bad Request", "Empty upload");
+        return ESP_FAIL;
+    }
+
+    if (req->content_len > ota_partition->size) {
+        HTTP_send_json_error(req, "413 Payload Too Large",
+                             "Firmware image is too large for device");
+        return ESP_FAIL;
+    }
+
     GLOBAL_STATE->SYSTEM_MODULE.is_firmware_update = true;
     snprintf(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_filename, 20, "esp-miner.bin");
     snprintf(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_status, 20, "Starting...");
 
     char buf[1000];
     esp_ota_handle_t ota_handle;
-    int remaining = req->content_len;
-
-    const esp_partition_t * ota_partition = esp_ota_get_next_update_partition(NULL);
-    ESP_ERROR_CHECK(esp_ota_begin(ota_partition, OTA_SIZE_UNKNOWN, &ota_handle));
+    size_t remaining = req->content_len;
+    esp_err_t begin_err = esp_ota_begin(ota_partition, req->content_len, &ota_handle);
+    if (begin_err != ESP_OK) {
+        snprintf(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_status, 20, "Begin Error");
+        GLOBAL_STATE->SYSTEM_MODULE.is_firmware_update = false;
+        HTTP_send_json_error(req, "500 Internal Server Error", "OTA initialization failed");
+        return ESP_FAIL;
+    }
 
     int chunks = 0;
+    int64_t started_at = esp_timer_get_time();
+    int64_t last_progress_at = started_at;
     while (remaining > 0) {
-        int recv_len = httpd_req_recv(req, buf, MIN(remaining, sizeof(buf)));
+        int recv_len = HTTP_receive_upload_chunk(req, buf, sizeof(buf), remaining,
+                                                 started_at, &last_progress_at);
 
-        // Timeout Error: Just retry
         if (recv_len == HTTPD_SOCK_ERR_TIMEOUT) {
-            continue;
-
-            // Serious Error: Abort OTA
+            esp_ota_abort(ota_handle);
+            snprintf(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_status, 20, "Receive Timeout");
+            GLOBAL_STATE->SYSTEM_MODULE.is_firmware_update = false;
+            HTTP_send_json_error(req, "408 Request Timeout", "Upload timed out");
+            return ESP_FAIL;
         } else if (recv_len <= 0) {
+            esp_ota_abort(ota_handle);
             snprintf(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_status, 20, "Protocol Error");
-            HTTP_send_json_error(req, "500 Internal Server Error", "Protocol Error");
+            GLOBAL_STATE->SYSTEM_MODULE.is_firmware_update = false;
+            HTTP_send_json_error(req, "400 Bad Request", "Incomplete upload");
             return ESP_FAIL;
         }
 
-        // Successful Upload: Flash firmware chunk
-        if (esp_ota_write(ota_handle, (const void *) buf, recv_len) != ESP_OK) {
+        if (esp_ota_write(ota_handle, (const void *)buf, (size_t)recv_len) != ESP_OK) {
             esp_ota_abort(ota_handle);
             snprintf(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_status, 20, "Write Error");
+            GLOBAL_STATE->SYSTEM_MODULE.is_firmware_update = false;
             HTTP_send_json_error(req, "500 Internal Server Error", "Write Error");
             return ESP_FAIL;
         }
 
-        uint8_t percentage = 100 - ((remaining * 100 / req->content_len));
-
-        snprintf(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_status, 20, "Working (%d%%)", percentage);
-
-        remaining -= recv_len;
+        remaining -= (size_t)recv_len;
+        size_t written = req->content_len - remaining;
+        unsigned int percentage =
+            (unsigned int)(((uint64_t)written * 100U) / req->content_len);
+        snprintf(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_status, 20,
+                 "Working (%u%%)", percentage);
 
         chunks++;
         if (chunks % 16 == 0) {
@@ -1802,9 +1910,17 @@ esp_err_t POST_OTA_update(httpd_req_t * req)
     }
 
     // Validate and switch to new OTA image and reboot
-    if (esp_ota_end(ota_handle) != ESP_OK || esp_ota_set_boot_partition(ota_partition) != ESP_OK) {
+    if (esp_ota_end(ota_handle) != ESP_OK) {
         snprintf(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_status, 20, "Validation Error");
-        HTTP_send_json_error(req, "500 Internal Server Error", "Validation / Activation Error");
+        GLOBAL_STATE->SYSTEM_MODULE.is_firmware_update = false;
+        HTTP_send_json_error(req, "500 Internal Server Error", "Validation Error");
+        return ESP_OK;
+    }
+
+    if (esp_ota_set_boot_partition(ota_partition) != ESP_OK) {
+        snprintf(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_status, 20, "Activation Error");
+        GLOBAL_STATE->SYSTEM_MODULE.is_firmware_update = false;
+        HTTP_send_json_error(req, "500 Internal Server Error", "Activation Error");
         return ESP_OK;
     }
 
