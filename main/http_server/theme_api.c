@@ -47,12 +47,15 @@ static esp_err_t theme_post_handler(httpd_req_t *req)
 
     // Read POST data
     char content[1024];
-    int ret = httpd_req_recv(req, content, sizeof(content) - 1);
-    if (ret <= 0) {
+    esp_err_t receive_result = HTTP_receive_body(req, content, sizeof(content));
+    if (receive_result == ESP_ERR_INVALID_SIZE) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid request length");
+        return ESP_FAIL;
+    }
+    if (receive_result != ESP_OK) {
         httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to read request");
         return ESP_FAIL;
     }
-    content[ret] = '\0';
 
     cJSON *root = cJSON_Parse(content);
     if (!root) {

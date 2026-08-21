@@ -12,6 +12,7 @@
 #include "log_buffer.h"
 
 #define WS_LOG_SCRATCH_SIZE 2048
+#define WS_RX_MAX_PAYLOAD_SIZE 1024
 
 static const char * TAG = "websocket";
 
@@ -221,15 +222,18 @@ esp_err_t websocket_handler(httpd_req_t *req)
         return ret;
     }
 
-    // If there's a payload, drain it
+    // Inbound application data is ignored, but it must be drained to keep the
+    // WebSocket stream synchronized. Never allocate based on a peer-provided
+    // frame length.
     if (ws_pkt.len > 0) {
-        uint8_t *buf = (uint8_t *)calloc(1, ws_pkt.len + 1);
-        if (buf) {
-            ws_pkt.payload = buf;
-            ret = httpd_ws_recv_frame(req, &ws_pkt, ws_pkt.len);
-            free(buf);
-            return ret;
+        if (ws_pkt.len > WS_RX_MAX_PAYLOAD_SIZE) {
+            ESP_LOGW(TAG, "Rejecting oversized WebSocket frame: %zu bytes", ws_pkt.len);
+            return ESP_ERR_INVALID_SIZE;
         }
+
+        uint8_t buf[WS_RX_MAX_PAYLOAD_SIZE];
+        ws_pkt.payload = buf;
+        return httpd_ws_recv_frame(req, &ws_pkt, sizeof(buf));
     }
 
     return ESP_OK;
