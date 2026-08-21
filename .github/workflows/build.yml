@@ -1,10 +1,21 @@
 name: Build Firmware
-on: [push, pull_request]
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
     - name: Checkout repo
       uses: actions/checkout@v6
@@ -14,33 +25,29 @@ jobs:
       uses: actions/setup-node@v6
       with:
         node-version: '24.14.0'
+        cache: 'npm'
+        cache-dependency-path: main/http_server/axe-os/package-lock.json
     - name: Build web dist
       working-directory: ./main/http_server/axe-os
       run: |
         npm ci
         npm run build
-    - name: esp-idf build
+    - name: esp-idf build + merge
       uses: espressif/esp-idf-ci-action@v1
       with:
         esp_idf_version: v6.0.2
         target: esp32s3
-        command: GITHUB_ACTIONS="true" idf.py build
+        command: idf.py build && idf.py merge_bin_target
         path: '.'
-    - uses: actions/setup-python@v6
-      with:
-        python-version: '3.10'
-        cache: 'pip'
-    - run: pip install esptool
-    - name: "Create factory/merged image"
-      run: "./merge_bin.sh ./esp-miner-merged.bin"
     - name: upload esp-miner-merged.bin
       uses: actions/upload-artifact@v4
       with:
-        name: esp-miner-factory.bin
+        name: esp-miner-merged.bin
         path: ./esp-miner-merged.bin
+        retention-days: 7
     - name: upload esp-miner.bin
       uses: actions/upload-artifact@v4
       with:
         name: esp-miner.bin
         path: ./build/esp-miner.bin
-
+        retention-days: 7
