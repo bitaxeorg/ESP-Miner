@@ -35,6 +35,9 @@ static GlobalState GLOBAL_STATE;
 
 static const char * TAG = "bitaxe";
 
+#define DEFAULT_GPIO_I2C_SDA CONFIG_GPIO_I2C_SDA
+#define DEFAULT_GPIO_I2C_SCL CONFIG_GPIO_I2C_SCL
+
 static void heap_alloc_failed_hook(size_t requested_size, uint32_t caps, const char *function_name)
 {
     if (caps & MALLOC_CAP_SPIRAM) {
@@ -83,15 +86,11 @@ void app_main(void)
     }
 #endif
   
-    // Init I2C
-    ESP_ERROR_CHECK(i2c_bitaxe_init());
-    ESP_LOGI(TAG, "I2C initialized successfully");
-
     // Initialize RST pin to low early to minimize ASIC power consumption
     ESP_ERROR_CHECK(asic_hold_reset_low());
     ESP_LOGI(TAG, "RST pin initialized to low");
 
-    // wait for I2C to init
+    // Allow the ASIC reset line to settle before continuing startup.
     vTaskDelay(100 / portTICK_PERIOD_MS);
 
     // Init ADC
@@ -131,6 +130,16 @@ void app_main(void)
         ESP_LOGE(TAG, "Failed to init device config");
         return;
     }
+
+    int i2c_sda = GLOBAL_STATE.DEVICE_CONFIG.i2c_sda != 0
+        ? GLOBAL_STATE.DEVICE_CONFIG.i2c_sda
+        : DEFAULT_GPIO_I2C_SDA;
+    int i2c_scl = GLOBAL_STATE.DEVICE_CONFIG.i2c_scl != 0
+        ? GLOBAL_STATE.DEVICE_CONFIG.i2c_scl
+        : DEFAULT_GPIO_I2C_SCL;
+
+    ESP_ERROR_CHECK(i2c_bitaxe_init(i2c_sda, i2c_scl));
+    ESP_LOGI(TAG, "I2C initialized successfully");
 
     if (self_test_init(&GLOBAL_STATE) != ESP_OK) {
         ESP_LOGE(TAG, "Failed to init self test");
