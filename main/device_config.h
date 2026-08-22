@@ -6,6 +6,7 @@
 #include "esp_err.h"
 
 #define THERMAL_MAX_SENSORS 2
+#define NAJA_DUO_VOLTAGE_DOMAINS 2
 
 typedef struct GlobalState GlobalState;
 
@@ -46,6 +47,7 @@ typedef enum
     GAMMA_DUO,
     SUPRA_HEX,
     GAMMA_TURBO,
+    NAJA_DUO,
 } Family;
 
 typedef struct FamilyConfig {
@@ -65,6 +67,10 @@ typedef struct DeviceConfig {
     FamilyConfig family;
     bool plug_sense;
     bool asic_enable;
+    bool asic_enable_active_high;
+    bool disable_bap : 1;
+    uint8_t i2c_sda;
+    uint8_t i2c_scl;
     bool EMC2101 : 1;
     bool EMC2103 : 1;
     bool EMC2302 : 1;
@@ -107,7 +113,7 @@ static const AsicConfig default_asic_configs[] = {
     ASIC_BM1368,
     ASIC_BM1370,
     ASIC_BM1370XP,
-    ASIC_BM1373
+    ASIC_BM1373,
 };
 
 static const FamilyConfig FAMILY_MAX         = { .id = MAX,         .name = "Max",        .asic = ASIC_BM1397,   .asic_count = 1, .max_power =  25, .power_offset = 5,  .nominal_voltage = 5,  .voltage_domains = 1, .swarm_color = "red",      };
@@ -118,6 +124,7 @@ static const FamilyConfig FAMILY_GAMMA       = { .id = GAMMA,       .name = "Gam
 static const FamilyConfig FAMILY_GAMMA_DUO   = { .id = GAMMA_DUO,   .name = "GammaDuo",   .asic = ASIC_BM1370XP, .asic_count = 2, .max_power =  40, .power_offset = 5,  .nominal_voltage = 5,  .voltage_domains = 1, .swarm_color = "green",    };
 static const FamilyConfig FAMILY_SUPRA_HEX   = { .id = SUPRA_HEX,   .name = "SupraHex",   .asic = ASIC_BM1368,   .asic_count = 6, .max_power = 120, .power_offset = 25, .nominal_voltage = 12, .voltage_domains = 3, .swarm_color = "darkblue", };
 static const FamilyConfig FAMILY_GAMMA_TURBO = { .id = GAMMA_TURBO, .name = "GammaTurbo", .asic = ASIC_BM1370,   .asic_count = 2, .max_power =  60, .power_offset = 10, .nominal_voltage = 12, .voltage_domains = 1, .swarm_color = "cyan",     };
+static const FamilyConfig FAMILY_NAJA_DUO    = { .id = NAJA_DUO,    .name = "NajaDuo",    .asic = ASIC_BM1373,   .asic_count = 2, .max_power =  60, .power_offset = 0,  .nominal_voltage = 12, .voltage_domains = NAJA_DUO_VOLTAGE_DOMAINS, .swarm_color = "magenta",  };
 
 static const FamilyConfig default_families[] = {
     FAMILY_MAX,
@@ -127,6 +134,7 @@ static const FamilyConfig default_families[] = {
     FAMILY_GAMMA,
     FAMILY_SUPRA_HEX,
     FAMILY_GAMMA_TURBO,
+    FAMILY_NAJA_DUO,
 };
 
 static const DeviceConfig default_configs[] = {
@@ -153,6 +161,7 @@ static const DeviceConfig default_configs[] = {
     { .board_version = "701",  .family = FAMILY_SUPRA_HEX,   .EMC2302 = true, .TMP1075 = true,                                            .temp_offset = 10,  .TPS546 = true,                                                           .power_consumption_target = 90, },
     { .board_version = "702",  .family = FAMILY_SUPRA_HEX,   .EMC2302 = true, .TMP1075 = true,                                            .temp_offset = 10,  .TPS546 = true,                                                           .power_consumption_target = 90, },
     { .board_version = "801",  .family = FAMILY_GAMMA_TURBO, .EMC2103 = true,                                          .temp_flip = true, .temp_offset = 0,   .TPS546 = true,                                                           .power_consumption_target = 36, },
+    { .board_version = "1201", .family = FAMILY_NAJA_DUO,    .asic_enable = true, .asic_enable_active_high = true, .disable_bap = true, .i2c_sda = 44, .i2c_scl = 43, .EMC2103 = true, .emc_ideality_factor = 0x17, .emc_beta_compensation = 0x10, .temp_offset = 0, .TPS546 = true, .power_consumption_target = 50, },
 };
 
 esp_err_t device_config_init(GlobalState * GLOBAL_STATE);
