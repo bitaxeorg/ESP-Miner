@@ -156,7 +156,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
 
     this.httpClient.get(`http://${window.location.hostname}/api/system/info`).subscribe({
       next: (response: any) => {
-        this.currentDeviceIp = response.ipv4;
+        this.currentDeviceIp = this.deviceIpv4(response) ?? null;
         this.currentDeviceVersion = response.version;
         this.initSwarm(response.version);
       },
@@ -210,6 +210,11 @@ private isIpAddress(value: string): boolean {
     return ipRegex.test(value);
   }
 
+  // AxeOS reports the device IP as `ipv4`, NerdOS reports it as `hostip`
+  private deviceIpv4(info: any): string | undefined {
+    return info?.['ipv4'] || info?.['hostip'] || undefined;
+  }
+
   // Utility method to get the display name for a device
   public getDeviceDisplayName(device: SwarmDevice): string {
     return device.displayName || device.address;
@@ -257,7 +262,11 @@ private isIpAddress(value: string): boolean {
       this.httpClient.get(`http://${window.location.hostname}/api/system/info`)
         .subscribe({
           next: (response: any) => {
-            const serverIp = response.ipv4;
+            const serverIp = this.deviceIpv4(response);
+            if (!serverIp) {
+              this.scanning = false;
+              return;
+            }
             const { start, end } = this.calculateIpRange(serverIp, '255.255.255.0');
             const ips = Array.from({ length: end - start + 1 }, (_, i) => this.intToIp(start + i));
             this.performNetworkScan(ips);
@@ -312,7 +321,8 @@ private isIpAddress(value: string): boolean {
             ...(existingDevice ? existingDevice : {}),
             ...info,
             ...asic,
-            ...this.numerizeDeviceBestDiffs(info as ISystemInfo)
+            ...this.numerizeDeviceBestDiffs(info as ISystemInfo),
+            ipv4: this.deviceIpv4(info) ?? existingDevice?.['ipv4']
           };
           return this.fallbackDeviceModel(result);
         }),
@@ -345,7 +355,9 @@ private isIpAddress(value: string): boolean {
         return;
       }
 
-      if (this.swarm.some(item => item.connectionAddress === info['ipv4'])) {
+      const ipv4 = this.deviceIpv4(info);
+
+      if (ipv4 && this.swarm.some(item => item.connectionAddress === ipv4)) {
         this.toastr.warning('Device already added to the swarm.', `Device at ${address}`);
         return;
       }
@@ -353,10 +365,11 @@ private isIpAddress(value: string): boolean {
       const device = {
         address: info['fullHostname'] || info['hostname'] || address,
         displayName: info['hostname'] ? info['hostname'].replace(/\.local$/i, '') : address,
-        connectionAddress: info['ipv4'] || address,
+        connectionAddress: ipv4 || address,
         ...asic,
         ...info,
-        ...this.numerizeDeviceBestDiffs(info)
+        ...this.numerizeDeviceBestDiffs(info),
+        ipv4
       };
       this.swarm.push(device);
       this.sortSwarm();
