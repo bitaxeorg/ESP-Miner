@@ -210,9 +210,28 @@ private isIpAddress(value: string): boolean {
     return ipRegex.test(value);
   }
 
-  // AxeOS reports the device IP as `ipv4`, NerdOS reports it as `hostip`
-  private deviceIpv4(info: any): string | undefined {
-    return info?.['ipv4'] || info?.['hostip'] || undefined;
+  // Device IP field names differ per firmware:
+  //   AxeOS    -> `ipv4`   on /api/system/info
+  //   NerdOS   -> `hostip` on /api/system/info
+  //   Bitforge -> `staIp`  on /api/ap/info (see fetchDeviceIpv4)
+  private deviceIpv4(...sources: any[]): string | undefined {
+    for (const source of sources) {
+      const ipv4 = source?.['ipv4'] || source?.['hostip'] || source?.['staIp'];
+      if (ipv4) return ipv4;
+    }
+    return undefined;
+  }
+
+  private fetchDeviceIpv4(address: string, info: any): Observable<string | undefined> {
+    const ipv4 = this.deviceIpv4(info);
+    if (ipv4) {
+      return of(ipv4);
+    }
+    return this.httpClient.get(`http://${address}/api/ap/info`).pipe(
+      timeout(3000),
+      map((ap: any) => this.deviceIpv4(ap)),
+      catchError(() => of(undefined))
+    );
   }
 
   // Utility method to get the display name for a device
@@ -308,10 +327,15 @@ private isIpAddress(value: string): boolean {
         info: this.httpClient.get(`http://${address}/api/system/info`).pipe(catchError(() => of(null))),
         asic: fetchAsic ? this.httpClient.get(`http://${address}/api/system/asic`).pipe(catchError(() => of({}))) : of({})
       }).pipe(
-        map(({ info, asic }) => {
-          if (info === null) {
+        mergeMap(({ info, asic }) => info === null
+          ? of(null)
+          : this.fetchDeviceIpv4(address, info).pipe(map(ipv4 => ({ info, asic, ipv4 })))
+        ),
+        map(bundle => {
+          if (bundle === null) {
             return null;
           }
+          const { info, asic, ipv4 } = bundle;
 
           const existingDevice = this.swarm.find(device => device.connectionAddress === address);
           const result = {
@@ -322,7 +346,7 @@ private isIpAddress(value: string): boolean {
             ...info,
             ...asic,
             ...this.numerizeDeviceBestDiffs(info as ISystemInfo),
-            ipv4: this.deviceIpv4(info) ?? existingDevice?.['ipv4']
+            ipv4: ipv4 ?? existingDevice?.['ipv4']
           };
           return this.fallbackDeviceModel(result);
         }),
@@ -347,15 +371,21 @@ private isIpAddress(value: string): boolean {
         throw error;
       })),
       asic: this.httpClient.get<any>(`http://${address}/api/system/asic`).pipe(catchError(() => of({})))
-    }).subscribe(({ info, asic }) => {
-      if ((info as any)._corsError === 401) {
-        return; // Already showed warning
-      }
-      if (!info.ASICModel || !asic.ASICModel) {
+    }).pipe(
+      mergeMap(({ info, asic }) => {
+        if ((info as any)._corsError === 401) {
+          return of(null); // Already showed warning
+        }
+        if (!info.ASICModel || !asic.ASICModel) {
+          return of(null);
+        }
+        return this.fetchDeviceIpv4(address, info).pipe(map(ipv4 => ({ info, asic, ipv4 })));
+      })
+    ).subscribe(result => {
+      if (result === null) {
         return;
       }
-
-      const ipv4 = this.deviceIpv4(info);
+      const { info, asic, ipv4 } = result;
 
       if (ipv4 && this.swarm.some(item => item.connectionAddress === ipv4)) {
         this.toastr.warning('Device already added to the swarm.', `Device at ${address}`);
