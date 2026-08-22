@@ -7,9 +7,6 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
-#define GPIO_I2C_SDA CONFIG_GPIO_I2C_SDA
-#define GPIO_I2C_SCL CONFIG_GPIO_I2C_SCL
-
 #define I2C_MASTER_FREQ_HZ 100000
 
 #define I2C_MASTER_NUM 0
@@ -63,13 +60,13 @@ static esp_err_t i2c_transfer_with_retries(i2c_master_dev_handle_t dev_handle,
 /**
  * @brief i2c master initialization
  */
-esp_err_t i2c_bitaxe_init(void)
+esp_err_t i2c_bitaxe_init(int sda_gpio, int scl_gpio)
 {
     i2c_master_bus_config_t i2c_bus_config = {
         .clk_source = I2C_CLK_SRC_DEFAULT,
         .i2c_port = I2C_MASTER_NUM,
-        .scl_io_num = GPIO_I2C_SCL,
-        .sda_io_num = GPIO_I2C_SDA,
+        .scl_io_num = scl_gpio,
+        .sda_io_num = sda_gpio,
         .glitch_ignore_cnt = 7,
         .flags.enable_internal_pullup = true,
     };
