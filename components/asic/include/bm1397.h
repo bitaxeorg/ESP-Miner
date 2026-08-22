@@ -33,5 +33,6 @@ int BM1397_set_default_baud(void);
 float BM1397_send_hash_frequency(float frequency);
 task_result * BM1397_process_work(GlobalState * GLOBAL_STATE);
 void BM1397_read_registers(void);
+float BM1397_get_domain_hashrate(float register_hashrate);
 
 #endif /* BM1397_H_ */

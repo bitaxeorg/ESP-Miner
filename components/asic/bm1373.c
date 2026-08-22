@@ -547,3 +547,10 @@ void BM1373_read_registers(void)
         }
     }
 }
+
+float BM1373_get_domain_hashrate(float register_hashrate)
+{
+    // BM1372/BM1373 domain counter values are half-scale relative to the
+    // total counter. Normalize them at the driver boundary.
+    return register_hashrate * 2.0f;
+}

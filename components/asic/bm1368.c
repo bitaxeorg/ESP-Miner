@@ -345,3 +345,8 @@ void BM1368_read_registers(void)
         }
     }
 }
+
+float BM1368_get_domain_hashrate(float register_hashrate)
+{
+    return register_hashrate;
+}
