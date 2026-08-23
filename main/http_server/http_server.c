@@ -248,43 +248,174 @@ static esp_err_t ip_in_private_range(uint32_t address) {
         return ESP_OK;
     }
 
+    // 127.0.0.0/8 loopback
+    if ((ip_address >= 0x7F000000) && (ip_address <= 0x7FFFFFFF)) {
+        return ESP_OK;
+    }
+
+    // 169.254.0.0/16 link-local
+    if ((ip_address >= 0xA9FE0000) && (ip_address <= 0xA9FEFFFF)) {
+        return ESP_OK;
+    }
+
     return ESP_FAIL;
+}
+
+static bool ipv6_is_v4mapped(const struct in6_addr *addr)
+{
+    // ::ffff:0:0/96
+    return addr->un.u32_addr[0] == 0 && addr->un.u32_addr[1] == 0 &&
+           addr->un.u32_addr[2] == htonl(0x0000ffff);
+}
+
+static bool ipv6_addr_is_lan(const struct in6_addr *addr)
+{
+    if (addr == NULL) {
+        return false;
+    }
+
+    // IPv4-mapped IPv6 (:ffff:a.b.c.d) — evaluate the embedded IPv4 address
+    if (ipv6_is_v4mapped(addr)) {
+        return ip_in_private_range(addr->un.u32_addr[3]) == ESP_OK;
+    }
+
+    // ::1 loopback
+    if (addr->un.u32_addr[0] == 0 && addr->un.u32_addr[1] == 0 &&
+        addr->un.u32_addr[2] == 0 && addr->un.u32_addr[3] == htonl(1)) {
+        return true;
+    }
+
+    // fe80::/10 link-local
+    uint32_t w0 = ntohl(addr->un.u32_addr[0]);
+    if ((w0 & 0xffc00000U) == 0xfe800000U) {
+        return true;
+    }
+
+    // Unique local addresses fc00::/7
+    if ((w0 & 0xfe000000U) == 0xfc000000U) {
+        return true;
+    }
+
+    return false;
+}
+
+/* Extract host from Origin into out_host. Returns true on success.
+ * Handles http(s)://host, http(s)://host:port, and http(s)://[ipv6]:port. */
+static bool extract_origin_host(const char *origin, char *out_host, size_t out_host_len)
+{
+    if (origin == NULL || out_host == NULL || out_host_len == 0) {
+        return false;
+    }
+
+    const char *authority = NULL;
+    if (strncasecmp(origin, "http://", 7) == 0) {
+        authority = origin + 7;
+    } else if (strncasecmp(origin, "https://", 8) == 0) {
+        authority = origin + 8;
+    } else {
+        return false;
+    }
+
+    size_t authority_len = strcspn(authority, "/?#");
+    if (authority_len == 0) {
+        return false;
+    }
+
+    if (authority[0] == '[') {
+        const char *closing = memchr(authority, ']', authority_len);
+        if (closing == NULL) {
+            return false;
+        }
+        size_t host_len = (size_t)(closing - authority - 1);
+        if (host_len == 0 || host_len >= out_host_len) {
+            return false;
+        }
+        memcpy(out_host, authority + 1, host_len);
+        out_host[host_len] = '\0';
+        return true;
+    }
+
+    const char *colon = memchr(authority, ':', authority_len);
+    size_t host_len = colon ? (size_t)(colon - authority) : authority_len;
+    if (host_len == 0 || host_len >= out_host_len) {
+        return false;
+    }
+    memcpy(out_host, authority, host_len);
+    out_host[host_len] = '\0';
+    return true;
 }
 
 static uint32_t extract_origin_ip_addr(char *origin)
 {
     char host_str[128];
-    uint32_t origin_ip_addr = 0;
+    if (!extract_origin_host(origin, host_str, sizeof(host_str))) {
+        return 0;
+    }
 
-    // Find the start of the hostname in the Origin header
-    const char *prefix = "http://";
-    char *host_start = strstr(origin, prefix);
-    if (host_start) {
-        host_start += strlen(prefix); // Move past "http://"
+    struct in_addr addr;
+    if (inet_pton(AF_INET, host_str, &addr) == 1) {
+        ESP_LOGD(CORS_TAG, "Extracted IPv4 address %lu", (unsigned long)addr.s_addr);
+        return addr.s_addr;
+    }
 
-        // Extract the hostname portion (up to the next '/')
-        char *host_end = strchr(host_start, '/');
-        size_t host_len = host_end ? (size_t)(host_end - host_start) : strlen(host_start);
-        if (host_len < sizeof(host_str)) {
-            strncpy(host_str, host_start, host_len);
-            host_str[host_len] = '\0'; // Null-terminate the string
+    ESP_LOGD(CORS_TAG, "Origin host is not IPv4: %s", host_str);
+    return 0;
+}
 
-            // Check if it's an IP address or hostname
-            struct in_addr addr;
-            if (inet_pton(AF_INET, host_str, &addr) == 1) {
-                origin_ip_addr = addr.s_addr;
-                ESP_LOGD(CORS_TAG, "Extracted IP address %lu", origin_ip_addr);
-            } else {
-                ESP_LOGD(CORS_TAG, "Origin contains hostname: %s (not an IP)", host_str);
-                // For hostnames, return 0 to indicate it's not an IP address
-                origin_ip_addr = 0;
+/* Strip optional "%zone" suffix from an IPv6 presentation string. */
+static void ipv6_strip_zone(const char *in, char *out, size_t out_len)
+{
+    if (in == NULL || out == NULL || out_len == 0) {
+        return;
+    }
+    const char *pct = strchr(in, '%');
+    size_t n = pct ? (size_t)(pct - in) : strlen(in);
+    if (n >= out_len) {
+        n = out_len - 1;
+    }
+    memcpy(out, in, n);
+    out[n] = '\0';
+}
+
+static bool origin_matches_device_address(const char *origin)
+{
+    char host_str[128];
+    if (!extract_origin_host(origin, host_str, sizeof(host_str))) {
+        return false;
+    }
+
+    if (GLOBAL_STATE != NULL) {
+        if (GLOBAL_STATE->SYSTEM_MODULE.ip_addr_str[0] != '\0' &&
+            strcmp(host_str, GLOBAL_STATE->SYSTEM_MODULE.ip_addr_str) == 0) {
+            return true;
+        }
+
+        if (GLOBAL_STATE->SYSTEM_MODULE.ipv6_addr_str[0] != '\0') {
+            char device_v6[INET6_ADDRSTRLEN];
+            ipv6_strip_zone(GLOBAL_STATE->SYSTEM_MODULE.ipv6_addr_str, device_v6, sizeof(device_v6));
+            if (device_v6[0] != '\0' && strcasecmp(host_str, device_v6) == 0) {
+                return true;
             }
-        } else {
-            ESP_LOGW(CORS_TAG, "Hostname string is too long: %s", host_start);
         }
     }
 
-    return origin_ip_addr;
+    // Also accept Origin IPv6 that is LAN-scoped (ULA / link-local / loopback)
+    struct in6_addr v6;
+    if (inet_pton(AF_INET6, host_str, &v6) == 1 && ipv6_addr_is_lan(&v6)) {
+        return true;
+    }
+
+    return false;
+}
+
+static bool peer_is_lan(const struct sockaddr_in6 *addr)
+{
+    if (addr == NULL) {
+        return false;
+    }
+
+    // Dual-stack httpd presents IPv4 clients as IPv4-mapped IPv6.
+    return ipv6_addr_is_lan(&addr->sin6_addr);
 }
 
 // Helper function to normalize hostname by stripping ".local" suffix if present
@@ -315,8 +446,7 @@ esp_err_t is_network_allowed(httpd_req_t * req)
     }
 
     int sockfd = httpd_req_to_sockfd(req);
-    char ipstr[INET6_ADDRSTRLEN];
-    struct sockaddr_in6 addr;   // esp_http_server uses IPv6 addressing
+    struct sockaddr_in6 addr;   // esp_http_server uses IPv6 addressing (IPv4-mapped for v4)
     socklen_t addr_size = sizeof(addr);
 
     if (getpeername(sockfd, (struct sockaddr *)&addr, &addr_size) < 0) {
@@ -324,104 +454,102 @@ esp_err_t is_network_allowed(httpd_req_t * req)
         return ESP_FAIL;
     }
 
-    uint32_t request_ip_addr = addr.sin6_addr.un.u32_addr[3];
-
-    // // Convert to IPv6 string
-    // inet_ntop(AF_INET, &addr.sin6_addr, ipstr, sizeof(ipstr));
-
-    // Convert to IPv4 string
-    inet_ntop(AF_INET, &request_ip_addr, ipstr, sizeof(ipstr));
+    bool request_is_lan = peer_is_lan(&addr);
 
     // Attempt to get the Origin header.
-    char origin[128];
-    uint32_t origin_ip_addr;
-    if (httpd_req_get_hdr_value_str(req, "Origin", origin, sizeof(origin)) == ESP_OK) {
-        ESP_LOGD(CORS_TAG, "Origin header: %s", origin);
-        origin_ip_addr = extract_origin_ip_addr(origin);
-    } else {
-        ESP_LOGD(CORS_TAG, "No origin header found.");
-        origin_ip_addr = request_ip_addr;
+    char origin[256];
+    size_t origin_len = httpd_req_get_hdr_value_len(req, "Origin");
+    bool has_origin = origin_len > 0 && origin_len < sizeof(origin) &&
+                      httpd_req_get_hdr_value_str(req, "Origin", origin, sizeof(origin)) == ESP_OK;
+
+    if (!has_origin) {
+        // Same-origin navigations and non-browser clients often omit Origin.
+        // Allow only when the peer itself is on a LAN-scoped address (v4 private
+        // or v6 ULA/link-local/loopback/v4-mapped private).
+        if (request_is_lan) {
+            ESP_LOGD(CORS_TAG, "LAN peer with no Origin header - allowing");
+            return ESP_OK;
+        }
+        ESP_LOGI(CORS_TAG, "Non-LAN peer with no Origin header - denying");
+        return ESP_FAIL;
     }
 
-    if (origin_ip_addr != 0 && ip_in_private_range(origin_ip_addr) == ESP_OK && ip_in_private_range(request_ip_addr) == ESP_OK) {
-        ESP_LOGD(CORS_TAG, "Origin and IP both in private range. Allowing.");
+    ESP_LOGD(CORS_TAG, "Origin header: %s", origin);
+
+    // IPv4 private Origin + LAN peer (legacy path)
+    uint32_t origin_ip_addr = extract_origin_ip_addr(origin);
+    if (origin_ip_addr != 0 && ip_in_private_range(origin_ip_addr) == ESP_OK && request_is_lan) {
+        ESP_LOGD(CORS_TAG, "Origin IPv4 and peer both LAN - allowing");
         return ESP_OK;
     }
-    
-    // If origin contains hostname (origin_ip_addr == 0), proceed to hostname validation
-    if (origin_ip_addr == 0) {
-        ESP_LOGD(CORS_TAG, "Origin contains hostname, proceeding to hostname validation");
+
+    // Origin is this device's IPv4/IPv6 (including GUA shown in System menu) or a
+    // LAN-scoped IPv6 literal. Required so http://[2001:db8::x] WebUI works when
+    // the browser Origin uses the device's global IPv6 address from SLAAC.
+    if (origin_matches_device_address(origin) && request_is_lan) {
+        ESP_LOGD(CORS_TAG, "Origin matches device/LAN address and peer is LAN - allowing");
+        return ESP_OK;
     }
 
-    // Check if Origin header matches the avahi hostname or is a local-network hostname
-    if (httpd_req_get_hdr_value_len(req, "Origin") > 0) {
-        httpd_req_get_hdr_value_str(req, "Origin", origin, sizeof(origin));
-        ESP_LOGD(CORS_TAG, "Origin header: %s", origin);
-
-        // Extract the host portion from the origin for local-hostname validation
-        char host_str[128] = {0};
-        const char *prefix = "http://";
-        char *host_start = strstr(origin, prefix);
-        bool is_local_hostname = false;
-        if (host_start) {
-            host_start += strlen(prefix);
-            // Strip port if present
-            char *colon = strchr(host_start, ':');
-            char *slash = strchr(host_start, '/');
-            size_t host_len = 0;
-            if (colon) {
-                host_len = colon - host_start;
-            } else if (slash) {
-                host_len = slash - host_start;
-            } else {
-                host_len = strlen(host_start);
+    // When Origin is the device GUA, the peer may also be a GUA on the same LAN
+    // (home IPv6 without ULA). Allow if Origin host equals the device address
+    // regardless of peer classification — the user loaded our WebUI directly.
+    if (origin_matches_device_address(origin)) {
+        char host_str[128];
+        if (extract_origin_host(origin, host_str, sizeof(host_str))) {
+            char device_v6[INET6_ADDRSTRLEN] = {0};
+            char device_v4[16] = {0};
+            if (GLOBAL_STATE != NULL) {
+                strncpy(device_v4, GLOBAL_STATE->SYSTEM_MODULE.ip_addr_str, sizeof(device_v4) - 1);
+                ipv6_strip_zone(GLOBAL_STATE->SYSTEM_MODULE.ipv6_addr_str, device_v6, sizeof(device_v6));
             }
-            if (host_len > 0 && host_len < sizeof(host_str)) {
-                strncpy(host_str, host_start, host_len);
-                host_str[host_len] = '\0';
-
-                // Allow any .local hostname (mDNS, inherently local network)
-                size_t hlen = strlen(host_str);
-                if (hlen > 6 && strcasecmp(host_str + hlen - 6, ".local") == 0) {
-                    is_local_hostname = true;
-                    ESP_LOGD(CORS_TAG, "Origin host '%s' is a .local mDNS hostname - allowing", host_str);
-                }
-                // Allow any bare hostname (no dots, only resolvable on local network)
-                else if (strchr(host_str, '.') == NULL) {
-                    is_local_hostname = true;
-                    ESP_LOGD(CORS_TAG, "Origin host '%s' is a bare local hostname - allowing", host_str);
-                }
+            if ((device_v4[0] && strcmp(host_str, device_v4) == 0) ||
+                (device_v6[0] && strcasecmp(host_str, device_v6) == 0)) {
+                ESP_LOGD(CORS_TAG, "Origin is this device's IP - allowing WebUI access");
+                return ESP_OK;
             }
         }
+    }
 
-        if (is_local_hostname) {
-            ESP_LOGD(CORS_TAG, "Request from local hostname - allowing access");
-            return ESP_OK;
+    // Hostname validation (.local, bare hostname, configured hostname)
+    char host_str[128] = {0};
+    bool is_local_hostname = false;
+    if (extract_origin_host(origin, host_str, sizeof(host_str))) {
+        size_t hlen = strlen(host_str);
+        if (hlen > 6 && strcasecmp(host_str + hlen - 6, ".local") == 0) {
+            is_local_hostname = true;
+            ESP_LOGD(CORS_TAG, "Origin host '%s' is a .local mDNS hostname - allowing", host_str);
+        } else if (strchr(host_str, '.') == NULL && strchr(host_str, ':') == NULL) {
+            // Bare hostname only (exclude IPv6 literals which contain ':')
+            is_local_hostname = true;
+            ESP_LOGD(CORS_TAG, "Origin host '%s' is a bare local hostname - allowing", host_str);
         }
+    }
 
-        // Fall back to exact match against this device's configured hostname
-        char *hostname = nvs_config_get_string(NVS_CONFIG_HOSTNAME);
-        ESP_LOGD(CORS_TAG, "Configured hostname: %s", hostname);
-        // Match origin as http://<hostname>.local[:port] or http://<hostname>[:port]
-        const char *patterns[] = { "http://%s.local", "http://%s" };
-        bool matched = false;
-        for (int i = 0; i < 2 && !matched; i++) {
-            char expected[256];
-            snprintf(expected, sizeof(expected), patterns[i], hostname);
-            size_t len = strlen(expected);
-            // Origin must start with expected, followed by end-of-string or ':port'
-            if (strncmp(origin, expected, len) == 0 &&
-                (origin[len] == '\0' || origin[len] == ':')) {
-                matched = true;
-            }
+    if (is_local_hostname) {
+        ESP_LOGD(CORS_TAG, "Request from local hostname - allowing access");
+        return ESP_OK;
+    }
+
+    // Fall back to exact match against this device's configured hostname
+    char *hostname = nvs_config_get_string(NVS_CONFIG_HOSTNAME);
+    ESP_LOGD(CORS_TAG, "Configured hostname: %s", hostname);
+    const char *patterns[] = { "http://%s.local", "http://%s", "https://%s.local", "https://%s" };
+    bool matched = false;
+    for (int i = 0; i < 4 && !matched; i++) {
+        char expected[256];
+        snprintf(expected, sizeof(expected), patterns[i], hostname);
+        size_t len = strlen(expected);
+        // Origin must start with expected, followed by end-of-string or ':port'
+        if (strncmp(origin, expected, len) == 0 &&
+            (origin[len] == '\0' || origin[len] == ':')) {
+            matched = true;
         }
-        free(hostname);
-        if (matched) {
-            ESP_LOGD(CORS_TAG, "Request from hostname - allowing access");
-            return ESP_OK;
-        }
-    } else {
-        ESP_LOGD(CORS_TAG, "No Origin header found");
+    }
+    free(hostname);
+    if (matched) {
+        ESP_LOGD(CORS_TAG, "Request from hostname - allowing access");
+        return ESP_OK;
     }
 
     ESP_LOGI(CORS_TAG, "Client is NOT in the private ip ranges or same range as server.");
