@@ -196,8 +196,8 @@ void create_jobs_task(void *pvParameters)
 
 static void generate_work(GlobalState *GLOBAL_STATE, mining_notify *notification, uint64_t extranonce_2, double difficulty)
 {
-    if (GLOBAL_STATE->extranonce_2_len > MAX_EXTRANONCE2_LEN) {
-        ESP_LOGE(TAG, "extranonce_2_len %d exceeds maximum %d, skipping job", GLOBAL_STATE->extranonce_2_len, MAX_EXTRANONCE2_LEN);
+    if (GLOBAL_STATE->extranonce_2_len > MAX_EXTRANONCE2_LEN || GLOBAL_STATE->extranonce_2_len < 1) {
+        ESP_LOGE(TAG, "extranonce_2_len %d out of range [1, %d], skipping job", GLOBAL_STATE->extranonce_2_len, MAX_EXTRANONCE2_LEN);
         return;
     }
     char extranonce_2_str[MAX_EXTRANONCE2_STR];

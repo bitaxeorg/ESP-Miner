@@ -183,13 +183,23 @@ export class UpdateComponent {
 
   // https://gist.github.com/elfefe/ef08e583e276e7617cd316ba2382fc40
   public simpleMarkdownParser(markdown: string): string {
-    const toHTML = markdown
+    // Escape HTML entities in the (remotely authored) input
+    // BEFORE generating any markup. Previously the regex chain ran on raw
+    // release-note text and XSS prevention rested entirely on Angular's
+    // [innerHTML] sanitizer.
+    const escaped = markdown
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+    const toHTML = escaped
       .replace(/^#{1,6}\s+(.+)$/gim, '<h4 class="mt-2">$1</h4>') // Headlines
       .replace(/\*\*(.+?)\*\*|__(.+?)__/gim, '<b>$1</b>') // Bold text
       .replace(/\*(.+?)\*|_(.+?)_/gim, '<i>$1</i>') // Italic text
-      .replace(/\[(.*?)\]\((.*?)\s?(?:"(.*?)")?\)/gm, '<a href="$2" class="underline text-white" target="_blank">$1</a>') // Markdown links
-      .replace(/(https?:\/\/github\.com\/.+\/(.+[^\s])+)/gim, (match, p1, p2) => `<a href="${p1}" target="_blank">${match.includes('/pull/') ? '#' : ''}${p2}</a>`) // Regular links
-      .replace(/@([^\s]+)/gim, ' <a href="https://github.com/$1" target="_blank">@$1</a> ') // Username links
+      .replace(/\[(.*?)\]\((.*?)\s?(?:&quot;(.*?)&quot;)?\)/gm, '<a href="$2" class="underline text-white" target="_blank" rel="noopener noreferrer">$1</a>') // Markdown links
+      .replace(/(https?:\/\/github\.com\/.+\/(.+[^\s])+)/gim, (match, p1, p2) => `<a href="${p1}" target="_blank" rel="noopener noreferrer">${match.includes('/pull/') ? '#' : ''}${p2}</a>`) // Regular links
+      .replace(/@([^\s]+)/gim, ' <a href="https://github.com/$1" target="_blank" rel="noopener noreferrer">@$1</a> ') // Username links
       .replace(/^\s*[-+*]\s?(.+)$/gim, '<li>$1</li>') // Unordered list
       .replace(/`([^`]+)`/gim, '<code class="bg-surface-100 rounded px-1">$1</code>') // Code
       .replace(/\r\n\r\n/gim, '<br>'); // Breaks
