@@ -712,6 +712,7 @@ components:
             - BM1366
             - BM1368
             - BM1370
+            - BM1373
             - BM1397
           examples:
             - "BM1366"
