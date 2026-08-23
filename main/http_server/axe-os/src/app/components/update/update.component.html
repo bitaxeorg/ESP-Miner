@@ -30,23 +30,16 @@
               <a style="text-decoration: underline;" target="_blank"
               [href]="latestRelease.html_url">{{latestRelease.name}}</a>
             </h3>
-            <div class="text-orange-500 mb-3">Download both files for update!</div>
-            @for (asset of latestRelease.assets; track asset) {
-              <div>
-                @if (asset.name == 'esp-miner.bin') {
-                  <div>
-                    <a style="text-decoration: underline;" target="_blank"
-                    [href]="asset.browser_download_url">esp-miner.bin</a>
-                  </div>
-                }
-                @if (asset.name == 'www.bin') {
-                  <div>
-                    <a style="text-decoration: underline;" target="_blank"
-                    [href]="asset.browser_download_url">www.bin</a>
-                  </div>
-                }
-              </div>
-            }
+            @if (latestEspMinerAsset$ | async; as asset) {
+                <div>
+                  <a style="text-decoration: underline;" target="_blank"
+                [href]="asset.browser_download_url">esp-miner.bin</a>
+                </div>
+            } @else {
+                <span class="text-orange-500 mb-3">
+                  Firmware binaries are not yet available for this release. Please check back shortly.
+                </span>
+              }
             <a class="text-secondary underline block mt-3 cursor-pointer" (click)="releaseNotesModal.isVisible = true">
               Release Notes
             </a>
