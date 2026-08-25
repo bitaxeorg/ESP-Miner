@@ -210,7 +210,7 @@ void app_main(void)
         ESP_LOGI(TAG, "Waiting for NTP... (%d attempts remaining)", retry);
     }
     if (retry == -1) {
-        ESP_LOGW(TAG, "Failed to get NTP time! Certificate validation may fail!");
+        ESP_LOGW(TAG, "Failed to get NTP in time! Certificate validation may fail!");
     }
 
     queue_init(&GLOBAL_STATE.stratum_queue);
