@@ -1,0 +1,10 @@
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/.github/workflows"
+    schedule:
+      interval: "weekly"
+  - package-ecosystem: "npm"
+    directory: "/main/http_server/axe-os"
+    schedule:
+      interval: "weekly"

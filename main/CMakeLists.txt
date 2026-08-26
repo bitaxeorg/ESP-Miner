@@ -101,7 +101,7 @@ idf_build_set_property(COMPILE_OPTIONS "-DLV_CONF_PATH=\"${CMAKE_SOURCE_DIR}/mai
 
 set(WEB_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/http_server/axe-os")
 
-if("$ENV{GITHUB_ACTIONS}" STREQUAL "true")
+if(DEFINED ENV{GITHUB_ACTIONS} AND "$ENV{GITHUB_ACTIONS}" STREQUAL "true")
     message(STATUS "Running on GitHub Actions. Web ui will be prebuilt.")
 
     add_custom_command(
@@ -119,12 +119,18 @@ if("$ENV{GITHUB_ACTIONS}" STREQUAL "true")
     add_custom_target(web_ui_gen DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/embedded_web_ui.c")
     add_dependencies(${COMPONENT_LIB} web_ui_gen)
 
-
 else()
     find_program(NPM_EXECUTABLE npm)
-    if(NOT NPM_EXECUTABLE AND NOT EXISTS ${WEB_SRC_DIR}/dist)
-        message(FATAL_ERROR "npm is not found! Please install it to proceed.")
+    if(NOT NPM_EXECUTABLE OR NPM_EXECUTABLE STREQUAL "NPM_EXECUTABLE-NOTFOUND")
+        if(NOT EXISTS ${WEB_SRC_DIR}/dist)
+            message(FATAL_ERROR "npm is not found and no prebuilt web UI dist exists! Install node.js or build the web UI first.")
+        endif()
+        # npm not available but prebuilt dist exists — skip npm calls entirely
+        set(NPM_EXECUTABLE "")
     endif()
+
+    # Only run npm-based steps if npm is actually available
+    if(NPM_EXECUTABLE AND NOT NPM_EXECUTABLE STREQUAL "NPM_EXECUTABLE-NOTFOUND")
 
     # OpenAPI generation - only when openapi.yaml changes
     set(OPENAPI_SPEC "${CMAKE_CURRENT_SOURCE_DIR}/http_server/openapi.yaml")
@@ -180,7 +186,7 @@ else()
         DEPENDS ${WEB_UI_STAMP} ${OPENAPI_STAMP}
     )
 
-    add_dependencies(${COMPONENT_LIB} web_ui_dist)
+    endif() # NPM_EXECUTABLE available
 
     # Generate embedded C files from the build output directory
     add_custom_command(
@@ -189,7 +195,7 @@ else()
                 "${WEB_SRC_DIR}/dist/axe-os"
                 "${CMAKE_CURRENT_BINARY_DIR}/embedded_web_ui.c"
                 "${CMAKE_CURRENT_BINARY_DIR}/embedded_web_ui.h"
-        DEPENDS ${WEB_UI_STAMP} "${CMAKE_SOURCE_DIR}/tools/embed_web_ui.py"
+        DEPENDS "${WEB_SRC_DIR}/dist/axe-os/index.html.gz" "${CMAKE_SOURCE_DIR}/tools/embed_web_ui.py"
         COMMENT "Generating embedded Web UI source files"
         VERBATIM
     )
@@ -197,6 +203,9 @@ else()
     # In local build, make the component depend on the generated file too
     add_custom_target(web_ui_gen DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/embedded_web_ui.c")
     add_dependencies(${COMPONENT_LIB} web_ui_gen)
+    if(NPM_EXECUTABLE AND NOT NPM_EXECUTABLE STREQUAL "NPM_EXECUTABLE-NOTFOUND")
+        add_dependencies(${COMPONENT_LIB} web_ui_dist)
+    endif()
 
 
 endif()
