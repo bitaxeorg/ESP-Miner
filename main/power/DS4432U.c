@@ -18,7 +18,13 @@
 #define BITAXE_RB 3320.0       // R15
 #define BITAXE_VNOM 1.451   // this is with the current DAC set to 0. Should be pretty close to (VFB*(RA+RB))/RB
 #define BITAXE_VMAX 2.39
-#define BITAXE_VMIN 0.046
+// The DAC magnitude is only 7 bits (bit 7 is the direction flag), so the lowest
+// voltage this resistor network can actually reach is the one that needs a code
+// of exactly 127, which works out to ~0.9886V. Asking for less used to overflow
+// the code, wrap into the direction bit and drive the core to roughly BITAXE_VNOM
+// (~1.45V) instead - i.e. a request to undervolt produced a large overvolt.
+#define BITAXE_DAC_MAX_CODE 127
+#define BITAXE_VMIN 0.989
 
 #define TPS40305_VFB 0.6
 
@@ -53,12 +59,23 @@ esp_err_t DS4432U_set_voltage(float vout) {
 
     // make sure the requested voltage is in within range of BITAXE_VMIN and BITAXE_VMAX
     if (vout > BITAXE_VMAX || vout < BITAXE_VMIN) {
+        ESP_LOGE(TAG, "Requested voltage %.3fV is outside the reachable range %.3fV - %.3fV", vout, (float) BITAXE_VMIN, (float) BITAXE_VMAX);
         return ESP_FAIL;
     }
 
     // this is the transfer function. comes from the DS4432U+ datasheet
     change = fabs((((TPS40305_VFB / BITAXE_RB) - ((vout - TPS40305_VFB) / BITAXE_RA)) / BITAXE_IFS) * 127);
-    reg = (uint8_t)ceil(change);
+
+    // Only 7 bits are available for the magnitude; bit 7 selects the direction.
+    // Refuse rather than let the cast wrap, which would invert the direction bit
+    // and apply a completely different (much higher) voltage than requested.
+    int code = (int) ceil(change);
+    if (code > BITAXE_DAC_MAX_CODE) {
+        ESP_LOGE(TAG, "DAC code %d for %.3fV exceeds the 7-bit maximum of %d", code, vout, BITAXE_DAC_MAX_CODE);
+        return ESP_FAIL;
+    }
+
+    reg = (uint8_t) code;
 
     // Set the MSB high if the requested voltage is BELOW nominal
     if (vout < BITAXE_VNOM) {
