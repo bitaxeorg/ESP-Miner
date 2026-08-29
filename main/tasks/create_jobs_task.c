@@ -45,13 +45,8 @@ void create_jobs_task(void *pvParameters)
 {
     GlobalState *GLOBAL_STATE = (GlobalState *)pvParameters;
 
-    // Initialize ASIC task module (moved from ASIC_task)
-    GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs = heap_caps_malloc(sizeof(bm_job *) * 128, MALLOC_CAP_SPIRAM);
-    GLOBAL_STATE->valid_jobs = heap_caps_malloc(sizeof(uint8_t) * 128, MALLOC_CAP_SPIRAM);
-    for (int i = 0; i < 128; i++) {
-        GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[i] = NULL;
-        GLOBAL_STATE->valid_jobs[i] = 0;
-    }
+    // active_jobs / valid_jobs are allocated and zeroed by SYSTEM_init_system(),
+    // before any task that touches them can run.
 
     double difficulty = GLOBAL_STATE->pool_difficulty;
     void *current_work = NULL;

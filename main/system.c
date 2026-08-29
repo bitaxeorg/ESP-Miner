@@ -20,6 +20,7 @@
 #include "driver/gpio.h"
 #include "esp_app_desc.h"
 #include "esp_timer.h"
+#include "esp_heap_caps.h"
 
 #include "global_state.h"
 #include "system.h"
@@ -283,6 +284,17 @@ void SYSTEM_init_system(GlobalState * GLOBAL_STATE)
     // Initialize mutexes
     pthread_mutex_init(&GLOBAL_STATE->valid_jobs_lock, NULL);
     GLOBAL_STATE->stratum_mux = (portMUX_TYPE)portMUX_INITIALIZER_UNLOCKED;
+
+    // Allocate the job tracking tables here rather than in create_jobs_task().
+    // The stratum tasks touch valid_jobs (SYSTEM_clean_jobs_queue) as soon as they
+    // connect, so tying the allocation to create_jobs_task actually starting is a
+    // NULL dereference waiting to happen if that task ever fails to spawn.
+    GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs = heap_caps_calloc(MAX_ASIC_JOBS, sizeof(bm_job *), MALLOC_CAP_SPIRAM);
+    GLOBAL_STATE->valid_jobs = heap_caps_calloc(MAX_ASIC_JOBS, sizeof(uint8_t), MALLOC_CAP_SPIRAM);
+    if (GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs == NULL || GLOBAL_STATE->valid_jobs == NULL) {
+        ESP_LOGE(TAG, "Failed to allocate job tracking tables");
+        abort();
+    }
 }
 
 void SYSTEM_init_versions(GlobalState * GLOBAL_STATE)
@@ -416,7 +428,7 @@ void SYSTEM_clean_jobs_queue(GlobalState * GLOBAL_STATE)
     queue_clear(&GLOBAL_STATE->stratum_queue);
 
     pthread_mutex_lock(&GLOBAL_STATE->valid_jobs_lock);
-    for (int i = 0; i < 128; i = i + 4) {
+    for (int i = 0; i < MAX_ASIC_JOBS; i = i + 4) {
         GLOBAL_STATE->valid_jobs[i] = 0;
     }
     pthread_mutex_unlock(&GLOBAL_STATE->valid_jobs_lock);
