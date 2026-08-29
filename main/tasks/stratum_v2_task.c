@@ -313,7 +313,7 @@ static void stratum_v2_decode_coinbase(GlobalState *GLOBAL_STATE, sv2_conn_t *co
     // Convert binary prefix/suffix/extranonce to hex strings for the V1 decoder
     char *coinbase_1_hex = malloc(prefix_len * 2 + 1);
     char *coinbase_2_hex = malloc(job->coinbase_suffix_len * 2 + 1);
-    char *extranonce1_hex = malloc(conn->extranonce_prefix_len * 2 + 1);
+    char *extranonce1_hex = malloc(job->extranonce_prefix_len * 2 + 1);
     if (!coinbase_1_hex || !coinbase_2_hex || !extranonce1_hex) {
         ESP_LOGE(TAG, "Failed to allocate hex buffers for coinbase decode");
         free(coinbase_1_hex);
@@ -327,8 +327,8 @@ static void stratum_v2_decode_coinbase(GlobalState *GLOBAL_STATE, sv2_conn_t *co
             coinbase_1_hex, prefix_len * 2 + 1);
     bin2hex(job->coinbase_suffix, job->coinbase_suffix_len,
             coinbase_2_hex, job->coinbase_suffix_len * 2 + 1);
-    bin2hex(conn->extranonce_prefix, conn->extranonce_prefix_len,
-            extranonce1_hex, conn->extranonce_prefix_len * 2 + 1);
+    bin2hex(job->extranonce_prefix, job->extranonce_prefix_len,
+            extranonce1_hex, job->extranonce_prefix_len * 2 + 1);
     free(stripped_prefix);
 
     // SV2 spec: extranonce_size is the miner's rollable portion (not total)
@@ -369,7 +369,7 @@ static void stratum_v2_decode_coinbase(GlobalState *GLOBAL_STATE, sv2_conn_t *co
         ESP_LOGE(TAG, "Failed to decode extended job coinbase (err=0x%x, prefix_len=%u, "
                  "suffix_len=%u, en_prefix_len=%u, en_size=%u, prefix_start=%s)",
                  err, job->coinbase_prefix_len, job->coinbase_suffix_len,
-                 conn->extranonce_prefix_len, conn->extranonce_size, prefix_hex);
+                 job->extranonce_prefix_len, conn->extranonce_size, prefix_hex);
         free(result);
         return;
     }
@@ -439,6 +439,11 @@ static void stratum_v2_handle_new_extended_mining_job(GlobalState *GLOBAL_STATE,
              job->job_id, job->version, job->merkle_path_count,
              job->coinbase_prefix_len, job->coinbase_suffix_len,
              job->ntime > 0 ? "no" : "yes");
+
+    // Pin the prefix in force now: work for this job is generated later, and a
+    // SetExtranoncePrefix applies only to jobs sent after it (spec 5.3.10).
+    job->extranonce_prefix_len = conn->extranonce_prefix_len;
+    memcpy(job->extranonce_prefix, conn->extranonce_prefix, conn->extranonce_prefix_len);
 
     // Decode coinbase transaction (block height, scriptsig, outputs)
     stratum_v2_decode_coinbase(GLOBAL_STATE, conn, job);
@@ -586,6 +591,26 @@ static void stratum_v2_handle_set_new_prev_hash(GlobalState *GLOBAL_STATE, sv2_c
 }
 
 // Handle SetTarget message
+static void stratum_v2_handle_set_extranonce_prefix(sv2_conn_t *conn,
+                                                    const uint8_t *payload, uint32_t len)
+{
+    uint32_t channel_id;
+    uint8_t prefix[32];
+    uint8_t prefix_len;
+
+    if (sv2_parse_set_extranonce_prefix(payload, len, &channel_id, prefix, &prefix_len) != 0) {
+        ESP_LOGE(TAG, "Failed to parse SetExtranoncePrefix");
+        return;
+    }
+
+    char prefix_hex[65] = {0};
+    bin2hex(prefix, prefix_len, prefix_hex, sizeof(prefix_hex));
+    ESP_LOGI(TAG, "Set extranonce prefix: %s (applies to following jobs)", prefix_hex);
+
+    conn->extranonce_prefix_len = prefix_len;
+    memcpy(conn->extranonce_prefix, prefix, prefix_len);
+}
+
 static void stratum_v2_handle_set_target(GlobalState *GLOBAL_STATE, sv2_conn_t *conn,
                                          const uint8_t *payload, uint32_t len)
 {
@@ -1009,6 +1034,10 @@ void stratum_v2_task(void *pvParameters)
 
                 case SV2_MSG_NEW_EXTENDED_MINING_JOB:
                     stratum_v2_handle_new_extended_mining_job(GLOBAL_STATE, conn, recv_buf, hdr.msg_length);
+                    break;
+
+                case SV2_MSG_SET_EXTRANONCE_PREFIX:
+                    stratum_v2_handle_set_extranonce_prefix(conn, recv_buf, hdr.msg_length);
                     break;
 
                 case SV2_MSG_SET_NEW_PREV_HASH:

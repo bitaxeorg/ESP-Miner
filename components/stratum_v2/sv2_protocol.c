@@ -299,6 +299,25 @@ int sv2_parse_set_new_prev_hash(const uint8_t *payload, uint32_t len,
     return 0;
 }
 
+int sv2_parse_set_extranonce_prefix(const uint8_t *payload, uint32_t len,
+                                    uint32_t *channel_id,
+                                    uint8_t *extranonce_prefix,
+                                    uint8_t *extranonce_prefix_len)
+{
+    // channel_id(4) + extranonce_prefix B0_32 (1 + N) = min 5 bytes
+    if (len < 5) return -1;
+
+    *channel_id = read_u32_le(payload);
+
+    uint8_t prefix_len = payload[4];
+    if (prefix_len > 32) return -1;
+    if (5 + (uint32_t)prefix_len > len) return -1;
+
+    *extranonce_prefix_len = prefix_len;
+    memcpy(extranonce_prefix, payload + 5, prefix_len);
+    return 0;
+}
+
 int sv2_parse_set_target(const uint8_t *payload, uint32_t len,
                          uint32_t *channel_id, uint8_t max_target[32])
 {
