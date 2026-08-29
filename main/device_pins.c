@@ -81,7 +81,7 @@ static esp_err_t device_pins_validate(const DevicePins * pins)
 
 static void apply_kconfig_pin_overrides(DevicePins * pins)
 {
-#if defined(CONFIG_ENABLE_BAP) && !CONFIG_ENABLE_BAP
+#if !defined(CONFIG_ENABLE_BAP)
     pins->bap = NULL;
     ESP_LOGI(TAG, "BAP disabled via Kconfig (CONFIG_ENABLE_BAP=n)");
 #elif defined(CONFIG_GPIO_BAP_TX) && defined(CONFIG_GPIO_BAP_RX)
