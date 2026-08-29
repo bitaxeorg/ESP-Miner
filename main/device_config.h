@@ -91,6 +91,7 @@ typedef struct DeviceConfig {
     uint8_t emc_ideality_factor;
     uint8_t emc_beta_compensation;
     bool temp_flip;
+    bool display_flip : 1;
     int8_t temp_offset;
     bool DS4432U : 1;
     bool INA260  : 1;
@@ -179,7 +180,7 @@ static const DeviceConfig default_configs[] = {
     { .board_version = "702",  .family = FAMILY_SUPRA_HEX,   .pins = BITAXE_ORIGINAL_PINS, .EMC2302 = true, .TMP1075 = true,                                            .temp_offset = 10,  .TPS546 = true,                                                           .power_consumption_target = 90, },
     { .board_version = "801",  .family = FAMILY_GAMMA_TURBO, .pins = BITAXE_ORIGINAL_PINS, .EMC2103 = true,                                          .temp_flip = true, .temp_offset = 0,   .TPS546 = true, .power_consumption_target = 36, .self_test_fan_target_rpm = 500, },
     { .board_version = "1201", .family = FAMILY_NAJA_DUO,    .pins = BITAXE_COLOR_PINS,    .asic_enable = true, .asic_enable_active_high = true, .EMC2103 = true, .emc_ideality_factor = 0x17, .emc_beta_compensation = 0x10, .temp_offset = 0, .TPS546 = true, .power_consumption_target = 50, .power_consumption_margin = 10, .self_test_fan_target_rpm = 500, },
-    { .board_version = "1300", .family = FAMILY_GAMMA_HEX,   .pins = BITAXE_COLOR_PINS,    .asic_enable = true, .asic_enable_active_high = true, .EMC2103 = true, .emc_direct_pwm = true, .temp_flip = true, .temp_offset = 0, .TPS546 = true, .power_consumption_target = 140, .power_consumption_margin = 21, .self_test_fan_target_rpm = 500, },
+    { .board_version = "1300", .family = FAMILY_GAMMA_HEX,   .pins = BITAXE_COLOR_PINS,    .asic_enable = true, .asic_enable_active_high = true, .EMC2103 = true, .emc_direct_pwm = true, .temp_flip = true, .display_flip = true, .temp_offset = 0, .TPS546 = true, .power_consumption_target = 140, .power_consumption_margin = 21, .self_test_fan_target_rpm = 500, },
 };
 
 esp_err_t device_config_init(GlobalState * GLOBAL_STATE);

@@ -93,9 +93,11 @@ static esp_err_t init_i80_st7789_display(GlobalState * GLOBAL_STATE, const lvgl_
     const I80Pins *pins = GLOBAL_STATE->DEVICE_CONFIG.pins.i80;
     ESP_RETURN_ON_FALSE(pins, ESP_ERR_INVALID_ARG, TAG, "No I80 display pin map configured");
     current_st7789_pins = pins;
-    const bool rotate_180 = true;
-    const bool mirror_x = !rotate_180;
-    const bool mirror_y = rotate_180;
+    // Some boards mount the panel upside down; mirroring the other axis
+    // turns the image by 180 degrees.
+    const bool flip = GLOBAL_STATE->DEVICE_CONFIG.display_flip;
+    const bool mirror_x = flip;
+    const bool mirror_y = !flip;
 
     ESP_LOGI(TAG, "Configure ST7789 GPIOs");
     gpio_config_t output_config = {
