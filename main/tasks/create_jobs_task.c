@@ -90,6 +90,14 @@ void create_jobs_task(void *pvParameters)
         void *new_work = queue_dequeue_timeout(&GLOBAL_STATE->stratum_queue, timeout_ms);
         timeout_ms -= (esp_timer_get_time() - start_time) / 1000;
 
+        // A run of non-clean notifies takes the `continue` path below without
+        // resetting timeout_ms, so the remaining budget can go negative. That
+        // turns the next dequeue into a non-blocking poll and lets jobs be
+        // pushed to the ASIC in a burst, so floor it at zero.
+        if (timeout_ms < 0) {
+            timeout_ms = 0;
+        }
+
         if (new_work != NULL) {
             active_protocol = GLOBAL_STATE->stratum_protocol;
 
