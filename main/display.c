@@ -182,6 +182,7 @@ static esp_err_t init_i80_st7789_display(GlobalState * GLOBAL_STATE, const lvgl_
         .color_format = LV_COLOR_FORMAT_RGB565,
         .flags = {
             .buff_dma = true,
+            .buff_spiram = true,
             .swap_bytes = false,
             .sw_rotate = false,
         }
@@ -361,6 +362,7 @@ esp_err_t display_init(GlobalState * GLOBAL_STATE)
         .monochrome = true,
         .color_format = LV_COLOR_FORMAT_I1,
         .flags = {
+            .buff_spiram = true,
             .swap_bytes = false,
             .sw_rotate = false,
         }
