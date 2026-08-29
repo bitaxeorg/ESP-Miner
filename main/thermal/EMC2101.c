@@ -102,6 +102,13 @@ uint16_t EMC2101_get_fan_speed(void)
     // ESP_LOGI(TAG, "Raw Fan Speed = %02X %02X", tach_msb, tach_lsb);
 
     reading = tach_lsb | (tach_msb << 8);
+
+    // A zero tach count would raise an integer divide-by-zero exception and
+    // panic the ESP32, so treat it the same as "no fan detected".
+    if (reading == 0) {
+        return 0;
+    }
+
     RPM = 5400000 / reading;
 
     // ESP_LOGI(TAG, "Fan Speed = %d RPM", RPM);
