@@ -33,6 +33,7 @@ zero status if any of the uploads failed.
 from __future__ import annotations
 
 import argparse
+import os
 import pathlib
 import sys
 import textwrap
@@ -78,12 +79,13 @@ def _iter_ips(args: argparse.Namespace) -> Iterable[str]:
                     yield ip
 
 
-def _upload_binary(ip: str, bin_path: pathlib.Path, endpoint: str) -> bool:
+def _upload_binary(ip: str, bin_path: pathlib.Path, endpoint: str, password: str | None = None) -> bool:
     """Upload *bin_path* to *ip* at *endpoint*. Return True on HTTP 200."""
     url = f"http://{ip}{endpoint}"
     try:
+        auth = ("admin", password) if password else None
         with open(bin_path, "rb") as f:
-            resp = requests.post(url, data=f, headers=_HEADERS, timeout=120)
+            resp = requests.post(url, data=f, headers=_HEADERS, timeout=120, auth=auth)
         if resp.status_code == 200:
             print(f"[OK] {bin_path.name} uploaded to {ip}{endpoint}")
             return True
@@ -98,21 +100,40 @@ def _upload_binary(ip: str, bin_path: pathlib.Path, endpoint: str) -> bool:
     return False
 
 
+def _verify_auth(ip: str, password: str | None = None) -> bool:
+    """Send a lightweight PATCH request to verify authentication before uploading large binaries."""
+    url = f"http://{ip}/api/system"
+    auth = ("admin", password) if password else None
+    try:
+        resp = requests.patch(url, json={}, timeout=10, auth=auth)
+        if resp.status_code == 401:
+            print(f"[FAIL] Authentication failed for {ip}: HTTP 401 – {resp.text[:100]}", file=sys.stderr)
+            return False
+        return True
+    except RequestException as e:
+        print(f"[ERROR] Connection to {ip} failed: {e}", file=sys.stderr)
+        return False
+
+
 def _process_device(
     ip: str,
     build_dir: pathlib.Path,
+    password: str | None = None,
     custom_www: bool = False,
     www_only: bool = False,
 ) -> bool:
     """Upload web UI (if requested or www-only) and/or firmware to *ip*. Return True if successful."""
+    if not _verify_auth(ip, password):
+        return False
+
     www_path = build_dir / _WWW_BIN
-    
+
     if custom_www or www_only:
         if not www_path.is_file():
             flag_name = "--www-only" if www_only else "--custom-www"
             print(f"[ERROR] {www_path.name} not found in build directory, but {flag_name} was requested.", file=sys.stderr)
             return False
-        www_ok = _upload_binary(ip, www_path, _ENDPOINT_WWW)
+        www_ok = _upload_binary(ip, www_path, _ENDPOINT_WWW, password)
         if not www_ok:
             return False
         if www_only:
@@ -121,7 +142,7 @@ def _process_device(
         import time
         time.sleep(1)
 
-    firmware_ok = _upload_binary(ip, build_dir / _FIRMWARE_BIN, _ENDPOINT_FIRMWARE)
+    firmware_ok = _upload_binary(ip, build_dir / _FIRMWARE_BIN, _ENDPOINT_FIRMWARE, password)
     return firmware_ok
 
 
@@ -134,6 +155,8 @@ def _parse_args(argv: List[str] | None = None) -> argparse.Namespace:
             """Examples:
   python3 upload2device.py 192.168.1.50 192.168.1.51
   python3 upload2device.py --file devices.txt
+  python3 upload2device.py --build-dir /tmp/build 192.168.1.100
+  python3 upload2device.py --password my-secure-password 192.168.1.50
   python3 upload2device.py --build-dir /tmp/build --custom-www 192.168.1.100
   python3 upload2device.py --www-only 192.168.1.100
 """,
@@ -157,7 +180,14 @@ def _parse_args(argv: List[str] | None = None) -> argparse.Namespace:
         default=None,
         help="Custom build directory containing firmware binaries (default: <repo_root>/build)",
     )
-    
+    parser.add_argument(
+        "--password",
+        "-p",
+        type=str,
+        default=None,
+        help="AxeOS administration password (optional, required if authentication is enabled)",
+    )
+
     upload_group = parser.add_mutually_exclusive_group()
     upload_group.add_argument(
         "--custom-www",
@@ -189,10 +219,12 @@ def main(argv: List[str] | None = None) -> None:
         print(f"Build directory '{build_dir}' does not exist or is not a directory.", file=sys.stderr)
         sys.exit(1)
 
+    password = args.password or os.environ.get("AXEOS_PASSWORD")
+
     overall_success = True
     for ip in ips:
         print(f"\n=== Processing device {ip} ===")
-        success = _process_device(ip, build_dir, args.custom_www, args.www_only)
+        success = _process_device(ip, build_dir, password, args.custom_www, args.www_only)
         overall_success = overall_success and success
 
     sys.exit(0 if overall_success else 2)

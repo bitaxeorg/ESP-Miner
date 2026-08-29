@@ -23,6 +23,9 @@ build/config/*
 test/build/*
 test-ci/
 
+# CI build report
+main/http_server/axe-os/report.xml
+
 # HTML documentation
 html_doc/
 
