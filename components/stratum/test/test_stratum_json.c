@@ -1,5 +1,71 @@
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+
 #include "unity.h"
 #include "stratum_api.h"
+
+// A mining.notify with 8 params, so it passes the params_count check, but with one
+// field replaced by a non-string. cJSON leaves valuestring NULL for those, and the
+// parser used to hand that straight to strdup()/strtoul()/hex2bin(), which
+// dereference immediately. Each of these crashed the device before validation was
+// added; they must now be rejected cleanly.
+TEST_CASE("Parse stratum mining.notify rejects non-string params", "[stratum]")
+{
+    const char *cases[] = {
+        // params[1] prev_block_hash is a number
+        "{\"id\":null,\"method\":\"mining.notify\",\"params\":"
+        "[\"job\",1,\"00\",\"00\",[],\"20000004\",\"1705c739\",\"64495522\",false]}",
+        // params[2] coinbase_1 is a number
+        "{\"id\":null,\"method\":\"mining.notify\",\"params\":"
+        "[\"job\",\"00\",2,\"00\",[],\"20000004\",\"1705c739\",\"64495522\",false]}",
+        // params[3] coinbase_2 is null
+        "{\"id\":null,\"method\":\"mining.notify\",\"params\":"
+        "[\"job\",\"00\",\"00\",null,[],\"20000004\",\"1705c739\",\"64495522\",false]}",
+        // params[5] version is a bool
+        "{\"id\":null,\"method\":\"mining.notify\",\"params\":"
+        "[\"job\",\"00\",\"00\",\"00\",[],true,\"1705c739\",\"64495522\",false]}",
+        // params[6] nbits is an object
+        "{\"id\":null,\"method\":\"mining.notify\",\"params\":"
+        "[\"job\",\"00\",\"00\",\"00\",[],\"20000004\",{},\"64495522\",false]}",
+        // params[7] ntime is an array
+        "{\"id\":null,\"method\":\"mining.notify\",\"params\":"
+        "[\"job\",\"00\",\"00\",\"00\",[],\"20000004\",\"1705c739\",[],false]}",
+        // a merkle branch entry is a number
+        "{\"id\":null,\"method\":\"mining.notify\",\"params\":"
+        "[\"job\",\"00\",\"00\",\"00\",[7],\"20000004\",\"1705c739\",\"64495522\",false]}",
+    };
+
+    for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+        StratumApiV1Message msg = {};
+        TEST_ASSERT_FALSE_MESSAGE(STRATUM_V1_parse(&msg, cases[i]), cases[i]);
+        TEST_ASSERT_NULL(msg.mining_notification);
+    }
+}
+
+// The coinbase halves size a buffer downstream, so an absurd length has to be
+// rejected at the parser rather than propagated.
+TEST_CASE("Parse stratum mining.notify rejects oversized coinbase", "[stratum]")
+{
+    const size_t oversized = 9000; // above MAX_COINBASE_HEX_LEN (8192)
+    const char *prefix = "{\"id\":null,\"method\":\"mining.notify\",\"params\":[\"job\",\"00\",\"";
+    const char *suffix = "\",\"00\",[],\"20000004\",\"1705c739\",\"64495522\",false]}";
+
+    char *json = malloc(strlen(prefix) + oversized + strlen(suffix) + 1);
+    TEST_ASSERT_NOT_NULL(json);
+
+    char *p = json;
+    p += sprintf(p, "%s", prefix);
+    memset(p, 'a', oversized);
+    p += oversized;
+    sprintf(p, "%s", suffix);
+
+    StratumApiV1Message msg = {};
+    TEST_ASSERT_FALSE(STRATUM_V1_parse(&msg, json));
+    TEST_ASSERT_NULL(msg.mining_notification);
+
+    free(json);
+}
 
 TEST_CASE("Parse stratum method", "[stratum]")
 {

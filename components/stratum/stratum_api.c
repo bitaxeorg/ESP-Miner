@@ -24,6 +24,10 @@
 #define TRANSPORT_TIMEOUT_MS 5000
 #define BUFFER_SIZE 1024
 #define MAX_EXTRANONCE_2_LEN 32
+// Upper bound on each coinbase half, in hex characters. Real coinbase transactions
+// run a few hundred characters; this is generous headroom while keeping the derived
+// binary buffer bounded.
+#define MAX_COINBASE_HEX_LEN 8192
 static const char * TAG = "stratum_api";
 
 static char * json_rpc_buffer = NULL;
@@ -265,6 +269,21 @@ static stratum_method parse_method(const cJSON *method_json)
     return METHOD_UNKNOWN;
 }
 
+// mining.notify fields are pool-controlled. cJSON leaves valuestring NULL for any
+// item that is not a string, and strdup()/hex2bin()/strtoul() all dereference their
+// argument immediately, so every field has to be type-checked before use.
+static const char *require_string_param(cJSON *params, int index, const char *name)
+{
+    cJSON *item = cJSON_GetArrayItem(params, index);
+
+    if (!cJSON_IsString(item) || item->valuestring == NULL) {
+        ESP_LOGE(TAG, "mining.notify params[%d] (%s) is not a string", index, name);
+        return NULL;
+    }
+
+    return item->valuestring;
+}
+
 static bool parse_mining_notify(cJSON *json, StratumApiV1Message *message)
 {
     cJSON *params = cJSON_GetObjectItem(json, "params");
@@ -278,56 +297,79 @@ static bool parse_mining_notify(cJSON *json, StratumApiV1Message *message)
         return false;
     }
 
+    // Every field below is attacker-controlled. cJSON leaves valuestring NULL for
+    // any item that is not a string, and both strdup() and hex2bin() dereference
+    // their argument immediately, so an unchecked field is a NULL dereference.
+    const char *job_id_str      = require_string_param(params, 0, "job_id");
+    const char *prev_hash_str   = require_string_param(params, 1, "prev_block_hash");
+    const char *coinbase_1_str  = require_string_param(params, 2, "coinbase_1");
+    const char *coinbase_2_str  = require_string_param(params, 3, "coinbase_2");
+    const char *version_str     = require_string_param(params, 5, "version");
+    const char *target_str      = require_string_param(params, 6, "nbits");
+    const char *ntime_str       = require_string_param(params, 7, "ntime");
+
+    if (!job_id_str || !prev_hash_str || !coinbase_1_str || !coinbase_2_str ||
+        !version_str || !target_str || !ntime_str) {
+        return false;
+    }
+
+    // The coinbase halves size a buffer downstream. Real coinbase transactions are
+    // a few hundred hex characters; anything approaching this bound is a protocol
+    // violation rather than a large block template.
+    if (strlen(coinbase_1_str) > MAX_COINBASE_HEX_LEN || strlen(coinbase_2_str) > MAX_COINBASE_HEX_LEN) {
+        ESP_LOGE(TAG, "Coinbase too long in mining.notify (limit %d hex chars)", MAX_COINBASE_HEX_LEN);
+        return false;
+    }
+
+    cJSON *merkle_branch = cJSON_GetArrayItem(params, 4);
+    if (!merkle_branch || !cJSON_IsArray(merkle_branch)) {
+        ESP_LOGE(TAG, "Invalid merkle_branch in mining.notify");
+        return false;
+    }
+    size_t n_merkle_branches = cJSON_GetArraySize(merkle_branch);
+    if (n_merkle_branches > MAX_MERKLE_BRANCHES) {
+        ESP_LOGE(TAG, "Too many Merkle branches: %zu", n_merkle_branches);
+        return false;
+    }
+    for (size_t i = 0; i < n_merkle_branches; i++) {
+        cJSON *branch = cJSON_GetArrayItem(merkle_branch, i);
+        if (!cJSON_IsString(branch) || branch->valuestring == NULL) {
+            ESP_LOGE(TAG, "Merkle branch %zu is not a string", i);
+            return false;
+        }
+    }
+
+    // Everything is validated; allocate only now so there is a single failure path.
     mining_notify *new_work = calloc(1, sizeof(mining_notify));
     if (!new_work) {
         ESP_LOGE(TAG, "Memory allocation failed for mining_notify");
         return false;
     }
 
-    cJSON *job_id_item = cJSON_GetArrayItem(params, 0);
-    if (!job_id_item || !cJSON_IsString(job_id_item)) {
-        ESP_LOGE(TAG, "Invalid job_id in mining.notify");
-        free(new_work);
+    new_work->job_id = strdup(job_id_str);
+    new_work->prev_block_hash = strdup(prev_hash_str);
+    new_work->coinbase_1 = strdup(coinbase_1_str);
+    new_work->coinbase_2 = strdup(coinbase_2_str);
+    new_work->n_merkle_branches = n_merkle_branches;
+    new_work->merkle_branches = n_merkle_branches ? malloc(HASH_SIZE * n_merkle_branches) : NULL;
+
+    if (!new_work->job_id || !new_work->prev_block_hash || !new_work->coinbase_1 ||
+        !new_work->coinbase_2 || (n_merkle_branches && !new_work->merkle_branches)) {
+        ESP_LOGE(TAG, "Memory allocation failed for mining.notify fields");
+        STRATUM_V1_free_mining_notify(new_work);
         return false;
     }
 
-    new_work->job_id = strdup(job_id_item->valuestring);
-    new_work->prev_block_hash = strdup(cJSON_GetArrayItem(params, 1)->valuestring);
-    new_work->coinbase_1 = strdup(cJSON_GetArrayItem(params, 2)->valuestring);
-    new_work->coinbase_2 = strdup(cJSON_GetArrayItem(params, 3)->valuestring);
-
-    cJSON *merkle_branch = cJSON_GetArrayItem(params, 4);
-    if (!merkle_branch || !cJSON_IsArray(merkle_branch)) {
-        ESP_LOGE(TAG, "Invalid merkle_branch in mining.notify");
-        free(new_work->job_id);
-        free(new_work->prev_block_hash);
-        free(new_work->coinbase_1);
-        free(new_work->coinbase_2);
-        free(new_work);
-        return false;
-    }
-    new_work->n_merkle_branches = cJSON_GetArraySize(merkle_branch);
-    if (new_work->n_merkle_branches > MAX_MERKLE_BRANCHES) {
-        ESP_LOGE(TAG, "Too many Merkle branches: %zu", new_work->n_merkle_branches);
-        free(new_work->job_id);
-        free(new_work->prev_block_hash);
-        free(new_work->coinbase_1);
-        free(new_work->coinbase_2);
-        free(new_work);
-        return false;
-    }
-    new_work->merkle_branches = malloc(HASH_SIZE * new_work->n_merkle_branches);
-    for (size_t i = 0; i < new_work->n_merkle_branches; i++) {
+    for (size_t i = 0; i < n_merkle_branches; i++) {
         hex2bin(cJSON_GetArrayItem(merkle_branch, i)->valuestring, new_work->merkle_branches + HASH_SIZE * i, HASH_SIZE);
     }
 
-    new_work->version = strtoul(cJSON_GetArrayItem(params, 5)->valuestring, NULL, 16);
-    new_work->target = strtoul(cJSON_GetArrayItem(params, 6)->valuestring, NULL, 16);
-    new_work->ntime = strtoul(cJSON_GetArrayItem(params, 7)->valuestring, NULL, 16);
+    new_work->version = strtoul(version_str, NULL, 16);
+    new_work->target = strtoul(target_str, NULL, 16);
+    new_work->ntime = strtoul(ntime_str, NULL, 16);
 
     // params can be variable length
-    int paramsLength = cJSON_GetArraySize(params);
-    int value = cJSON_IsTrue(cJSON_GetArrayItem(params, paramsLength - 1));
+    int value = cJSON_IsTrue(cJSON_GetArrayItem(params, params_count - 1));
     new_work->clean_jobs = value;
 
     message->mining_notification = new_work;
