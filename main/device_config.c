@@ -110,5 +110,26 @@ esp_err_t device_config_init(GlobalState * GLOBAL_STATE)
 
     free(board_version);
 
+    if (nvs_config_has_key(NVS_CONFIG_PIN_PROFILE)) {
+        char * pin_profile = nvs_config_get_string(NVS_CONFIG_PIN_PROFILE);
+        if (pin_profile == NULL) {
+            ESP_LOGE(TAG, "Failed to read pin profile");
+            return ESP_ERR_NO_MEM;
+        }
+
+        if (strcasecmp(pin_profile, "original") == 0) {
+            GLOBAL_STATE->DEVICE_CONFIG.pins = (DevicePins)BITAXE_ORIGINAL_PINS;
+        } else if (strcasecmp(pin_profile, "color") == 0) {
+            GLOBAL_STATE->DEVICE_CONFIG.pins = (DevicePins)BITAXE_COLOR_PINS;
+        } else {
+            ESP_LOGE(TAG, "Unknown pin profile: %s", pin_profile);
+            free(pin_profile);
+            return ESP_ERR_INVALID_ARG;
+        }
+
+        ESP_LOGI(TAG, "Pin Profile: %s", pin_profile);
+        free(pin_profile);
+    }
+
     return device_pins_init(&GLOBAL_STATE->DEVICE_CONFIG.pins);
 }

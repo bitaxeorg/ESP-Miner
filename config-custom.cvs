@@ -24,11 +24,15 @@ selftest,data,u16,1
 overheat_mode,data,u16,0
 # Custom Firmware Board overrides
 # Custom board version
+# Recognized board versions use their built-in family and ASIC.
+# Use an unknown board version to activate the devicemodel and asicmodel settings below.
 boardversion,data,string,207
 # Family (Max, Ultra, Supra, Gamma, Gamma_Turbo)
 devicemodel,data,string,ultra
 # ASIC (BM1397, BM1366, BM1368, BM1370)
 asicmodel,data,string,BM1366
+# Pin profile (original or color). Use color for the Bitaxe Color GPIO layout.
+pinprofile,data,string,original
 # PLUG_SENSE (0,1)
 plug_sense,data,u16,0
 # ASIC_ENABLE (0,1)
