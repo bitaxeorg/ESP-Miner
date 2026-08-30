@@ -11,7 +11,11 @@
 #include "system_api_json.h"
 #include "cjson_utils.h"
 
-#define WEBSOCKET_API_RATE_LIMIT_MS 500
+// One update per second. Every tick rebuilds the full system-info JSON tree and
+// diffs it against the previous one, which is the largest recurring CPU cost on
+// the device while the web UI is open. None of the telemetry it carries changes
+// faster than this, so a higher rate buys nothing.
+#define WEBSOCKET_API_RATE_LIMIT_MS 1000
 
 static const char *TAG = "websocket_api";
 static GlobalState *GLOBAL_STATE = NULL;
