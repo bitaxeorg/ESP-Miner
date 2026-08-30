@@ -32,6 +32,7 @@ esp_err_t device_config_init(GlobalState * GLOBAL_STATE)
         ESP_LOGI(TAG, "Custom Board Version: %s", board_version);
 
         GLOBAL_STATE->DEVICE_CONFIG.board_version = strdup(board_version);
+        GLOBAL_STATE->DEVICE_CONFIG.pins = (DevicePins)BITAXE_ORIGINAL_PINS;
 
         char * device_model = nvs_config_get_string(NVS_CONFIG_DEVICE_MODEL);
 
