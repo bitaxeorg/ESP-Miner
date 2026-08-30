@@ -351,8 +351,8 @@ int sv2_noise_handshake(sv2_noise_ctx_t *ctx, esp_transport_handle_t transport,
     // This is required by the Noise framework before processing any handshake tokens
     mix_hash(ctx->h, (const uint8_t *)"", 0);
 
-    ESP_LOGI(TAG, "h after MixHash(prologue):");
-    ESP_LOG_BUFFER_HEX_LEVEL(TAG, ctx->h, 32, ESP_LOG_INFO);
+    ESP_LOGD(TAG, "h after MixHash(prologue):");
+    ESP_LOG_BUFFER_HEX_LEVEL(TAG, ctx->h, 32, ESP_LOG_DEBUG);
 
     // Step 2: Generate ephemeral keypair
     ESP_LOGI(TAG, "Generating ephemeral keypair (ElligatorSwift)");
@@ -376,8 +376,8 @@ int sv2_noise_handshake(sv2_noise_ctx_t *ctx, esp_transport_handle_t transport,
 
     // Step 4: Send our 64-byte encoded ephemeral pubkey (-> Act 1)
     ESP_LOGI(TAG, "-> Sending ephemeral public key (64 bytes)");
-    ESP_LOGI(TAG, "e_pub (first 16):");
-    ESP_LOG_BUFFER_HEX_LEVEL(TAG, ctx->e_pub_encoded, 16, ESP_LOG_INFO);
+    ESP_LOGD(TAG, "e_pub (first 16):");
+    ESP_LOG_BUFFER_HEX_LEVEL(TAG, ctx->e_pub_encoded, 16, ESP_LOG_DEBUG);
     if (noise_send_all(transport, ctx->e_pub_encoded, 64) != 0) {
         ESP_LOGE(TAG, "Failed to send ephemeral key");
         return -1;
@@ -394,8 +394,8 @@ int sv2_noise_handshake(sv2_noise_ctx_t *ctx, esp_transport_handle_t transport,
 
     // Step 6: Parse responder ephemeral (bytes 0-63), mix into hash
     const uint8_t *re_pub = resp;
-    ESP_LOGI(TAG, "re_pub (first 16):");
-    ESP_LOG_BUFFER_HEX_LEVEL(TAG, re_pub, 16, ESP_LOG_INFO);
+    ESP_LOGD(TAG, "re_pub (first 16):");
+    ESP_LOG_BUFFER_HEX_LEVEL(TAG, re_pub, 16, ESP_LOG_DEBUG);
     mix_hash(ctx->h, re_pub, 64);
 
     // Step 7: ECDH #1 — our ephemeral with responder ephemeral
@@ -410,24 +410,15 @@ int sv2_noise_handshake(sv2_noise_ctx_t *ctx, esp_transport_handle_t transport,
     }
 
     // Step 8: HKDF to derive ck and temp_k
-    uint8_t temp_k[32];
-    ESP_LOGI(TAG, "ECDH shared (first 16):");
-    ESP_LOG_BUFFER_HEX_LEVEL(TAG, shared, 16, ESP_LOG_INFO);
-    ESP_LOGI(TAG, "ck before HKDF:");
-    ESP_LOG_BUFFER_HEX_LEVEL(TAG, ctx->ck, 16, ESP_LOG_INFO);
-    hkdf2(ctx->ck, shared, 32, ctx->ck, temp_k);
+    //
+    // The ECDH shared secret, the chaining key and the derived temp_k must never
+    // be logged. The log ring buffer is served unauthenticated over
+    // /api/system/logs and /api/ws, so dumping them there hands any LAN peer the
+    // keys to this Noise session. Do not reinstate these dumps for debugging —
+    // use a JTAG/UART session instead.
 
-    // DEBUG: Log all the values for comparison
-    ESP_LOGI(TAG, "h (AAD for decrypt):");
-    ESP_LOG_BUFFER_HEX_LEVEL(TAG, ctx->h, 32, ESP_LOG_INFO);
-    ESP_LOGI(TAG, "ck after HKDF:");
-    ESP_LOG_BUFFER_HEX_LEVEL(TAG, ctx->ck, 16, ESP_LOG_INFO);
-    ESP_LOGI(TAG, "temp_k for decrypt:");
-    ESP_LOG_BUFFER_HEX_LEVEL(TAG, temp_k, 32, ESP_LOG_INFO);
-    ESP_LOGI(TAG, "Ciphertext (first 32 bytes):");
-    ESP_LOG_BUFFER_HEX_LEVEL(TAG, resp + 64, 32, ESP_LOG_INFO);
-    ESP_LOGI(TAG, "MAC (last 16 of encrypted static):");
-    ESP_LOG_BUFFER_HEX_LEVEL(TAG, resp + 64 + 64, 16, ESP_LOG_INFO);
+    uint8_t temp_k[32];
+    hkdf2(ctx->ck, shared, 32, ctx->ck, temp_k);
 
     // Step 9: Decrypt responder's encrypted static key (bytes 64-143 = 80 bytes)
     // 80 bytes = 64 bytes ciphertext + 16 bytes MAC

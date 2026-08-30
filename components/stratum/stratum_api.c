@@ -553,7 +553,10 @@ bool STRATUM_V1_parse(StratumApiV1Message *message, const char *stratum_json)
 {
     STRATUM_V1_reset_message(message);
 
-    ESP_LOGI(TAG, "rx: %s", stratum_json); // debug incoming stratum messages
+    // Debug level only: every line lands in the log ring buffer, which is served
+    // unauthenticated over /api/system/logs and /api/ws. A mining.notify is several
+    // hundred bytes, so logging each one at INFO also costs CPU and PSRAM bandwidth.
+    ESP_LOGD(TAG, "rx: %s", stratum_json);
 
     cJSON *json = cJSON_Parse(stratum_json);
     if (!json) {
@@ -636,13 +639,15 @@ static void stamp_tx(int request_id, uint64_t timestamp_us)
     }
 }
 
+// Debug level only, for the same reason as the rx path above. Callers must not
+// pass a message that carries a credential — see STRATUM_V1_authorize().
 static void debug_stratum_tx(const char * msg)
 {
     char *newline = strchr(msg, '\n');
     if (newline) {
-        ESP_LOGI(TAG, "tx: %.*s", (int)(newline - msg), msg);
+        ESP_LOGD(TAG, "tx: %.*s", (int)(newline - msg), msg);
     } else {
-        ESP_LOGI(TAG, "tx: %s", msg);
+        ESP_LOGD(TAG, "tx: %s", msg);
     }
 }
 
@@ -688,7 +693,12 @@ int STRATUM_V1_authorize(esp_transport_handle_t transport, int send_uid, const c
     snprintf(authorize_msg, sizeof(authorize_msg),
         "{\"id\":%d,\"method\":\"mining.authorize\",\"params\":[\"%s\",\"%s\"]}\n",
         send_uid, username, pass);
-    debug_stratum_tx(authorize_msg);
+
+    // Deliberately not routed through debug_stratum_tx(): the pool password must
+    // never reach the log ring buffer, which is readable over the network. The
+    // REST API masks it as "*****" for the same reason.
+    ESP_LOGD(TAG, "tx: {\"id\":%d,\"method\":\"mining.authorize\",\"params\":[\"%s\",\"<redacted>\"]}",
+        send_uid, username);
 
     return esp_transport_write(transport, authorize_msg, strlen(authorize_msg), TRANSPORT_TIMEOUT_MS);
 }
