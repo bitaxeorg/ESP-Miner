@@ -44,6 +44,31 @@ static const char *get_reset_reason_str(esp_reset_reason_t reason)
     }
 }
 
+// Unlike the other heap counters, heap_caps_get_largest_free_block() walks the
+// heap free list with the heap lock held, blocking every other task's malloc()
+// while it runs. This telemetry is emitted on the live WebSocket feed as well as
+// on GET /api/system/info, so at the feed's cadence that walk would stall
+// allocations several times a second. It is a diagnostic rather than a live
+// metric, so serve it from a short-lived cache.
+//
+// The statics are shared between the httpd task and the WebSocket API task
+// without a lock. Both are 32-bit aligned so neither can tear, and the worst
+// case of a race is one redundant walk or a value a few seconds stale.
+#define MAX_ALLOC_HEAP_CACHE_US (5 * 1000 * 1000)
+
+static size_t get_max_alloc_heap_cached(void)
+{
+    static size_t cached = 0;
+    static int64_t cached_at_us = 0;
+
+    int64_t now_us = esp_timer_get_time();
+    if (cached_at_us == 0 || (now_us - cached_at_us) >= MAX_ALLOC_HEAP_CACHE_US) {
+        cached = heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL);
+        cached_at_us = now_us;
+    }
+    return cached;
+}
+
 static void system_api_add_telemetry(cJSON *root, GlobalState *g) {
     if (!root || !g) return;
 
@@ -94,7 +119,7 @@ static void system_api_add_telemetry(cJSON *root, GlobalState *g) {
     cJSON_AddNumberToObject(root, "freeHeapInternal", heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
     cJSON_AddNumberToObject(root, "freeHeapSpiram", heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
     cJSON_AddNumberToObject(root, "minFreeHeap", esp_get_minimum_free_heap_size());
-    cJSON_AddNumberToObject(root, "maxAllocHeap", heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL));
+    cJSON_AddNumberToObject(root, "maxAllocHeap", get_max_alloc_heap_cached());
     cJSON_AddNumberToObject(root, "uptimeSeconds", g->SYSTEM_MODULE.uptime_seconds);
     cJSON_AddNumberToObject(root, "totalUptimeSeconds", SYSTEM_noinit_get_total_uptime_seconds());
     cJSON_AddNumberToObject(root, "totalHashes", SYSTEM_noinit_get_total_hashes());
