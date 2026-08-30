@@ -313,7 +313,7 @@ uint8_t BM1373_init(GlobalState * GLOBAL_STATE)
     detected_voltage_domains = GLOBAL_STATE->DEVICE_CONFIG.family.voltage_domains;
     chip_command_address_interval = BM1372_SET_ADDRESS_STRIDE >> BM1372_COMMAND_ADDRESS_SHIFT;
     chip_response_address_interval = BM1372_SET_ADDRESS_STRIDE;
-    chip_nonce_address_interval = 256 / detected_chip_count;
+    chip_nonce_address_interval = 255 / detected_chip_count;
     if (chip_nonce_address_interval == 0) {
         ESP_LOGE(TAG, "Invalid nonce address interval for %u ASICs", detected_chip_count);
         return 0;
