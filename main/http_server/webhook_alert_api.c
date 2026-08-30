@@ -4,14 +4,17 @@
 
 #include "cJSON.h"
 #include "esp_http_server.h"
+#include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 
 #include "http_server.h"
 #include "nvs_config.h"
 #include "webhook_alert_api.h"
+#include "webhook_alert_utils.h"
 #include "webhook_alerts.h"
 
 #define WEBHOOK_ALERT_REQUEST_MAX_LEN 1024
+#define WEBHOOK_ALERT_REQUEST_DEADLINE_MS 10000
 #define WEBHOOK_ALERT_TEST_TIMEOUT_MS 6000
 
 static int response_prebuffer_len = 160;
@@ -65,9 +68,23 @@ static esp_err_t receive_json(httpd_req_t *req, cJSON **root)
     }
 
     int received_total = 0;
+    int64_t request_start_us = esp_timer_get_time();
     while (received_total < req->content_len) {
+        if (WEBHOOK_ALERT_UTILS_deadline_expired(request_start_us, esp_timer_get_time(),
+                                                 WEBHOOK_ALERT_REQUEST_DEADLINE_MS)) {
+            free(body);
+            httpd_resp_set_status(req, "408 Request Timeout");
+            return httpd_resp_send(req, "Request body timed out", HTTPD_RESP_USE_STRLEN);
+        }
+
         int received = httpd_req_recv(req, body + received_total, req->content_len - received_total);
         if (received == HTTPD_SOCK_ERR_TIMEOUT) {
+            if (WEBHOOK_ALERT_UTILS_deadline_expired(request_start_us, esp_timer_get_time(),
+                                                     WEBHOOK_ALERT_REQUEST_DEADLINE_MS)) {
+                free(body);
+                httpd_resp_set_status(req, "408 Request Timeout");
+                return httpd_resp_send(req, "Request body timed out", HTTPD_RESP_USE_STRLEN);
+            }
             continue;
         }
         if (received <= 0) {
@@ -75,6 +92,12 @@ static esp_err_t receive_json(httpd_req_t *req, cJSON **root)
             return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid request body");
         }
         received_total += received;
+        if (WEBHOOK_ALERT_UTILS_deadline_expired(request_start_us, esp_timer_get_time(),
+                                                 WEBHOOK_ALERT_REQUEST_DEADLINE_MS)) {
+            free(body);
+            httpd_resp_set_status(req, "408 Request Timeout");
+            return httpd_resp_send(req, "Request body timed out", HTTPD_RESP_USE_STRLEN);
+        }
     }
     body[received_total] = '\0';
 

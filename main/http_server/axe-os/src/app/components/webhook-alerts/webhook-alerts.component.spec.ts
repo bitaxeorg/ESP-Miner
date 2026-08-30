@@ -68,6 +68,22 @@ describe('WebhookAlertsComponent', () => {
     expect(component.form.controls['webhookUrl'].invalid).toBeTrue();
   });
 
+  it('rejects malformed or out-of-range webhook ports', () => {
+    for (const url of [
+      'https://example.com:notaport/hook',
+      'https://example.com:0/hook',
+      'https://example.com:65536/hook',
+    ]) {
+      component.form.controls['webhookUrl'].setValue(url);
+      expect(component.form.controls['webhookUrl'].invalid).withContext(url).toBeTrue();
+    }
+  });
+
+  it('rejects non-ASCII webhook URLs before submission', () => {
+    component.form.controls['webhookUrl'].setValue('https://example.com/hook-\u00e9');
+    expect(component.form.controls['webhookUrl'].invalid).toBeTrue();
+  });
+
   it('preserves the sentinel when saving switches', () => {
     systemService.updateWebhookAlertSettings.and.returnValue(of({
       hasWebhook: true,
@@ -92,5 +108,21 @@ describe('WebhookAlertsComponent', () => {
     component.form.controls['bestDiffEnabled'].setValue(true);
     component.form.markAsDirty();
     expect(component.testDisabled).toBeTrue();
+  });
+
+  it('uses responsive sizing that keeps labels and actions readable', () => {
+    const labels = Array.from(
+      fixture.nativeElement.querySelectorAll('form > div > label')
+    ) as HTMLElement[];
+    const actionRow = fixture.nativeElement.querySelector('[data-testid="webhook-actions"]') as HTMLElement;
+    const actionButtons = Array.from(actionRow.querySelectorAll('button')) as HTMLElement[];
+
+    expect(labels.every(label => label.classList.contains('md:w-3/12'))).toBeTrue();
+    expect(labels.every(label => label.classList.contains('xl:w-2/12'))).toBeTrue();
+    expect(actionRow.classList.contains('flex-col')).toBeTrue();
+    expect(actionRow.classList.contains('sm:flex-row')).toBeTrue();
+    expect(actionButtons.every(button => button.classList.contains('w-full'))).toBeTrue();
+    expect(actionButtons.every(button => button.classList.contains('sm:w-auto'))).toBeTrue();
+    expect(actionButtons.every(button => button.classList.contains('whitespace-nowrap'))).toBeTrue();
   });
 });

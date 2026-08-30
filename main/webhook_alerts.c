@@ -18,6 +18,7 @@
 #include "global_state.h"
 #include "nvs_config.h"
 #include "utils.h"
+#include "webhook_alert_utils.h"
 #include "webhook_alerts.h"
 
 #define WEBHOOK_ALERT_QUEUE_LENGTH 4
@@ -36,15 +37,22 @@ typedef struct {
     WebhookEventType type;
     double difficulty;
     double network_difficulty;
+    uint32_t request_id;
     bool report_result;
     bool simulated;
 } WebhookAlertEvent;
+
+typedef struct {
+    uint32_t request_id;
+    esp_err_t result;
+} WebhookAlertResult;
 
 static const char *TAG = "webhook_alerts";
 static GlobalState *GLOBAL_STATE = NULL;
 static QueueHandle_t alert_queue = NULL;
 static QueueHandle_t test_result_queue = NULL;
 static SemaphoreHandle_t test_mutex = NULL;
+static uint32_t next_test_request_id = 0;
 
 static void cleanup_alert_resources(void)
 {
@@ -65,45 +73,7 @@ static void cleanup_alert_resources(void)
 
 bool WEBHOOK_ALERTS_is_valid_url(const char *url)
 {
-    if (url == NULL) {
-        return false;
-    }
-
-    size_t len = strlen(url);
-    if (len <= strlen("https://") || len > WEBHOOK_ALERT_URL_MAX_LEN) {
-        return false;
-    }
-    if (strncmp(url, "https://", strlen("https://")) != 0) {
-        return false;
-    }
-
-    for (size_t i = 0; i < len; i++) {
-        if (iscntrl((unsigned char) url[i]) || isspace((unsigned char) url[i])) {
-            return false;
-        }
-    }
-
-    const char *authority = url + strlen("https://");
-    const char *authority_end = authority;
-    while (*authority_end != '\0' && *authority_end != '/' && *authority_end != '?' && *authority_end != '#') {
-        authority_end++;
-    }
-    if (authority_end == authority || strchr(url, '#') != NULL) {
-        return false;
-    }
-
-    size_t authority_len = authority_end - authority;
-    if (memchr(authority, '@', authority_len) != NULL) {
-        return false;
-    }
-
-    const char *host_end = memchr(authority, ':', authority_len);
-    if (host_end == NULL) {
-        host_end = authority_end;
-    }
-    size_t host_len = host_end - authority;
-    const char *dot = memchr(authority, '.', host_len);
-    return dot != NULL && dot != authority && dot + 1 < host_end;
+    return WEBHOOK_ALERT_UTILS_is_valid_url(url, WEBHOOK_ALERT_URL_MAX_LEN);
 }
 
 bool WEBHOOK_ALERTS_has_webhook(void)
@@ -161,10 +131,29 @@ static bool is_watchdog_reset(esp_reset_reason_t reason)
     return reason == ESP_RST_INT_WDT || reason == ESP_RST_TASK_WDT || reason == ESP_RST_WDT;
 }
 
+static void sanitize_hostname(const char *hostname, char *safe_hostname, size_t safe_hostname_len)
+{
+    if (safe_hostname_len == 0) {
+        return;
+    }
+
+    const char *source = hostname != NULL && hostname[0] != '\0' ? hostname : "Bitaxe";
+    size_t output_index = 0;
+    while (source[output_index] != '\0' && output_index + 1 < safe_hostname_len) {
+        unsigned char character = (unsigned char) source[output_index];
+        safe_hostname[output_index] = isalnum(character) || character == '.' || character == '-' || character == '_'
+                                        ? (char) character
+                                        : '_';
+        output_index++;
+    }
+    safe_hostname[output_index] = '\0';
+}
+
 static void build_message(const WebhookAlertEvent *event, char *message, size_t message_len)
 {
     char *hostname = nvs_config_get_string(NVS_CONFIG_HOSTNAME);
-    const char *safe_hostname = hostname && hostname[0] != '\0' ? hostname : "Bitaxe";
+    char safe_hostname[33];
+    sanitize_hostname(hostname, safe_hostname, sizeof(safe_hostname));
     const char *safe_ip = "unknown";
     if (GLOBAL_STATE != NULL && GLOBAL_STATE->SYSTEM_MODULE.ip_addr_str[0] != '\0') {
         safe_ip = GLOBAL_STATE->SYSTEM_MODULE.ip_addr_str;
@@ -288,13 +277,17 @@ static void webhook_alert_task(void *parameter)
 
         esp_err_t result = deliver_event(&event);
         if (event.report_result && test_result_queue != NULL) {
-            xQueueOverwrite(test_result_queue, &result);
+            WebhookAlertResult test_result = {
+                .request_id = event.request_id,
+                .result = result,
+            };
+            xQueueOverwrite(test_result_queue, &test_result);
         }
     }
 }
 
 static esp_err_t enqueue_event(WebhookEventType type, double difficulty, double network_difficulty,
-                               bool report_result, bool simulated)
+                               uint32_t request_id, bool report_result, bool simulated)
 {
     if (alert_queue == NULL || !WEBHOOK_ALERTS_has_webhook() || !event_enabled(type)) {
         return ESP_ERR_INVALID_STATE;
@@ -304,6 +297,7 @@ static esp_err_t enqueue_event(WebhookEventType type, double difficulty, double 
         .type = type,
         .difficulty = difficulty,
         .network_difficulty = network_difficulty,
+        .request_id = request_id,
         .report_result = report_result,
         .simulated = simulated,
     };
@@ -323,7 +317,7 @@ esp_err_t WEBHOOK_ALERTS_init(GlobalState *global_state)
 
     GLOBAL_STATE = global_state;
     alert_queue = xQueueCreate(WEBHOOK_ALERT_QUEUE_LENGTH, sizeof(WebhookAlertEvent));
-    test_result_queue = xQueueCreate(1, sizeof(esp_err_t));
+    test_result_queue = xQueueCreate(1, sizeof(WebhookAlertResult));
     test_mutex = xSemaphoreCreateMutex();
     if (alert_queue == NULL || test_result_queue == NULL || test_mutex == NULL) {
         cleanup_alert_resources();
@@ -343,18 +337,18 @@ esp_err_t WEBHOOK_ALERTS_init(GlobalState *global_state)
 void WEBHOOK_ALERTS_notify_startup(void)
 {
     if (is_watchdog_reset(esp_reset_reason())) {
-        enqueue_event(WEBHOOK_EVENT_WATCHDOG_RESET, 0, 0, false, false);
+        enqueue_event(WEBHOOK_EVENT_WATCHDOG_RESET, 0, 0, 0, false, false);
     }
 }
 
 void WEBHOOK_ALERTS_notify_block_found(double difficulty, double network_difficulty)
 {
-    enqueue_event(WEBHOOK_EVENT_BLOCK_FOUND, difficulty, network_difficulty, false, false);
+    enqueue_event(WEBHOOK_EVENT_BLOCK_FOUND, difficulty, network_difficulty, 0, false, false);
 }
 
 void WEBHOOK_ALERTS_notify_best_difficulty(double difficulty, double network_difficulty)
 {
-    enqueue_event(WEBHOOK_EVENT_BEST_DIFFICULTY, difficulty, network_difficulty, false, false);
+    enqueue_event(WEBHOOK_EVENT_BEST_DIFFICULTY, difficulty, network_difficulty, 0, false, false);
 }
 
 esp_err_t WEBHOOK_ALERTS_send_test(TickType_t timeout_ticks)
@@ -372,8 +366,13 @@ esp_err_t WEBHOOK_ALERTS_send_test_event(WebhookAlertTestEvent test_event, TickT
         return ESP_ERR_INVALID_STATE;
     }
 
-    esp_err_t stale_result;
+    WebhookAlertResult stale_result;
     xQueueReceive(test_result_queue, &stale_result, 0);
+
+    uint32_t request_id = ++next_test_request_id;
+    if (request_id == 0) {
+        request_id = ++next_test_request_id;
+    }
 
     double network_difficulty = 0;
     double difficulty = 0;
@@ -394,10 +393,25 @@ esp_err_t WEBHOOK_ALERTS_send_test_event(WebhookAlertTestEvent test_event, TickT
         difficulty = 1;
     }
 
-    esp_err_t result = enqueue_event(event_type, difficulty, network_difficulty, true,
+    esp_err_t result = enqueue_event(event_type, difficulty, network_difficulty, request_id, true,
                                      test_event != WEBHOOK_ALERT_TEST_GENERIC);
-    if (result == ESP_OK && xQueueReceive(test_result_queue, &result, timeout_ticks) != pdTRUE) {
+    if (result == ESP_OK) {
+        TickType_t start_ticks = xTaskGetTickCount();
+        TickType_t remaining_ticks = timeout_ticks;
         result = ESP_ERR_TIMEOUT;
+
+        while (remaining_ticks > 0) {
+            WebhookAlertResult test_result;
+            if (xQueueReceive(test_result_queue, &test_result, remaining_ticks) != pdTRUE) {
+                break;
+            }
+            if (WEBHOOK_ALERT_UTILS_result_matches(request_id, test_result.request_id)) {
+                result = test_result.result;
+                break;
+            }
+            remaining_ticks = (TickType_t) WEBHOOK_ALERT_UTILS_remaining_ticks(
+                (uint32_t) start_ticks, (uint32_t) xTaskGetTickCount(), (uint32_t) timeout_ticks);
+        }
     }
 
     xSemaphoreGive(test_mutex);

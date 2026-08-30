@@ -82,6 +82,7 @@ REQUIRES
     "dns_server"
     "stratum"
     "stratum_v2"
+    "webhook_alert_utils"
 
 PRIV_REQUIRES
     "app_update"

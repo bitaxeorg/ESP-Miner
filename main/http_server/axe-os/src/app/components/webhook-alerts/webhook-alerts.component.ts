@@ -17,13 +17,15 @@ function webhookUrlValidator(control: AbstractControl): ValidationErrors | null 
   if (!value || value === WEBHOOK_SENTINEL) {
     return null;
   }
-  if (value.length > 512 || /\s/.test(value)) {
+  if (value.length > 512 || /[^\x21-\x7e]/.test(value)) {
     return { webhookUrl: true };
   }
   try {
     const parsed = new URL(value);
+    const validPort = !parsed.port || (/^\d+$/.test(parsed.port) && Number(parsed.port) >= 1 && Number(parsed.port) <= 65535);
     return parsed.protocol === 'https:' &&
       parsed.hostname.includes('.') &&
+      validPort &&
       !parsed.username &&
       !parsed.password &&
       !parsed.hash
