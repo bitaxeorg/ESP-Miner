@@ -145,14 +145,6 @@ void app_main(void)
 
     if (!GLOBAL_STATE.SELF_TEST_MODULE.is_active) {
         wifi_init(&GLOBAL_STATE);
-        ESP_LOGI(TAG, "Starting SNTP");
-        esp_sntp_config_t config = ESP_NETIF_SNTP_DEFAULT_CONFIG("pool.ntp.org");
-        config.start = true;
-        config.smooth_sync = true;
-        config.server_from_dhcp = true;
-        config.renew_servers_after_new_IP = true;
-        config.ip_event_to_renew = IP_EVENT_STA_GOT_IP;
-        esp_netif_sntp_init(&config);
     }
 
     esp_err_t system_init_ret = SYSTEM_init_peripherals(&GLOBAL_STATE);
@@ -205,12 +197,24 @@ void app_main(void)
     // Connected to WiFi: tear down the setup BLE service to free the radio.
     setup_ble_stop();
 
-    int retry = 15;
-    while (esp_netif_sntp_sync_wait(2000 / portTICK_PERIOD_MS) == ESP_ERR_TIMEOUT && --retry >= 0) {
-        ESP_LOGI(TAG, "Waiting for NTP... (%d attempts remaining)", retry);
-    }
-    if (retry == -1) {
-        ESP_LOGW(TAG, "Failed to get NTP in time! Certificate validation may fail!");
+    if (nvs_config_get_bool(NVS_CONFIG_USE_NTP)) {
+        ESP_LOGI(TAG, "Starting SNTP");
+        // default to pool.ntp.org to find the nearest NTP server if none are provided by DHCP
+        esp_sntp_config_t config = ESP_NETIF_SNTP_DEFAULT_CONFIG("pool.ntp.org");
+        config.start = true;
+        config.smooth_sync = true;
+        config.server_from_dhcp = true;
+        config.renew_servers_after_new_IP = true; // replace default with DHCP-provided server(s)
+        config.ip_event_to_renew = IP_EVENT_STA_GOT_IP;
+        esp_netif_sntp_init(&config);
+
+        int retry = 15;
+        while (esp_netif_sntp_sync_wait(2000 / portTICK_PERIOD_MS) == ESP_ERR_TIMEOUT && --retry >= 0) {
+            ESP_LOGI(TAG, "Waiting for NTP... (%d attempts remaining)", retry);
+        }
+        if (retry == -1) {
+            ESP_LOGW(TAG, "Failed to get NTP in time! Certificate validation may fail!");
+        }
     }
 
     queue_init(&GLOBAL_STATE.stratum_queue);
