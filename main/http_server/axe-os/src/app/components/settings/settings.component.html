@@ -1,4 +1,5 @@
 <div [ngClass]="{'card': (form$ | async), 'hidden': !(form$ | async)}">
     <h2>Settings</h2>
     <app-edit></app-edit>
+    <app-webhook-alerts></app-webhook-alerts>
 </div>
