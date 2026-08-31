@@ -46,7 +46,7 @@ jobs:
         with:
           esp_idf_version: v6.0.2
           target: esp32s3
-          command: /opt/esp/idf/components/nvs_flash/nvs_partition_generator/nvs_partition_gen.py generate config-${{ matrix.build_type }}.cvs config.bin 0x6000
+          command: /opt/esp/idf/components/nvs_flash/nvs_partition_generator/nvs_partition_gen.py generate configs/config-${{ matrix.build_type }}.cvs config.bin 0x6000
           path: '.'
       - uses: actions/setup-python@v6
         with:

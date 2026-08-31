@@ -15,7 +15,7 @@ ESP-Miner is the firmware powering the Bitaxe open-source Bitcoin ASIC miners. I
 ├── main/                       # Main application source code
 │   └── http_server/            # C-based HTTP server logic
 │       └── axe-os/             # Axe-OS Angular Frontend
-├── config-*.cvs                # Hardware-specific configuration files
+├── configs/                    # Hardware-specific NVS configuration files
 ├── partitions.csv              # Flash partition layout
 └── sdkconfig                   # Project-wide ESP-IDF configuration
 ```
