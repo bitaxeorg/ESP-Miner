@@ -59,8 +59,43 @@ npm run start
 
 ## Testing
 
-### Internal C Components (Unity & QEMU)
-Backend firmware unit tests use the Unity test framework and run under QEMU emulation (`esp32s3` machine target) in CI.
+### Internal C Components (Host, Unity & QEMU)
+Before adding or changing a C test, read the canonical
+[unit-testing strategy and contribution guide](doc/unit_testing.md). It defines
+the host/QEMU/device/hardware boundaries, tag classifications, CMake
+registration, shim rules, and required validation.
+
+Portable backend unit tests compile their production C sources natively and
+run under GCC/Clang with sanitizers in CI. From the repository root, run:
+
+```bash
+./tools/run_host_tests.sh
+# Or, after configuring the ESP-IDF project:
+idf.py host-test
+```
+
+When adding a portable test, keep its single source of truth under
+`components/<component>/test`, register a new test file and its production
+sources in `host-tests/CMakeLists.txt`, and run:
+
+```bash
+python3 tools/test_inventory.py --check
+./tools/run_host_tests.sh '[affected-tag]'
+./tools/run_host_tests.sh --all
+```
+
+Do not make production modules host-testable by compiling out their ESP
+dependencies. Split portable logic from platform behavior and select behavioral
+adapters at link time. For simple compatibility surfaces such as `esp_log.h`,
+use the general host compatibility code under `host-tests`; do not create a
+module-specific shim solely to replace an existing platform API.
+
+Tests tagged `[qemu-integration]`, `[device-integration]`, or `[hardware]` must
+live in a dedicated source file and must not be registered with the host suite.
+Use `[not-on-qemu]` for device/hardware tests that QEMU must skip.
+
+ESP-IDF integration tests continue to use the Unity framework under QEMU
+emulation (`esp32s3` machine target) in CI.
 
 **Run locally using the helper script:**
 ```bash
@@ -73,7 +108,7 @@ cd test-ci
 idf.py build
 cd build
 esptool --chip esp32s3 merge-bin --pad-to-size 16MB -o flash_image.bin @flash_args
-qemu-system-xtensa -machine esp32s3 -monitor none -nographic -no-reboot -watchdog-action shutdown -drive file=flash_image.bin,if=mtd,format=raw -m 4 -serial stdio
+qemu-system-xtensa -machine esp32s3 -nographic -no-reboot -drive file=flash_image.bin,if=mtd,format=raw
 ```
 *Note: Test cases tagged with `[not-on-qemu]` (such as hardware-specific ASIC nonce tests) are automatically skipped in QEMU emulation.*
 
