@@ -21,7 +21,16 @@ void calculate_coinbase_tx_hash(const char *coinbase_1, const char *coinbase_2, 
 
     size_t coinbase_tx_bin_len = (len1 + len2 + len3 + len4) / 2;
 
-    uint8_t coinbase_tx_bin[coinbase_tx_bin_len];
+    // This length is derived from pool-supplied strings, so it must not size a
+    // stack allocation. A variable length array here put an unbounded amount of
+    // attacker-influenced data on the caller's 8 KB task stack, and with the
+    // canary-based overflow check the corruption is only noticed at the next
+    // context switch. Use the heap, as calculate_coinbase_tx_hash_bin() does.
+    uint8_t *coinbase_tx_bin = malloc(coinbase_tx_bin_len);
+    if (coinbase_tx_bin == NULL) {
+        memset(dest, 0, 32);
+        return;
+    }
 
     size_t bin_offset = 0;
     bin_offset += hex2bin(coinbase_1, coinbase_tx_bin + bin_offset, coinbase_tx_bin_len - bin_offset);
@@ -30,6 +39,8 @@ void calculate_coinbase_tx_hash(const char *coinbase_1, const char *coinbase_2, 
     bin_offset += hex2bin(coinbase_2, coinbase_tx_bin + bin_offset, coinbase_tx_bin_len - bin_offset);
 
     double_sha256_bin(coinbase_tx_bin, coinbase_tx_bin_len, dest);
+
+    free(coinbase_tx_bin);
 }
 
 void calculate_coinbase_tx_hash_bin(const uint8_t *prefix, size_t prefix_len,
