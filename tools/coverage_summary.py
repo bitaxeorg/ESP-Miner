@@ -87,8 +87,13 @@ def add_breadth_gate(summary: dict, minimum_breadth: float) -> bool:
     return passed
 
 
-def add_full_file_gates(summary: dict, report: dict, filenames: list[str]) -> bool:
-    """Require complete line and function coverage for selected files."""
+def add_full_file_gates(
+    summary: dict,
+    report: dict,
+    filenames: list[str],
+    minimum_branch_percent: float = 0.0,
+) -> bool:
+    """Require complete line/function coverage and a branch floor for selected files."""
 
     entries = {entry["filename"]: entry for entry in report["files"]}
     gates = []
@@ -115,6 +120,27 @@ def add_full_file_gates(summary: dict, report: dict, filenames: list[str]) -> bo
                 "passed": metric_passed,
             }
             passed = passed and metric_passed
+
+        branch_total = entry.get("branch_total")
+        branch_covered = entry.get("branch_covered")
+        if (
+            not isinstance(branch_total, int)
+            or branch_total < 0
+            or not isinstance(branch_covered, int)
+        ):
+            raise ValueError(
+                f"required coverage file has invalid branch totals: {filename}"
+            )
+        branch_percent = percentage(branch_covered, branch_total)
+        branch_passed = branch_percent >= minimum_branch_percent
+        metrics["branches"] = {
+            "total": branch_total,
+            "covered": branch_covered,
+            "percent": branch_percent,
+            "minimum_percent": minimum_branch_percent,
+            "passed": branch_passed,
+        }
+        passed = passed and branch_passed
 
         gates.append({"filename": filename, **metrics, "passed": passed})
 
@@ -156,13 +182,15 @@ def format_text(summary: dict) -> str:
     ]
 
     if summary.get("full_file_gates"):
-        output.extend(["", "Required file coverage (100% lines and functions):"])
+        output.extend(["", "Required file coverage:"])
         for file_gate in summary["full_file_gates"]:
             status = "PASS" if file_gate["passed"] else "FAIL"
             output.append(
                 f"  {file_gate['filename']}: "
                 f"lines {file_gate['lines']['covered']}/{file_gate['lines']['total']}, "
                 f"functions {file_gate['functions']['covered']}/{file_gate['functions']['total']} "
+                f"(both 100%); branches {file_gate['branches']['percent']:.1f}% "
+                f"(floor {file_gate['branches']['minimum_percent']:.1f}%) "
                 f"[{status}]"
             )
 
@@ -202,9 +230,11 @@ def format_markdown(summary: dict) -> str:
     for file_gate in summary.get("full_file_gates", []):
         status = "PASS" if file_gate["passed"] else "FAIL"
         output.append(
-            f"| Required: `{file_gate['filename']}` lines/functions | "
+            f"| Required: `{file_gate['filename']}` | "
             f"{file_gate['lines']['covered']}/{file_gate['lines']['total']} lines; "
-            f"{file_gate['functions']['covered']}/{file_gate['functions']['total']} functions "
+            f"{file_gate['functions']['covered']}/{file_gate['functions']['total']} functions; "
+            f"{file_gate['branches']['percent']:.1f}% branches "
+            f"(floor {file_gate['branches']['minimum_percent']:.1f}%) "
             f"{status} |"
         )
 
@@ -241,6 +271,12 @@ def main() -> int:
         default=[],
         help="require 100%% line and function coverage for this report path",
     )
+    parser.add_argument(
+        "--required-file-branch-floor",
+        type=parse_percentage,
+        default=0.0,
+        help="minimum branch coverage for every required file",
+    )
     arguments = parser.parse_args()
 
     try:
@@ -248,7 +284,10 @@ def main() -> int:
         summary = summarize(report)
         breadth_passed = add_breadth_gate(summary, arguments.fail_under_breadth)
         files_passed = add_full_file_gates(
-            summary, report, arguments.require_fully_covered_file
+            summary,
+            report,
+            arguments.require_fully_covered_file,
+            arguments.required_file_branch_floor,
         )
     except (KeyError, OSError, json.JSONDecodeError, ValueError) as error:
         print(f"ERROR: unable to summarize coverage: {error}", file=sys.stderr)
@@ -273,7 +312,7 @@ def main() -> int:
         if not file_gate["passed"]:
             print(
                 f"ERROR: {file_gate['filename']} does not have 100% line and "
-                "function coverage",
+                "function coverage or meet its branch floor",
                 file=sys.stderr,
             )
 

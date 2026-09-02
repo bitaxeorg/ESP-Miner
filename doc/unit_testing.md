@@ -138,7 +138,7 @@ as 0% and contributes to the coverage totals.
 
 The source-file instrumentation breadth is the number of report files with
 compiler coverage points divided by the complete eligible source inventory.
-The foundation baseline is 9 of 76 files (11.8%). The inventory is discovered
+The foundation baseline is 10 of 82 files (12.2%). The inventory is discovered
 automatically rather than enumerated: every C or C++ source under `components`
 and `main` is eligible, subject only to the explicit exclusions below. The
 current inventory matches the repository-owned sources registered in the
@@ -177,17 +177,18 @@ percentage.
 After removing third-party sources from the measured set, CI enforces two
 different kinds of non-regression floor:
 
-- Source-file instrumentation breadth: 11.8% (9 of 76 eligible files).
+- Source-file instrumentation breadth: 11.8% floor (currently 10 of 82 files,
+  or 12.2%).
 - Coverage depth within instrumented files: 58% line and 49% branch coverage.
-- `components/stratum/sv1_protocol.c`: 100% line and function coverage.
+- `components/stratum/sv1_protocol.c`: 100% line and function coverage and at
+  least 90% branch coverage.
 
 These are baselines, not quality targets. New or changed portable behavior
 should be covered, and thresholds should only move upward as gaps are closed.
 The SV1 protocol file has its own non-regression gate because its parser and
-encoders form the compatibility boundary for later ASIC job changes. Branch
-coverage remains visible in the report and should improve as meaningful input
-paths are added; compiler-generated and unreachable defensive edges are not
-part of the per-file 100% gate.
+encoders form the compatibility boundary for later ASIC job changes. The
+branch floor protects meaningful decisions without claiming that defensive
+allocation failures and compiler-generated edges are all practical to force.
 Local diagnostic runs can override the floors with
 `ESP_MINER_COVERAGE_MIN_BREADTH`, `ESP_MINER_COVERAGE_MIN_LINE`, and
 `ESP_MINER_COVERAGE_MIN_BRANCH`; CI must use the checked-in defaults. Breadth

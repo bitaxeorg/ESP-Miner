@@ -21,6 +21,8 @@ class CoverageSummaryTest(unittest.TestCase):
                     "line_covered": 1,
                     "function_total": 1,
                     "function_covered": 1,
+                    "branch_total": 2,
+                    "branch_covered": 2,
                 },
                 {
                     "filename": "components/example/uncovered.c",
@@ -28,6 +30,8 @@ class CoverageSummaryTest(unittest.TestCase):
                     "line_covered": 0,
                     "function_total": 1,
                     "function_covered": 0,
+                    "branch_total": 2,
+                    "branch_covered": 1,
                 },
                 {
                     "filename": "main/platform_only.c",
@@ -35,6 +39,8 @@ class CoverageSummaryTest(unittest.TestCase):
                     "line_covered": 0,
                     "function_total": 0,
                     "function_covered": 0,
+                    "branch_total": 0,
+                    "branch_covered": 0,
                 },
             ],
             "line_total": 2,
@@ -84,6 +90,21 @@ class CoverageSummaryTest(unittest.TestCase):
             )
         )
 
+    def test_full_file_gate_enforces_branch_floor(self) -> None:
+        summary = coverage_summary.summarize(self.report)
+
+        self.report["files"][0]["branch_covered"] = 1
+        self.assertTrue(
+            coverage_summary.add_full_file_gates(
+                summary, self.report, ["components/example/covered.c"], 50.0
+            )
+        )
+        self.assertFalse(
+            coverage_summary.add_full_file_gates(
+                summary, self.report, ["components/example/covered.c"], 50.1
+            )
+        )
+
     def test_full_file_gate_rejects_a_missing_file(self) -> None:
         summary = coverage_summary.summarize(self.report)
 
@@ -110,7 +131,8 @@ class CoverageSummaryTest(unittest.TestCase):
 
         self.assertIn("Instrumented by the host suite: 2/3 (66.7%)", text)
         self.assertIn("gated by gcovr", text)
-        self.assertIn("lines 1/1, functions 1/1 [PASS]", text)
+        self.assertIn("lines 1/1, functions 1/1 (both 100%)", text)
+        self.assertIn("branches 100.0% (floor 0.0%) [PASS]", text)
         self.assertIn("Source-file instrumentation breadth", markdown)
         self.assertIn("components/example/covered.c", markdown)
 

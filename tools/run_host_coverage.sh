@@ -85,6 +85,7 @@ python3 "$project_dir/tools/coverage_summary.py" \
     --json-output "$report_dir/coverage-summary.json" \
     --markdown-output "$report_dir/coverage-summary.md" \
     --fail-under-breadth "$minimum_breadth_coverage" \
+    --required-file-branch-floor 90 \
     --require-fully-covered-file components/stratum/sv1_protocol.c || breadth_status=$?
 
 printf 'Coverage reports: %s\n' "$report_dir"
