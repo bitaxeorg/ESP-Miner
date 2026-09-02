@@ -155,6 +155,7 @@ static void system_api_add_config(cJSON *root, GlobalState *g) {
     cJSON_AddStringToObject(root, "ipv4", g->SYSTEM_MODULE.ip_addr_str);
     cJSON_AddStringToObject(root, "ipv6", g->SYSTEM_MODULE.ipv6_addr_str);
     cJSON_AddNumberToObject(root, "apEnabled", g->SYSTEM_MODULE.ap_enabled ? 1 : 0);
+    cJSON_AddNumberToObject(root, "useNTP", nvs_config_get_bool(NVS_CONFIG_USE_NTP) ? 1 : 0);
 
     // Pool Configuration
     cJSON_AddStringToObject(root, "poolConnectionInfo", g->SYSTEM_MODULE.pool_connection_info);

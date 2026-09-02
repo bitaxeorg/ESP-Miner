@@ -297,6 +297,7 @@ components:
         - temp
         - temp2
         - uptimeSeconds
+        - useNTP
         - version
         - axeOSVersion
         - voltage
@@ -692,7 +693,9 @@ components:
           description: List of available app partitions and their firmware versions
           items:
             $ref: '#/components/schemas/SystemPartition'
-
+        useNTP:
+          type: boolean
+          description: Whether NTP time sync is enabled
     SystemASIC:
       type: object
       required:
