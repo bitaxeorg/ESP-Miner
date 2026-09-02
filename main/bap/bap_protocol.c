@@ -85,3 +85,42 @@ uint8_t BAP_calculate_checksum(const char *sentence_body) {
     //ESP_LOGI(TAG, "Final checksum: 0x%02X", checksum);
     return checksum;
 }
+
+bool BAP_format_message(char *message, size_t message_size, bap_command_t cmd,
+                        const char *parameter, const char *value, size_t *message_len) {
+    char sentence_body[BAP_MAX_MESSAGE_LEN];
+    int formatted_len;
+
+    if (message_len == NULL) {
+        return false;
+    }
+    *message_len = 0;
+
+    if (message == NULL || message_size == 0 || parameter == NULL) {
+        return false;
+    }
+
+    message[0] = '\0';
+
+    if (value != NULL && value[0] != '\0') {
+        formatted_len = snprintf(sentence_body, sizeof(sentence_body), "BAP,%s,%s,%s",
+                                 BAP_command_to_string(cmd), parameter, value);
+    } else {
+        formatted_len = snprintf(sentence_body, sizeof(sentence_body), "BAP,%s,%s",
+                                 BAP_command_to_string(cmd), parameter);
+    }
+
+    if (formatted_len < 0 || (size_t)formatted_len >= sizeof(sentence_body)) {
+        return false;
+    }
+
+    uint8_t checksum = BAP_calculate_checksum(sentence_body);
+    formatted_len = snprintf(message, message_size, "$%s*%02X\r\n", sentence_body, checksum);
+    if (formatted_len < 0 || (size_t)formatted_len >= message_size) {
+        message[0] = '\0';
+        return false;
+    }
+
+    *message_len = (size_t)formatted_len;
+    return true;
+}
