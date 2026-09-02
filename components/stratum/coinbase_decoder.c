@@ -145,6 +145,47 @@ void coinbase_decode_address_from_scriptpubkey(const uint8_t *script, size_t scr
     bin2hex(script, hex_len, output + 8, output_len - 8);
 }
 
+// Store a decoded output, or fold it into the "others" bucket once `outputs[]` is full.
+// Pools that pay miners directly from the coinbase can emit far more outputs than the
+// array holds, so keep the user's own output and the largest ones and aggregate the rest.
+// Zero-value outputs (OP_RETURN / witness commitment) are never evicted; they are dropped
+// instead of aggregated because they are not payout recipients.
+static void coinbase_store_output(mining_notification_result_t *result, const char *address,
+                                  uint64_t value_satoshis, bool is_user_output) {
+    int idx = result->output_count;
+
+    if (idx >= MAX_COINBASE_TX_OUTPUTS) {
+        if (value_satoshis == 0) return;
+
+        // Pick the smallest non-user output as the eviction candidate.
+        uint64_t evict_value = UINT64_MAX;
+        idx = -1;
+        for (int i = 0; i < MAX_COINBASE_TX_OUTPUTS; i++) {
+            if (result->outputs[i].is_user_output) continue;
+            if (result->outputs[i].value_satoshis == 0) continue;
+            if (result->outputs[i].value_satoshis < evict_value) {
+                evict_value = result->outputs[i].value_satoshis;
+                idx = i;
+            }
+        }
+
+        if (idx < 0 || (!is_user_output && value_satoshis <= evict_value)) {
+            result->others_count++;
+            result->others_value_satoshis += value_satoshis;
+            return;
+        }
+
+        result->others_count++;
+        result->others_value_satoshis += evict_value;
+    } else {
+        result->output_count++;
+    }
+
+    strncpy(result->outputs[idx].address, address, MAX_ADDRESS_STRING_LEN);
+    result->outputs[idx].value_satoshis = value_satoshis;
+    result->outputs[idx].is_user_output = is_user_output;
+}
+
 esp_err_t coinbase_process_notification(const mining_notify *notification,
                                  const char *extranonce1,
                                  int extranonce2_len,
@@ -156,6 +197,8 @@ esp_err_t coinbase_process_notification(const mining_notify *notification,
     // Initialize result
     result->total_value_satoshis = 0;
     result->user_value_satoshis = 0;
+    result->others_count = 0;
+    result->others_value_satoshis = 0;
     result->decode_coinbase_tx = decode_coinbase_tx;
 
     // Detect network from user address prefix for correct address encoding
@@ -310,27 +353,14 @@ esp_err_t coinbase_process_notification(const mining_notify *notification,
         if (offset + script_len > coinbase_2_len) break;
 
         if (decode_coinbase_tx) {
-            if (value_satoshis > 0) {            
-                char output_address[MAX_ADDRESS_STRING_LEN];
-                coinbase_decode_address_from_scriptpubkey(coinbase_2_bin + offset, script_len, output_address, MAX_ADDRESS_STRING_LEN, bech32_hrp, is_testnet);
-                bool is_user_address = strncmp(user_address, output_address, strlen(output_address)) == 0;
+            char output_address[MAX_ADDRESS_STRING_LEN];
+            coinbase_decode_address_from_scriptpubkey(coinbase_2_bin + offset, script_len, output_address, MAX_ADDRESS_STRING_LEN, bech32_hrp, is_testnet);
 
-                if (is_user_address) result->user_value_satoshis += value_satoshis;
+            bool is_user_address = value_satoshis > 0 && strncmp(user_address, output_address, strlen(output_address)) == 0;
 
-                if (i < MAX_COINBASE_TX_OUTPUTS) {
-                    strncpy(result->outputs[i].address, output_address, MAX_ADDRESS_STRING_LEN);
-                    result->outputs[i].value_satoshis = value_satoshis;
-                    result->outputs[i].is_user_output = is_user_address;
-                    result->output_count++;
-                }
-            } else {
-                if (i < MAX_COINBASE_TX_OUTPUTS) {
-                    coinbase_decode_address_from_scriptpubkey(coinbase_2_bin + offset, script_len, result->outputs[i].address, MAX_ADDRESS_STRING_LEN, bech32_hrp, is_testnet);
-                    result->outputs[i].value_satoshis = 0;
-                    result->outputs[i].is_user_output = false;
-                    result->output_count++;
-                }
-            }
+            if (is_user_address) result->user_value_satoshis += value_satoshis;
+
+            coinbase_store_output(result, output_address, value_satoshis, is_user_address);
         }
 
         offset += script_len;

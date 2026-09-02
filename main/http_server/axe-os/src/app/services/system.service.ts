@@ -114,6 +114,7 @@ export class SystemApiService {
             stratumTLS: 0,
             stratumCert: "",
             stratumDecodeCoinbase: true,
+            stratumShareWarning: true,
             stratumV2ChannelType: "extended" as const,
             stratumV2AuthorityPubkey: "",
             stratumV2RequireAuth: false
@@ -130,6 +131,7 @@ export class SystemApiService {
             stratumTLS: 0,
             stratumCert: "",
             stratumDecodeCoinbase: true,
+            stratumShareWarning: true,
             stratumV2ChannelType: "extended" as const,
             stratumV2AuthorityPubkey: "",
             stratumV2RequireAuth: false
@@ -146,6 +148,7 @@ export class SystemApiService {
         stratumV2AuthorityPubkey: "",
         stratumV2ChannelType: "extended" as const,
         stratumDecodeCoinbase: true,
+        stratumShareWarning: true,
         fallbackStratumProtocol: "SV1" as const,
         fallbackStratumURL: "test.public-pool.io",
         fallbackStratumPort: 21497,
@@ -155,6 +158,7 @@ export class SystemApiService {
         fallbackStratumTLS: !!0,
         fallbackStratumCert: "",
         fallbackStratumDecodeCoinbase: true,
+        fallbackStratumShareWarning: true,
         fallbackStratumV2AuthorityPubkey: "",
         fallbackStratumV2ChannelType: "extended" as const,
         poolDifficulty: 1000,
@@ -214,6 +218,8 @@ export class SystemApiService {
         coinbaseOutputs: [{value: 50, address: "payoutaddress"}],
         coinbaseValueTotalSatoshis: 50,
         coinbaseValueUserSatoshis: 50,
+        coinbaseOthersCount: 0,
+        coinbaseOthersValueSatoshis: 0,
         miningPaused: false,
         workReceived: 42,
       }

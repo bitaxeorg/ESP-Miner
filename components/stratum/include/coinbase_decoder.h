@@ -67,6 +67,8 @@ typedef struct {
     char *scriptsig; // Allocated, must be freed by caller
     coinbase_output_t outputs[MAX_COINBASE_TX_OUTPUTS];
     int output_count;
+    int others_count;               // outputs that did not fit in `outputs[]`
+    uint64_t others_value_satoshis; // summed value of those outputs
     uint64_t total_value_satoshis;
     uint64_t user_value_satoshis;
     bool decode_coinbase_tx;

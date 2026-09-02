@@ -75,6 +75,7 @@ static void parse_pool_config_json(const char *json_str, PoolConfig *cfg, int in
     cfg->tls = index == 0 ? CONFIG_STRATUM_TLS : 0;
     cfg->cert = strdup("");
     cfg->decode_coinbase_tx = true;
+    cfg->share_warning = true;
     cfg->sv2_channel_type = SV2_CHANNEL_EXTENDED;
     cfg->sv2_authority_pubkey = strdup("");
     cfg->sv2_require_auth = false;
@@ -143,6 +144,11 @@ static void parse_pool_config_json(const char *json_str, PoolConfig *cfg, int in
     item = cJSON_GetObjectItem(root, "stratumDecodeCoinbase");
     if (item && (cJSON_IsBool(item) || cJSON_IsNumber(item))) {
         cfg->decode_coinbase_tx = cJSON_IsTrue(item) || (cJSON_IsNumber(item) && item->valueint != 0);
+    }
+
+    item = cJSON_GetObjectItem(root, "stratumShareWarning");
+    if (item && (cJSON_IsBool(item) || cJSON_IsNumber(item))) {
+        cfg->share_warning = cJSON_IsTrue(item) || (cJSON_IsNumber(item) && item->valueint != 0);
     }
 
     item = cJSON_GetObjectItem(root, "stratumV2ChannelType");
@@ -435,6 +441,43 @@ void SYSTEM_clean_jobs_queue(GlobalState * GLOBAL_STATE)
 
     // Reset hashrate measurements to prevent a spike on reconnection
     hashrate_monitor_reset_measurements(GLOBAL_STATE);
+}
+
+void SYSTEM_update_coinbase_outputs(GlobalState * GLOBAL_STATE, mining_notification_result_t * result)
+{
+    // Safety guard: ensure output_count doesn't exceed array capacity
+    if (result->output_count > MAX_COINBASE_TX_OUTPUTS) {
+        result->output_count = MAX_COINBASE_TX_OUTPUTS;
+    }
+
+    GLOBAL_STATE->coinbase_value_total_satoshis = result->total_value_satoshis;
+    ESP_LOGI(TAG, "Coinbase outputs: %d, total value: %llu%s", result->output_count, result->total_value_satoshis, result->decode_coinbase_tx ? " sats" : "");
+
+    if (result->output_count != GLOBAL_STATE->coinbase_output_count ||
+        result->others_count != GLOBAL_STATE->coinbase_others_count ||
+        result->others_value_satoshis != GLOBAL_STATE->coinbase_others_value_satoshis ||
+        memcmp(result->outputs, GLOBAL_STATE->coinbase_outputs, sizeof(coinbase_output_t) * result->output_count) != 0) {
+
+        GLOBAL_STATE->coinbase_output_count = result->output_count;
+        GLOBAL_STATE->coinbase_others_count = result->others_count;
+        GLOBAL_STATE->coinbase_others_value_satoshis = result->others_value_satoshis;
+        memcpy(GLOBAL_STATE->coinbase_outputs, result->outputs, sizeof(coinbase_output_t) * result->output_count);
+        GLOBAL_STATE->coinbase_value_user_satoshis = result->user_value_satoshis;
+        for (int i = 0; i < result->output_count; i++) {
+            if (result->outputs[i].value_satoshis > 0) {
+                if (result->outputs[i].is_user_output) {
+                    ESP_LOGI(TAG, "  Output %d: %s (%llu sat) (Your payout address)", i, result->outputs[i].address, result->outputs[i].value_satoshis);
+                } else {
+                    ESP_LOGI(TAG, "  Output %d: %s (%llu sat)", i, result->outputs[i].address, result->outputs[i].value_satoshis);
+                }
+            } else {
+                ESP_LOGI(TAG, "  Output %d: %s", i, result->outputs[i].address);
+            }
+        }
+        if (result->others_count > 0) {
+            ESP_LOGI(TAG, "  + %d other output(s) aggregated (%llu sat)", result->others_count, result->others_value_satoshis);
+        }
+    }
 }
 
 void SYSTEM_notify_accepted_share(GlobalState * GLOBAL_STATE)

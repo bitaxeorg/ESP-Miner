@@ -759,6 +759,7 @@ static bool validate_pool_json(const cJSON *pool_item, int i) {
     if (!validate_number_range(cJSON_GetObjectItem(pool_item, "stratumTLS"), "stratumTLS", 0, 2, i)) return false;
     if (!validate_string_field(cJSON_GetObjectItem(pool_item, "stratumCert"), "stratumCert", 3000, i)) return false;
     if (!validate_bool_or_num(cJSON_GetObjectItem(pool_item, "stratumDecodeCoinbase"), "stratumDecodeCoinbase", i)) return false;
+    if (!validate_bool_or_num(cJSON_GetObjectItem(pool_item, "stratumShareWarning"), "stratumShareWarning", i)) return false;
 
     cJSON *v2chan = cJSON_GetObjectItem(pool_item, "stratumV2ChannelType");
     if (v2chan) {
@@ -812,6 +813,7 @@ static void update_pool_nvs(const cJSON *pool_item, int i) {
     add_number_field_default(p_obj, pool_item, "stratumTLS", 0);
     add_string_field_default(p_obj, pool_item, "stratumCert", "");
     add_bool_field_default(p_obj, pool_item, "stratumDecodeCoinbase", true);
+    add_bool_field_default(p_obj, pool_item, "stratumShareWarning", true);
     add_string_field_default(p_obj, pool_item, "stratumV2ChannelType", SV2_CHANNEL_TYPE_EXTENDED);
     add_string_field_default(p_obj, pool_item, "stratumV2AuthorityPubkey", "");
     add_bool_field_default(p_obj, pool_item, "stratumV2RequireAuth", false);
