@@ -20,7 +20,7 @@ void miner_job_pool_init(void)
         if (!s_job_pool[i].coinbase_suffix) {
             s_job_pool[i].coinbase_suffix = heap_caps_calloc(1, MAX_COINBASE_SUFFIX_LEN, MALLOC_CAP_SPIRAM);
             if (!s_job_pool[i].coinbase_suffix) {
-                s_job_pool[i].coinbase_suffix = calloc(1, 2048);
+                s_job_pool[i].coinbase_suffix = calloc(1, MAX_COINBASE_SUFFIX_LEN);
             }
         }
         uint8_t *p_buf = s_job_pool[i].coinbase_prefix;
