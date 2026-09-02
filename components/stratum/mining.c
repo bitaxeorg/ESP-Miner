@@ -1,6 +1,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <limits.h>
+#include <stdlib.h>
 #include "esp_log.h"
 #include "mining.h"
 #include "utils.h"

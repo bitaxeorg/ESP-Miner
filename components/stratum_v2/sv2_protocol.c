@@ -21,11 +21,6 @@ static inline uint32_t read_u32_le(const uint8_t *p)
            ((uint32_t)p[2] << 16) | ((uint32_t)p[3] << 24);
 }
 
-static inline uint64_t read_u64_le(const uint8_t *p)
-{
-    return (uint64_t)read_u32_le(p) | ((uint64_t)read_u32_le(p + 4) << 32);
-}
-
 static inline void write_u16_le(uint8_t *p, uint16_t v)
 {
     p[0] = (uint8_t)(v);
