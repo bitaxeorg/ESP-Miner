@@ -16,6 +16,7 @@
 #include "esp_timer.h"
 #include "esp_heap_caps.h"
 #include <inttypes.h>
+#include <math.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -347,7 +348,16 @@ static bool parse_set_difficulty(cJSON *json, StratumApiV1Message *message)
         ESP_LOGE(TAG, "Invalid difficulty value in set_difficulty");
         return false;
     }
-    message->new_difficulty = difficulty->valuedouble;
+    double d = difficulty->valuedouble;
+    /* Reject NaN/inf and non-positive values, and keep the value inside the
+     * uint32 range used by get_difficulty_mask() (float->int cast is UB
+     * outside it). A >4e9 share difficulty is meaningless for this hardware
+     * class anyway. */
+    if (!isfinite(d) || d < 1.0 || d > 4294967295.0) {
+        ESP_LOGE(TAG, "Difficulty value out of range in set_difficulty: %f", d);
+        return false;
+    }
+    message->new_difficulty = d;
     ESP_LOGI(TAG, "Set pool difficulty: %.2f", message->new_difficulty);
     return true;
 }
