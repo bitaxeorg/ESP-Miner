@@ -96,6 +96,104 @@ through its build frontend:
 idf.py host-test
 ```
 
+## Measuring native coverage
+
+The host suite is the source of code-coverage metrics. Coverage runs use GCC's
+gcov instrumentation in a build separate from the sanitizer builds. QEMU and
+hardware tests remain integration checks; they are not mixed into the native
+coverage percentage.
+
+Install the reporter once in the Python environment from which you run the
+tests:
+
+```sh
+python3 -m pip install -r host-tests/requirements.txt
+```
+
+Then run coverage through the ESP-IDF build frontend or directly:
+
+```sh
+idf.py host-coverage
+# Equivalent standalone entry point:
+./tools/run_host_coverage.sh
+```
+
+The command always runs the complete native suite and writes these ignored
+build artifacts under `build/host-coverage/coverage`:
+
+- `coverage.txt`: per-source line summary.
+- `index.html`: browsable line and branch details.
+- `coverage.json`: gcovr's machine-readable report for CI tooling.
+- `gcovr-summary.json`: gcovr's standard per-file and aggregate totals.
+- `coverage-summary.txt`: breadth, depth, and non-regression gate results.
+- `coverage-summary.json`: machine-readable breadth, depth, file lists, and gates.
+- `coverage-summary.md`: the summary rendered in the GitHub Actions job page.
+
+The report inventories every C and C++ production source under `components`
+and `main`, including files that are not part of the native test executable.
+An uncompiled file has no compiler metadata identifying its executable lines,
+so gcovr displays it as uninstrumented (`--%`). This is intentionally distinct
+from a compiled file whose executable lines were never reached, which displays
+as 0% and contributes to the coverage totals.
+
+The source-file instrumentation breadth is the number of report files with
+compiler coverage points divided by the complete eligible source inventory.
+The foundation baseline is 9 of 76 files (11.8%). The inventory is discovered
+automatically rather than enumerated: every C or C++ source under `components`
+and `main` is eligible, subject only to the explicit exclusions below. The
+current inventory matches the repository-owned sources registered in the
+ESP-IDF firmware build. Keeping the filesystem scan slightly stricter also
+prevents a source from disappearing from the denominator merely because it was
+accidentally removed from an ESP-IDF component registration.
+
+The native job deliberately does not parse the ESP-IDF component graph; doing
+so would require a complete ESP-IDF installation merely to run portable host
+tests. If repository-owned firmware sources are introduced outside
+`components` or `main`, add the new source root to `tools/run_host_coverage.sh`.
+Generated build outputs remain outside the inventory.
+
+The instrumented numerator is also derived, not configured separately. A
+production source registered with the native target in
+`host-tests/CMakeLists.txt` appears as instrumented when gcov produces coverage
+points for it. This means normal test additions change the metric without
+editing a coverage manifest. Host production sources remain explicit in CMake
+because only portable modules, with platform adapters selected at link time,
+belong in the native executable.
+
+Test bodies, host shims, downloaded dependencies, `node_modules`, and these
+third-party source copies are excluded:
+
+- The `components/libsecp256k1` submodule.
+- Espressif's copied `components/dns_server/dns_server.c` implementation.
+- The copied libbase58 implementation in `components/stratum/base58.c`.
+- The copied reference implementation in `components/stratum/segwit_addr.c`.
+
+Keep the exclusions explicit and narrow. A new repository-owned production
+source is included automatically and should remain visible even before it can
+be compiled by the host harness. A newly copied third-party implementation
+must add a documented exclusion; do not exclude first-party code to improve a
+percentage.
+
+After removing third-party sources from the measured set, CI enforces two
+different kinds of non-regression floor:
+
+- Source-file instrumentation breadth: 11.8% (9 of 76 eligible files).
+- Coverage depth within instrumented files: 58% line and 49% branch coverage.
+- `components/stratum/sv1_protocol.c`: 100% line and function coverage.
+
+These are baselines, not quality targets. New or changed portable behavior
+should be covered, and thresholds should only move upward as gaps are closed.
+The SV1 protocol file has its own non-regression gate because its parser and
+encoders form the compatibility boundary for later ASIC job changes. Branch
+coverage remains visible in the report and should improve as meaningful input
+paths are added; compiler-generated and unreachable defensive edges are not
+part of the per-file 100% gate.
+Local diagnostic runs can override the floors with
+`ESP_MINER_COVERAGE_MIN_BREADTH`, `ESP_MINER_COVERAGE_MIN_LINE`, and
+`ESP_MINER_COVERAGE_MIN_BRANCH`; CI must use the checked-in defaults. Breadth
+is file-based and intentionally does not pretend that files have equal size;
+line and branch depth remain the measures of exercised behavior.
+
 ## Test classification and tags
 
 A normal Unity test is host-eligible by default. Its tags describe the feature
@@ -187,6 +285,7 @@ Before committing a host-test change, run:
 python3 tools/test_inventory.py --check
 ./tools/run_host_tests.sh '[affected-tag]'
 ./tools/run_host_tests.sh --all
+./tools/run_host_coverage.sh
 ```
 
 ## Adding an environment-specific test
@@ -236,7 +335,8 @@ For additional target-test details, see the
 ## CI expectations
 
 Every pull request runs the native suite under GCC and Clang with sanitizers,
-the existing ESP32-S3 QEMU lane, the firmware build, and frontend tests. A local
-host run is the minimum pre-commit check; changes to platform integration should
-also be exercised in QEMU, and hardware changes require documented physical
-validation.
+enforces native line and branch coverage floors, runs the existing ESP32-S3
+QEMU lane and firmware build, and runs frontend tests. A local host run is the
+minimum pre-commit check; changes to portable C behavior should also run native
+coverage, changes to platform integration should also be exercised in QEMU,
+and hardware changes require documented physical validation.

@@ -10,6 +10,15 @@ include(FetchContent)
 set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
 
 option(ESP_MINER_ENABLE_SANITIZERS "Enable address and undefined behavior sanitizers" ON)
+option(ESP_MINER_ENABLE_COVERAGE "Enable GCC coverage instrumentation" OFF)
+
+if(ESP_MINER_ENABLE_SANITIZERS AND ESP_MINER_ENABLE_COVERAGE)
+    message(FATAL_ERROR "Sanitizers and coverage must run in separate builds")
+endif()
+
+if(ESP_MINER_ENABLE_COVERAGE AND NOT CMAKE_C_COMPILER_ID STREQUAL "GNU")
+    message(FATAL_ERROR "Native coverage requires GCC and gcov")
+endif()
 
 # Keep native dependencies exact and independent from packages installed on
 # the developer's machine. These versions match ESP-IDF 6.0.2.
@@ -172,6 +181,18 @@ if(ESP_MINER_ENABLE_SANITIZERS)
             -fsanitize=address,undefined
             -fno-sanitize-recover=all
     )
+endif()
+
+if(ESP_MINER_ENABLE_COVERAGE)
+    target_compile_options(
+        esp_miner_host_tests
+        PRIVATE
+            --coverage
+            -fprofile-abs-path
+            -O0
+            -g3
+    )
+    target_link_options(esp_miner_host_tests PRIVATE --coverage)
 endif()
 
 add_test(NAME host.unit COMMAND esp_miner_host_tests)

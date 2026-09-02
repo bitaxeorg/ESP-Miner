@@ -20,3 +20,12 @@ add_custom_target(host-test
     USES_TERMINAL
     VERBATIM
 )
+
+# Coverage uses a separate GCC build because sanitizer and gcov
+# instrumentation serve different validation purposes.
+add_custom_target(host-coverage
+    COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/tools/run_host_coverage.sh"
+    WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+    USES_TERMINAL
+    VERBATIM
+)

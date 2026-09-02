@@ -74,6 +74,27 @@ run under GCC/Clang with sanitizers in CI. From the repository root, run:
 idf.py host-test
 ```
 
+Measure production line and branch coverage with the separate GCC coverage
+build. Install the pinned reporter once, then use either entry point:
+
+```bash
+python3 -m pip install -r host-tests/requirements.txt
+./tools/run_host_coverage.sh
+# Or, after configuring the ESP-IDF project:
+idf.py host-coverage
+```
+
+Coverage reports are generated under `build/host-coverage/coverage`. CI uses
+the checked-in coverage floors; do not lower or override them to land a change.
+All first-party production C/C++ files under `components` and `main` belong in
+the report, even when they are not compiled by the host suite. Such files show
+as uninstrumented (`--%`). Keep copied third-party exclusions narrow and
+document their provenance in `doc/unit_testing.md`; never exclude first-party
+code to improve the metric. Treat the generated source-file instrumentation
+breadth separately from line and branch depth: breadth shows how much of the
+production inventory is measurable, while depth only describes files compiled
+by the host suite. Do not present depth as firmware-wide coverage.
+
 When adding a portable test, keep its single source of truth under
 `components/<component>/test`, register a new test file and its production
 sources in `host-tests/CMakeLists.txt`, and run:
@@ -82,6 +103,7 @@ sources in `host-tests/CMakeLists.txt`, and run:
 python3 tools/test_inventory.py --check
 ./tools/run_host_tests.sh '[affected-tag]'
 ./tools/run_host_tests.sh --all
+./tools/run_host_coverage.sh
 ```
 
 Do not make production modules host-testable by compiling out their ESP
