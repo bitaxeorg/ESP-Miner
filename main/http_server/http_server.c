@@ -1623,8 +1623,11 @@ static esp_err_t GET_scoreboard(httpd_req_t * req)
     cJSON * root = cJSON_CreateArray();
 
     if (xSemaphoreTake(scoreboard->mutex, portMAX_DELAY) == pdTRUE) {
-        for (int i = 0; i < scoreboard->count; i++) {
+        for (int i = 0; i < MAX_SCOREBOARD; i++) {
             const ScoreboardEntry *e = &scoreboard->entries[i];
+            if (e->difficulty <= 0.0) {
+                break;
+            }
             cJSON *entry = cJSON_CreateObject();
 
             char nonce_str[9], version_bits_str[9];
