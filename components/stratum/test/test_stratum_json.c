@@ -19,6 +19,74 @@ static bool test_parse(StratumApiV1Message *message, const char *stratum_json)
 }
 #define STRATUM_V1_parse test_parse
 
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+
+#define VALID_PREVIOUS_BLOCK_HASH "0000000000000000000000000000000000000000000000000000000000000000"
+#define VALID_MERKLE_BRANCH "0000000000000000000000000000000000000000000000000000000000000000"
+
+static char *create_notify_message(const char *coinbase_prefix, const char *coinbase_suffix,
+                                   size_t merkle_branch_count, const char *merkle_branch,
+                                   const char *ntime)
+{
+    size_t branch_list_capacity = 3 + merkle_branch_count * (strlen(merkle_branch) + 3);
+    char *branch_list = malloc(branch_list_capacity);
+    if (branch_list == NULL) {
+        return NULL;
+    }
+
+    size_t offset = 0;
+    offset += (size_t)snprintf(branch_list + offset, branch_list_capacity - offset, "[");
+    for (size_t index = 0; index < merkle_branch_count; ++index) {
+        offset += (size_t)snprintf(branch_list + offset, branch_list_capacity - offset,
+                                   "%s\"%s\"", index == 0 ? "" : ",", merkle_branch);
+    }
+    (void)snprintf(branch_list + offset, branch_list_capacity - offset, "]");
+
+    size_t json_capacity = strlen(coinbase_prefix) + strlen(coinbase_suffix) +
+                           strlen(branch_list) + strlen(ntime) + 256;
+    char *json = malloc(json_capacity);
+    if (json == NULL) {
+        free(branch_list);
+        return NULL;
+    }
+
+    (void)snprintf(
+        json, json_capacity,
+        "{\"id\":null,\"method\":\"mining.notify\",\"params\":[\"job-1\",\"%s\",\"%s\",\"%s\",%s,\"20000000\",\"1705ae3a\",\"%s\",true]}",
+        VALID_PREVIOUS_BLOCK_HASH, coinbase_prefix, coinbase_suffix, branch_list, ntime);
+    free(branch_list);
+    return json;
+}
+
+static bool parse_notify(StratumApiV1Message *message, const char *coinbase_prefix,
+                         const char *coinbase_suffix, size_t merkle_branch_count,
+                         const char *merkle_branch, const char *ntime)
+{
+    char *json = create_notify_message(coinbase_prefix, coinbase_suffix,
+                                       merkle_branch_count, merkle_branch, ntime);
+    if (json == NULL) {
+        return false;
+    }
+    bool result = STRATUM_V1_parse(message, json);
+    free(json);
+    return result;
+}
+
+TEST_CASE("Stratum protocol identifiers convert to and from strings", "[stratum protocol]")
+{
+    TEST_ASSERT_EQUAL_INT(STRATUM_PROTOCOL_V1, stratum_protocol_from_string(STRATUM_V1));
+    TEST_ASSERT_EQUAL_INT(STRATUM_PROTOCOL_V2, stratum_protocol_from_string(STRATUM_V2));
+    TEST_ASSERT_EQUAL_INT(STRATUM_PROTOCOL_UNKNOWN, stratum_protocol_from_string("invalid"));
+    TEST_ASSERT_EQUAL_INT(STRATUM_PROTOCOL_UNKNOWN, stratum_protocol_from_string(NULL));
+
+    TEST_ASSERT_EQUAL_STRING(STRATUM_V1, stratum_protocol_to_string(STRATUM_PROTOCOL_V1));
+    TEST_ASSERT_EQUAL_STRING(STRATUM_V2, stratum_protocol_to_string(STRATUM_PROTOCOL_V2));
+    TEST_ASSERT_EQUAL_STRING("unknown", stratum_protocol_to_string(STRATUM_PROTOCOL_UNKNOWN));
+}
+
 TEST_CASE("Parse stratum method", "[stratum]")
 {
     memset(&stratum_api_v1_message, 0, sizeof(stratum_api_v1_message));
@@ -270,6 +338,26 @@ TEST_CASE("Parse stratum invalid json or malformed parameters", "[stratum]")
     memset(&stratum_api_v1_message2, 0, sizeof(stratum_api_v1_message2));
     const char *json_string2 = "invalid json";
     TEST_ASSERT_FALSE(STRATUM_V1_parse(&stratum_api_v1_message2, json_string2));
+}
+
+TEST_CASE("Parse stratum rejects invalid field types", "[stratum]")
+{
+    const char *invalid_messages[] = {
+        "{\"id\":null,\"method\":\"mining.set_difficulty\",\"params\":[]}",
+        "{\"id\":null,\"method\":\"mining.set_difficulty\",\"params\":[\"high\"]}",
+        "{\"id\":null,\"method\":\"mining.set_version_mask\",\"params\":[]}",
+        "{\"id\":null,\"method\":\"mining.set_version_mask\",\"params\":[123]}",
+        "{\"id\":null,\"method\":\"mining.set_extranonce\",\"params\":[123,4]}",
+        "{\"id\":null,\"method\":\"client.show_message\",\"params\":[123]}",
+        "{\"id\":2,\"result\":[[],123,4],\"error\":null}",
+        "{\"id\":1,\"result\":{\"version-rolling\":false,\"version-rolling.mask\":\"1fffe000\"},\"error\":null}",
+    };
+
+    for (size_t index = 0; index < sizeof(invalid_messages) / sizeof(invalid_messages[0]); ++index) {
+        StratumApiV1Message message = {};
+        TEST_ASSERT_FALSE(STRATUM_V1_parse(&message, invalid_messages[index]));
+        STRATUM_V1_reset_message(&message);
+    }
 }
 
 TEST_CASE("Parse stratum mining.set_extranonce params", "[stratum]")
@@ -559,4 +647,165 @@ TEST_CASE("Reject invalid numeric and trailing JSON-RPC values", "[stratum][secu
     // Non-object JSON
     TEST_ASSERT_FALSE(STRATUM_V1_parse(&msg, "true"));
     TEST_ASSERT_FALSE(STRATUM_V1_parse(&msg, "[1, 2, 3]"));
+}
+
+TEST_CASE("Parse stratum mining.notify requires an array of parameters", "[mining.notify]")
+{
+    StratumApiV1Message message = {};
+
+    TEST_ASSERT_FALSE(STRATUM_V1_parse(
+        &message, "{\"id\":null,\"method\":\"mining.notify\"}"));
+    TEST_ASSERT_FALSE(STRATUM_V1_parse(
+        &message, "{\"id\":null,\"method\":\"mining.notify\",\"params\":{}}"));
+}
+
+TEST_CASE("Parse stratum mining.notify rejects invalid coinbase lengths", "[mining.notify]")
+{
+    StratumApiV1Message message = {};
+
+    TEST_ASSERT_FALSE(parse_notify(
+        &message, "", "0200", 0, VALID_MERKLE_BRANCH, "647025b5"));
+    TEST_ASSERT_FALSE(parse_notify(
+        &message, "0", "0200", 0, VALID_MERKLE_BRANCH, "647025b5"));
+    TEST_ASSERT_FALSE(parse_notify(
+        &message, "0100", "0", 0, VALID_MERKLE_BRANCH, "647025b5"));
+}
+
+TEST_CASE("Parse stratum mining.notify rejects oversized coinbase storage", "[mining.notify][not-on-qemu]")
+{
+    StratumApiV1Message message = {};
+    size_t oversized_prefix_chars = MAX_COINBASE_PREFIX_LEN * 2 + 2;
+    size_t oversized_suffix_chars = MAX_COINBASE_SUFFIX_LEN * 2 + 2;
+    char *oversized_prefix = malloc(oversized_prefix_chars + 1);
+    char *oversized_suffix = malloc(oversized_suffix_chars + 1);
+    TEST_ASSERT_NOT_NULL(oversized_prefix);
+    TEST_ASSERT_NOT_NULL(oversized_suffix);
+
+    memset(oversized_prefix, '0', oversized_prefix_chars);
+    oversized_prefix[oversized_prefix_chars] = '\0';
+    memset(oversized_suffix, '0', oversized_suffix_chars);
+    oversized_suffix[oversized_suffix_chars] = '\0';
+
+    TEST_ASSERT_FALSE(parse_notify(
+        &message, oversized_prefix, "0200", 0, VALID_MERKLE_BRANCH, "647025b5"));
+    TEST_ASSERT_FALSE(parse_notify(
+        &message, "0100", oversized_suffix, 0, VALID_MERKLE_BRANCH, "647025b5"));
+
+    free(oversized_prefix);
+    free(oversized_suffix);
+}
+
+TEST_CASE("Parse stratum mining.notify validates Merkle branch limits", "[mining.notify]")
+{
+    StratumApiV1Message message = {};
+
+    TEST_ASSERT_FALSE(parse_notify(
+        &message, "0100", "0200", MAX_MERKLE_BRANCHES + 1,
+        VALID_MERKLE_BRANCH, "647025b5"));
+    TEST_ASSERT_FALSE(parse_notify(
+        &message, "0100", "0200", 1, "00", "647025b5"));
+}
+
+TEST_CASE("Parse stratum mining.notify checks future time with a synced clock", "[mining.notify]")
+{
+    StratumApiV1Message message = {};
+    time_t now = time(NULL);
+    bool accepted = parse_notify(
+        &message, "0100", "0200", 0, VALID_MERKLE_BRANCH, "ffffffff");
+
+    TEST_ASSERT_EQUAL(now <= 1704067200, accepted);
+}
+
+TEST_CASE("Parse stratum result falls back for unstructured errors", "[stratum]")
+{
+    StratumApiV1Message message = {};
+
+    TEST_ASSERT_TRUE(STRATUM_V1_parse(
+        &message, "{\"id\":1,\"result\":null,\"error\":7,\"reject-reason\":\"stale\"}"));
+    TEST_ASSERT_FALSE(message.response_success);
+    TEST_ASSERT_EQUAL_STRING("stale", message.error_str);
+
+    TEST_ASSERT_TRUE(STRATUM_V1_parse(&message, "{\"id\":2,\"error\":7}"));
+    TEST_ASSERT_FALSE(message.response_success);
+    TEST_ASSERT_EQUAL_STRING("unknown", message.error_str);
+    STRATUM_V1_reset_message(&message);
+}
+
+TEST_CASE("Parse stratum rejects missing and non-array method parameters", "[stratum]")
+{
+    const char *invalid_messages[] = {
+        "{\"method\":\"mining.set_difficulty\"}",
+        "{\"method\":\"mining.set_difficulty\",\"params\":{}}",
+        "{\"method\":\"mining.set_version_mask\"}",
+        "{\"method\":\"mining.set_version_mask\",\"params\":{}}",
+        "{\"method\":\"mining.set_extranonce\"}",
+        "{\"method\":\"mining.set_extranonce\",\"params\":{}}",
+        "{\"method\":\"client.show_message\"}",
+        "{\"method\":\"client.show_message\",\"params\":{}}",
+    };
+
+    for (size_t index = 0; index < sizeof(invalid_messages) / sizeof(invalid_messages[0]); ++index) {
+        StratumApiV1Message message = {};
+        TEST_ASSERT_FALSE(STRATUM_V1_parse(&message, invalid_messages[index]));
+    }
+}
+
+TEST_CASE("Parse stratum rejects remaining invalid value types", "[stratum]")
+{
+    const char *invalid_messages[] = {
+        "{\"id\":\"one\",\"method\":7}",
+        "{\"method\":\"mining.set_extranonce\",\"params\":[\"deadbeef\",\"eight\"]}",
+        "{\"method\":\"mining.set_extranonce\",\"params\":[\"00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff00\",8]}",
+        "{\"result\":[[],\"deadbeef\",\"eight\"],\"error\":null}",
+        "{\"result\":{\"version-rolling\":true},\"error\":null}",
+        "{\"result\":{\"version-rolling\":true,\"version-rolling.mask\":7},\"error\":null}",
+    };
+
+    for (size_t index = 0; index < sizeof(invalid_messages) / sizeof(invalid_messages[0]); ++index) {
+        StratumApiV1Message message = {};
+        TEST_ASSERT_FALSE(STRATUM_V1_parse(&message, invalid_messages[index]));
+        STRATUM_V1_reset_message(&message);
+    }
+}
+
+TEST_CASE("Parse stratum mining.notify rejects remaining invalid field types", "[mining.notify]")
+{
+    StratumApiV1Message message = {};
+    const char *invalid_messages[] = {
+        "{\"method\":\"mining.notify\",\"params\":[\"1\",\"0000000000000000000000000000000000000000000000000000000000000000\",\"0100\",7,[],\"20000000\",\"1705ae3a\",\"647025b5\",true]}",
+        "{\"method\":\"mining.notify\",\"params\":[\"1\",\"0000000000000000000000000000000000000000000000000000000000000000\",\"0100\",\"0200\",[],\"20000000\",7,\"647025b5\",true]}",
+        "{\"method\":\"mining.notify\",\"params\":[\"1\",\"0000000000000000000000000000000000000000000000000000000000000000\",\"0100\",\"0200\",[],\"20000000\",\"1705ae3a\",7,true]}",
+    };
+
+    for (size_t index = 0; index < sizeof(invalid_messages) / sizeof(invalid_messages[0]); ++index) {
+        TEST_ASSERT_FALSE(STRATUM_V1_parse(&message, invalid_messages[index]));
+    }
+}
+
+TEST_CASE("Parse stratum handles malformed structured errors", "[stratum]")
+{
+    const char *messages[] = {
+        "{\"result\":null,\"error\":[21]}",
+        "{\"result\":null,\"error\":[21,7]}",
+        "{\"result\":null,\"error\":{}}",
+        "{\"result\":null,\"error\":{\"message\":7}}",
+        "{\"result\":false,\"error\":null}",
+        "{\"result\":false,\"error\":null,\"reject-reason\":7}",
+    };
+
+    for (size_t index = 0; index < sizeof(messages) / sizeof(messages[0]); ++index) {
+        StratumApiV1Message message = {};
+        TEST_ASSERT_TRUE(STRATUM_V1_parse(&message, messages[index]));
+        TEST_ASSERT_FALSE(message.response_success);
+        TEST_ASSERT_EQUAL_STRING("unknown", message.error_str);
+        STRATUM_V1_reset_message(&message);
+    }
+}
+
+TEST_CASE("Parse stratum rejects unsupported result containers", "[stratum]")
+{
+    StratumApiV1Message message = {};
+
+    TEST_ASSERT_FALSE(STRATUM_V1_parse(&message, "{\"result\":[]}"));
+    TEST_ASSERT_FALSE(STRATUM_V1_parse(&message, "{\"result\":{}}"));
 }

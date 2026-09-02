@@ -47,6 +47,23 @@ TEST_CASE("Base58 P2SH encoding", "[base58]")
     TEST_ASSERT_EQUAL_STRING("3J98t1WpEZ73CNmQviecrnyiWrnqRhWNLy", output);
 }
 
+TEST_CASE("Base58 P2PKH decoding", "[base58]")
+{
+    static const uint8_t expected_hash[20] = {
+        0x62, 0xe9, 0x07, 0xb1, 0x5c, 0xbf, 0x27, 0xd5, 0x42, 0x53,
+        0x99, 0xeb, 0xf6, 0xf0, 0xfb, 0x50, 0xeb, 0xb8, 0x8f, 0x18
+    };
+    static const char address[] = "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa";
+    uint8_t decoded[25];
+    size_t decoded_size = sizeof(decoded);
+
+    TEST_ASSERT_TRUE(b58tobin(decoded, &decoded_size, address, 0));
+    TEST_ASSERT_EQUAL_UINT32(sizeof(decoded), decoded_size);
+    TEST_ASSERT_EQUAL_UINT8(0, decoded[0]);
+    TEST_ASSERT_EQUAL_UINT8_ARRAY(expected_hash, decoded + 1, sizeof(expected_hash));
+    TEST_ASSERT_EQUAL_INT(0, b58check(decoded, decoded_size, address, 0));
+}
+
 TEST_CASE("Base58 buffer too small", "[base58]")
 {
     uint8_t hash[20] = {0};
