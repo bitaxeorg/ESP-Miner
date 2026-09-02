@@ -191,15 +191,29 @@ void create_jobs_task(void *pvParameters)
 
 static void generate_work(GlobalState *GLOBAL_STATE, mining_notify *notification, uint64_t extranonce_2, double difficulty)
 {
-    if (GLOBAL_STATE->extranonce_2_len > MAX_EXTRANONCE2_LEN) {
-        ESP_LOGE(TAG, "extranonce_2_len %d exceeds maximum %d, skipping job", GLOBAL_STATE->extranonce_2_len, MAX_EXTRANONCE2_LEN);
+    if (GLOBAL_STATE->extranonce_2_len < 0 ||
+        GLOBAL_STATE->extranonce_2_len > MAX_EXTRANONCE2_LEN) {
+        ESP_LOGE(TAG, "Invalid extranonce_2_len %d, skipping job",
+                 GLOBAL_STATE->extranonce_2_len);
         return;
     }
     char extranonce_2_str[MAX_EXTRANONCE2_STR];
-    extranonce_2_generate(extranonce_2, GLOBAL_STATE->extranonce_2_len, extranonce_2_str);
+    if (!extranonce_2_generate(extranonce_2,
+                               (uint32_t)GLOBAL_STATE->extranonce_2_len,
+                               extranonce_2_str, sizeof(extranonce_2_str))) {
+        ESP_LOGE(TAG, "Failed to generate extranonce2");
+        return;
+    }
 
     uint8_t coinbase_tx_hash[32];
-    calculate_coinbase_tx_hash(notification->coinbase_1, notification->coinbase_2, GLOBAL_STATE->extranonce_str, extranonce_2_str, coinbase_tx_hash);
+    if (!calculate_coinbase_tx_hash(notification->coinbase_1,
+                                    notification->coinbase_2,
+                                    GLOBAL_STATE->extranonce_str,
+                                    extranonce_2_str,
+                                    coinbase_tx_hash)) {
+        ESP_LOGE(TAG, "Failed to construct coinbase transaction hash");
+        return;
+    }
 
     uint8_t merkle_root[32];
     calculate_merkle_root_hash(coinbase_tx_hash, (uint8_t(*)[32])notification->merkle_branches, notification->n_merkle_branches, merkle_root);
@@ -215,6 +229,13 @@ static void generate_work(GlobalState *GLOBAL_STATE, mining_notify *notification
 
     next_job->extranonce2 = strdup(extranonce_2_str);
     next_job->jobid = strdup(notification->job_id);
+    if (next_job->extranonce2 == NULL || next_job->jobid == NULL) {
+        ESP_LOGE(TAG, "Failed to allocate V1 job metadata");
+        free(next_job->jobid);
+        free(next_job->extranonce2);
+        free(next_job);
+        return;
+    }
     next_job->version_mask = GLOBAL_STATE->version_mask;
 
     // Check if ASIC is initialized before trying to send work

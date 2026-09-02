@@ -13,7 +13,8 @@ TEST_CASE("Check coinbase tx construction", "[mining]")
     const char *extranonce = "e9695791";
     const char *extranonce_2 = "99999999";    
     uint8_t coinbase_tx_hash[32];
-    calculate_coinbase_tx_hash(coinbase_1, coinbase_2, extranonce, extranonce_2, coinbase_tx_hash);
+    TEST_ASSERT_TRUE(calculate_coinbase_tx_hash(
+        coinbase_1, coinbase_2, extranonce, extranonce_2, coinbase_tx_hash));
 
     char expected_coinbase_tx[] = "01000000010000000000000000000000000000000000000000000000000000000000000000ffffffff20020862062f503253482f04b8864e5008e969579199999999072f736c7573682f000000000100f2052a010000001976a914d23fcdf86f7e756a64a7a9688ef9903327048ed988ac00000000";
     size_t expected_coinbase_tx_len = strlen(expected_coinbase_tx) / 2;
@@ -34,7 +35,8 @@ TEST_CASE("Validate merkle root calculation", "[mining]")
     const char *extranonce = "00f2052a";
     const char *extranonce_2 = "01000000";
     uint8_t coinbase_tx_hash[32];
-    calculate_coinbase_tx_hash(coinbase_1, coinbase_2, extranonce, extranonce_2, coinbase_tx_hash);
+    TEST_ASSERT_TRUE(calculate_coinbase_tx_hash(
+        coinbase_1, coinbase_2, extranonce, extranonce_2, coinbase_tx_hash));
 
     uint8_t merkles[12][32];
     int num_merkles = 12;
@@ -66,7 +68,8 @@ TEST_CASE("Validate another merkle root calculation", "[mining]")
     const char *extranonce = "603f352a";
     const char *extranonce_2 = "01000000";
     uint8_t coinbase_tx_hash[32];
-    calculate_coinbase_tx_hash(coinbase_1, coinbase_2, extranonce, extranonce_2, coinbase_tx_hash);
+    TEST_ASSERT_TRUE(calculate_coinbase_tx_hash(
+        coinbase_1, coinbase_2, extranonce, extranonce_2, coinbase_tx_hash));
 
     uint8_t merkles[5][32];
     int num_merkles = 5;
@@ -151,24 +154,50 @@ TEST_CASE("Validate version mask incrementing", "[mining]")
 TEST_CASE("Test extranonce 2 generation", "[mining extranonce2]")
 {
     char first[9];
-    extranonce_2_generate(0, 4, first);
+    TEST_ASSERT_TRUE(extranonce_2_generate(0, 4, first, sizeof(first)));
     TEST_ASSERT_EQUAL_STRING("00000000", first);
 
     char second[9];
-    extranonce_2_generate(1, 4, second);
+    TEST_ASSERT_TRUE(extranonce_2_generate(1, 4, second, sizeof(second)));
     TEST_ASSERT_EQUAL_STRING("01000000", second);
 
     char third[9];
-    extranonce_2_generate(2, 4, third);
+    TEST_ASSERT_TRUE(extranonce_2_generate(2, 4, third, sizeof(third)));
     TEST_ASSERT_EQUAL_STRING("02000000", third);
 
     char fourth[9];
-    extranonce_2_generate(UINT_MAX - 1, 4, fourth);
+    TEST_ASSERT_TRUE(extranonce_2_generate(UINT_MAX - 1, 4, fourth,
+                                          sizeof(fourth)));
     TEST_ASSERT_EQUAL_STRING("feffffff", fourth);
 
     char fifth[13];
-    extranonce_2_generate(UINT_MAX / 2, 6, fifth);
+    TEST_ASSERT_TRUE(extranonce_2_generate(UINT_MAX / 2, 6, fifth,
+                                          sizeof(fifth)));
     TEST_ASSERT_EQUAL_STRING("ffffff7f0000", fifth);
+}
+
+TEST_CASE("Extranonce generation rejects unsafe sizes", "[mining extranonce2]")
+{
+    char output[65];
+
+    TEST_ASSERT_TRUE(extranonce_2_generate(0, 32, output, sizeof(output)));
+    TEST_ASSERT_EQUAL_size_t(64, strlen(output));
+    TEST_ASSERT_FALSE(extranonce_2_generate(0, 33, output, sizeof(output)));
+    TEST_ASSERT_FALSE(extranonce_2_generate(0, 32, output, sizeof(output) - 1));
+    TEST_ASSERT_FALSE(extranonce_2_generate(0, 1, NULL, 0));
+}
+
+TEST_CASE("Coinbase hashing rejects malformed hex", "[mining]")
+{
+    uint8_t hash[32];
+
+    TEST_ASSERT_FALSE(calculate_coinbase_tx_hash(
+        "00xz", "00", "00", "00", hash));
+    TEST_ASSERT_FALSE(calculate_coinbase_tx_hash(
+        "0", "00", "00", "00", hash));
+    TEST_ASSERT_FALSE(calculate_coinbase_tx_hash("", "", "", "", hash));
+    TEST_ASSERT_FALSE(calculate_coinbase_tx_hash(
+        "00", "00", "00", "00", NULL));
 }
 
 TEST_CASE("Test nonce diff checking", "[mining test_nonce][not-on-qemu]")
@@ -199,12 +228,12 @@ TEST_CASE("Test nonce diff checking 2", "[mining test_nonce][not-on-qemu]")
     notify_message.ntime = 0x647025b5;
 
     uint8_t coinbase_tx_hash[32];
-    calculate_coinbase_tx_hash(
+    TEST_ASSERT_TRUE(calculate_coinbase_tx_hash(
         "01000000010000000000000000000000000000000000000000000000000000000000000000ffffffff4b0389130cfabe6d6d5cbab26a2599e92916edec5657a94a0708ddb970f5c45b5d12905085617eff8e",
         "31650707758de07b010000000000001cfd7038212f736c7573682f000000000379ad0c2a000000001976a9147c154ed1dc59609e3d26abb2df2ea3d587cd8c4188ac00000000000000002c6a4c2952534b424c4f434b3ae725d3994b811572c1f345deb98b56b465ef8e153ecbbd27fa37bf1b005161380000000000000000266a24aa21a9ed63b06a7946b190a3fda1d76165b25c9b883bcc6621b040773050ee2a1bb18f1800000000",
         "01000000",
         "00000000",
-        coinbase_tx_hash);
+        coinbase_tx_hash));
     uint8_t merkles[13][32];
     int num_merkles = 13;
 

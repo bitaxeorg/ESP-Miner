@@ -1,6 +1,8 @@
 #ifndef MINING_H_
 #define MINING_H_
 
+#include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 
 typedef struct mining_notify mining_notify;
@@ -27,8 +29,9 @@ typedef struct bm_job
 
 void free_bm_job(bm_job *job);
 
-void calculate_coinbase_tx_hash(const char *coinbase_1, const char *coinbase_2,
-                                const char *extranonce, const char *extranonce_2, uint8_t dest[32]);
+bool calculate_coinbase_tx_hash(const char *coinbase_1, const char *coinbase_2,
+                                const char *extranonce, const char *extranonce_2,
+                                uint8_t dest[32]);
 
 void calculate_coinbase_tx_hash_bin(const uint8_t *prefix, size_t prefix_len,
                                     const uint8_t *extranonce_prefix, size_t ep_len,
@@ -47,7 +50,8 @@ double hash_to_pdiff(const uint8_t hash[32]);
 
 double test_nonce_value(const bm_job *job, const uint32_t nonce, const uint32_t rolled_version);
 
-void extranonce_2_generate(uint64_t extranonce_2, uint32_t length, char dest[static length * 2 + 1]);
+bool extranonce_2_generate(uint64_t extranonce_2, uint32_t length,
+                           char *dest, size_t dest_len);
 
 uint32_t increment_bitmask(const uint32_t value, const uint32_t mask);
 
