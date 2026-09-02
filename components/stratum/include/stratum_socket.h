@@ -27,4 +27,13 @@ esp_err_t stratum_socket_resolve(const char *hostname, uint16_t port, stratum_co
 // by both the SV1 and SV2 stratum tasks.
 void stratum_socket_set_options(esp_transport_handle_t transport);
 
+// Establishes an asynchronous TCP connection with a shutdown check callback.
+// Returns ESP_OK on success, ESP_ERR_INVALID_STATE if should_shutdown_fn returns true,
+// or ESP_FAIL on connection error.
+esp_err_t stratum_socket_connect_async(esp_transport_handle_t transport,
+                                      const char *host_ip,
+                                      uint16_t port,
+                                      int timeout_ms,
+                                      bool (*should_shutdown_fn)(void));
+
 #endif /* STRATUM_SOCKET_H_ */
