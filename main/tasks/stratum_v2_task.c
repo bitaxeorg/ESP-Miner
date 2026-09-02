@@ -1003,11 +1003,22 @@ void stratum_v2_task(void *pvParameters)
             sv2_parse_frame_header(hdr_buf, &hdr);
 
             switch (hdr.msg_type) {
+                // Job messages must match the channel we negotiated. Consumers pick
+                // the job struct type from the channel type, so accepting the wrong
+                // message here would have them read and free the wrong type.
                 case SV2_MSG_NEW_MINING_JOB:
+                    if (conn->channel_type != SV2_CHANNEL_STANDARD) {
+                        ESP_LOGW(TAG, "Ignoring NewMiningJob received on an extended channel");
+                        break;
+                    }
                     stratum_v2_handle_new_mining_job(GLOBAL_STATE, conn, recv_buf, hdr.msg_length);
                     break;
 
                 case SV2_MSG_NEW_EXTENDED_MINING_JOB:
+                    if (conn->channel_type != SV2_CHANNEL_EXTENDED) {
+                        ESP_LOGW(TAG, "Ignoring NewExtendedMiningJob received on a standard channel");
+                        break;
+                    }
                     stratum_v2_handle_new_extended_mining_job(GLOBAL_STATE, conn, recv_buf, hdr.msg_length);
                     break;
 
