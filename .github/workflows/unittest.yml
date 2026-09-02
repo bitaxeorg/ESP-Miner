@@ -7,6 +7,29 @@ permissions:
   contents: read
 
 jobs:
+  host-test:
+    name: Host tests (${{ matrix.name }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: GCC sanitizers
+            compiler: gcc
+            sanitizers: ON
+          - name: Clang sanitizers
+            compiler: clang
+            sanitizers: ON
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v6
+
+      - name: Run native unit tests
+        env:
+          CC: ${{ matrix.compiler }}
+          ESP_MINER_HOST_SANITIZERS: ${{ matrix.sanitizers }}
+        run: ./tools/run_host_tests.sh --all
+
   build-and-test:
     runs-on: ubuntu-latest
     steps:
