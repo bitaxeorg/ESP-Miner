@@ -19,8 +19,8 @@
 #include "device_config.h"
 #include "PID.h"
 #include "self_test.h"
-#include "stratum_api.h"
 #include "miner_job.h"
+#include "sv1_protocol.h"
 #include "utils.h"
 
 #define GPIO_ASIC_ENABLE CONFIG_GPIO_ASIC_ENABLE

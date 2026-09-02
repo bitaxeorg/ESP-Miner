@@ -7,7 +7,7 @@
 #include "stratum_task.h"
 #include "stratum_v1_client.h"
 #include "stratum_v2_client.h"
-#include "stratum_api.h"
+#include "sv1_client.h"
 #include "connect.h"
 #include "system.h"
 #include <sys/socket.h>

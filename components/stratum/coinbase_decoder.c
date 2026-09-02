@@ -1,5 +1,4 @@
 #include "coinbase_decoder.h"
-#include "stratum_api.h"
 #include "utils.h"
 #include "segwit_addr.h"
 #include "libbase58.h"

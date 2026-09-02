@@ -3,7 +3,6 @@
 #include <limits.h>
 #include "esp_log.h"
 #include "mining.h"
-#include "stratum_api.h"
 #include "utils.h"
 
 static const char *TAG = "mining";

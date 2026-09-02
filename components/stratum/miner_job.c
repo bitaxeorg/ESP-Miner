@@ -1,5 +1,4 @@
 #include "miner_job.h"
-#include "stratum_api.h"
 #include "utils.h"
 #include <string.h>
 #include <pthread.h>
