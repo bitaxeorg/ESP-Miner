@@ -150,6 +150,7 @@ TEST_CASE("Test nonce diff checking", "[mining test_nonce][not-on-qemu]")
     static miner_job_t mjob;
     memset(&mjob, 0, sizeof(mjob));
     hex2bin("d02b10fc0d4711eae1a805af50a8a83312a2215e00017f2b0000000000000000", mjob.prev_hash, 32);
+    reverse_endianness_per_word(mjob.prev_hash);
     mjob.version = 0x20000004;
     mjob.nbits = 0x1705ae3a;
     mjob.ntime = 0x646ff1a9;
@@ -172,6 +173,7 @@ TEST_CASE("Test nonce diff checking 2", "[mining test_nonce][not-on-qemu]")
     static miner_job_t mjob;
     memset(&mjob, 0, sizeof(mjob));
     hex2bin("0c859545a3498373a57452fac22eb7113df2a465000543520000000000000000", mjob.prev_hash, 32);
+    reverse_endianness_per_word(mjob.prev_hash);
     mjob.version = 0x20000004;
     mjob.nbits = 0x1705ae3a;
     mjob.ntime = 0x647025b5;
