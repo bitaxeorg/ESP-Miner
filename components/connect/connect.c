@@ -171,10 +171,14 @@ static void initialize_mdns_if_needed(GlobalState *GLOBAL_STATE) {
             return;
         }
 
-        /* If conflict resolution changed the hostname, persist to NVS */
+        /* A conflict-resolved rename is applied at runtime only and
+         * is deliberately NOT persisted to NVS. mDNS conflict answers are
+         * unauthenticated multicast: any LAN host can spoof one, and persisting
+         * the rename let an attacker rewrite device identity and amplify flash
+         * writes. The configured hostname stays authoritative across reboots. */
         if (strcmp(final_hostname, hostname) != 0) {
-            nvs_config_set_string(NVS_CONFIG_HOSTNAME, final_hostname);
-            ESP_LOGI(TAG, "Hostname conflict resolved, updated NVS to: %s", final_hostname);
+            ESP_LOGW(TAG, "mDNS conflict: using '%s' for this session only, configured hostname '%s' unchanged",
+                     final_hostname, hostname);
         }
 
         /* Set mDNS hostname */
@@ -280,10 +284,11 @@ esp_err_t update_mdns_hostname(const char *new_hostname, GlobalState *GLOBAL_STA
         return ESP_ERR_NO_MEM;
     }
 
-    /* If the hostname was resolved to a different one, update NVS */
+    /* Runtime-only rename, never persisted (see note in the mDNS
+     * init path): spoofed conflict answers must not rewrite NVS identity. */
     if (strcmp(resolved_hostname, new_hostname) != 0) {
-        nvs_config_set_string(NVS_CONFIG_HOSTNAME, resolved_hostname);
-        ESP_LOGI(TAG, "Hostname conflict resolved, updated NVS to: %s", resolved_hostname);
+        ESP_LOGW(TAG, "mDNS conflict: using '%s' for this session only, configured hostname '%s' unchanged",
+                 resolved_hostname, new_hostname);
     }
 
     esp_err_t err = mdns_hostname_set(resolved_hostname);
