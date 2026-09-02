@@ -122,6 +122,7 @@ TEST_CASE("Test mining.subcribe result parsing", "[mining.subscribe]")
     TEST_ASSERT_TRUE(STRATUM_V1_parse(&stratum_api_v1_message, json_string));
     TEST_ASSERT_EQUAL_STRING("4de05269", stratum_api_v1_message.extranonce_str);
     TEST_ASSERT_EQUAL_INT(8, stratum_api_v1_message.extranonce_2_len);
+    STRATUM_V1_reset_message(&stratum_api_v1_message);
 }
 
 TEST_CASE("Parse stratum mining.subscribe result malformed", "[mining.subscribe]")
@@ -196,6 +197,8 @@ TEST_CASE("Parse stratum result error", "[stratum]")
     TEST_ASSERT_EQUAL(STRATUM_RESULT, stratum_api_v1_message.method);
     TEST_ASSERT_FALSE(stratum_api_v1_message.response_success);
     TEST_ASSERT_EQUAL_STRING("Job not found", stratum_api_v1_message.error_str);
+    STRATUM_V1_reset_message(&stratum_api_v1_setup_message);
+    STRATUM_V1_reset_message(&stratum_api_v1_message);
 }
 
 TEST_CASE("Parse stratum result alternative error", "[stratum]")
@@ -207,6 +210,7 @@ TEST_CASE("Parse stratum result alternative error", "[stratum]")
     TEST_ASSERT_EQUAL(STRATUM_RESULT, stratum_api_v1_message.method);
     TEST_ASSERT_FALSE(stratum_api_v1_message.response_success);
     TEST_ASSERT_EQUAL_STRING("Above target 2", stratum_api_v1_message.error_str);
+    STRATUM_V1_reset_message(&stratum_api_v1_message);
 }
 
 TEST_CASE("Parse stratum result with error string (Stale)", "[stratum]")
@@ -218,6 +222,7 @@ TEST_CASE("Parse stratum result with error string (Stale)", "[stratum]")
     TEST_ASSERT_EQUAL(STRATUM_RESULT, stratum_api_v1_message.method);
     TEST_ASSERT_FALSE(stratum_api_v1_message.response_success);
     TEST_ASSERT_EQUAL_STRING("Stale", stratum_api_v1_message.error_str);
+    STRATUM_V1_reset_message(&stratum_api_v1_message);
 }
 
 TEST_CASE("Parse stratum result with null result and error string", "[stratum]")
@@ -229,6 +234,7 @@ TEST_CASE("Parse stratum result with null result and error string", "[stratum]")
     TEST_ASSERT_EQUAL(STRATUM_RESULT, stratum_api_v1_message.method);
     TEST_ASSERT_FALSE(stratum_api_v1_message.response_success);
     TEST_ASSERT_EQUAL_STRING("Stale", stratum_api_v1_message.error_str);
+    STRATUM_V1_reset_message(&stratum_api_v1_message);
 }
 
 TEST_CASE("Parse stratum error array format", "[stratum]")
@@ -240,6 +246,7 @@ TEST_CASE("Parse stratum error array format", "[stratum]")
     TEST_ASSERT_EQUAL(STRATUM_RESULT, stratum_api_v1_message.method);
     TEST_ASSERT_FALSE(stratum_api_v1_message.response_success);
     TEST_ASSERT_EQUAL_STRING("Job not found", stratum_api_v1_message.error_str);
+    STRATUM_V1_reset_message(&stratum_api_v1_message);
 }
 
 TEST_CASE("Parse stratum error jsonrpc object with code", "[stratum]")
@@ -251,6 +258,7 @@ TEST_CASE("Parse stratum error jsonrpc object with code", "[stratum]")
     TEST_ASSERT_EQUAL(STRATUM_RESULT, stratum_api_v1_message.method);
     TEST_ASSERT_FALSE(stratum_api_v1_message.response_success);
     TEST_ASSERT_EQUAL_STRING("duplicate share", stratum_api_v1_message.error_str);
+    STRATUM_V1_reset_message(&stratum_api_v1_message);
 }
 
 TEST_CASE("Parse stratum invalid json or malformed parameters", "[stratum]")
@@ -272,6 +280,7 @@ TEST_CASE("Parse stratum mining.set_extranonce params", "[stratum]")
     TEST_ASSERT_EQUAL(MINING_SET_EXTRANONCE, stratum_api_v1_message.method);
     TEST_ASSERT_EQUAL_STRING("deadbeef", stratum_api_v1_message.extranonce_str);
     TEST_ASSERT_EQUAL_INT(8, stratum_api_v1_message.extranonce_2_len);
+    STRATUM_V1_reset_message(&stratum_api_v1_message);
 }
 
 TEST_CASE("Parse stratum mining.set_extranonce invalid params", "[stratum]")
@@ -288,6 +297,7 @@ TEST_CASE("Parse stratum client.show_message", "[stratum]")
     TEST_ASSERT_TRUE(STRATUM_V1_parse(&stratum_api_v1_message, json_string));
     TEST_ASSERT_EQUAL(CLIENT_SHOW_MESSAGE, stratum_api_v1_message.method);
     TEST_ASSERT_EQUAL_STRING("Welcome to the pool!", stratum_api_v1_message.show_message);
+    STRATUM_V1_reset_message(&stratum_api_v1_message);
 }
 
 TEST_CASE("Parse stratum client.show_message invalid params", "[stratum]")
@@ -304,6 +314,7 @@ TEST_CASE("Parse stratum client.get_version", "[stratum]")
     TEST_ASSERT_TRUE(STRATUM_V1_parse(&stratum_api_v1_message, json_string));
     TEST_ASSERT_EQUAL(CLIENT_GET_VERSION, stratum_api_v1_message.method);
     TEST_ASSERT_EQUAL_STRING("unknown", stratum_api_v1_message.version_string);
+    STRATUM_V1_reset_message(&stratum_api_v1_message);
 }
 
 TEST_CASE("Parse stratum client.reconnect", "[stratum]")
