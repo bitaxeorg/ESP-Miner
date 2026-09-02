@@ -43,7 +43,7 @@
               (click)="layoutService.toggleWideView()"
               >
               <i class="pi text-xl block"
-              [ngClass]="layoutService.isWideView() ? 'pi-window-minimize' : 'pi-window-maximize'"></i>
+              [class]="layoutService.isWideView() ? 'pi-window-minimize' : 'pi-window-maximize'"></i>
             </a>
           </li>
           <li class="hidden md:block">
@@ -63,7 +63,7 @@
             (click)="dashboardEdit.toggleEditMode()"
             >
             <i class="pi text-xl block"
-            [ngClass]="(dashboardEdit.editMode$ | async) ? 'pi-save' : 'pi-th-large'"></i>
+            [class]="(dashboardEdit.editMode$ | async) ? 'pi-save' : 'pi-th-large'"></i>
           </a>
         </li>
         <li>
@@ -90,7 +90,7 @@
             [appTooltip]="isMiningPaused ? 'Resume Mining' : 'Pause Mining'"
             (click)="toggleMiningPaused()"
             >
-            <i class="pi text-xl block" [ngClass]="isMiningPaused ? 'pi-play-circle' : 'pi-pause-circle'"></i>
+            <i class="pi text-xl block" [class]="isMiningPaused ? 'pi-play-circle' : 'pi-pause-circle'"></i>
           </a>
         </li>
         <li>

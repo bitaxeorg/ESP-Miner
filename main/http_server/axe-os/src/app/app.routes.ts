@@ -1,5 +1,4 @@
-import { NgModule } from '@angular/core';
-import { RouterModule, Routes } from '@angular/router';
+import { Routes } from '@angular/router';
 
 import { HomeComponent } from './components/home/home.component';
 import { LogsComponent } from './components/logs/logs.component';
@@ -16,7 +15,7 @@ import { ApModeGuard } from './guards/ap-mode.guard';
 
 const TITLE_PREFIX = 'AxeOS';
 
-const routes: Routes = [
+export const routes: Routes = [
   {
       path: 'ap',
       component: AppLayoutComponent,
@@ -85,11 +84,4 @@ const routes: Routes = [
       }
     ]
   },
-
 ];
-
-@NgModule({
-  imports: [RouterModule.forRoot(routes)],
-  exports: [RouterModule]
-})
-export class AppRoutingModule { }

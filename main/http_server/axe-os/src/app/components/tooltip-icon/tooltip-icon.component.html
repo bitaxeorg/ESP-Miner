@@ -1,8 +1,8 @@
 @if (tooltip) {
   @if (isMobile) {
-    <button (click)="showMobileTooltip = true" [ngClass]="tooltipIconClass"></button>
+    <button (click)="showMobileTooltip = true" [class]="tooltipIconClass"></button>
   } @else {
-    <i appTooltip="{{tooltip}}" [ngClass]="tooltipIconClass"></i>
+    <i appTooltip="{{tooltip}}" [class]="tooltipIconClass"></i>
   }
   @if (showMobileTooltip) {
     <div (click)="showMobileTooltip = false" class="tooltip-mobile-backdrop">

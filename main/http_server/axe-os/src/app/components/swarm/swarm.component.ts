@@ -1,6 +1,6 @@
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Component, OnDestroy, OnInit, ViewChild, HostListener } from '@angular/core';
-import { AbstractControl, FormBuilder, FormGroup, Validators, FormControl, ValidationErrors } from '@angular/forms';
+import { AbstractControl, FormBuilder, FormGroup, Validators, FormControl, ValidationErrors, FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { ToastrService } from 'ngx-toastr';
 import { forkJoin, catchError, from, map, mergeMap, of, take, timeout, toArray, Observable, Subscription } from 'rxjs';
 import { LocalStorageService } from 'src/app/local-storage.service';
@@ -8,6 +8,13 @@ import { LayoutService } from "../../layout/service/app.layout.service";
 import { SystemApiService } from 'src/app/services/system.service';
 import { SystemInfo as ISystemInfo } from 'src/app/generated/models';
 import { ModalComponent } from '../modal/modal.component';
+import { DecimalPipe } from '@angular/common';
+import { TooltipDirective } from '../../directives/tooltip.directive';
+import { SliderComponent } from '../slider/slider.component';
+import { EditComponent } from '../edit/edit.component';
+import { DateAgoPipe } from '../../pipes/date-ago.pipe';
+import { HashSuffixPipe } from '../../pipes/hash-suffix.pipe';
+import { DiffSuffixPipe } from '../../pipes/diff-suffix.pipe';
 
 const SWARM_DATA = 'SWARM_DATA';
 const SWARM_VERSION = 'SWARM_VERSION';
@@ -44,10 +51,10 @@ type SwarmDevice = {
 };
 
 @Component({
-    selector: 'app-swarm',
-    templateUrl: './swarm.component.html',
-    styleUrls: ['./swarm.component.scss'],
-    standalone: false
+  selector: 'app-swarm',
+  templateUrl: './swarm.component.html',
+  styleUrls: ['./swarm.component.scss'],
+  imports: [FormsModule, TooltipDirective, ReactiveFormsModule, SliderComponent, ModalComponent, EditComponent, DecimalPipe, DateAgoPipe, HashSuffixPipe, DiffSuffixPipe]
 })
 export class SwarmComponent implements OnInit, OnDestroy {
 
