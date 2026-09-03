@@ -37,6 +37,9 @@ void url_decode(char *dst, const char *src);
 
 char *strdup_psram(const char *str);
 
-#define STRATUM_DEFAULT_VERSION_MASK 0x1fffe000
+// BIP320 16-bit version rolling mask (bits 13..28: 0x1fffe000).
+// BM13xx ASICs program version rolling as a 16-bit field shifted by 13 (version_mask >> 13).
+// This is a strict hardware-compatible subset of the BIP323 mask.
+#define BIP320_VERSION_ROLLING_MASK 0x1fffe000U
 
 #endif // STRATUM_UTILS_H

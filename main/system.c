@@ -35,8 +35,9 @@
 #include "self_test.h"
 #include "filesystem.h"
 #include "embedded_web_ui.h"
-#include "work_queue.h"
 #include "hashrate_monitor_task.h"
+#include "coinbase_decoder.h"
+#include "sv2_protocol.h"
 
 #define NVS_COUNTER_UPDATE_INTERVAL_MS 60 * 60 * 1000  // Update NVS once per hour
 #define NOINIT_SENTINEL_VALUE 0x4C4F4732       // "LOG2" in hex
@@ -242,22 +243,8 @@ void SYSTEM_init_system(GlobalState * GLOBAL_STATE)
         SYSTEM_load_pool_from_nvs(GLOBAL_STATE, i);
     }
 
-    // load primary and secondary pool index selectors
-    module->primary_pool_index = nvs_config_get_u16(NVS_CONFIG_PRIMARY_POOL_INDEX);
-    module->secondary_pool_index = nvs_config_get_u16(NVS_CONFIG_SECONDARY_POOL_INDEX);
-
-    if (module->primary_pool_index >= MAX_POOLS) {
-        module->primary_pool_index = 0;
-    }
-    if (module->secondary_pool_index >= MAX_POOLS) {
-        module->secondary_pool_index = 1;
-    }
-
-    // use fallback stratum
-    module->use_fallback_stratum = nvs_config_get_bool(NVS_CONFIG_USE_FALLBACK_STRATUM);
-
-    // set based on config
-    module->is_using_fallback = module->use_fallback_stratum;
+    // load primary and secondary pool index selectors and fallback preference
+    SYSTEM_reload_pool_config(GLOBAL_STATE);
 
     // Initialize pool connection info
     strcpy(module->pool_connection_info, "Not Connected");
@@ -276,22 +263,17 @@ void SYSTEM_init_system(GlobalState * GLOBAL_STATE)
     suffixString(module->best_nonce_diff, module->best_diff_string, DIFF_STRING_SIZE, 0);
     suffixString(module->best_session_nonce_diff, module->best_session_diff_string, DIFF_STRING_SIZE, 0);
 
-    // Load stratum protocol selection from the active pool configuration
-    uint16_t active_pool_idx = module->is_using_fallback ? module->secondary_pool_index : module->primary_pool_index;
-    GLOBAL_STATE->stratum_protocol = module->pools[active_pool_idx].protocol;
-    GLOBAL_STATE->sv2_conn = NULL;
-
     // Initialize mutexes
-    pthread_mutex_init(&GLOBAL_STATE->valid_jobs_lock, NULL);
-    GLOBAL_STATE->stratum_mux = (portMUX_TYPE)portMUX_INITIALIZER_UNLOCKED;
+    pthread_mutex_init(&GLOBAL_STATE->ASIC_TASK_MODULE.valid_jobs_lock, NULL);
+    pthread_mutex_init(&GLOBAL_STATE->transport_mutex, NULL);
 
     // Allocate the job tracking tables here rather than in create_jobs_task().
     // The stratum tasks touch valid_jobs (SYSTEM_clean_jobs_queue) as soon as they
     // connect, so tying the allocation to create_jobs_task actually starting is a
     // NULL dereference waiting to happen if that task ever fails to spawn.
     GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs = heap_caps_calloc(MAX_ASIC_JOBS, sizeof(bm_job *), MALLOC_CAP_SPIRAM);
-    GLOBAL_STATE->valid_jobs = heap_caps_calloc(MAX_ASIC_JOBS, sizeof(uint8_t), MALLOC_CAP_SPIRAM);
-    if (GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs == NULL || GLOBAL_STATE->valid_jobs == NULL) {
+    GLOBAL_STATE->ASIC_TASK_MODULE.valid_jobs = heap_caps_calloc(MAX_ASIC_JOBS, sizeof(uint8_t), MALLOC_CAP_SPIRAM);
+    if (GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs == NULL || GLOBAL_STATE->ASIC_TASK_MODULE.valid_jobs == NULL) {
         ESP_LOGE(TAG, "Failed to allocate job tracking tables");
         abort();
     }
@@ -424,14 +406,13 @@ esp_err_t SYSTEM_init_peripherals(GlobalState * GLOBAL_STATE) {
 
 void SYSTEM_clean_jobs_queue(GlobalState * GLOBAL_STATE)
 {
-    ESP_LOGI(TAG, "Clean Jobs: clearing queue");
-    queue_clear(&GLOBAL_STATE->stratum_queue);
+    ESP_LOGI(TAG, "Clean Jobs: invalidating active jobs");
 
-    pthread_mutex_lock(&GLOBAL_STATE->valid_jobs_lock);
+    pthread_mutex_lock(&GLOBAL_STATE->ASIC_TASK_MODULE.valid_jobs_lock);
     for (int i = 0; i < MAX_ASIC_JOBS; i = i + 4) {
-        GLOBAL_STATE->valid_jobs[i] = 0;
+        GLOBAL_STATE->ASIC_TASK_MODULE.valid_jobs[i] = 0;
     }
-    pthread_mutex_unlock(&GLOBAL_STATE->valid_jobs_lock);
+    pthread_mutex_unlock(&GLOBAL_STATE->ASIC_TASK_MODULE.valid_jobs_lock);
 
     // Reset hashrate measurements to prevent a spike on reconnection
     hashrate_monitor_reset_measurements(GLOBAL_STATE);
@@ -492,6 +473,125 @@ void SYSTEM_notify_new_ntime(GlobalState * GLOBAL_STATE, uint32_t ntime)
     tv.tv_sec = ntime;
     tv.tv_usec = 0;
     settimeofday(&tv, NULL);
+}
+
+// Reset decoded coinbase UI fields (scriptsig, coinbase values, outputs, block signals).
+// Note: block_height is intentionally NOT reset here; it is preserved as the "last known good"
+// network height so the UI, screen, and BAP do not flicker or lose context on transient disconnects.
+void SYSTEM_reset_coinbase_ui_state(GlobalState * GLOBAL_STATE, const char *scriptsig_msg)
+{
+    GLOBAL_STATE->coinbase_output_count = 0;
+    GLOBAL_STATE->coinbase_value_total_satoshis = 0;
+    GLOBAL_STATE->coinbase_value_user_satoshis = 0;
+    if (scriptsig_msg) {
+        strncpy(GLOBAL_STATE->scriptsig, scriptsig_msg, sizeof(GLOBAL_STATE->scriptsig) - 1);
+        GLOBAL_STATE->scriptsig[sizeof(GLOBAL_STATE->scriptsig) - 1] = '\0';
+    } else {
+        GLOBAL_STATE->scriptsig[0] = '\0';
+    }
+    GLOBAL_STATE->block_signals_count = 0;
+}
+
+void SYSTEM_decode_and_apply_coinbase(GlobalState * GLOBAL_STATE, const miner_job_t * job)
+{
+    if (!GLOBAL_STATE || !job) return;
+
+    // Update network difficulty from nbits (available on all job types, including SV2 Standard)
+    if (job->nbits != 0) {
+        double net_diff = networkDifficulty(job->nbits);
+        GLOBAL_STATE->network_nonce_diff = (uint64_t) net_diff;
+        suffixString(net_diff, GLOBAL_STATE->network_diff_string, DIFF_STRING_SIZE, 0);
+    }
+
+    // Direct Merkle Root jobs (e.g. SV2 Standard) don't carry coinbase parts
+    if (job->type == JOB_TYPE_SV2_STANDARD) {
+        GLOBAL_STATE->block_height = 0;
+        SYSTEM_reset_coinbase_ui_state(GLOBAL_STATE, NULL);
+        return;
+    }
+
+    mining_notification_result_t *result = heap_caps_malloc(sizeof(mining_notification_result_t), MALLOC_CAP_SPIRAM);
+    if (!result) {
+        ESP_LOGE(TAG, "Failed to allocate coinbase decode result in PSRAM");
+        SYSTEM_reset_coinbase_ui_state(GLOBAL_STATE, "[decode error]");
+        return;
+    }
+    memset(result, 0, sizeof(mining_notification_result_t));
+
+    uint16_t pool_idx = (job->pool_id < MAX_POOLS) ? job->pool_id : 0;
+    const char *user = GLOBAL_STATE->SYSTEM_MODULE.pools[pool_idx].user;
+    bool decode_coinbase_tx = GLOBAL_STATE->SYSTEM_MODULE.pools[pool_idx].decode_coinbase_tx;
+
+    if (coinbase_process_miner_job(job, user, decode_coinbase_tx, result) != ESP_OK) {
+        ESP_LOGW(TAG, "Failed to decode coinbase for job %s", job->job_id);
+        free(result);
+        SYSTEM_reset_coinbase_ui_state(GLOBAL_STATE, "[decode error]");
+        return;
+    }
+
+    // Update block height
+    if (result->block_height != 0 && (uint32_t)GLOBAL_STATE->block_height != result->block_height) {
+        ESP_LOGI(TAG, "Block height %d", result->block_height);
+        GLOBAL_STATE->block_height = result->block_height;
+    }
+
+    // Update block signals (BIP-110, BIP-54, etc.)
+    GLOBAL_STATE->block_signals_count = 0;
+    if (result->bip54_signaling) {
+        strncpy(GLOBAL_STATE->block_signals[GLOBAL_STATE->block_signals_count], "BIP-54", MAX_BLOCK_SIGNAL_LEN - 1);
+        GLOBAL_STATE->block_signals[GLOBAL_STATE->block_signals_count][MAX_BLOCK_SIGNAL_LEN - 1] = '\0';
+        GLOBAL_STATE->block_signals_count++;
+        ESP_LOGI(TAG, "BIP-54 signaling detected");
+    }
+    if (result->bip110_signaling) {
+        strncpy(GLOBAL_STATE->block_signals[GLOBAL_STATE->block_signals_count], "BIP-110", MAX_BLOCK_SIGNAL_LEN - 1);
+        GLOBAL_STATE->block_signals[GLOBAL_STATE->block_signals_count][MAX_BLOCK_SIGNAL_LEN - 1] = '\0';
+        GLOBAL_STATE->block_signals_count++;
+        ESP_LOGI(TAG, "BIP-110 signaling detected");
+    }
+
+    // Update scriptsig
+    if (result->scriptsig) {
+        if (strcmp(result->scriptsig, GLOBAL_STATE->scriptsig) != 0) {
+            ESP_LOGI(TAG, "Scriptsig: %s", result->scriptsig);
+            strncpy(GLOBAL_STATE->scriptsig, result->scriptsig, sizeof(GLOBAL_STATE->scriptsig) - 1);
+            GLOBAL_STATE->scriptsig[sizeof(GLOBAL_STATE->scriptsig) - 1] = '\0';
+        }
+        free(result->scriptsig);
+    }
+
+    // Update coinbase outputs
+    if (result->output_count > MAX_COINBASE_TX_OUTPUTS) {
+        result->output_count = MAX_COINBASE_TX_OUTPUTS;
+    }
+
+    GLOBAL_STATE->coinbase_value_total_satoshis = result->total_value_satoshis;
+    ESP_LOGI(TAG, "Coinbase outputs: %d, total value: %llu%s",
+             result->output_count, result->total_value_satoshis,
+             result->decode_coinbase_tx ? " sats" : "");
+
+    if (result->output_count != GLOBAL_STATE->coinbase_output_count ||
+        memcmp(result->outputs, GLOBAL_STATE->coinbase_outputs, sizeof(coinbase_output_t) * result->output_count) != 0) {
+
+        GLOBAL_STATE->coinbase_output_count = result->output_count;
+        memcpy(GLOBAL_STATE->coinbase_outputs, result->outputs, sizeof(coinbase_output_t) * result->output_count);
+        GLOBAL_STATE->coinbase_value_user_satoshis = result->user_value_satoshis;
+        for (int i = 0; i < result->output_count; i++) {
+            if (result->outputs[i].value_satoshis > 0) {
+                if (result->outputs[i].is_user_output) {
+                    ESP_LOGI(TAG, "  Output %d: %s (%llu sat) (Your payout address)",
+                             i, result->outputs[i].address, result->outputs[i].value_satoshis);
+                } else {
+                    ESP_LOGI(TAG, "  Output %d: %s (%llu sat)",
+                             i, result->outputs[i].address, result->outputs[i].value_satoshis);
+                }
+            } else {
+                ESP_LOGI(TAG, "  Output %d: %s", i, result->outputs[i].address);
+            }
+        }
+    }
+
+    free(result);
 }
 
 void SYSTEM_notify_found_nonce(GlobalState * GLOBAL_STATE, double diff, uint32_t target)
@@ -600,22 +700,6 @@ double SYSTEM_noinit_get_total_log2_work()
     return 64.0 + log2(high_plus_fraction);
 }
 
-stratum_protocol_t stratum_protocol_from_string(const char *s)
-{
-    if (!s) return STRATUM_PROTOCOL_UNKNOWN;
-    if (strcmp(s, STRATUM_V1) == 0) return STRATUM_PROTOCOL_V1;
-    if (strcmp(s, STRATUM_V2) == 0) return STRATUM_PROTOCOL_V2;
-    return STRATUM_PROTOCOL_UNKNOWN;
-}
-
-sv2_channel_type_t sv2_channel_type_from_string(const char *s)
-{
-    if (!s) return SV2_CHANNEL_UNKNOWN;
-    if (strcmp(s, SV2_CHANNEL_TYPE_EXTENDED) == 0) return SV2_CHANNEL_EXTENDED;
-    if (strcmp(s, SV2_CHANNEL_TYPE_STANDARD) == 0) return SV2_CHANNEL_STANDARD;
-    return SV2_CHANNEL_UNKNOWN;
-}
-
 void SYSTEM_init_partitions(GlobalState * GLOBAL_STATE) {
     if (!GLOBAL_STATE) return;
     SystemModule *module = &GLOBAL_STATE->SYSTEM_MODULE;
@@ -678,4 +762,20 @@ void SYSTEM_load_pool_from_nvs(GlobalState * GLOBAL_STATE, int i) {
     char *json_str = nvs_config_get_string_indexed(NVS_CONFIG_POOL, i);
     parse_pool_config_json(json_str, cfg, i);
     free(json_str);
+}
+
+void SYSTEM_reload_pool_config(GlobalState * GLOBAL_STATE)
+{
+    SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
+    module->primary_pool_index = nvs_config_get_u16(NVS_CONFIG_PRIMARY_POOL_INDEX);
+    module->secondary_pool_index = nvs_config_get_u16(NVS_CONFIG_SECONDARY_POOL_INDEX);
+
+    if (module->primary_pool_index >= MAX_POOLS) {
+        module->primary_pool_index = 0;
+    }
+    if (module->secondary_pool_index >= MAX_POOLS) {
+        module->secondary_pool_index = 1;
+    }
+
+    module->use_fallback_stratum = nvs_config_get_bool(NVS_CONFIG_USE_FALLBACK_STRATUM);
 }

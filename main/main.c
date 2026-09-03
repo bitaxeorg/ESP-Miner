@@ -14,10 +14,11 @@
 #include "global_state.h"
 #include "system.h"
 #include "http_server.h"
-#include "protocol_coordinator.h"
+#include "stratum_task.h"
 #include "i2c_bitaxe.h"
 #include "adc.h"
 #include "nvs_config.h"
+#include "miner_job.h"
 #include "self_test.h"
 #include "asic.h"
 #include "bap/bap.h"
@@ -206,15 +207,7 @@ void app_main(void)
     // Connected to WiFi: tear down the setup BLE service to free the radio.
     setup_ble_stop();
 
-    queue_init(&GLOBAL_STATE.stratum_queue);
-
-    // The self-test feeds create_jobs_task a hardcoded stratum V1 mock job.
-    // SYSTEM_init_system() picked the protocol from the configured pool, so pin
-    // V1 here — before create_jobs_task latches it — or an SV2-configured device
-    // would cast the mock mining_notify to sv2_job_t.
-    if (GLOBAL_STATE.SELF_TEST_MODULE.is_active) {
-        GLOBAL_STATE.stratum_protocol = STRATUM_PROTOCOL_V1;
-    }
+    miner_job_pool_init();
 
     if (system_init_ret == ESP_OK) {
         if (asic_initialize(&GLOBAL_STATE, ASIC_INIT_COLD_BOOT, 0) == 0) {
@@ -225,7 +218,7 @@ void app_main(void)
             self_test_show_message(&GLOBAL_STATE, GLOBAL_STATE.SYSTEM_MODULE.asic_status);
             system_init_ret = ESP_FAIL;
         } else {
-            if (xTaskCreate(create_jobs_task, "stratum miner", 8192, (void *) &GLOBAL_STATE, 20, NULL) != pdPASS) {
+            if (xTaskCreate(create_jobs_task, "stratum miner", 8192, (void *) &GLOBAL_STATE, 20, &GLOBAL_STATE.create_jobs_task_handle) != pdPASS) {
                 ESP_LOGE(TAG, "Error creating stratum miner task");
             }
             if (xTaskCreate(ASIC_result_task, "asic result", 8192, (void *) &GLOBAL_STATE, 15, NULL) != pdPASS) {
@@ -242,9 +235,8 @@ void app_main(void)
     }
 
     if (!GLOBAL_STATE.SELF_TEST_MODULE.is_active) {
-        protocol_coordinator_init(&GLOBAL_STATE);
-        if (xTaskCreateWithCaps(protocol_coordinator_task, "protocol coord", 8192, (void *) &GLOBAL_STATE, 5, NULL, MALLOC_CAP_SPIRAM) != pdPASS) {
-            ESP_LOGE(TAG, "Error creating protocol coordinator task");
+        if (xTaskCreateWithCaps(stratum_task, "stratum", 16384, (void *) &GLOBAL_STATE, 5, NULL, MALLOC_CAP_SPIRAM) != pdPASS) {
+            ESP_LOGE(TAG, "Error creating stratum task");
         }
     }
 

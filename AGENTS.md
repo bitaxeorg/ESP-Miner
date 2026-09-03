@@ -59,11 +59,23 @@ npm run start
 
 ## Testing
 
-### Internal C Components
-Firmware unit tests are located in the `test/` directory.
+### Internal C Components (Unity & QEMU)
+Backend firmware unit tests use the Unity test framework and run under QEMU emulation (`esp32s3` machine target) in CI.
+
+**Run locally using the helper script:**
 ```bash
-idf.py build test
+bash tools/run_qemu_tests.sh
 ```
+
+**Manual Execution / Under the Hood:**
+```bash
+cd test-ci
+idf.py build
+cd build
+esptool --chip esp32s3 merge-bin --pad-to-size 16MB -o flash_image.bin @flash_args
+qemu-system-xtensa -machine esp32s3 -monitor none -nographic -no-reboot -watchdog-action shutdown -drive file=flash_image.bin,if=mtd,format=raw -m 4 -serial stdio
+```
+*Note: Test cases tagged with `[not-on-qemu]` (such as hardware-specific ASIC nonce tests) are automatically skipped in QEMU emulation.*
 
 ### Axe-OS Frontend
 Angular unit tests use Karma and Jasmine. We use a specific CI command for CI environments which ensures consistent reporting and uses a headless browser.

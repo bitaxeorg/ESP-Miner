@@ -2,20 +2,11 @@
 #define SYSTEM_H_
 
 #include "esp_err.h"
-
-#include "sv2_protocol.h"
+#include "miner_job.h"
+#include "stratum_api.h"
 
 typedef struct GlobalState GlobalState;
 typedef struct SystemModule SystemModule;
-
-typedef enum {
-    STRATUM_PROTOCOL_UNKNOWN = 0,
-    STRATUM_PROTOCOL_V1 = 1,
-    STRATUM_PROTOCOL_V2 = 2,
-} stratum_protocol_t;
-
-#define STRATUM_V1 "SV1"
-#define STRATUM_V2 "SV2"
 
 void SYSTEM_check_firmware_migration(void);
 void SYSTEM_reset_custom_www(void);
@@ -34,12 +25,17 @@ void SYSTEM_notify_rejected_share(GlobalState * GLOBAL_STATE, char * error_msg);
 void SYSTEM_notify_found_nonce(GlobalState * GLOBAL_STATE, double diff, uint32_t target);
 void SYSTEM_notify_new_ntime(GlobalState * GLOBAL_STATE, uint32_t ntime);
 
+// Reset decoded coinbase UI fields (scriptsig, coinbase values, outputs, block signals).
+// Note: block_height is intentionally NOT reset here; it is preserved as the "last known good"
+// network height so the UI, screen, and BAP do not flicker or lose context on transient disconnects.
+void SYSTEM_reset_coinbase_ui_state(GlobalState * GLOBAL_STATE, const char *scriptsig_msg);
+void SYSTEM_decode_and_apply_coinbase(GlobalState * GLOBAL_STATE, const miner_job_t * job);
+
 void SYSTEM_noinit_update(SystemModule * SYSTEM_MODULE);
 uint64_t SYSTEM_noinit_get_total_uptime_seconds();
 double SYSTEM_noinit_get_total_hashes();
 double SYSTEM_noinit_get_total_log2_work();
-stratum_protocol_t stratum_protocol_from_string(const char *s);
-sv2_channel_type_t sv2_channel_type_from_string(const char *s);
 void SYSTEM_load_pool_from_nvs(GlobalState * GLOBAL_STATE, int i);
+void SYSTEM_reload_pool_config(GlobalState * GLOBAL_STATE);
 
 #endif /* SYSTEM_H_ */

@@ -5,6 +5,7 @@
 #include <stdbool.h>
 #include <sys/time.h>
 #include <esp_transport.h>
+#include "miner_job.h"
 
 #define MAX_MERKLE_BRANCHES 32
 #define HASH_SIZE 32
@@ -30,26 +31,24 @@ typedef enum
     CLIENT_GET_VERSION,
 } stratum_method;
 
+typedef enum {
+    STRATUM_PROTOCOL_UNKNOWN = 0,
+    STRATUM_PROTOCOL_V1 = 1,
+    STRATUM_PROTOCOL_V2 = 2,
+} stratum_protocol_t;
+
+#define STRATUM_V1 "SV1"
+#define STRATUM_V2 "SV2"
+
+stratum_protocol_t stratum_protocol_from_string(const char *s);
+const char *stratum_protocol_to_string(stratum_protocol_t p);
+
 typedef enum
 {
     DISABLED = 0,
     BUNDLED_CRT = 1,
     CUSTOM_CRT = 2,
 } tls_mode;
-
-typedef struct mining_notify
-{
-    char *job_id;
-    char *prev_block_hash;
-    char *coinbase_1;
-    char *coinbase_2;
-    uint8_t *merkle_branches;
-    size_t n_merkle_branches;
-    uint32_t version;
-    uint32_t target;
-    uint32_t ntime;
-    bool clean_jobs;
-} mining_notify;
 
 typedef struct StratumApiV1Message
 {
@@ -60,8 +59,8 @@ typedef struct StratumApiV1Message
     // Indicates the type of request the message represents.
     stratum_method method;
 
-    // mining.notify
-    mining_notify *mining_notification;
+    // Pointer to miner_job_t destination for mining.notify (zero-copy)
+    miner_job_t *job;
     // mining.set_difficulty
     double new_difficulty;
     // mining.set_version_mask
@@ -73,13 +72,27 @@ typedef struct StratumApiV1Message
     char *version_string;
 } StratumApiV1Message;
 
+#define SV1_MAX_ACTIVE_JOB_IDS 16
+
+typedef struct sv1_conn {
+    int send_uid;
+    char user[256];
+    double pool_difficulty;
+    uint32_t version_mask;
+    uint8_t extranonce1[32];
+    uint8_t extranonce1_len;
+    uint8_t extranonce2_len;
+    char active_job_ids[SV1_MAX_ACTIVE_JOB_IDS][MAX_JOB_ID_LEN];
+    int active_job_ids_count;
+} sv1_conn_t;
+
 typedef struct RequestTiming
 {
     int64_t timestamp_us;
     bool tracking;
 } RequestTiming;
 
-esp_transport_handle_t STRATUM_V1_transport_init(tls_mode tls, char * cert);
+esp_transport_handle_t STRATUM_V1_transport_init(tls_mode tls, const char * cert);
 
 void STRATUM_V1_initialize_buffer(void);
 
@@ -87,11 +100,9 @@ char *STRATUM_V1_receive_jsonrpc_line(esp_transport_handle_t transport);
 
 int STRATUM_V1_subscribe(esp_transport_handle_t transport, int send_uid, const char * model);
 
-bool STRATUM_V1_parse(StratumApiV1Message *message, const char *stratum_json);
+bool STRATUM_V1_parse(StratumApiV1Message *message, const char *stratum_json, miner_job_t *job);
 
 void STRATUM_V1_reset_message(StratumApiV1Message *message);
-
-void STRATUM_V1_free_mining_notify(mining_notify *mining_notify);
 
 int STRATUM_V1_authorize(esp_transport_handle_t transport, int send_uid, const char *username, const char *pass);
 
