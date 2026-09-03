@@ -10,7 +10,9 @@ import {
   SystemAsic as ISystemASIC,
   SystemScoreboardEntry as ISystemScoreboardEntry,
   Settings,
-  GenericResponse
+  GenericResponse,
+  WebhookAlertSettings,
+  WebhookAlertUpdate
 } from '../generated/models';
 import { Api } from '../generated/api';
 import * as functions from '../generated/functions';
@@ -405,6 +407,46 @@ export class SystemApiService {
       } as ISystemUpdateResponse);
     }
     return of(undefined);
+  }
+
+  public getWebhookAlertSettings(uri: string = ''): Observable<WebhookAlertSettings> {
+    if (!environment.mock && this.api && !uri) {
+      return from(this.api.invoke(functions.getWebhookAlertSettings, {})).pipe(timeout(API_TIMEOUT));
+    }
+    if (!environment.mock && uri) {
+      return this.httpClient.get<WebhookAlertSettings>(`${uri}/api/system/alerts`).pipe(timeout(API_TIMEOUT));
+    }
+    return of({
+      hasWebhook: false,
+      watchdogEnabled: true,
+      blockFoundEnabled: true,
+      bestDiffEnabled: true,
+    });
+  }
+
+  public updateWebhookAlertSettings(uri: string = '', update: WebhookAlertUpdate): Observable<WebhookAlertSettings> {
+    if (!environment.mock && this.api && !uri) {
+      return from(this.api.invoke(functions.updateWebhookAlertSettings, { body: update }));
+    }
+    if (!environment.mock && uri) {
+      return this.httpClient.patch<WebhookAlertSettings>(`${uri}/api/system/alerts`, update);
+    }
+    return of({
+      hasWebhook: !!update.webhookUrl,
+      watchdogEnabled: update.watchdogEnabled ?? true,
+      blockFoundEnabled: update.blockFoundEnabled ?? true,
+      bestDiffEnabled: update.bestDiffEnabled ?? true,
+    });
+  }
+
+  public testWebhookAlert(uri: string = ''): Observable<GenericResponse> {
+    if (!environment.mock && this.api && !uri) {
+      return from(this.api.invoke(functions.testWebhookAlert, {}) as Promise<GenericResponse>);
+    }
+    if (!environment.mock && uri) {
+      return this.httpClient.post<GenericResponse>(`${uri}/api/system/alerts/test`, {});
+    }
+    return of({ message: 'Webhook test delivered (mock)' });
   }
 
   public deletePool(uri: string = '', id: number): Observable<any> {

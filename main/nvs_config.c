@@ -1,4 +1,5 @@
 #include "nvs_config.h"
+#include "webhook_alerts.h"
 #include "sv2_protocol.h"
 #include "global_state.h"
 #include "cJSON.h"
@@ -83,6 +84,10 @@ static Settings settings[NVS_CONFIG_COUNT] = {
     [NVS_CONFIG_STATISTICS_FREQUENCY]                  = {.nvs_key_name = "statsFrequency",  .type = TYPE_U16,                                                                          .rest_name = "statsFrequency",                     .min = 0,  .max = UINT16_MAX},
 
     [NVS_CONFIG_BEST_DIFF]                             = {.nvs_key_name = "bestdiff",        .type = TYPE_U64},
+    [NVS_CONFIG_WEBHOOK_URL]                           = {.nvs_key_name = "webhook_url",     .type = TYPE_STR,   .default_value = {.str = ""},    .min = 0, .max = WEBHOOK_ALERT_URL_MAX_LEN},
+    [NVS_CONFIG_WEBHOOK_WATCHDOG]                      = {.nvs_key_name = "webhook_wdt",     .type = TYPE_BOOL,  .default_value = {.b = true}},
+    [NVS_CONFIG_WEBHOOK_BLOCK_FOUND]                   = {.nvs_key_name = "webhook_block",   .type = TYPE_BOOL,  .default_value = {.b = true}},
+    [NVS_CONFIG_WEBHOOK_BEST_DIFF]                     = {.nvs_key_name = "webhook_best",    .type = TYPE_BOOL,  .default_value = {.b = true}},
     [NVS_CONFIG_SELF_TEST]                             = {.nvs_key_name = "selftest",        .type = TYPE_BOOL},
     [NVS_CONFIG_SWARM]                                 = {.nvs_key_name = "swarmconfig",     .type = TYPE_STR},
     [NVS_CONFIG_THEME_SCHEME]                          = {.nvs_key_name = "themescheme",     .type = TYPE_STR,   .default_value = {.str = DEFAULT_THEME}},
@@ -881,4 +886,3 @@ bool nvs_config_has_key(NvsConfigKey key)
     xSemaphoreGive(nvs_cache_mutex);
     return result;
 }
-

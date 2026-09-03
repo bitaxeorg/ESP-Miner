@@ -24,6 +24,48 @@ components:
       properties:
         message:
           type: string
+    WebhookAlertSettings:
+      type: object
+      required:
+        - hasWebhook
+        - watchdogEnabled
+        - blockFoundEnabled
+        - bestDiffEnabled
+      properties:
+        hasWebhook:
+          type: boolean
+          description: Whether a valid webhook URL is stored
+        watchdogEnabled:
+          type: boolean
+          description: Send an alert after a watchdog reset
+        blockFoundEnabled:
+          type: boolean
+          description: Send an immediate block-candidate alert
+        bestDiffEnabled:
+          type: boolean
+          description: Send an alert for a new all-time best difficulty
+    WebhookAlertUpdate:
+      type: object
+      properties:
+        webhookUrl:
+          type: string
+          writeOnly: true
+          maxLength: 512
+          description: HTTPS webhook URL. Omit or send the sentinel to preserve the stored secret; send an empty string to clear it.
+        watchdogEnabled:
+          type: boolean
+        blockFoundEnabled:
+          type: boolean
+        bestDiffEnabled:
+          type: boolean
+    WebhookAlertTestRequest:
+      type: object
+      properties:
+        event:
+          type: string
+          enum: [generic, watchdog, block-found, best-diff]
+          default: generic
+          description: Optional event format to simulate without changing miner state
     UpdateSettingsResponse:
       type: object
       properties:
@@ -1317,6 +1359,72 @@ paths:
           description: Unauthorized - Client not in allowed network range
         '500':
           description: Internal server error
+
+  /api/system/alerts:
+    get:
+      summary: Get webhook alert settings
+      operationId: getWebhookAlertSettings
+      tags:
+        - system
+      responses:
+        '200':
+          description: Non-secret webhook alert status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebhookAlertSettings'
+        '401':
+          description: Unauthorized - Client not in allowed network range
+    patch:
+      summary: Update webhook alert settings
+      operationId: updateWebhookAlertSettings
+      tags:
+        - system
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WebhookAlertUpdate'
+      responses:
+        '200':
+          description: Updated non-secret webhook alert status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebhookAlertSettings'
+        '400':
+          description: Invalid alert settings
+        '401':
+          description: Unauthorized - Client not in allowed network range
+
+  /api/system/alerts/test:
+    post:
+      summary: Send a test webhook alert
+      operationId: testWebhookAlert
+      tags:
+        - system
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WebhookAlertTestRequest'
+      responses:
+        '200':
+          description: Webhook test delivered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericResponse'
+        '400':
+          description: No webhook configured
+        '401':
+          description: Unauthorized - Client not in allowed network range
+        '409':
+          description: Another webhook test is running
+        '502':
+          description: Webhook delivery failed
 
   /api/system/OTA:
     post:
