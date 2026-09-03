@@ -74,6 +74,30 @@ static int system_statistics_prebuffer_len = 256;
 static int system_wifi_scan_prebuffer_len = 256;
 static int api_common_prebuffer_len = 256;
 
+esp_err_t HTTP_receive_body(httpd_req_t *req, char *buffer, size_t buffer_size)
+{
+    if (req == NULL || buffer == NULL || buffer_size == 0) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    const size_t content_len = req->content_len;
+    if (content_len == 0 || content_len >= buffer_size) {
+        return ESP_ERR_INVALID_SIZE;
+    }
+
+    size_t received_len = 0;
+    while (received_len < content_len) {
+        int received = httpd_req_recv(req, buffer + received_len, content_len - received_len);
+        if (received <= 0) {
+            return ESP_FAIL;
+        }
+        received_len += (size_t)received;
+    }
+
+    buffer[received_len] = '\0';
+    return ESP_OK;
+}
+
 typedef enum
 {
     SRC_HASHRATE,
@@ -1045,25 +1069,16 @@ static esp_err_t PATCH_update_settings(httpd_req_t * req)
         return ESP_OK;
     }
 
-    int total_len = req->content_len;
-    int cur_len = 0;
     char * buf = ((rest_server_context_t *) (req->user_ctx))->scratch;
-    int received = 0;
-    if (total_len >= SCRATCH_BUFSIZE) {
-        /* Respond with 500 Internal Server Error */
-        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "content too long");
-        return ESP_OK;
+    esp_err_t receive_result = HTTP_receive_body(req, buf, SCRATCH_BUFSIZE);
+    if (receive_result == ESP_ERR_INVALID_SIZE) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid request length");
+        return ESP_FAIL;
     }
-    while (cur_len < total_len) {
-        received = httpd_req_recv(req, buf + cur_len, total_len);
-        if (received <= 0) {
-            /* Respond with 500 Internal Server Error */
-            httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to post control value");
-            return ESP_OK;
-        }
-        cur_len += received;
+    if (receive_result != ESP_OK) {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to receive request data");
+        return ESP_FAIL;
     }
-    buf[total_len] = '\0';
 
     cJSON * root = cJSON_Parse(buf);
     if (root == NULL) {
@@ -1248,17 +1263,16 @@ static esp_err_t PUT_system_pool(httpd_req_t *req)
         return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid pool index");
     }
 
-    int total_len = req->content_len;
-    if (total_len <= 0 || total_len >= SCRATCH_BUFSIZE) {
-        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid request length");
-    }
-
     char *buf = ((rest_server_context_t *)(req->user_ctx))->scratch;
-    int received = httpd_req_recv(req, buf, total_len);
-    if (received <= 0) {
-        return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to receive request data");
+    esp_err_t receive_result = HTTP_receive_body(req, buf, SCRATCH_BUFSIZE);
+    if (receive_result == ESP_ERR_INVALID_SIZE) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid request length");
+        return ESP_FAIL;
     }
-    buf[received] = '\0';
+    if (receive_result != ESP_OK) {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to receive request data");
+        return ESP_FAIL;
+    }
 
     cJSON *root = cJSON_Parse(buf);
     if (!root) {
@@ -1430,25 +1444,18 @@ static esp_err_t POST_system_boot(httpd_req_t *req)
         return ESP_OK;
     }
 
-    size_t total_len = req->content_len;
-    if (total_len == 0) {
-        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Empty request body");
+    char *buf = ((rest_server_context_t *)(req->user_ctx))->scratch;
+    esp_err_t receive_result = HTTP_receive_body(req, buf, SCRATCH_BUFSIZE);
+    if (receive_result == ESP_ERR_INVALID_SIZE) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid request length");
+        return ESP_FAIL;
     }
-
-    char *buf = malloc(total_len + 1);
-    if (!buf) {
-        return httpd_resp_send_500(req);
+    if (receive_result != ESP_OK) {
+        httpd_resp_send_500(req);
+        return ESP_FAIL;
     }
-
-    int ret = httpd_req_recv(req, buf, total_len);
-    if (ret <= 0) {
-        free(buf);
-        return httpd_resp_send_500(req);
-    }
-    buf[ret] = '\0';
 
     cJSON *root = cJSON_Parse(buf);
-    free(buf);
     if (!root) {
         return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid JSON");
     }
