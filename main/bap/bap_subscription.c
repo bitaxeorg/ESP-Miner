@@ -36,6 +36,8 @@ typedef struct {
     char current[32];
     char shares[64];
     char fan_speed[32];
+    char auto_fan[8];
+    char manual_fan_speed[8];
     char best_difficulty[32];
     char block_height[32];
     char wifi_ssid[64];
@@ -54,6 +56,8 @@ typedef struct {
     bool current;
     bool shares;
     bool fan_speed;
+    bool auto_fan;
+    bool manual_fan_speed;
     bool best_difficulty;
     bool block_height;
     bool wifi_ssid;
@@ -86,6 +90,26 @@ esp_err_t BAP_subscription_init(void) {
     memset(subscriptions, 0, sizeof(subscriptions));
     memset(&last_values, 0, sizeof(last_values));
     memset(&last_values_valid, 0, sizeof(last_values_valid));
+
+    // Stream the standard display data even when the accessory's TX path is
+    // unavailable. A received SUB command can still override the interval.
+    const bap_parameter_t display_defaults[] = {
+        BAP_PARAM_HASHRATE,
+        BAP_PARAM_TEMPERATURE,
+        BAP_PARAM_POWER,
+        BAP_PARAM_FAN_SPEED,
+        BAP_PARAM_SHARES,
+        BAP_PARAM_BEST_DIFFICULTY,
+        BAP_PARAM_WIFI,
+        BAP_PARAM_BLOCK_HEIGHT,
+    };
+    for (size_t i = 0; i < sizeof(display_defaults) / sizeof(display_defaults[0]); i++) {
+        bap_parameter_t param = display_defaults[i];
+        subscriptions[param].active = true;
+        subscriptions[param].last_subscribe = 0;
+        subscriptions[param].last_response = 0;
+        subscriptions[param].update_interval_ms = 3000;
+    }
     
     //ESP_LOGI(TAG, "BAP subscription management initialized");
     return ESP_OK;
@@ -138,6 +162,8 @@ void BAP_subscription_handle_subscribe(const char *parameter, const char *value)
                 break;
             case BAP_PARAM_FAN_SPEED:
                 last_values_valid.fan_speed = false;
+                last_values_valid.auto_fan = false;
+                last_values_valid.manual_fan_speed = false;
                 break;
             case BAP_PARAM_BEST_DIFFICULTY:
                 last_values_valid.best_difficulty = false;
@@ -224,7 +250,7 @@ void BAP_send_subscription_update(GlobalState *state) {
 
         for (int i = 0; i < BAP_PARAM_UNKNOWN; i++) {
             // Check for subscription timeout (5 minutes without refresh)
-            if (subscriptions[i].active &&
+            if (subscriptions[i].active && subscriptions[i].last_subscribe != 0 &&
                 (current_time - subscriptions[i].last_subscribe > SUBSCRIPTION_TIMEOUT_MS)) {
                 ESP_LOGW(TAG, "Subscription for %s timed out after 5 minutes, deactivating",
                          BAP_parameter_to_string((bap_parameter_t)i));
@@ -296,8 +322,16 @@ void BAP_send_subscription_update(GlobalState *state) {
                     case BAP_PARAM_FAN_SPEED:
                         {
                             char fan_speed_str[32];
+                            char auto_fan_str[8];
+                            char manual_fan_speed_str[8];
                             snprintf(fan_speed_str, sizeof(fan_speed_str), "%d", state->POWER_MANAGEMENT_MODULE.fan_rpm);
+                            snprintf(auto_fan_str, sizeof(auto_fan_str), "%d",
+                                     nvs_config_get_bool(NVS_CONFIG_AUTO_FAN_SPEED) ? 1 : 0);
+                            snprintf(manual_fan_speed_str, sizeof(manual_fan_speed_str), "%u",
+                                     nvs_config_get_u16(NVS_CONFIG_MANUAL_FAN_SPEED));
                             BAP_send_if_changed("fan_speed", fan_speed_str, last_values.fan_speed, sizeof(last_values.fan_speed), &last_values_valid.fan_speed);
+                            BAP_send_if_changed("auto_fan", auto_fan_str, last_values.auto_fan, sizeof(last_values.auto_fan), &last_values_valid.auto_fan);
+                            BAP_send_if_changed("manual_fan_speed", manual_fan_speed_str, last_values.manual_fan_speed, sizeof(last_values.manual_fan_speed), &last_values_valid.manual_fan_speed);
                         }
                         break;
                     
