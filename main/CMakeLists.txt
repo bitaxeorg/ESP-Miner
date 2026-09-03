@@ -101,6 +101,7 @@ PRIV_REQUIRES
     "tcp_transport"
     "esp_mm"
     "bt"
+    "prometheus_format"
 
 EMBED_FILES "http_server/recovery_page.html"
 )
