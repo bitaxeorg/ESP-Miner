@@ -87,15 +87,9 @@ void BAP_parse_message(const char *message) {
         uint8_t calc_checksum = BAP_calculate_checksum(sentence_body);
         
         if (calc_checksum != received_checksum) {
-            ESP_LOGE(TAG, "Parse message: Checksum mismatch (received: 0x%02X, calculated: 0x%02X)",
+            ESP_LOGE(TAG, "Parse message: Checksum mismatch (received: 0x%02X, calculated: 0x%02X), rejecting",
                      received_checksum, calc_checksum);
-            
-            if (strstr(sentence_body, "BAP,SUB,") == sentence_body) {
-                //ESP_LOGI(TAG, "Subscription command - ignoring checksum mismatch");
-            } else {
-                ESP_LOGE(TAG, "Non-subscription command with invalid checksum, rejecting");
-                return;
-            }
+            return;
         }
     } else {
         size_t body_len = len - 1;
@@ -114,14 +108,9 @@ void BAP_parse_message(const char *message) {
         
         strncpy(sentence_body, message + 1, body_len);
         sentence_body[body_len] = '\0';
-        
-        if (strstr(sentence_body, "BAP,SUB,") == sentence_body ||
-            strstr(sentence_body, "BAP,UNSUB,") == sentence_body) {
-            //ESP_LOGI(TAG, "Subscription command without checksum, accepted");
-        } else {
-            ESP_LOGE(TAG, "Non-subscription command without checksum, rejecting");
-            return;
-        }
+
+        ESP_LOGE(TAG, "Parse message: Missing checksum, rejecting");
+        return;
     }
 
     char tokenize_body[BAP_MAX_MESSAGE_LEN];
