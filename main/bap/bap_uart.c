@@ -148,12 +148,12 @@ static void uart_receive_task(void *pvParameters) {
                         
                         //ESP_LOGI(TAG, "Received complete message: %s", message);
                         BAP_parse_message(message);
-                        
-                        if (c == '\r') {
-                            ESP_LOGD(TAG, "Got CR, waiting for possible LF");
-                        } else {
-                            in_message = false;
-                        }
+
+                        // End the message on either terminator. Leaving it open after
+                        // CR meant a trailing LF re-parsed the same buffer with one
+                        // more byte, which slipped past the duplicate filter and ran
+                        // SET handlers (including restart) twice.
+                        in_message = false;
                     } else if (message_len >= BAP_MAX_MESSAGE_LEN) {
                         ESP_LOGE(TAG, "Message too long, discarding");
                         in_message = false;
