@@ -40,7 +40,9 @@ void BAP_parse_message(const char *message) {
     uint32_t current_time = esp_timer_get_time() / 1000;
     if (strcmp(message, last_processed_message) == 0 &&
         (current_time - last_message_time) < 1000) {
-        ESP_LOGW(TAG, "Duplicate message detected, ignoring: %s", message);
+        // Do not echo the body: a SET can carry the Wi-Fi or pool password, and
+        // the log buffer is served over /api/system/logs and the log WebSocket.
+        ESP_LOGW(TAG, "Duplicate message detected, ignoring");
         return;
     }
 
