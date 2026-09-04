@@ -75,6 +75,7 @@ INCLUDE_DIRS
     "${CMAKE_CURRENT_BINARY_DIR}"
 
 REQUIRES
+    "http_rx"
     "asic"
     "connect"
     "dns_server"
