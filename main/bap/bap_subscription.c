@@ -39,7 +39,6 @@ typedef struct {
     char best_difficulty[32];
     char block_height[32];
     char wifi_ssid[64];
-    char wifi_password[64];
     char wifi_rssi[32];
     char wifi_ip[32];
     char found_block[16];
@@ -57,7 +56,6 @@ typedef struct {
     bool best_difficulty;
     bool block_height;
     bool wifi_ssid;
-    bool wifi_password;
     bool wifi_rssi;
     bool wifi_ip;
     bool found_block;
@@ -147,7 +145,6 @@ void BAP_subscription_handle_subscribe(const char *parameter, const char *value)
                 break;
             case BAP_PARAM_WIFI:
                 last_values_valid.wifi_ssid = false;
-                last_values_valid.wifi_password = false;
                 last_values_valid.wifi_rssi = false;
                 last_values_valid.wifi_ip = false;
                 break;
@@ -331,15 +328,12 @@ void BAP_send_subscription_update(GlobalState *state) {
                             snprintf(rssi_str, sizeof(rssi_str), "%d", current_rssi);
                             
                             snprintf(ip_str, sizeof(ip_str), "%s", state->SYSTEM_MODULE.ip_addr_str);
-                            char *wifi_pass = nvs_config_get_string(NVS_CONFIG_WIFI_PASS);
-                            if (!wifi_pass) {
-                                wifi_pass = strdup("");
-                            }
+                            // The Wi-Fi password is deliberately not published here. The BAP UART
+                            // has no authentication, so anything wired to the accessory header could
+                            // subscribe and read the home network credential back.
                             BAP_send_if_changed("wifi_ssid", state->SYSTEM_MODULE.ssid, last_values.wifi_ssid, sizeof(last_values.wifi_ssid), &last_values_valid.wifi_ssid);
-                            BAP_send_if_changed("wifi_password", wifi_pass, last_values.wifi_password, sizeof(last_values.wifi_password), &last_values_valid.wifi_password);
                             BAP_send_if_changed("wifi_rssi", rssi_str, last_values.wifi_rssi, sizeof(last_values.wifi_rssi), &last_values_valid.wifi_rssi);
                             BAP_send_if_changed("wifi_ip", ip_str, last_values.wifi_ip, sizeof(last_values.wifi_ip), &last_values_valid.wifi_ip);
-                            free(wifi_pass);
                         }
                         break;
 
