@@ -130,7 +130,8 @@ void create_jobs_task(void *pvParameters)
                 GLOBAL_STATE->new_stratum_version_rolling_msg = false;
             }
 
-            extranonce_2 = 0;
+            // *** AANPASSING: start extranonce2 bij 0x00001000 i.p.v. 0 ***
+            extranonce_2 = 0x00001000;
 
             // Check clean_jobs flag
             bool clean;
