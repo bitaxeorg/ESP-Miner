@@ -96,8 +96,9 @@ production inventory is measurable, while depth only describes files compiled
 by the host suite. Do not present depth as firmware-wide coverage.
 
 When adding a portable test, keep its single source of truth under
-`components/<component>/test`, register a new test file and its production
-sources in `host-tests/CMakeLists.txt`, and run:
+`components/<component>/test`, register a new test file in
+`host-tests/test_sources.txt` and its production sources in
+`host-tests/CMakeLists.txt`, and run:
 
 ```bash
 python3 tools/test_inventory.py --check

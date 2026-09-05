@@ -16,6 +16,8 @@ NON_HOST_TAGS = {"qemu-integration", "device-integration", "hardware"}
 
 
 def strip_comments(source: str) -> str:
+    """Remove C comments while preserving literals and source line numbers."""
+
     output = []
     index = 0
     state = "code"
@@ -24,7 +26,19 @@ def strip_comments(source: str) -> str:
         current = source[index]
         following = source[index + 1] if index + 1 < len(source) else ""
 
-        if state == "code" and current == "/" and following == "/":
+        if state in {"string", "character"}:
+            output.append(current)
+            index += 1
+            if current == "\\" and following:
+                output.append(following)
+                index += 1
+            elif current == ('"' if state == "string" else "'"):
+                state = "code"
+        elif state == "code" and current in {'"', "'"}:
+            output.append(current)
+            index += 1
+            state = "string" if current == '"' else "character"
+        elif state == "code" and current == "/" and following == "/":
             output.extend("  ")
             index += 2
             state = "line-comment"
@@ -80,7 +94,14 @@ def find_tests() -> list[dict[str, object]]:
 
 def check_inventory(tests: list[dict[str, object]]) -> list[str]:
     errors = []
-    host_cmake = (ROOT / "host-tests" / "CMakeLists.txt").read_text(encoding="utf-8")
+    # CMake consumes this same manifest. A path mentioned in CMake comments,
+    # diagnostics, or another target must not count as a test registration.
+    manifest = (ROOT / "host-tests" / "test_sources.txt").read_text(encoding="utf-8")
+    host_sources = {
+        source
+        for line in manifest.splitlines()
+        if (source := line.split("#", 1)[0].strip())
+    }
     names: set[str] = set()
     classifications_by_source: dict[str, set[str]] = {}
 
@@ -94,10 +115,9 @@ def check_inventory(tests: list[dict[str, object]]) -> list[str]:
             errors.append(f"duplicate test name: {name}")
         names.add(name)
 
-        host_reference = f"../{source}"
-        if classification == "host-unit" and host_reference not in host_cmake:
-            errors.append(f"host-eligible test is not in host-tests/CMakeLists.txt: {source}")
-        if classification != "host-unit" and host_reference in host_cmake:
+        if classification == "host-unit" and source not in host_sources:
+            errors.append(f"host-eligible test is not in host-tests/test_sources.txt: {source}")
+        if classification != "host-unit" and source in host_sources:
             errors.append(f"host-excluded test is compiled by the host suite: {source}")
         if classification == "conflicting":
             errors.append(f"test has conflicting environment tags: {name}")

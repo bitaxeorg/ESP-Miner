@@ -22,7 +22,7 @@ export CC="${CC:-gcc}"
 python3 "$project_dir/tools/test_inventory.py" --check
 python3 -m unittest discover \
     -s "$project_dir/tools/tests" \
-    -p 'test_coverage_summary.py'
+    -p 'test_*.py'
 
 cmake \
     -S "$project_dir/host-tests" \

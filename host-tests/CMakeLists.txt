@@ -55,22 +55,26 @@ FetchContent_MakeAvailable(unity cjson mbedtls)
 
 target_compile_definitions(unity PUBLIC UNITY_INCLUDE_DOUBLE=1)
 
+# Use the inventory checker's manifest as the test registration source of
+# truth. Production sources and platform adapters remain explicit below.
+set(host_test_manifest "${CMAKE_CURRENT_SOURCE_DIR}/test_sources.txt")
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${host_test_manifest}")
+file(STRINGS "${host_test_manifest}" host_test_lines)
+set(host_test_sources)
+foreach(source IN LISTS host_test_lines)
+    string(REGEX REPLACE "#.*$" "" source "${source}")
+    string(STRIP "${source}" source)
+    if(NOT source STREQUAL "")
+        list(APPEND host_test_sources "../${source}")
+    endif()
+endforeach()
+
 add_executable(
     esp_miner_host_tests
     src/host_test_runner.c
     src/host_platform_stubs.c
     src/esp_log_host.c
-    ../components/stratum/test/test_stratum_json.c
-    ../components/stratum/test/test_sv1_protocol_encode.c
-    ../components/stratum/test/test_miner_job.c
-    ../components/stratum/test/test_coinbase_decoder.c
-    ../components/stratum/test/test_base58.c
-    ../components/stratum/test/test_bech32.c
-    ../components/stratum/test/test_mining.c
-    ../components/stratum/test/test_utils.c
-    ../components/stratum_v2/test/test_sv2.c
-    ../components/asic/test/test_pll.c
-    ../components/asic/test/test_timeout.c
+    ${host_test_sources}
     ../components/stratum/stratum_protocol.c
     ../components/stratum/sv1_protocol.c
     ../components/stratum/miner_job.c

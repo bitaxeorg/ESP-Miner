@@ -26,8 +26,11 @@ pure transformations and state machines, and QEMU for ESP-IDF integration.
 The native harness in `host-tests` compiles the existing Unity test bodies and
 the production C sources they exercise:
 
-- `host-tests/CMakeLists.txt` explicitly lists host-eligible test files,
-  production sources, include paths, and pinned dependencies.
+- `host-tests/test_sources.txt` lists host-eligible test files, one
+  repository-relative path per line. Blank lines and text after `#` are ignored.
+  Both CMake and the inventory checker consume this manifest.
+- `host-tests/CMakeLists.txt` explicitly lists production sources, include
+  paths, and pinned dependencies, and imports the test-source manifest.
 - `host-tests/include/host_test_compat.h` adapts ESP-IDF's `TEST_CASE` macro to
   the native runner. Test bodies remain shared with ESP-IDF.
 - Code under `host-tests/include` and `host-tests/src` provides narrow ESP
@@ -40,7 +43,7 @@ the production C sources they exercise:
   appropriate `esp_log.h` and implementation.
 - `tools/test_inventory.py` discovers active `TEST_CASE` declarations,
   classifies their host eligibility, detects duplicate names and conflicting
-  environment tags, and verifies host CMake registration.
+  environment tags, and verifies registration in the shared manifest.
 - `tools/run_host_tests.sh` is the supported entry point. It configures, builds,
   and runs the suite with AddressSanitizer and UndefinedBehaviorSanitizer by
   default.
@@ -229,9 +232,11 @@ declarations.
    boundary values, malformed input, ownership transfer, and failure behavior
    where relevant. Release every resource allocated by the test or production
    call so LeakSanitizer remains useful.
-4. If this is a new test file, add it to the `esp_miner_host_tests` executable
-   in `host-tests/CMakeLists.txt`. Add any production source, include directory,
-   or target library required to exercise it.
+4. If this is a new test file, add its repository-relative path to
+   `host-tests/test_sources.txt`. CMake imports these tests into the
+   `esp_miner_host_tests` executable. Add any production source, include
+   directory, or target library required to exercise it in
+   `host-tests/CMakeLists.txt`.
 5. Ensure the component test directory has an ESP-IDF `CMakeLists.txt`. If this
    is a new component, add its name to `TEST_COMPONENTS` in both
    `test/CMakeLists.txt` and `test-ci/CMakeLists.txt`.
@@ -293,7 +298,7 @@ python3 tools/test_inventory.py --check
 
 Put the test in a dedicated source file and give it the appropriate
 `[qemu-integration]`, `[device-integration]`, or `[hardware]` tag. Do not list
-that file in `host-tests/CMakeLists.txt`. Run the inventory check to verify that
+that file in `host-tests/test_sources.txt`. Run the inventory check to verify that
 it was not accidentally registered with the host suite.
 
 For device and hardware tests, also add `[not-on-qemu]` unless the test has a

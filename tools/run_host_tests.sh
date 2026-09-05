@@ -44,6 +44,9 @@ if [[ $# -eq 1 ]]; then
 fi
 
 python3 "$project_dir/tools/test_inventory.py" --check
+python3 -m unittest discover \
+    -s "$project_dir/tools/tests" \
+    -p 'test_inventory_checks.py'
 
 cmake \
     -S "$project_dir/host-tests" \
