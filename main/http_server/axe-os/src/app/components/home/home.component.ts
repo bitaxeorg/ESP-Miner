@@ -1,5 +1,5 @@
 import { Component, OnInit, ViewChild, Input, OnDestroy, ElementRef, HostListener, effect, NgZone, ChangeDetectionStrategy, ChangeDetectorRef } from '@angular/core';
-import { map, Observable, shareReplay, Subscription, switchMap, tap, first, Subject, takeUntil, BehaviorSubject, filter, combineLatest } from 'rxjs';
+import { map, Observable, shareReplay, Subscription, switchMap, tap, first, Subject, takeUntil, BehaviorSubject, filter, combineLatest, finalize } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
 import { getHttpErrorMessage } from 'src/app/utils/error-handler';
 import { FormBuilder, FormGroup } from '@angular/forms';
@@ -106,6 +106,8 @@ export class HomeComponent implements OnInit, OnDestroy {
   public activePoolLabel!: PoolLabel;
   public activePoolProtocol!: string;
   public responseTime!: number;
+  private isChangingPool: boolean = false;
+  private targetPoolLabel: PoolLabel | null = null;
 
   public flashShareAccepted: boolean = false;
   public flashShareRejected: boolean = false;
@@ -946,14 +948,27 @@ export class HomeComponent implements OnInit, OnDestroy {
         this.networkDifficultyPercentage = this.getNetworkDifficultyPercentage(info);
         this.payoutPercentage = this.getPayoutPercentage(info);
 
-        const isFallbackPool = !!info.isUsingFallbackStratum;
-        this.activePoolLabel = isFallbackPool ? 'Fallback' : 'Primary';
-        this.activePoolURL = isFallbackPool ? info.fallbackStratumURL : info.stratumURL;
-        this.activePoolUser = isFallbackPool ? info.fallbackStratumUser : info.stratumUser;
-        this.activePoolPort = isFallbackPool ? info.fallbackStratumPort : info.stratumPort;
-        const activeProtocol = isFallbackPool ? info.fallbackStratumProtocol : info.stratumProtocol;
+        if (this.targetPoolLabel !== null) {
+          const targetMatches = (this.targetPoolLabel === 'Fallback')
+            ? (info.useFallbackStratum === 1)
+            : (info.useFallbackStratum === 0);
+          if (targetMatches) {
+            this.targetPoolLabel = null;
+          }
+        }
+
+        if (this.targetPoolLabel !== null) {
+          this.activePoolLabel = this.targetPoolLabel;
+        } else {
+          this.activePoolLabel = info.useFallbackStratum === 1 ? 'Fallback' : 'Primary';
+        }
+        const isCurrentlyFallback = info.isUsingFallbackStratum === 1;
+        this.activePoolURL = isCurrentlyFallback ? info.fallbackStratumURL : info.stratumURL;
+        this.activePoolUser = isCurrentlyFallback ? info.fallbackStratumUser : info.stratumUser;
+        this.activePoolPort = isCurrentlyFallback ? info.fallbackStratumPort : info.stratumPort;
+        const activeProtocol = isCurrentlyFallback ? info.fallbackStratumProtocol : info.stratumProtocol;
         if (activeProtocol === 'SV2') {
-          const channelType = isFallbackPool ? info.fallbackStratumV2ChannelType : info.stratumV2ChannelType;
+          const channelType = isCurrentlyFallback ? info.fallbackStratumV2ChannelType : info.stratumV2ChannelType;
           this.activePoolProtocol = channelType === 'standard' ? 'SV2 Standard Channel' : 'SV2 Extended Channel';
         } else {
           this.activePoolProtocol = 'SV1';
@@ -1092,23 +1107,28 @@ export class HomeComponent implements OnInit, OnDestroy {
   }
 
   onPoolChange(event: { originalEvent?: Event; value: PoolLabel }) {
-    const useFallbackStratum = Number(event.value === 'Fallback');
+    if (this.isChangingPool) return;
+    const targetIsFallback = event.value === 'Fallback';
+    const useFallbackStratum = Number(targetIsFallback);
+    this.isChangingPool = true;
+    this.targetPoolLabel = event.value;
+    this.activePoolLabel = event.value;
 
     this.systemService.updateSystem('', { useFallbackStratum })
       .pipe(
         this.loadingService.lockUIUntilComplete(),
-        switchMap(() =>
-          this.systemService.restart().pipe(
-            this.loadingService.lockUIUntilComplete()
-          )
-        )
+        finalize(() => {
+          this.isChangingPool = false;
+        })
       )
       .subscribe({
         next: () => {
-          this.toastr.success('Pool changed and device restarted');
+          this.toastr.success(`Switched to ${event.value} pool`);
         },
         error: (err: HttpErrorResponse) => {
-          this.toastr.error(`Error during pool change or device restart: ${getHttpErrorMessage(err, this.uri)}`);
+          this.isChangingPool = false;
+          this.targetPoolLabel = null;
+          this.toastr.error(`Error during pool change: ${getHttpErrorMessage(err, this.uri)}`);
         }
       });
   }
@@ -1216,7 +1236,7 @@ export class HomeComponent implements OnInit, OnDestroy {
     updateMessage(!!info.power_fault, 'POWER_FAULT', 'error', `${info.power_fault} Check your Power Supply.`);
     updateMessage(!!info.hardware_fault, 'HARDWARE_FAULT', 'error', `${info.hardware_fault}`);
     updateMessage(!info.frequency || info.frequency < 400, 'FREQUENCY_LOW', 'warn', 'Device frequency is set low - See settings');
-    updateMessage(!!info.isUsingFallbackStratum, 'FALLBACK_STRATUM', 'warn', 'Using fallback pool - Share stats reset. Check Pool Settings and / or reboot Device.');
+    updateMessage(info.isUsingFallbackStratum === 1 && info.useFallbackStratum === 0, 'FALLBACK_STRATUM', 'warn', 'Primary pool unreachable - operating on fallback pool.');
     if (info.coinbaseOutputs && info.coinbaseOutputs.length > 0) {
       let percentage = this.getPayoutPercentage(info);
       updateMessage(percentage > 0 && percentage < 95, 'NOT_SOLO_MINING', 'warn', `Your share of the mining reward is only ${percentage.toFixed(1)}%`);

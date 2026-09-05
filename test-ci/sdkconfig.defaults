@@ -1,2 +1,4 @@
 CONFIG_ESP_INT_WDT=n
 CONFIG_ESP_TASK_WDT=n
+# Match the PSRAM-backed allocations used by the firmware under QEMU.
+CONFIG_SPIRAM=y

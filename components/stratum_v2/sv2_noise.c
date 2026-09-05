@@ -4,6 +4,8 @@
 
 #include <string.h>
 #include <stdlib.h>
+#include <time.h>
+#include <inttypes.h>
 
 #include "esp_log.h"
 #include "esp_random.h"
@@ -34,6 +36,10 @@ struct sv2_noise_ctx {
     uint8_t e_pub_encoded[64];  // ElligatorSwift-encoded ephemeral pubkey
     uint8_t send_key[32];       // c1: initiator -> responder
     uint8_t recv_key[32];       // c2: responder -> initiator
+    // Note on nonce limits: The Noise Protocol specification bounds the 64-bit
+    // nonce counter at 2^64 - 1 to prevent cipher state exhaustion. At embedded
+    // miner share submit rates (~tens of submits per second), 2^64 messages is
+    // practically unreachable, so explicit in-session rekeying is omitted here.
     uint64_t send_nonce;
     uint64_t recv_nonce;
     bool handshake_complete;
@@ -48,7 +54,7 @@ static int noise_recv_exact(esp_transport_handle_t transport, uint8_t *buf, int 
     while (received < len) {
         int r = esp_transport_read(transport, (char *)buf + received, len - received, timeout_ms);
         if (r <= 0) {
-            ESP_LOGE(TAG, "recv failed: r=%d", r);
+            ESP_LOGD(TAG, "recv returned: r=%d", r);
             return -1;
         }
         received += r;
@@ -60,7 +66,7 @@ static int noise_send_all(esp_transport_handle_t transport, const uint8_t *buf, 
 {
     int ret = esp_transport_write(transport, (const char *)buf, len, TRANSPORT_TIMEOUT_MS);
     if (ret < 0) {
-        ESP_LOGE(TAG, "send failed: ret=%d", ret);
+        ESP_LOGD(TAG, "send returned: ret=%d", ret);
         return -1;
     }
     return 0;
@@ -518,6 +524,7 @@ int sv2_noise_handshake(sv2_noise_ctx_t *ctx, esp_transport_handle_t transport,
             ESP_LOGE(TAG, "Server certificate INVALID - Schnorr signature verification failed!");
             return -1;
         }
+
         ESP_LOGI(TAG, "Server certificate verified OK");
     } else {
         ESP_LOGW(TAG, "Skipping certificate verification (no authority pubkey)");

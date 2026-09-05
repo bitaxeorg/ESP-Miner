@@ -59,11 +59,81 @@ npm run start
 
 ## Testing
 
-### Internal C Components
-Firmware unit tests are located in the `test/` directory.
+### Internal C Components (Host, Unity & QEMU)
+Before adding or changing a C test, read the canonical
+[unit-testing strategy and contribution guide](doc/unit_testing.md). It defines
+the host/QEMU/device/hardware boundaries, tag classifications, CMake
+registration, shim rules, and required validation.
+
+Portable backend unit tests compile their production C sources natively and
+run under GCC/Clang with sanitizers in CI. From the repository root, run:
+
 ```bash
-idf.py build test
+./tools/run_host_tests.sh
+# Or, after configuring the ESP-IDF project:
+idf.py host-test
 ```
+
+Measure production line and branch coverage with the separate GCC coverage
+build. Install the pinned reporter once, then use either entry point:
+
+```bash
+python3 -m pip install -r host-tests/requirements.txt
+./tools/run_host_coverage.sh
+# Or, after configuring the ESP-IDF project:
+idf.py host-coverage
+```
+
+Coverage reports are generated under `build/host-coverage/coverage`. CI uses
+the checked-in coverage floors; do not lower or override them to land a change.
+All first-party production C/C++ files under `components` and `main` belong in
+the report, even when they are not compiled by the host suite. Such files show
+as uninstrumented (`--%`). Keep copied third-party exclusions narrow and
+document their provenance in `doc/unit_testing.md`; never exclude first-party
+code to improve the metric. Treat the generated source-file instrumentation
+breadth separately from line and branch depth: breadth shows how much of the
+production inventory is measurable, while depth only describes files compiled
+by the host suite. Do not present depth as firmware-wide coverage.
+
+When adding a portable test, keep its single source of truth under
+`components/<component>/test`, register a new test file in
+`host-tests/test_sources.txt` and its production sources in
+`host-tests/CMakeLists.txt`, and run:
+
+```bash
+python3 tools/test_inventory.py --check
+./tools/run_host_tests.sh '[affected-tag]'
+./tools/run_host_tests.sh --all
+./tools/run_host_coverage.sh
+```
+
+Do not make production modules host-testable by compiling out their ESP
+dependencies. Split portable logic from platform behavior and select behavioral
+adapters at link time. For simple compatibility surfaces such as `esp_log.h`,
+use the general host compatibility code under `host-tests`; do not create a
+module-specific shim solely to replace an existing platform API.
+
+Tests tagged `[qemu-integration]`, `[device-integration]`, or `[hardware]` must
+live in a dedicated source file and must not be registered with the host suite.
+Use `[not-on-qemu]` for device/hardware tests that QEMU must skip.
+
+ESP-IDF integration tests continue to use the Unity framework under QEMU
+emulation (`esp32s3` machine target) in CI.
+
+**Run locally using the helper script:**
+```bash
+bash tools/run_qemu_tests.sh
+```
+
+**Manual Execution / Under the Hood:**
+```bash
+cd test-ci
+idf.py build
+cd build
+esptool --chip esp32s3 merge-bin --pad-to-size 16MB -o flash_image.bin @flash_args
+qemu-system-xtensa -machine esp32s3 -nographic -no-reboot -drive file=flash_image.bin,if=mtd,format=raw
+```
+*Note: Test cases tagged with `[not-on-qemu]` (such as hardware-specific ASIC nonce tests) are automatically skipped in QEMU emulation.*
 
 ### Axe-OS Frontend
 Angular unit tests use Karma and Jasmine. We use a specific CI command for CI environments which ensures consistent reporting and uses a headless browser.

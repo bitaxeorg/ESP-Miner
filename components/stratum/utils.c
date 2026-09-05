@@ -192,31 +192,23 @@ void midstate_sha256_bin(const uint8_t *data, const size_t data_len, uint8_t des
 
 void reverse_32bit_words(const uint8_t src[32], uint8_t dest[32])
 {
-    const uint32_t *s = (const uint32_t *)src;
-    uint32_t *d = (uint32_t *)dest;
-    
-    d[0] = s[7];
-    d[1] = s[6];
-    d[2] = s[5];
-    d[3] = s[4];
-    d[4] = s[3];
-    d[5] = s[2];
-    d[6] = s[1];
-    d[7] = s[0];    
+    uint8_t reversed[32];
+
+    for (size_t i = 0; i < 8; i++) {
+        memcpy(reversed + i * 4, src + (7 - i) * 4, 4);
+    }
+    memcpy(dest, reversed, sizeof(reversed));
 }
 
 void reverse_endianness_per_word(uint8_t data[32])
 {
-    uint32_t *d = (uint32_t *)data;
+    for (size_t i = 0; i < 8; i++) {
+        uint32_t word;
 
-    d[0] = __builtin_bswap32(d[0]);
-    d[1] = __builtin_bswap32(d[1]);
-    d[2] = __builtin_bswap32(d[2]);
-    d[3] = __builtin_bswap32(d[3]);
-    d[4] = __builtin_bswap32(d[4]);
-    d[5] = __builtin_bswap32(d[5]);
-    d[6] = __builtin_bswap32(d[6]);
-    d[7] = __builtin_bswap32(d[7]);
+        memcpy(&word, data + i * sizeof(word), sizeof(word));
+        word = __builtin_bswap32(word);
+        memcpy(data + i * sizeof(word), &word, sizeof(word));
+    }
 }
 
 const double truediffone = 26959535291011309493156476344723991336010898738574164086137773096960.0;
@@ -227,20 +219,19 @@ static const double bits64 = 18446744073709551616.0;
 /* Converts a little endian 256 bit value to a double */
 double le256todouble(const void *target)
 {
-    uint64_t *data64;
-    double dcut64;
+    const uint8_t *bytes = target;
+    uint64_t words[4] = {0};
 
-    data64 = (uint64_t *)(target + 24);
-    dcut64 = *data64 * bits192;
+    for (size_t word = 0; word < 4; word++) {
+        for (size_t byte = 0; byte < 8; byte++) {
+            words[word] |= (uint64_t)bytes[word * 8 + byte] << (byte * 8);
+        }
+    }
 
-    data64 = (uint64_t *)(target + 16);
-    dcut64 += *data64 * bits128;
-
-    data64 = (uint64_t *)(target + 8);
-    dcut64 += *data64 * bits64;
-
-    data64 = (uint64_t *)(target);
-    dcut64 += *data64;
+    double dcut64 = words[3] * bits192;
+    dcut64 += words[2] * bits128;
+    dcut64 += words[1] * bits64;
+    dcut64 += words[0];
 
     return dcut64;
 }

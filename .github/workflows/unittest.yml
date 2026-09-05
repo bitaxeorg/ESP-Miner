@@ -7,6 +7,63 @@ permissions:
   contents: read
 
 jobs:
+  host-test:
+    name: Host tests (${{ matrix.name }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: GCC sanitizers
+            compiler: gcc
+            sanitizers: ON
+          - name: Clang sanitizers
+            compiler: clang
+            sanitizers: ON
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v6
+
+      - name: Run native unit tests
+        env:
+          CC: ${{ matrix.compiler }}
+          ESP_MINER_HOST_SANITIZERS: ${{ matrix.sanitizers }}
+        run: ./tools/run_host_tests.sh --all
+
+  host-coverage:
+    name: Host coverage (GCC)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v6
+
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.14'
+
+      - name: Install coverage reporter
+        run: python3 -m pip install -r host-tests/requirements.txt
+
+      - name: Measure native coverage
+        env:
+          CC: gcc
+        run: ./tools/run_host_coverage.sh
+
+      - name: Publish coverage summary
+        if: always()
+        run: |
+          if [[ -f build/host-coverage/coverage/coverage-summary.md ]]; then
+            cat build/host-coverage/coverage/coverage-summary.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload coverage reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: host-coverage
+          path: build/host-coverage/coverage
+
   build-and-test:
     runs-on: ubuntu-latest
     steps:

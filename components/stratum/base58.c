@@ -39,7 +39,7 @@ static const b58_almostmaxint_t b58_almostmaxint_mask = ((((b58_maxint_t)1) << b
 bool b58tobin(void *bin, size_t *binszp, const char *b58, size_t b58sz)
 {
 	size_t binsz = *binszp;
-	const unsigned char *b58u = (void*)b58;
+	const unsigned char *b58u = (const void*)b58;
 	unsigned char *binu = bin;
 	size_t outisz = (binsz + sizeof(b58_almostmaxint_t) - 1) / sizeof(b58_almostmaxint_t);
 	b58_almostmaxint_t outi[outisz];
@@ -49,10 +49,10 @@ bool b58tobin(void *bin, size_t *binszp, const char *b58, size_t b58sz)
 	uint8_t bytesleft = binsz % sizeof(b58_almostmaxint_t);
 	b58_almostmaxint_t zeromask = bytesleft ? (b58_almostmaxint_mask << (bytesleft * 8)) : 0;
 	unsigned zerocount = 0;
-	
+
 	if (!b58sz)
 		b58sz = strlen(b58);
-	
+
 	for (i = 0; i < outisz; ++i) {
 		outi[i] = 0;
 	}
@@ -108,7 +108,7 @@ bool b58tobin(void *bin, size_t *binszp, const char *b58, size_t b58sz)
 		--*binszp;
 	}
 	*binszp += zerocount;
-	
+
 	return true;
 }
 
@@ -121,6 +121,7 @@ bool my_dblsha256(void *hash, const void *data, size_t datasz)
 
 int b58check(const void *bin, size_t binsz, const char *base58str, size_t b58sz)
 {
+	(void)b58sz;
 	unsigned char buf[32];
 	const uint8_t *binc = bin;
 	unsigned i;
@@ -151,7 +152,7 @@ bool b58enc(char *b58, size_t *b58sz, const void *data, size_t binsz)
 	
 	while (zcount < binsz && !bin[zcount])
 		++zcount;
-	
+
 	size = (binsz - zcount) * 138 / 100 + 1;
 	uint8_t buf[size];
 	memset(buf, 0, size);
@@ -184,7 +185,7 @@ bool b58enc(char *b58, size_t *b58sz, const void *data, size_t binsz)
 		b58[i] = b58digits_ordered[buf[j]];
 	b58[i] = '\0';
 	*b58sz = i + 1;
-	
+
 	return true;
 }
 
@@ -200,6 +201,6 @@ bool b58check_enc(char *b58c, size_t *b58c_sz, uint8_t ver, const void *data, si
 		*b58c_sz = 0;
 		return false;
 	}
-	
+
 	return b58enc(b58c, b58c_sz, buf, 1 + datasz + 4);
 }

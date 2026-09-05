@@ -13,7 +13,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "nvs_config.h"
-#include "stratum_api.h"
+#include "sv1_client.h"
 
 #if defined(CONFIG_BT_NIMBLE_ENABLED) && CONFIG_BT_NIMBLE_ENABLED
 #include "esp_bt.h"

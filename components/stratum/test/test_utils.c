@@ -1,5 +1,6 @@
 #include "unity.h"
 #include "utils.h"
+#include "mining.h"
 #include <string.h>
 
 TEST_CASE("Test double_sha256_bin", "[utils]")
@@ -16,7 +17,7 @@ TEST_CASE("Test hex2bin", "[utils]")
 {
     char *hex_string = "48454c4c4f";
     size_t bin_len = strlen(hex_string) / 2;
-    uint8_t *bin = malloc(bin_len);
+    uint8_t bin[5];
     hex2bin(hex_string, bin, bin_len);
     TEST_ASSERT_EQUAL(72, bin[0]);
     TEST_ASSERT_EQUAL(69, bin[1]);
@@ -71,6 +72,41 @@ TEST_CASE("reverse_endianness_per_word", "[utils]")
     TEST_ASSERT_EQUAL_UINT8_ARRAY(expected, data, 32);
 }
 
+TEST_CASE("word reversal accepts unaligned buffers", "[utils]")
+{
+    uint8_t source_storage[33];
+    uint8_t destination_storage[33] = {0};
+    uint8_t *source = source_storage + 1;
+    uint8_t *destination = destination_storage + 1;
+
+    for (int i = 0; i < 32; i++) source[i] = i;
+
+    reverse_32bit_words(source, destination);
+    reverse_endianness_per_word(destination);
+
+    uint8_t expected[32];
+    for (int i = 0; i < 32; i++) expected[i] = 31 - i;
+    TEST_ASSERT_EQUAL_UINT8_ARRAY(expected, destination, 32);
+}
+
+TEST_CASE("le256todouble accepts unaligned little-endian input", "[utils]")
+{
+    uint8_t storage[33] = {0};
+    uint8_t *value = storage + 1;
+
+    value[0] = 1;
+    TEST_ASSERT_EQUAL_DOUBLE(1.0, le256todouble(value));
+
+    memset(value, 0, 32);
+    value[7] = 1;
+    TEST_ASSERT_EQUAL_DOUBLE(72057594037927936.0, le256todouble(value));
+
+    memset(value, 0, 32);
+    value[24] = 1;
+    TEST_ASSERT_EQUAL_DOUBLE(6277101735386680763835789423207666416102355444464034512896.0,
+                             le256todouble(value));
+}
+
 TEST_CASE("networkDifficulty", "[utils]")
 {
     uint32_t nBits = 0x1701cdfb;
@@ -80,4 +116,21 @@ TEST_CASE("networkDifficulty", "[utils]")
     double expected = 155973032196071.9;
 
     TEST_ASSERT_EQUAL_DOUBLE(expected, actual);
+}
+
+TEST_CASE("hash_to_pdiff safety", "[mining]")
+{
+    // 1. NULL pointer
+    TEST_ASSERT_EQUAL_DOUBLE((double)UINT32_MAX, hash_to_pdiff(NULL));
+
+    // 2. All zero target (division by zero guard)
+    uint8_t zero_target[32] = {0};
+    TEST_ASSERT_EQUAL_DOUBLE((double)UINT32_MAX, hash_to_pdiff(zero_target));
+
+    // 3. Max difficulty 1 target (0x00000000ffff0000...00)
+    uint8_t diff1_target[32] = {0};
+    diff1_target[26] = 0xff;
+    diff1_target[27] = 0xff;
+    double d1 = hash_to_pdiff(diff1_target);
+    TEST_ASSERT_TRUE(d1 >= 0.99 && d1 <= 1.01);
 }

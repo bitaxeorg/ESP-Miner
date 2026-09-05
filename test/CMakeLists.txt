@@ -10,11 +10,11 @@ set(EXTRA_COMPONENT_DIRS "../components")
 # - when invoking CMake directly: cmake -D TEST_COMPONENTS="xxxxx" ..
 # - when using idf.py: idf.py -T xxxxx build
 #
-set(TEST_COMPONENTS "stratum asic" CACHE STRING "List of components to test")
+set(TEST_COMPONENTS "stratum stratum_v2 asic" CACHE STRING "List of components to test")
+
+set(IDF_TARGET "esp32s3" CACHE STRING "IDF target")
 
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
-
-set(IDF_TARGET "esp32s3")
 
 idf_build_set_property(COMPILE_DEFINITIONS "-DCONFIG_ASIC_FREQUENCY=100" APPEND)
 

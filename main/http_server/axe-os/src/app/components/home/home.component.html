@@ -509,14 +509,16 @@
             }
           </h4>
 
-          <div class="flex flex-nowrap">
-            <div class="w-24 shrink-0 text-secondary">
-              <span>Height</span>
+          @if (info.blockHeight) {
+            <div class="flex flex-nowrap">
+              <div class="w-24 shrink-0 text-secondary">
+                <span>Height</span>
+              </div>
+              <div>
+                {{ info.blockHeight }}
+              </div>
             </div>
-            <div>
-              {{ info.blockHeight }}
-            </div>
-          </div>
+          }
 
           <div class="flex flex-nowrap">
             <div class="w-24 shrink-0 text-secondary">
@@ -529,14 +531,16 @@
             }
           </div>
 
-          <div class="flex flex-nowrap items-baseline">
-            <div class="w-24 shrink-0 text-secondary">
-              <span>Scriptsig</span>
+          @if (info.scriptsig) {
+            <div class="flex flex-nowrap items-baseline">
+              <div class="w-24 shrink-0 text-secondary">
+                <span>Scriptsig</span>
+              </div>
+              <div class="font-mono text-sm">
+                {{ info.scriptsig }}
+              </div>
             </div>
-            <div class="font-mono text-sm">
-              {{ info.scriptsig }}
-            </div>
-          </div>
+          }
           @if ((info.coinbaseOutputs?.length ?? 0) > 0) {
             <div class="flex flex-nowrap justify-between">
               <div class="w-24 shrink-0 text-secondary">
@@ -567,14 +571,12 @@
                 }
               </div>
             </div>
-          } @else {
+          } @else if (info.coinbaseValueTotalSatoshis && info.coinbaseValueTotalSatoshis > 0) {
             <div class="flex flex-nowrap items-baseline">
               <div class="w-24 shrink-0 text-secondary">
                 Amount
               </div>
-              @if (info.coinbaseValueTotalSatoshis && info.coinbaseValueTotalSatoshis > 0) {
-                {{ info.coinbaseValueTotalSatoshis / 100_000_000 }}
-              }
+              {{ info.coinbaseValueTotalSatoshis / 100_000_000 }}
             </div>
           }
         </div>
