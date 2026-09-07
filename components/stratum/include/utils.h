@@ -4,6 +4,26 @@
 #include <stddef.h>
 #include <stdint.h>
 
+extern const int8_t hex_val_table[256];
+
+/**
+ * @brief Decode two hex ASCII characters into a single byte.
+ * @param hex Pointer to hex characters.
+ * @return Decoded byte value (0..255), or -1 if invalid or odd-length.
+ */
+static inline int hex_decode_byte(const char *hex)
+{
+    if (hex == NULL || hex[0] == '\0' || hex[1] == '\0') {
+        return -1;
+    }
+    int high = hex_val_table[(unsigned char)hex[0]];
+    int low  = hex_val_table[(unsigned char)hex[1]];
+    if ((high | low) < 0) {
+        return -1;
+    }
+    return (high << 4) | low;
+}
+
 size_t bin2hex(const uint8_t *buf, size_t buflen, char *hex, size_t hexlen);
 
 size_t hex2bin(const char *hex, uint8_t *bin, size_t bin_len);

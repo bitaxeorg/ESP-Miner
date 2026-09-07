@@ -3,6 +3,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <math.h>
+#include "esp_attr.h"
 #include "esp_psram.h"
 #include "esp_heap_caps.h"
 
@@ -10,14 +11,18 @@
 
 #define HASH_CNT_LSB 0x100000000uLL // 2^32 hashes for difficulty 1
 
-static const char hex_table[] = "0123456789abcdef";
+DRAM_ATTR static const char hex_table[] = "0123456789abcdef";
 
-static const uint8_t hex_val_table[256] = {
-    ['0'] = 0, ['1'] = 1, ['2'] = 2, ['3'] = 3, ['4'] = 4,
-    ['5'] = 5, ['6'] = 6, ['7'] = 7, ['8'] = 8, ['9'] = 9,
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Woverride-init"
+DRAM_ATTR const int8_t hex_val_table[256] = {
+    [0 ... 255] = -1,
+    ['0'] = 0,  ['1'] = 1,  ['2'] = 2,  ['3'] = 3,  ['4'] = 4,
+    ['5'] = 5,  ['6'] = 6,  ['7'] = 7,  ['8'] = 8,  ['9'] = 9,
     ['a'] = 10, ['b'] = 11, ['c'] = 12, ['d'] = 13, ['e'] = 14, ['f'] = 15,
     ['A'] = 10, ['B'] = 11, ['C'] = 12, ['D'] = 13, ['E'] = 14, ['F'] = 15
 };
+#pragma GCC diagnostic pop
 
 size_t bin2hex(const uint8_t *buf, size_t buflen, char *hex, size_t hexlen)
 {
@@ -35,14 +40,18 @@ size_t bin2hex(const uint8_t *buf, size_t buflen, char *hex, size_t hexlen)
 
 size_t hex2bin(const char *hex, uint8_t *bin, size_t bin_len)
 {
-    size_t len = 0;
+    if (hex == NULL || bin == NULL) {
+        return 0;
+    }
 
-    while (len < bin_len && hex[0]) {
-        if (!hex[1]) {
-            bin[len++] = hex_val_table[(unsigned char)hex[0]] << 4;
-            break;
+    size_t len = 0;
+    while (len < bin_len && *hex != '\0') {
+        int byte = hex_decode_byte(hex);
+        if (byte < 0) {
+            return 0;
         }
-        bin[len++] = (hex_val_table[(unsigned char)hex[0]] << 4) | hex_val_table[(unsigned char)hex[1]];
+
+        bin[len++] = (uint8_t)byte;
         hex += 2;
     }
 
@@ -334,12 +343,23 @@ float hashCounterToGhs(uint64_t duration_us, uint32_t counter)
     return hashrate / 1e9f; // Convert to Gh/s
 }
 
-void url_decode(char *dst, const char *src) {
-    while (*src) {
-        if ((*src == '%') && src[1] && src[2]) {
-            *dst++ = (hex_val_table[(unsigned char)src[1]] << 4) | hex_val_table[(unsigned char)src[2]];
-            src += 3;
-        } else if (*src == '+') {
+void url_decode(char *dst, const char *src)
+{
+    if (dst == NULL || src == NULL) {
+        return;
+    }
+
+    while (*src != '\0') {
+        if (*src == '%' && src[1] != '\0') {
+            int byte = hex_decode_byte(src + 1);
+            if (byte >= 0) {
+                *dst++ = (char)byte;
+                src += 3;
+                continue;
+            }
+        }
+
+        if (*src == '+') {
             *dst++ = ' ';
             src++;
         } else {

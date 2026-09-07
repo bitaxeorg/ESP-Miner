@@ -22,11 +22,12 @@
 #include <stdbool.h>
 #include <math.h>
 #include <time.h>
+#include <sys/param.h>
 
 #define TRANSPORT_TIMEOUT_MS 5000
 #define BUFFER_SIZE 1024
 #define MAX_EXTRANONCE_2_LEN 32
-#define MAX_JSON_RPC_BUFFER_SIZE (32 * 1024)
+#define JSON_RPC_BUFFER_LIMIT (STRATUM_V1_MAX_JSON_LINE_SIZE + 2U)
 #define MIN_POOL_DIFFICULTY 0.0001
 #define MAX_POOL_DIFFICULTY 4294967295.0
 #define BITCOIN_GENESIS_NTIME 1231006505
@@ -35,6 +36,7 @@ static const char * TAG = "stratum_api";
 
 static char * json_rpc_buffer = NULL;
 static size_t json_rpc_buffer_size = 0;
+static size_t json_rpc_buffer_len = 0;
 
 static RequestTiming *request_timings = NULL;
 
@@ -98,24 +100,33 @@ esp_transport_handle_t STRATUM_V1_transport_init(tls_mode tls, const char * cert
     return transport;
 }
 
-void STRATUM_V1_initialize_buffer(void)
+bool STRATUM_V1_initialize_buffer(void)
 {
     // Free any existing buffer (may be non-NULL if a previous V1 task was running)
     free(json_rpc_buffer);
+    json_rpc_buffer = NULL;
+    json_rpc_buffer_size = 0;
+    json_rpc_buffer_len = 0;
 
     json_rpc_buffer = malloc(BUFFER_SIZE);
-    json_rpc_buffer_size = BUFFER_SIZE;
     if (json_rpc_buffer == NULL) {
-        printf("Error: Failed to allocate memory for buffer\n");
-        exit(1);
+        ESP_LOGE(TAG, "Failed to allocate memory for JSON-RPC buffer");
+        return false;
     }
-    memset(json_rpc_buffer, 0, BUFFER_SIZE);
+    json_rpc_buffer_size = BUFFER_SIZE;
+    json_rpc_buffer[0] = '\0';
 
     if (request_timings == NULL) {
         request_timings = heap_caps_malloc(sizeof(RequestTiming) * MAX_REQUEST_IDS, MALLOC_CAP_SPIRAM);
         if (request_timings == NULL) {
-            printf("Error: Failed to allocate memory for request_timings\n");
-            exit(1);
+            request_timings = malloc(sizeof(RequestTiming) * MAX_REQUEST_IDS);
+        }
+        if (request_timings == NULL) {
+            ESP_LOGE(TAG, "Failed to allocate memory for request_timings");
+            free(json_rpc_buffer);
+            json_rpc_buffer = NULL;
+            json_rpc_buffer_size = 0;
+            return false;
         }
     }
 
@@ -123,60 +134,54 @@ void STRATUM_V1_initialize_buffer(void)
         request_timings[i].timestamp_us = 0;
         request_timings[i].tracking = false;
     }
+
+    return true;
 }
 
-void cleanup_stratum_buffer()
+static bool ensure_json_buffer_capacity(size_t required_size)
 {
-    free(json_rpc_buffer);
-    json_rpc_buffer = NULL;
-    if (request_timings) {
-        free(request_timings);
-        request_timings = NULL;
+    if (required_size > JSON_RPC_BUFFER_LIMIT) {
+        return false;
     }
-}
 
-static bool realloc_json_buffer(size_t len)
-{
-    size_t old, new;
-
-    old = strlen(json_rpc_buffer);
-    new = old + len + 1;
-
-    if (new < json_rpc_buffer_size) {
+    if (required_size <= json_rpc_buffer_size) {
         return true;
     }
 
-    if (new > MAX_JSON_RPC_BUFFER_SIZE) {
-        ESP_LOGE(TAG, "JSON-RPC line exceeds maximum buffer size (%d bytes)", MAX_JSON_RPC_BUFFER_SIZE);
+    size_t new_size = json_rpc_buffer_size;
+    while (new_size < required_size && new_size < JSON_RPC_BUFFER_LIMIT) {
+        new_size = MIN(new_size + BUFFER_SIZE, JSON_RPC_BUFFER_LIMIT);
+    }
+
+    char *new_buffer = realloc(json_rpc_buffer, new_size);
+    if (new_buffer == NULL) {
+        ESP_LOGE(TAG, "Failed to grow JSON-RPC receive buffer to %zu bytes", new_size);
         return false;
     }
 
-    new = new + (BUFFER_SIZE - (new % BUFFER_SIZE));
-    void * new_sockbuf = realloc(json_rpc_buffer, new);
-
-    if (new_sockbuf == NULL) {
-        ESP_LOGE(TAG, "Error: realloc failed in realloc_json_buffer");
-        return false;
-    }
-
-    json_rpc_buffer = new_sockbuf;
-    memset(json_rpc_buffer + old, 0, new - old);
-    json_rpc_buffer_size = new;
+    json_rpc_buffer = new_buffer;
+    json_rpc_buffer_size = new_size;
     return true;
 }
 
 char * STRATUM_V1_receive_jsonrpc_line(esp_transport_handle_t transport)
 {
     if (json_rpc_buffer == NULL) {
-        STRATUM_V1_initialize_buffer();
+        if (!STRATUM_V1_initialize_buffer()) {
+            return NULL;
+        }
     }
     char *line = NULL;
     char recv_buffer[BUFFER_SIZE];
     int nbytes;
 
-    while (!strstr(json_rpc_buffer, "\n")) {
-        memset(recv_buffer, 0, BUFFER_SIZE);
-        nbytes = esp_transport_read(transport, recv_buffer, BUFFER_SIZE - 1, TRANSPORT_TIMEOUT_MS);
+    char *newline_pos = memchr(json_rpc_buffer, '\n', json_rpc_buffer_len);
+    while (newline_pos == NULL) {
+        size_t receive_capacity =
+            (STRATUM_V1_MAX_JSON_LINE_SIZE + 1U) - json_rpc_buffer_len;
+        size_t receive_size = MIN(sizeof(recv_buffer), receive_capacity);
+        nbytes = esp_transport_read(transport, recv_buffer, receive_size,
+                                    TRANSPORT_TIMEOUT_MS);
         if (nbytes < 0) {
             const char *err_str;
             switch(nbytes) {
@@ -194,35 +199,52 @@ char * STRATUM_V1_receive_jsonrpc_line(esp_transport_handle_t transport)
                     break;
             }
             ESP_LOGE(TAG, "Error: transport read failed: %s (code: %d)", err_str, nbytes);
-            if (json_rpc_buffer) {
-                free(json_rpc_buffer);
-                json_rpc_buffer = NULL;
-            }
+            json_rpc_buffer_len = 0;
+            json_rpc_buffer[0] = '\0';
             return NULL;
         }
         if (nbytes > 0) {
-            if (!realloc_json_buffer(nbytes)) {
-                free(json_rpc_buffer);
-                json_rpc_buffer = NULL;
+            if (memchr(recv_buffer, '\0', (size_t)nbytes) != NULL) {
+                ESP_LOGE(TAG, "JSON-RPC stream contains an embedded NUL byte");
+                json_rpc_buffer_len = 0;
+                json_rpc_buffer[0] = '\0';
                 return NULL;
             }
-            strncat(json_rpc_buffer, recv_buffer, nbytes);
+
+            size_t required_size = json_rpc_buffer_len + (size_t)nbytes + 1U;
+            if (!ensure_json_buffer_capacity(required_size)) {
+                json_rpc_buffer_len = 0;
+                json_rpc_buffer[0] = '\0';
+                return NULL;
+            }
+
+            memcpy(json_rpc_buffer + json_rpc_buffer_len, recv_buffer,
+                   (size_t)nbytes);
+            json_rpc_buffer_len += (size_t)nbytes;
+            json_rpc_buffer[json_rpc_buffer_len] = '\0';
+            newline_pos = memchr(json_rpc_buffer, '\n', json_rpc_buffer_len);
+
+            if (newline_pos == NULL &&
+                json_rpc_buffer_len > STRATUM_V1_MAX_JSON_LINE_SIZE) {
+                ESP_LOGE(TAG, "JSON-RPC line exceeds %u bytes",
+                         STRATUM_V1_MAX_JSON_LINE_SIZE);
+                json_rpc_buffer_len = 0;
+                json_rpc_buffer[0] = '\0';
+                return NULL;
+            }
         }
     }
 
     // Extract the line
-    size_t buflen = strlen(json_rpc_buffer);
-    char *newline_pos = strchr(json_rpc_buffer, '\n');
     if (newline_pos) {
-        size_t line_len = newline_pos - json_rpc_buffer;
+        size_t line_len = (size_t)(newline_pos - json_rpc_buffer);
         line = strndup(json_rpc_buffer, line_len);  // Copy only up to \n
-        size_t remaining_len = buflen - line_len - 1;
+        size_t remaining_len = json_rpc_buffer_len - line_len - 1U;
         if (remaining_len > 0) {
             memmove(json_rpc_buffer, newline_pos + 1, remaining_len);
-            json_rpc_buffer[remaining_len] = '\0';
-        } else {
-            json_rpc_buffer[0] = '\0';
         }
+        json_rpc_buffer_len = remaining_len;
+        json_rpc_buffer[json_rpc_buffer_len] = '\0';
     }
     return line;
 }
@@ -667,21 +689,40 @@ static bool parse_result(cJSON *json, StratumApiV1Message *message)
 
 bool STRATUM_V1_parse(StratumApiV1Message *message, const char *stratum_json, miner_job_t *job)
 {
+    if (message == NULL || stratum_json == NULL) {
+        return false;
+    }
+
     STRATUM_V1_reset_message(message);
     message->job = job;
 
-    ESP_LOGI(TAG, "rx: %s", stratum_json); // debug incoming stratum messages
+    size_t json_length = strnlen(stratum_json, STRATUM_V1_MAX_JSON_LINE_SIZE + 1U);
+    if (json_length > STRATUM_V1_MAX_JSON_LINE_SIZE) {
+        ESP_LOGE(TAG, "JSON-RPC message exceeds %u bytes", STRATUM_V1_MAX_JSON_LINE_SIZE);
+        return false;
+    }
 
-    cJSON *json = cJSON_Parse(stratum_json);
-    if (!json) {
-        ESP_LOGE(TAG, "JSON parse failed: %s", stratum_json);
+    ESP_LOGD(TAG, "rx: %.*s%s", (int)MIN(json_length, 512U), stratum_json,
+             json_length > 512U ? "..." : "");
+
+    cJSON *json = cJSON_ParseWithOpts(stratum_json, NULL, true);
+    if (!cJSON_IsObject(json)) {
+        ESP_LOGE(TAG, "JSON-RPC message is not a valid JSON object: %s", stratum_json);
         message->method = METHOD_UNKNOWN;
+        cJSON_Delete(json);
         return false;
     }
 
     // Parse message ID
     cJSON *id_json = cJSON_GetObjectItem(json, "id");
-    if (id_json && cJSON_IsNumber(id_json)) {
+    if (id_json && !cJSON_IsNull(id_json)) {
+        if (!cJSON_IsNumber(id_json) || id_json->valuedouble < 0 ||
+            id_json->valuedouble > INT_MAX ||
+            id_json->valuedouble != (double)id_json->valueint) {
+            ESP_LOGE(TAG, "Invalid JSON-RPC message id");
+            cJSON_Delete(json);
+            return false;
+        }
         message->message_id = id_json->valueint;
     }
 

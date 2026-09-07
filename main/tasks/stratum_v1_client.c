@@ -152,7 +152,10 @@ esp_err_t stratum_v1_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
     }
 
     GLOBAL_STATE->SYSTEM_MODULE.shares_pending = 0;
-    STRATUM_V1_initialize_buffer();
+    if (!STRATUM_V1_initialize_buffer()) {
+        ESP_LOGE(TAG, "Failed to initialize Stratum V1 buffer");
+        return ESP_ERR_NO_MEM;
+    }
 
     if (s_v1_conn != NULL) {
         clear_active_job_ids(s_v1_conn->active_job_ids, &s_v1_conn->active_job_ids_count);
@@ -315,11 +318,15 @@ esp_err_t stratum_v1_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
                 break;
             }
 
-            case MINING_SET_DIFFICULTY:
-                ESP_LOGI(TAG, "Set pool difficulty: %.2f", s_v1_msg->new_difficulty);
-                s_v1_conn->pool_difficulty = s_v1_msg->new_difficulty;
+            case MINING_SET_DIFFICULTY: {
+                double requested_diff = s_v1_msg->new_difficulty;
+                double asic_diff = GLOBAL_STATE->DEVICE_CONFIG.family.asic.difficulty;
+                s_v1_conn->pool_difficulty = (requested_diff < asic_diff) ? asic_diff : requested_diff;
+                ESP_LOGI(TAG, "Set effective pool difficulty: %.2f (requested: %.2f)",
+                         s_v1_conn->pool_difficulty, requested_diff);
                 GLOBAL_STATE->SYSTEM_MODULE.pool_difficulty = s_v1_conn->pool_difficulty;
                 break;
+            }
 
             case MINING_SET_VERSION_MASK:
                 ESP_LOGI(TAG, "Set version mask: %08lx", s_v1_msg->version_mask);

@@ -50,6 +50,21 @@ TEST_CASE("SV2 parse open extended channel extranonce bounds", "[sv2]")
         payload, len_32, &req_id, &chan_id, target, &extranonce_size, prefix, &prefix_len, &group_id));
     TEST_ASSERT_EQUAL_UINT16(16, extranonce_size);
     TEST_ASSERT_EQUAL_UINT8(16, prefix_len);
+
+    // 5. Invalid case: extranonce_size < 2 (e.g. 0 and 1)
+    payload[40] = 0; payload[41] = 0;
+    TEST_ASSERT_EQUAL(-1, sv2_parse_open_extended_channel_success(
+        payload, len_32, &req_id, &chan_id, target, &extranonce_size, prefix, &prefix_len, &group_id));
+    payload[40] = 1; payload[41] = 0;
+    TEST_ASSERT_EQUAL(-1, sv2_parse_open_extended_channel_success(
+        payload, len_32, &req_id, &chan_id, target, &extranonce_size, prefix, &prefix_len, &group_id));
+
+    // 6. Framing checks: trailing byte or truncated byte rejected
+    payload[40] = 16; payload[41] = 0; // restore valid size
+    TEST_ASSERT_EQUAL(-1, sv2_parse_open_extended_channel_success(
+        payload, len_32 + 1, &req_id, &chan_id, target, &extranonce_size, prefix, &prefix_len, &group_id));
+    TEST_ASSERT_EQUAL(-1, sv2_parse_open_extended_channel_success(
+        payload, len_32 - 1, &req_id, &chan_id, target, &extranonce_size, prefix, &prefix_len, &group_id));
 }
 
 TEST_CASE("SV2 parse submit shares error", "[sv2]")

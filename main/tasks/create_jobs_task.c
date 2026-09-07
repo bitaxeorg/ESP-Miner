@@ -74,6 +74,14 @@ static void generate_work_from_miner_job(GlobalState *GLOBAL_STATE, const miner_
     next_job->jobid = strdup(job->job_id);
     next_job->extranonce2 = strdup(extranonce_2_str);
 
+    if (next_job->jobid == NULL || next_job->extranonce2 == NULL) {
+        ESP_LOGE(TAG, "Failed to allocate job metadata");
+        free(next_job->jobid);
+        free(next_job->extranonce2);
+        free(next_job);
+        return;
+    }
+
     if (!GLOBAL_STATE->ASIC_initalized) {
         ESP_LOGW(TAG, "ASIC not initialized, skipping job send");
         free(next_job->jobid);
