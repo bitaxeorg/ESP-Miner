@@ -8,21 +8,14 @@
 
 static int system_asic_prebuffer_len = 256;
 
-// static const char *TAG = "asic_settings";
-static GlobalState *GLOBAL_STATE = NULL;
-
 // Function declarations from http_server.c
 extern esp_err_t is_network_allowed(httpd_req_t *req);
 extern esp_err_t set_cors_headers(httpd_req_t *req);
 
-// Initialize the ASIC API with the global state
-void asic_api_init(GlobalState *global_state) {
-    GLOBAL_STATE = global_state;
-}
-
 /* Handler for system asic endpoint */
 esp_err_t GET_system_asic(httpd_req_t *req)
 {
+    GlobalState *GLOBAL_STATE = (GlobalState *)httpd_get_global_user_ctx(req->handle);
     if (is_network_allowed(req) != ESP_OK) {
         return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
     }
