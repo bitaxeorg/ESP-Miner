@@ -49,11 +49,13 @@ export class AppLayoutComponent implements OnDestroy {
             }
         });
 
-        this.router.events.pipe(filter(event => event instanceof NavigationEnd))
-            .subscribe(() => {
-                this.hideMenu();
-                this.hideProfileMenu();
-            });
+        this.router.events.pipe(
+            filter(event => event instanceof NavigationEnd),
+            takeUntil(this.destroy$)
+        ).subscribe(() => {
+            this.hideMenu();
+            this.hideProfileMenu();
+        });
     }
 
     hideMenu() {
