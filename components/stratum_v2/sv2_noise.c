@@ -4,6 +4,8 @@
 
 #include <string.h>
 #include <stdlib.h>
+#include <time.h>
+#include <inttypes.h>
 
 #include "esp_log.h"
 #include "esp_random.h"
@@ -34,6 +36,12 @@ struct sv2_noise_ctx {
     uint8_t e_pub_encoded[64];  // ElligatorSwift-encoded ephemeral pubkey
     uint8_t send_key[32];       // c1: initiator -> responder
     uint8_t recv_key[32];       // c2: responder -> initiator
+    psa_key_id_t send_key_id;   // persistent PSA key for send
+    psa_key_id_t recv_key_id;   // persistent PSA key for recv
+    // Note on nonce limits: The Noise Protocol specification bounds the 64-bit
+    // nonce counter at 2^64 - 1 to prevent cipher state exhaustion. At embedded
+    // miner share submit rates (~tens of submits per second), 2^64 messages is
+    // practically unreachable, so explicit in-session rekeying is omitted here.
     uint64_t send_nonce;
     uint64_t recv_nonce;
     bool handshake_complete;
@@ -48,7 +56,7 @@ static int noise_recv_exact(esp_transport_handle_t transport, uint8_t *buf, int 
     while (received < len) {
         int r = esp_transport_read(transport, (char *)buf + received, len - received, timeout_ms);
         if (r <= 0) {
-            ESP_LOGE(TAG, "recv failed: r=%d", r);
+            ESP_LOGD(TAG, "recv returned: r=%d", r);
             return -1;
         }
         received += r;
@@ -60,7 +68,7 @@ static int noise_send_all(esp_transport_handle_t transport, const uint8_t *buf, 
 {
     int ret = esp_transport_write(transport, (const char *)buf, len, TRANSPORT_TIMEOUT_MS);
     if (ret < 0) {
-        ESP_LOGE(TAG, "send failed: ret=%d", ret);
+        ESP_LOGD(TAG, "send returned: ret=%d", ret);
         return -1;
     }
     return 0;
@@ -154,7 +162,7 @@ static void build_nonce(uint64_t counter, uint8_t nonce[12])
 
 // ChaCha20-Poly1305 encrypt
 // out must have room for pt_len + 16 bytes
-static int noise_encrypt(const uint8_t key[32], uint64_t nonce_counter,
+static int noise_encrypt(psa_key_id_t key_id, uint64_t nonce_counter,
                          const uint8_t *aad, size_t aad_len,
                          const uint8_t *plaintext, size_t pt_len,
                          uint8_t *out)
@@ -162,26 +170,11 @@ static int noise_encrypt(const uint8_t key[32], uint64_t nonce_counter,
     uint8_t nonce[12];
     build_nonce(nonce_counter, nonce);
 
-    psa_key_attributes_t attributes = PSA_KEY_ATTRIBUTES_INIT;
-    psa_set_key_usage_flags(&attributes, PSA_KEY_USAGE_ENCRYPT);
-    psa_set_key_algorithm(&attributes, PSA_ALG_CHACHA20_POLY1305);
-    psa_set_key_type(&attributes, PSA_KEY_TYPE_CHACHA20);
-    psa_set_key_bits(&attributes, 256);
-
-    psa_key_id_t key_id = 0;
-    psa_status_t status = psa_import_key(&attributes, key, 32, &key_id);
-    psa_reset_key_attributes(&attributes);
-
     size_t output_len = 0;
-    if (status == PSA_SUCCESS) {
-        status = psa_aead_encrypt(key_id, PSA_ALG_CHACHA20_POLY1305,
-                                  nonce, sizeof(nonce), aad, aad_len,
-                                  plaintext, pt_len, out, pt_len + 16,
-                                  &output_len);
-    }
-    if (key_id != 0) {
-        psa_destroy_key(key_id);
-    }
+    psa_status_t status = psa_aead_encrypt(key_id, PSA_ALG_CHACHA20_POLY1305,
+                                           nonce, sizeof(nonce), aad, aad_len,
+                                           plaintext, pt_len, out, pt_len + 16,
+                                           &output_len);
 
     if (status != PSA_SUCCESS || output_len != pt_len + 16) {
         ESP_LOGE(TAG, "encrypt failed: %ld", (long)status);
@@ -192,7 +185,7 @@ static int noise_encrypt(const uint8_t key[32], uint64_t nonce_counter,
 
 // ChaCha20-Poly1305 decrypt
 // ciphertext includes 16-byte tag at end. out receives ct_len - 16 bytes.
-static int noise_decrypt(const uint8_t key[32], uint64_t nonce_counter,
+static int noise_decrypt(psa_key_id_t key_id, uint64_t nonce_counter,
                          const uint8_t *aad, size_t aad_len,
                          const uint8_t *ciphertext, size_t ct_len,
                          uint8_t *out)
@@ -203,6 +196,25 @@ static int noise_decrypt(const uint8_t key[32], uint64_t nonce_counter,
     build_nonce(nonce_counter, nonce);
 
     size_t pt_len = ct_len - 16;
+    size_t output_len = 0;
+    psa_status_t status = psa_aead_decrypt(key_id, PSA_ALG_CHACHA20_POLY1305,
+                                           nonce, sizeof(nonce), aad, aad_len,
+                                           ciphertext, ct_len, out, pt_len,
+                                           &output_len);
+
+    if (status != PSA_SUCCESS || output_len != pt_len) {
+        ESP_LOGE(TAG, "decrypt failed: %ld", (long)status);
+        return -1;
+    }
+    return 0;
+}
+
+// ChaCha20-Poly1305 decrypt using raw 32-byte key (used only during handshake)
+static int noise_decrypt_raw_key(const uint8_t key[32], uint64_t nonce_counter,
+                                 const uint8_t *aad, size_t aad_len,
+                                 const uint8_t *ciphertext, size_t ct_len,
+                                 uint8_t *out)
+{
     psa_key_attributes_t attributes = PSA_KEY_ATTRIBUTES_INIT;
     psa_set_key_usage_flags(&attributes, PSA_KEY_USAGE_DECRYPT);
     psa_set_key_algorithm(&attributes, PSA_ALG_CHACHA20_POLY1305);
@@ -212,23 +224,14 @@ static int noise_decrypt(const uint8_t key[32], uint64_t nonce_counter,
     psa_key_id_t key_id = 0;
     psa_status_t status = psa_import_key(&attributes, key, 32, &key_id);
     psa_reset_key_attributes(&attributes);
-
-    size_t output_len = 0;
-    if (status == PSA_SUCCESS) {
-        status = psa_aead_decrypt(key_id, PSA_ALG_CHACHA20_POLY1305,
-                                  nonce, sizeof(nonce), aad, aad_len,
-                                  ciphertext, ct_len, out, pt_len,
-                                  &output_len);
-    }
-    if (key_id != 0) {
-        psa_destroy_key(key_id);
-    }
-
-    if (status != PSA_SUCCESS || output_len != pt_len) {
-        ESP_LOGE(TAG, "decrypt failed: %ld", (long)status);
+    if (status != PSA_SUCCESS) {
+        ESP_LOGE(TAG, "Failed to import temporary key: %ld", (long)status);
         return -1;
     }
-    return 0;
+
+    int ret = noise_decrypt(key_id, nonce_counter, aad, aad_len, ciphertext, ct_len, out);
+    psa_destroy_key(key_id);
+    return ret;
 }
 
 // --- Public API ---
@@ -260,6 +263,15 @@ sv2_noise_ctx_t *sv2_noise_create(void)
 void sv2_noise_destroy(sv2_noise_ctx_t *ctx)
 {
     if (!ctx) return;
+
+    if (ctx->send_key_id != 0) {
+        psa_destroy_key(ctx->send_key_id);
+        ctx->send_key_id = 0;
+    }
+    if (ctx->recv_key_id != 0) {
+        psa_destroy_key(ctx->recv_key_id);
+        ctx->recv_key_id = 0;
+    }
 
     // Securely zero sensitive material
     memset(ctx->e_priv, 0, 32);
@@ -432,7 +444,7 @@ int sv2_noise_handshake(sv2_noise_ctx_t *ctx, esp_transport_handle_t transport,
     // Step 9: Decrypt responder's encrypted static key (bytes 64-143 = 80 bytes)
     // 80 bytes = 64 bytes ciphertext + 16 bytes MAC
     uint8_t rs_static[64]; // responder static key (ElligatorSwift encoded)
-    if (noise_decrypt(temp_k, 0, ctx->h, 32, resp + 64, 80, rs_static) != 0) {
+    if (noise_decrypt_raw_key(temp_k, 0, ctx->h, 32, resp + 64, 80, rs_static) != 0) {
         ESP_LOGE(TAG, "Failed to decrypt server static key (MAC verification failed)");
         return -1;
     }
@@ -459,7 +471,7 @@ int sv2_noise_handshake(sv2_noise_ctx_t *ctx, esp_transport_handle_t transport,
     // Step 13: Decrypt signature message (bytes 144-233 = 90 bytes)
     // 90 bytes = 74 bytes plaintext + 16 bytes MAC
     uint8_t sig_msg[74];
-    if (noise_decrypt(temp_k2, 0, ctx->h, 32, resp + 144, 90, sig_msg) != 0) {
+    if (noise_decrypt_raw_key(temp_k2, 0, ctx->h, 32, resp + 144, 90, sig_msg) != 0) {
         ESP_LOGE(TAG, "Failed to decrypt server certificate (MAC verification failed)");
         return -1;
     }
@@ -518,6 +530,7 @@ int sv2_noise_handshake(sv2_noise_ctx_t *ctx, esp_transport_handle_t transport,
             ESP_LOGE(TAG, "Server certificate INVALID - Schnorr signature verification failed!");
             return -1;
         }
+
         ESP_LOGI(TAG, "Server certificate verified OK");
     } else {
         ESP_LOGW(TAG, "Skipping certificate verification (no authority pubkey)");
@@ -525,6 +538,35 @@ int sv2_noise_handshake(sv2_noise_ctx_t *ctx, esp_transport_handle_t transport,
 
     // Step 16: Key split — derive send_key and recv_key
     hkdf2(ctx->ck, (const uint8_t *)"", 0, ctx->send_key, ctx->recv_key);
+
+    // Import persistent PSA key handles for session
+    psa_key_attributes_t send_attr = PSA_KEY_ATTRIBUTES_INIT;
+    psa_set_key_usage_flags(&send_attr, PSA_KEY_USAGE_ENCRYPT);
+    psa_set_key_algorithm(&send_attr, PSA_ALG_CHACHA20_POLY1305);
+    psa_set_key_type(&send_attr, PSA_KEY_TYPE_CHACHA20);
+    psa_set_key_bits(&send_attr, 256);
+    if (psa_import_key(&send_attr, ctx->send_key, 32, &ctx->send_key_id) != PSA_SUCCESS) {
+        ESP_LOGE(TAG, "Failed to import send_key");
+        psa_reset_key_attributes(&send_attr);
+        return -1;
+    }
+    psa_reset_key_attributes(&send_attr);
+
+    psa_key_attributes_t recv_attr = PSA_KEY_ATTRIBUTES_INIT;
+    psa_set_key_usage_flags(&recv_attr, PSA_KEY_USAGE_DECRYPT);
+    psa_set_key_algorithm(&recv_attr, PSA_ALG_CHACHA20_POLY1305);
+    psa_set_key_type(&recv_attr, PSA_KEY_TYPE_CHACHA20);
+    psa_set_key_bits(&recv_attr, 256);
+    if (psa_import_key(&recv_attr, ctx->recv_key, 32, &ctx->recv_key_id) != PSA_SUCCESS) {
+        ESP_LOGE(TAG, "Failed to import recv_key");
+        psa_reset_key_attributes(&recv_attr);
+        if (ctx->send_key_id != 0) {
+            psa_destroy_key(ctx->send_key_id);
+            ctx->send_key_id = 0;
+        }
+        return -1;
+    }
+    psa_reset_key_attributes(&recv_attr);
 
     // Step 17: Zero ephemeral private key and temporaries
     memset(ctx->e_priv, 0, 32);
@@ -552,7 +594,7 @@ int sv2_noise_send(sv2_noise_ctx_t *ctx, esp_transport_handle_t transport,
     // Header-only frame: encrypt (6 -> 22 bytes) and send directly off the stack.
     if (payload_len <= 0) {
         uint8_t enc_hdr[22];
-        if (noise_encrypt(ctx->send_key, ctx->send_nonce++, NULL, 0,
+        if (noise_encrypt(ctx->send_key_id, ctx->send_nonce++, NULL, 0,
                           frame, SV2_FRAME_HEADER_SIZE, enc_hdr) != 0) {
             return -1;
         }
@@ -561,29 +603,28 @@ int sv2_noise_send(sv2_noise_ctx_t *ctx, esp_transport_handle_t transport,
 
     // Build the encrypted header and payload contiguously and send them in a
     // single write, so a frame leaves as one TCP segment instead of a header
-    // segment followed by a payload segment. The two parts use separate Noise
-    // nonces but are just consecutive bytes on the wire, so the receiver, which
-    // reads the 22-byte header first and then the payload, is unaffected.
+    // segment followed by a payload segment.
     int total_len = 22 + payload_len + 16;
-    uint8_t *out = malloc(total_len);
+    uint8_t stack_buf[128];
+    uint8_t *out = (total_len <= (int)sizeof(stack_buf)) ? stack_buf : malloc(total_len);
     if (!out) return -1;
 
     // Encrypt header (nonce N) into out[0..21]
-    if (noise_encrypt(ctx->send_key, ctx->send_nonce++, NULL, 0,
+    if (noise_encrypt(ctx->send_key_id, ctx->send_nonce++, NULL, 0,
                       frame, SV2_FRAME_HEADER_SIZE, out) != 0) {
-        free(out);
+        if (out != stack_buf) free(out);
         return -1;
     }
 
     // Encrypt payload (nonce N+1) into out[22..]
-    if (noise_encrypt(ctx->send_key, ctx->send_nonce++, NULL, 0,
+    if (noise_encrypt(ctx->send_key_id, ctx->send_nonce++, NULL, 0,
                       frame + SV2_FRAME_HEADER_SIZE, payload_len, out + 22) != 0) {
-        free(out);
+        if (out != stack_buf) free(out);
         return -1;
     }
 
     int ret = noise_send_all(transport, out, total_len);
-    free(out);
+    if (out != stack_buf) free(out);
     return ret;
 }
 
@@ -603,7 +644,7 @@ int sv2_noise_recv(sv2_noise_ctx_t *ctx, esp_transport_handle_t transport,
         return -1;
     }
 
-    if (noise_decrypt(ctx->recv_key, ctx->recv_nonce++, NULL, 0,
+    if (noise_decrypt(ctx->recv_key_id, ctx->recv_nonce++, NULL, 0,
                       enc_hdr, 22, hdr_out) != 0) {
         ESP_LOGE(TAG, "Failed to decrypt frame header");
         return -1;
@@ -624,22 +665,23 @@ int sv2_noise_recv(sv2_noise_ctx_t *ctx, esp_transport_handle_t transport,
 
     // Receive and decrypt payload
     int enc_len = hdr.msg_length + 16;
-    uint8_t *enc_payload = malloc(enc_len);
+    uint8_t stack_payload[128];
+    uint8_t *enc_payload = (enc_len <= (int)sizeof(stack_payload)) ? stack_payload : malloc(enc_len);
     if (!enc_payload) return -1;
 
     if (noise_recv_exact(transport, enc_payload, enc_len, RECV_TIMEOUT_MS) != 0) {
-        free(enc_payload);
+        if (enc_payload != stack_payload) free(enc_payload);
         return -1;
     }
 
-    if (noise_decrypt(ctx->recv_key, ctx->recv_nonce++, NULL, 0,
+    if (noise_decrypt(ctx->recv_key_id, ctx->recv_nonce++, NULL, 0,
                       enc_payload, enc_len, payload_out) != 0) {
         ESP_LOGE(TAG, "Failed to decrypt payload");
-        free(enc_payload);
+        if (enc_payload != stack_payload) free(enc_payload);
         return -1;
     }
 
-    free(enc_payload);
+    if (enc_payload != stack_payload) free(enc_payload);
     *payload_len_out = hdr.msg_length;
     return 0;
 }
