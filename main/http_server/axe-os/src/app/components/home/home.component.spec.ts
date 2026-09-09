@@ -149,13 +149,6 @@ describe('HomeComponent', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      declarations: [
-        HomeComponent,
-        TooltipTextIconComponent,
-        TooltipIconComponent,
-        ConfettiComponent,
-        SnowflakesComponent
-      ],
       imports: [
         ReactiveFormsModule,
         FormsModule,
@@ -170,6 +163,11 @@ describe('HomeComponent', () => {
         AddressPipe,
         SatsPipe,
         ByteSuffixPipe,
+        HomeComponent,
+        TooltipTextIconComponent,
+        TooltipIconComponent,
+        ConfettiComponent,
+        SnowflakesComponent,
         HeatmapLightnessPipe
       ],
       providers: [
@@ -200,7 +198,7 @@ describe('HomeComponent', () => {
   it('should render the dashboard widgets and dropdowns when info is loaded', () => {
     fixture.detectChanges();
     const element = fixture.nativeElement;
-    // Verify that the dropdowns inside *ngIf are rendered
+    // Verify that the dropdowns inside the @if block are rendered
     expect(element.querySelector('app-dropdown')).toBeTruthy();
   });
 

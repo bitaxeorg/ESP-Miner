@@ -5,8 +5,8 @@
       <table>
         @for (row of rows; track trackByRowLabel($index, row)) {
           <tr>
-            <td class="text-secondary align-top whitespace-nowrap pr-4 py-1" [ngClass]="row.class">{{ row.label }}</td>
-            <td class="align-top line-break-anywhere py-1" [ngClass]="(row.class || '') + ' ' + (row.valueClass || '')" [style.color]="row.color || null" [attr.sensitive-data]="row.isSensitiveData ? '' : null" [appTooltip]="row.tooltip ?? ''">{{ row.value }}</td>
+            <td class="text-secondary align-top whitespace-nowrap pr-4 py-1" [class]="row.class">{{ row.label }}</td>
+            <td class="align-top line-break-anywhere py-1" [class]="[row.class, row.valueClass]" [style.color]="row.color || null" [attr.sensitive-data]="row.isSensitiveData ? '' : null" [appTooltip]="row.tooltip ?? ''">{{ row.value }}</td>
           </tr>
         }
       </table>

@@ -42,7 +42,7 @@
             <!-- Card Header -->
             <div class="flex justify-between items-center p-3 cursor-pointer bg-bg-hover border-b border-surface" (click)="toggleCard(i)">
               <div class="flex items-center gap-2">
-                <i class="pi mr-1 text-secondary transition-transform duration-200" [ngClass]="activeCardIndex === i ? 'pi-chevron-up' : 'pi-chevron-down'" style="font-size: 0.9rem;"></i>
+                <i class="pi mr-1 text-secondary transition-transform duration-200" [class]="activeCardIndex === i ? 'pi-chevron-up' : 'pi-chevron-down'" style="font-size: 0.9rem;"></i>
                 <span class="font-bold text-lg text-main">Pool {{ poolControl.get('id')?.value + 1 }}</span>
                 <!-- Status / Protocol Badges -->
                 <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-blue-500 text-white">{{ getProtocolLabel(poolControl.get('stratumProtocol')?.value) }}</span>
@@ -169,7 +169,7 @@
                           </app-radio-button>
                           <label [for]="'stratumV2ChannelType_' + poolControl.get('id')?.value + '_' + option.value"
                             class="ml-2 cursor-pointer"
-                            [ngClass]="{'text-secondary/60': option.value === 'standard' && isStandardChannelDisabled()}">
+                            [class]="{'text-secondary/60': option.value === 'standard' && isStandardChannelDisabled()}">
                             {{ option.label }}
                           </label>
                         </div>

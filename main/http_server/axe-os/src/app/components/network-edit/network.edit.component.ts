@@ -1,7 +1,7 @@
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { getHttpErrorMessage } from 'src/app/utils/error-handler';
 import { Component, Input, OnInit } from '@angular/core';
-import { FormBuilder, FormGroup, Validators } from '@angular/forms';
+import { FormBuilder, FormGroup, Validators, FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { ToastrService } from 'ngx-toastr';
 import { finalize } from 'rxjs/operators';
 import { BehaviorSubject, Observable } from 'rxjs';
@@ -12,12 +12,14 @@ import { SystemApiService } from 'src/app/services/system.service';
 import { WifiNetwork } from 'src/app/generated/models';
 import { first } from 'rxjs/operators';
 import { ISystemUpdateResponse } from 'src/models/ISystemUpdateResponse';
+import { TooltipTextIconComponent } from '../tooltip-text-icon/tooltip-text-icon.component';
+import { TooltipDirective } from '../../directives/tooltip.directive';
 
 @Component({
-    selector: 'app-network-edit',
-    templateUrl: './network.edit.component.html',
-    styleUrls: ['./network.edit.component.scss'],
-    standalone: false
+  selector: 'app-network-edit',
+  templateUrl: './network.edit.component.html',
+  styleUrls: ['./network.edit.component.scss'],
+  imports: [FormsModule, ReactiveFormsModule, TooltipTextIconComponent, TooltipDirective]
 })
 export class NetworkEditComponent implements OnInit {
   private formSubject = new BehaviorSubject<FormGroup | null>(null);

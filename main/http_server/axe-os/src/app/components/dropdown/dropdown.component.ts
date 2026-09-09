@@ -1,6 +1,5 @@
 import { Component, ElementRef, EventEmitter, HostListener, Input, Output, forwardRef } from '@angular/core';
 import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
-import { CommonModule } from '@angular/common';
 import { SelectOption } from '../../models/select-option.model';
 
 @Component({
@@ -13,7 +12,7 @@ import { SelectOption } from '../../models/select-option.model';
         [class.border-primary]="isOpen"
         [class.opacity-50]="disabled"
         [class.pointer-events-none]="disabled"
-        [ngClass]="triggerClass || 'input-text'"
+        [class]="triggerClass || 'input-text'"
         class="flex items-center justify-between cursor-pointer select-none bg-bg-card border border-surface rounded outline-none transition duration-150 focus:border-primary"
       >
         <span>{{ selectedOptionName }}</span>
@@ -52,8 +51,7 @@ import { SelectOption } from '../../models/select-option.model';
       multi: true
     }
   ],
-  standalone: true,
-  imports: [CommonModule]
+  standalone: true
 })
 export class DropdownComponent implements ControlValueAccessor {
   @Input() options: SelectOption[] = [];

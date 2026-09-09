@@ -1,5 +1,4 @@
 import { Component, Input } from '@angular/core';
-import { CommonModule } from '@angular/common';
 
 export interface ProgressBarMarker {
   value: number;       // Percentage (0 to 100)
@@ -10,11 +9,10 @@ export interface ProgressBarMarker {
 @Component({
   selector: 'app-progressbar',
   standalone: true,
-  imports: [CommonModule],
   template: `
     <div class="relative w-full">
       <!-- Progress Bar Track -->
-      <div class="w-full bg-progressbar rounded-sm overflow-hidden" [ngClass]="heightClass">
+      <div class="w-full bg-progressbar rounded-sm overflow-hidden" [class]="heightClass">
         <div class="bg-progressbar-value h-full transition-[width] duration-300" [style.width.%]="progressValue"></div>
       </div>
 
