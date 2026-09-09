@@ -47,6 +47,10 @@ typedef struct PoolConfig
 #define MAX_BLOCK_SIGNAL_LEN 16
 #define MAX_POOLS 8
 
+// Job id slots tracked per ASIC. Job ids are 7-bit (0..127) on all supported
+// BM13xx parts, so both the active_jobs and valid_jobs tables are sized to 128.
+#define MAX_ASIC_JOBS 128
+
 typedef struct RejectedReasonStat
 {
     char message[64];
@@ -135,6 +139,7 @@ typedef struct SelfTestNonceMeasurement
 typedef struct SelfTestModule
 {
     bool is_active;
+    bool is_factory;
     bool is_finished;
     SelfTestNonceMeasurement nonce_measurement;
     const char *message;

@@ -91,7 +91,12 @@ static void _send_BM1397(uint8_t header, uint8_t *data, uint8_t data_len, bool d
     packet_type_t packet_type = (header & TYPE_JOB) ? JOB_PACKET : CMD_PACKET;
     uint8_t total_length = (packet_type == JOB_PACKET) ? (data_len + 6) : (data_len + 5);
 
-    uint8_t buf[total_length];
+    if (total_length > 160) {
+        ESP_LOGE(TAG, "Packet length %d exceeds maximum buffer size", total_length);
+        return;
+    }
+
+    uint8_t buf[160];
 
     // add the preamble
     buf[0] = 0x55;
@@ -225,22 +230,16 @@ uint8_t BM1397_init(GlobalState * GLOBAL_STATE)
     unsigned char init6[9] = {0x00, FAST_UART_CONFIGURATION, 0x06, 0x00, 0x00, 0x0F}; // init6 - fast_uart_configuration
     _send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), init6, 6, BM1397_SERIALTX_DEBUG);
 
-    BM1397_set_default_baud();
+    // Baud formula = 25M/((denominator+1)*8)
+    // The denominator is 5 bits found in the misc_control (bits 9-13)
+    // default divider of 26 (11010) for 115,749
+    unsigned char baudrate[9] = {0x00, MISC_CONTROL, 0x00, 0x00, 0b01111010, 0b00110001}; // baudrate - misc_control
+    _send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), baudrate, 6, BM1397_SERIALTX_DEBUG);
 
     //ramp up the hash frequency
     do_frequency_transition(GLOBAL_STATE, BM1397_send_hash_frequency);
 
     return chip_counter;
-}
-
-// Baud formula = 25M/((denominator+1)*8)
-// The denominator is 5 bits found in the misc_control (bits 9-13)
-int BM1397_set_default_baud(void)
-{
-    // default divider of 26 (11010) for 115,749
-    unsigned char baudrate[9] = {0x00, MISC_CONTROL, 0x00, 0x00, 0b01111010, 0b00110001}; // baudrate - misc_control
-    _send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), baudrate, 6, BM1397_SERIALTX_DEBUG);
-    return 115749;
 }
 
 int BM1397_set_max_baud(void)
@@ -384,13 +383,21 @@ task_result *BM1397_process_work(GlobalState * GLOBAL_STATE)
     return &result;
 }
 
-void BM1397_read_registers(void)
+void BM1397_read_registers(GlobalState * GLOBAL_STATE)
 {
+    uint16_t asic_count = GLOBAL_STATE->DEVICE_CONFIG.family.asic_count;
+    if (asic_count == 0 || address_interval <= 0) {
+        return;
+    }
+
     int size = sizeof(REGISTER_MAP) / sizeof(REGISTER_MAP[0]);
-    for (int reg = 0; reg < size; reg++) {
-        if (REGISTER_MAP[reg] != REGISTER_INVALID) {
-            _send_BM1397((TYPE_CMD | GROUP_ALL | CMD_READ), (uint8_t[]){0x00, reg}, 2, BM1397_SERIALTX_DEBUG);
-            vTaskDelay(1 / portTICK_PERIOD_MS);
+    for (uint8_t chip = 0; chip < asic_count; chip++) {
+        uint8_t chip_addr = chip * address_interval;
+        for (int reg = 0; reg < size; reg++) {
+            if (REGISTER_MAP[reg] != REGISTER_INVALID) {
+                _send_BM1397((TYPE_CMD | GROUP_SINGLE | CMD_READ), (uint8_t[]){chip_addr, reg}, 2, BM1397_SERIALTX_DEBUG);
+                vTaskDelay(pdMS_TO_TICKS(1));
+            }
         }
     }
 }

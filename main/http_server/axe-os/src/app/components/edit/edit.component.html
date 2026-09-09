@@ -71,9 +71,9 @@
           <label class="hidden md:flex w-full md:w-2/12 font-medium">Minimum Fan Speed</label>
           <div class="w-full md:w-10/12">
             <label class="block mb-1">
-              <span class="md:hidden mr-1">Minimum Fan Speed:</span>{{form.controls['minfanspeed'].value}} %
+              <span class="md:hidden mr-1">Minimum Fan Speed:</span>{{form.controls['minFanSpeed'].value}} %
             </label>
-            <app-slider [min]="0" [max]="99" formControlName="minfanspeed"></app-slider>
+            <app-slider [min]="0" [max]="99" formControlName="minFanSpeed"></app-slider>
           </div>
         </div>
       } @else {
@@ -103,11 +103,17 @@
       <div class="flex flex-col md:flex-row md:items-center mb-4 gap-2">
         <label for="displaySelect" class="w-full md:w-2/12 font-medium cursor-pointer">Type</label>
         <div class="w-full md:w-10/12">
-          <app-dropdown
-            id="displaySelect"
-            formControlName="display"
-            [options]="displayOptions">
-          </app-dropdown>
+          @if (isDisplayConfigurable) {
+            <app-dropdown
+              id="displaySelect"
+              formControlName="display"
+              [options]="displayOptions">
+            </app-dropdown>
+          } @else {
+            <span class="input-text block opacity-70">
+              {{form.controls['display'].value}}
+            </span>
+          }
         </div>
       </div>
       <div class="flex flex-col md:flex-row md:items-center mb-4 gap-2">

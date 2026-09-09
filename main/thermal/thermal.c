@@ -12,6 +12,10 @@
 
 static const char * TAG = "thermal";
 
+#define BM1373_TEMP_SCALE 0.9613546f
+#define BM1373_TEMP_OFFSET (-5.0858026f)
+#define NAJA_DUO_DIODE2_TEMP_OFFSET (-10.7f)
+
 esp_err_t Thermal_init(DeviceConfig * DEVICE_CONFIG)
 {
     if (DEVICE_CONFIG->EMC2101) {
@@ -24,7 +28,26 @@ esp_err_t Thermal_init(DeviceConfig * DEVICE_CONFIG)
         }
     }
     if (DEVICE_CONFIG->EMC2103) {
-        ESP_RETURN_ON_ERROR(EMC2103_init(DEVICE_CONFIG->temp_offset, DEVICE_CONFIG->temp_flip), TAG, "Failed to initialise EMC2103");
+        ESP_RETURN_ON_ERROR(EMC2103_init(DEVICE_CONFIG->temp_offset,
+                                         DEVICE_CONFIG->temp_flip,
+                                         DEVICE_CONFIG->emc_direct_pwm),
+                            TAG,
+                            "Failed to initialise EMC2103");
+        if (DEVICE_CONFIG->emc_ideality_factor != 0x00) {
+            ESP_RETURN_ON_ERROR(EMC2103_set_ideality_factor(DEVICE_CONFIG->emc_ideality_factor),
+                                TAG, "Failed to set EMC2103 ideality factor");
+            ESP_RETURN_ON_ERROR(EMC2103_set_beta_compensation(DEVICE_CONFIG->emc_beta_compensation),
+                                TAG, "Failed to set EMC2103 beta compensation");
+        }
+        if (DEVICE_CONFIG->family.asic.id == BM1373) {
+            ESP_RETURN_ON_ERROR(EMC2103_set_external_temp_calibration(
+                                    1, BM1373_TEMP_SCALE, BM1373_TEMP_OFFSET),
+                                TAG, "Failed to calibrate BM1373 diode 1");
+            ESP_RETURN_ON_ERROR(EMC2103_set_external_temp_calibration(
+                                    2, BM1373_TEMP_SCALE,
+                                    BM1373_TEMP_OFFSET + NAJA_DUO_DIODE2_TEMP_OFFSET),
+                                TAG, "Failed to calibrate BM1373 diode 2");
+        }
     }
     if (DEVICE_CONFIG->EMC2302) {
         ESP_RETURN_ON_ERROR(EMC2302_init(), TAG, "Failed to initialise EMC2302");

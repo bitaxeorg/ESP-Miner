@@ -667,6 +667,9 @@ esp_netif_t * wifi_init_sta(const char * wifi_ssid, const char * wifi_pass)
         authmode = WIFI_AUTH_WPA2_PSK;
     }
 
+    // On some new-ish Wi-Fi 7 routers, the Wi-Fi connection would fail, which leaves users in a bit of 
+    // a pickle. This will drop down to WPA2, instead of having a connection failure due to a vague 
+    // failed WPA3 handshake error.
     wifi_config_t wifi_sta_config = {
         .sta =
             {
@@ -680,6 +683,9 @@ esp_netif_t * wifi_init_sta(const char * wifi_ssid, const char * wifi_pass)
                         .capable = true,
                         .required = false
                     },
+                .sae_pwe_h2e = ESP_WIFI_SAE_MODE,
+                .sae_h2e_identifier = EXAMPLE_H2E_IDENTIFIER,
+                .disable_wpa3_compatible_mode = 1,
         },
     };
 

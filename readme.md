@@ -41,12 +41,12 @@ bitaxetool --firmware ./esp-miner-factory-401-v2.4.2.bin
 - Flash just the NVS config to a bitaxe:
 
 ```
-bitaxetool --config ./config-401.cvs
+bitaxetool --config ./configs/config-401.csv
 ```
 - Flash both a factory image _and_ a config to your Bitaxe: note the settings in the config file will overwrite the config already baked into the factory image:
 
 ```
-bitaxetool --config ./config-401.cvs --firmware ./esp-miner-factory-401-v2.4.2.bin
+bitaxetool --config ./configs/config-401.csv --firmware ./esp-miner-factory-401-v2.4.2.bin
 ```
 
 ## AxeOS API
@@ -346,12 +346,12 @@ Note: if using VSCode, you may have to configure the settings.json file to match
 With the bitaxe connected to your computer via USB, run:
 
 ```
-bitaxetool --config ./config-xxx.cvs --firmware ./esp-miner-merged.bin
+bitaxetool --config ./configs/config-xxx.csv --firmware ./esp-miner-merged.bin
 ```
 
-where xxx is the config file for your hardware version. You can see the list of available config files in the root of the repository.
+where xxx is the config file for your hardware version. You can see the list of available config files in the `configs` directory.
 
-A custom board version is also possible with `config-custom.cvs`. A custom board needs to be based on an existing `devicemodel` and `asicmodel`.
+A custom board version is also possible with `configs/config-custom.csv`. A custom board needs to be based on an existing `devicemodel` and `asicmodel`.
 
 **Notes:** 
   - If you are developing within a dev container, you will need to run the bitaxetool command from outside the container. Otherwise, you will get an error about the device not being found.

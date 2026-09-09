@@ -49,6 +49,7 @@ static const char * TAG = "nvs_config";
 static QueueHandle_t nvs_save_queue = NULL;
 static nvs_handle_t handle;
 static SemaphoreHandle_t nvs_cache_mutex = NULL;
+static SemaphoreHandle_t nvs_update_mutex = NULL;
 
 static Settings settings[NVS_CONFIG_COUNT] = {
     [NVS_CONFIG_WIFI_SSID]                             = {.nvs_key_name = "wifissid",        .type = TYPE_STR,   .default_value = {.str = (char *)CONFIG_ESP_WIFI_SSID},                .rest_name = "ssid",                               .min = 1,  .max = 32},
@@ -324,13 +325,15 @@ static void nvs_config_init_fallback(NvsConfigKey key, Settings * setting)
     }
 }
 
-static void nvs_config_apply_fallback(NvsConfigKey key, Settings * setting)
+static void nvs_config_apply_fallback(const ConfigUpdate *update)
 {
-    if (key == NVS_CONFIG_ASIC_FREQUENCY) {
-        nvs_set_u16(handle, FALLBACK_KEY_ASICFREQUENCY, (uint16_t) setting->value[0].f);
+    if (!update) return;
+
+    if (update->key == NVS_CONFIG_ASIC_FREQUENCY && update->type == TYPE_FLOAT) {
+        nvs_set_u16(handle, FALLBACK_KEY_ASICFREQUENCY, (uint16_t) update->value.f);
     }
-    if (key == NVS_CONFIG_MANUAL_FAN_SPEED) {
-        nvs_set_u16(handle, FALLBACK_KEY_FANSPEED, setting->value[0].u16);
+    if (update->key == NVS_CONFIG_MANUAL_FAN_SPEED && update->type == TYPE_U16) {
+        nvs_set_u16(handle, FALLBACK_KEY_FANSPEED, update->value.u16);
     }
 }
 
@@ -346,34 +349,7 @@ static void nvs_task(void *pvParameters)
                 char key[NVS_KEY_NAME_MAX_SIZE];
                 get_nvs_key_name(setting, update.index, key);
 
-                // NVS flash write is AFTER releasing the mutex so getters are never blocked
-                char *old_str = NULL;
                 char nvs_str_buf[32]; // for TYPE_FLOAT serialisation
-                xSemaphoreTake(nvs_cache_mutex, portMAX_DELAY);
-                setting->is_set = true;
-                switch (update.type) {
-                    case TYPE_STR:
-                        old_str = setting->value[update.index].str;
-                        setting->value[update.index].str = update.value.str;
-                        break;
-                    case TYPE_U16:
-                        setting->value[update.index].u16 = update.value.u16;
-                        break;
-                    case TYPE_I32:
-                        setting->value[update.index].i32 = update.value.i32;
-                        break;
-                    case TYPE_U64:
-                        setting->value[update.index].u64 = update.value.u64;
-                        break;
-                    case TYPE_FLOAT:
-                        setting->value[update.index].f = update.value.f;
-                        snprintf(nvs_str_buf, sizeof(nvs_str_buf), "%f", update.value.f);
-                        break;
-                    case TYPE_BOOL:
-                        setting->value[update.index].b = update.value.b;
-                        break;
-                }
-                xSemaphoreGive(nvs_cache_mutex);
 
                 switch (update.type) {
                     case TYPE_STR:
@@ -389,6 +365,7 @@ static void nvs_task(void *pvParameters)
                         ret = nvs_set_u64(handle, key, update.value.u64);
                         break;
                     case TYPE_FLOAT:
+                        snprintf(nvs_str_buf, sizeof(nvs_str_buf), "%f", update.value.f);
                         ret = nvs_set_str(handle, key, nvs_str_buf);
                         break;
                     case TYPE_BOOL:
@@ -396,7 +373,7 @@ static void nvs_task(void *pvParameters)
                         break;
                 }
 
-                nvs_config_apply_fallback(update.key, setting);
+                nvs_config_apply_fallback(&update);
 
                 if (ret == ESP_OK) {
                     ret = nvs_commit(handle);
@@ -404,7 +381,9 @@ static void nvs_task(void *pvParameters)
                         ESP_LOGE(TAG, "Failed to commit data to NVS");
                     }
                 }
-                if (old_str) free(old_str);
+                if (update.type == TYPE_STR) {
+                    free(update.value.str);
+                }
             } 
             else if (update.type == TYPE_STR) {
                 free(update.value.str);
@@ -444,8 +423,6 @@ esp_err_t nvs_config_init(void)
 
         nvs_config_init_fallback(key, setting);
 
-        esp_err_t ret;
-
         int count = get_array_size(setting);
         setting->value = calloc(count, sizeof(ConfigValue));
 
@@ -476,7 +453,7 @@ esp_err_t nvs_config_init(void)
                 }
                 case TYPE_U16: {
                     uint16_t val;
-                    ret = nvs_get_u16(handle, nvs_key, &val);
+                    esp_err_t ret = nvs_get_u16(handle, nvs_key, &val);
                     if (ret == ESP_OK) {
                         setting->value[idx].u16 = val;
                         setting->is_set = true;
@@ -487,7 +464,7 @@ esp_err_t nvs_config_init(void)
                 }
                 case TYPE_I32: {
                     int32_t val;
-                    ret = nvs_get_i32(handle, nvs_key, &val);
+                    esp_err_t ret = nvs_get_i32(handle, nvs_key, &val);
                     if (ret == ESP_OK) {
                         setting->value[idx].i32 = val;
                         setting->is_set = true;
@@ -498,7 +475,7 @@ esp_err_t nvs_config_init(void)
                 }
                 case TYPE_U64: {
                     uint64_t val;
-                    ret = nvs_get_u64(handle, nvs_key, &val);
+                    esp_err_t ret = nvs_get_u64(handle, nvs_key, &val);
                     if (ret == ESP_OK) {
                         setting->value[idx].u64 = val;
                         setting->is_set = true;
@@ -510,7 +487,7 @@ esp_err_t nvs_config_init(void)
                 case TYPE_FLOAT: {
                     char buf[32];
                     size_t len = sizeof(buf);
-                    ret = nvs_get_str(handle, nvs_key, buf, &len);
+                    esp_err_t ret = nvs_get_str(handle, nvs_key, buf, &len);
                     if (ret == ESP_OK) {
                         char *end;
                         float parsed = strtof(buf, &end);
@@ -528,7 +505,7 @@ esp_err_t nvs_config_init(void)
                 }
                 case TYPE_BOOL: {
                     uint16_t val;
-                    ret = nvs_get_u16(handle, nvs_key, &val);
+                    esp_err_t ret = nvs_get_u16(handle, nvs_key, &val);
                     if (ret == ESP_OK) {
                         setting->value[idx].b = (val != 0);
                         setting->is_set = true;
@@ -541,11 +518,17 @@ esp_err_t nvs_config_init(void)
         }
     }
 
-    nvs_save_queue = xQueueCreate(20, sizeof(ConfigUpdate));
+    nvs_save_queue = xQueueCreate(50, sizeof(ConfigUpdate));
 
     nvs_cache_mutex = xSemaphoreCreateMutex();
     if (!nvs_cache_mutex) {
         ESP_LOGE(TAG, "Failed to create nvs_cache_mutex");
+        return ESP_FAIL;
+    }
+
+    nvs_update_mutex = xSemaphoreCreateMutex();
+    if (!nvs_update_mutex) {
+        ESP_LOGE(TAG, "Failed to create nvs_update_mutex");
         return ESP_FAIL;
     }
 
@@ -602,23 +585,88 @@ char *nvs_config_get_string_indexed(NvsConfigKey key, int index)
 void nvs_config_set_string(NvsConfigKey key, const char *value)
 {
     Settings *setting = nvs_config_get_settings(key);
-    if (!setting || setting->type != TYPE_STR || (setting->value[0].str && strcmp(setting->value[0].str, value) == 0)) return;
+    if (!setting || setting->type != TYPE_STR || !value) return;
 
-    ConfigUpdate update = { .key = key, .type = TYPE_STR, .value.str = strdup(value) };
-    if (!update.value.str) return;
+    xSemaphoreTake(nvs_update_mutex, portMAX_DELAY);
+
+    xSemaphoreTake(nvs_cache_mutex, portMAX_DELAY);
+    if (setting->value[0].str && strcmp(setting->value[0].str, value) == 0 && setting->is_set) {
+        xSemaphoreGive(nvs_cache_mutex);
+        xSemaphoreGive(nvs_update_mutex);
+        return;
+    }
+    xSemaphoreGive(nvs_cache_mutex);
+
+    char *new_str = strdup(value);
+    if (!new_str) {
+        ESP_LOGE(TAG, "Failed to allocate memory for string cache update");
+        xSemaphoreGive(nvs_update_mutex);
+        return;
+    }
+
+    char *queue_str = strdup(value);
+    if (!queue_str) {
+        ESP_LOGE(TAG, "Failed to allocate memory for string queue update");
+        free(new_str);
+        xSemaphoreGive(nvs_update_mutex);
+        return;
+    }
+
+    xSemaphoreTake(nvs_cache_mutex, portMAX_DELAY);
+    char *old_str = setting->value[0].str;
+    setting->value[0].str = new_str;
+    setting->is_set = true;
+    xSemaphoreGive(nvs_cache_mutex);
+    if (old_str) free(old_str);
+
+    ConfigUpdate update = { .key = key, .type = TYPE_STR, .value.str = queue_str };
     xQueueSend(nvs_save_queue, &update, portMAX_DELAY);
+
+    xSemaphoreGive(nvs_update_mutex);
 }
 
 void nvs_config_set_string_indexed(NvsConfigKey key, int index, const char *value)
 {
     Settings *setting = nvs_config_get_settings(key);
-    if (!setting || setting->type != TYPE_STR || setting->array_size < 1) return;
+    if (!setting || setting->type != TYPE_STR || setting->array_size < 1 || !value) return;
     if (index < 0 || index >= setting->array_size) return;
-    if (setting->value[index].str && strcmp(setting->value[index].str, value) == 0) return;
 
-    ConfigUpdate update = { .key = key, .type = TYPE_STR, .value.str = strdup(value), .index = index };
-    if (!update.value.str) return;
+    xSemaphoreTake(nvs_update_mutex, portMAX_DELAY);
+
+    xSemaphoreTake(nvs_cache_mutex, portMAX_DELAY);
+    if (setting->value[index].str && strcmp(setting->value[index].str, value) == 0 && setting->is_set) {
+        xSemaphoreGive(nvs_cache_mutex);
+        xSemaphoreGive(nvs_update_mutex);
+        return;
+    }
+    xSemaphoreGive(nvs_cache_mutex);
+
+    char *new_str = strdup(value);
+    if (!new_str) {
+        ESP_LOGE(TAG, "Failed to allocate memory for string cache update");
+        xSemaphoreGive(nvs_update_mutex);
+        return;
+    }
+
+    char *queue_str = strdup(value);
+    if (!queue_str) {
+        ESP_LOGE(TAG, "Failed to allocate memory for string queue update");
+        free(new_str);
+        xSemaphoreGive(nvs_update_mutex);
+        return;
+    }
+
+    xSemaphoreTake(nvs_cache_mutex, portMAX_DELAY);
+    char *old_str = setting->value[index].str;
+    setting->value[index].str = new_str;
+    setting->is_set = true;
+    xSemaphoreGive(nvs_cache_mutex);
+    if (old_str) free(old_str);
+
+    ConfigUpdate update = { .key = key, .type = TYPE_STR, .value.str = queue_str, .index = index };
     xQueueSend(nvs_save_queue, &update, portMAX_DELAY);
+
+    xSemaphoreGive(nvs_update_mutex);
 }
 
 uint16_t nvs_config_get_u16(NvsConfigKey key)
@@ -641,10 +689,24 @@ uint16_t nvs_config_get_u16(NvsConfigKey key)
 void nvs_config_set_u16(NvsConfigKey key, uint16_t value)
 {
     Settings *setting = nvs_config_get_settings(key);
-    if (!setting || setting->type != TYPE_U16 || setting->value[0].u16 == value) return;
+    if (!setting || setting->type != TYPE_U16) return;
+
+    xSemaphoreTake(nvs_update_mutex, portMAX_DELAY);
+
+    xSemaphoreTake(nvs_cache_mutex, portMAX_DELAY);
+    if (setting->value[0].u16 == value && setting->is_set) {
+        xSemaphoreGive(nvs_cache_mutex);
+        xSemaphoreGive(nvs_update_mutex);
+        return;
+    }
+    setting->value[0].u16 = value;
+    setting->is_set = true;
+    xSemaphoreGive(nvs_cache_mutex);
 
     ConfigUpdate update = { .key = key, .type = TYPE_U16, .value.u16 = value };
     xQueueSend(nvs_save_queue, &update, portMAX_DELAY);
+
+    xSemaphoreGive(nvs_update_mutex);
 }
 
 int32_t nvs_config_get_i32(NvsConfigKey key)
@@ -667,10 +729,24 @@ int32_t nvs_config_get_i32(NvsConfigKey key)
 void nvs_config_set_i32(NvsConfigKey key, int32_t value)
 {
     Settings *setting = nvs_config_get_settings(key);
-    if (!setting || setting->type != TYPE_I32 || setting->value[0].i32 == value) return;
+    if (!setting || setting->type != TYPE_I32) return;
+
+    xSemaphoreTake(nvs_update_mutex, portMAX_DELAY);
+
+    xSemaphoreTake(nvs_cache_mutex, portMAX_DELAY);
+    if (setting->value[0].i32 == value && setting->is_set) {
+        xSemaphoreGive(nvs_cache_mutex);
+        xSemaphoreGive(nvs_update_mutex);
+        return;
+    }
+    setting->value[0].i32 = value;
+    setting->is_set = true;
+    xSemaphoreGive(nvs_cache_mutex);
 
     ConfigUpdate update = { .key = key, .type = TYPE_I32, .value.i32 = value };
     xQueueSend(nvs_save_queue, &update, portMAX_DELAY);
+
+    xSemaphoreGive(nvs_update_mutex);
 }
 
 uint64_t nvs_config_get_u64(NvsConfigKey key)
@@ -693,10 +769,24 @@ uint64_t nvs_config_get_u64(NvsConfigKey key)
 void nvs_config_set_u64(NvsConfigKey key, uint64_t value)
 {
     Settings *setting = nvs_config_get_settings(key);
-    if (!setting || setting->type != TYPE_U64 || setting->value[0].u64 == value) return;
+    if (!setting || setting->type != TYPE_U64) return;
+
+    xSemaphoreTake(nvs_update_mutex, portMAX_DELAY);
+
+    xSemaphoreTake(nvs_cache_mutex, portMAX_DELAY);
+    if (setting->value[0].u64 == value && setting->is_set) {
+        xSemaphoreGive(nvs_cache_mutex);
+        xSemaphoreGive(nvs_update_mutex);
+        return;
+    }
+    setting->value[0].u64 = value;
+    setting->is_set = true;
+    xSemaphoreGive(nvs_cache_mutex);
 
     ConfigUpdate update = { .key = key, .type = TYPE_U64, .value.u64 = value };
     xQueueSend(nvs_save_queue, &update, portMAX_DELAY);
+
+    xSemaphoreGive(nvs_update_mutex);
 }
 
 float nvs_config_get_float(NvsConfigKey key)
@@ -719,10 +809,24 @@ float nvs_config_get_float(NvsConfigKey key)
 void nvs_config_set_float(NvsConfigKey key, float value)
 {
     Settings *setting = nvs_config_get_settings(key);
-    if (!setting || setting->type != TYPE_FLOAT || fabsf(setting->value[0].f - value) < 0.001f) return;
+    if (!setting || setting->type != TYPE_FLOAT) return;
+
+    xSemaphoreTake(nvs_update_mutex, portMAX_DELAY);
+
+    xSemaphoreTake(nvs_cache_mutex, portMAX_DELAY);
+    if (fabsf(setting->value[0].f - value) < 0.001f && setting->is_set) {
+        xSemaphoreGive(nvs_cache_mutex);
+        xSemaphoreGive(nvs_update_mutex);
+        return;
+    }
+    setting->value[0].f = value;
+    setting->is_set = true;
+    xSemaphoreGive(nvs_cache_mutex);
 
     ConfigUpdate update = { .key = key, .type = TYPE_FLOAT, .value.f = value };
     xQueueSend(nvs_save_queue, &update, portMAX_DELAY);
+
+    xSemaphoreGive(nvs_update_mutex);
 }
 
 bool nvs_config_get_bool(NvsConfigKey key)
@@ -745,10 +849,24 @@ bool nvs_config_get_bool(NvsConfigKey key)
 void nvs_config_set_bool(NvsConfigKey key, bool value)
 {
     Settings *setting = nvs_config_get_settings(key);
-    if (!setting || setting->type != TYPE_BOOL || setting->value[0].b == value) return;
+    if (!setting || setting->type != TYPE_BOOL) return;
+
+    xSemaphoreTake(nvs_update_mutex, portMAX_DELAY);
+
+    xSemaphoreTake(nvs_cache_mutex, portMAX_DELAY);
+    if (setting->value[0].b == value && setting->is_set) {
+        xSemaphoreGive(nvs_cache_mutex);
+        xSemaphoreGive(nvs_update_mutex);
+        return;
+    }
+    setting->value[0].b = value;
+    setting->is_set = true;
+    xSemaphoreGive(nvs_cache_mutex);
 
     ConfigUpdate update = { .key = key, .type = TYPE_BOOL, .value.b = value };
     xQueueSend(nvs_save_queue, &update, portMAX_DELAY);
+
+    xSemaphoreGive(nvs_update_mutex);
 }
 
 bool nvs_config_has_key(NvsConfigKey key)

@@ -79,7 +79,7 @@ int _next_power_of_two(int num)
     return power;
 }
 
-int count_asic_chips(uint16_t asic_count, uint16_t chip_id, int chip_id_response_length)
+int count_asic_chips_with_id_alias(uint16_t asic_count, uint16_t chip_id, uint16_t chip_id_alias, int chip_id_response_length)
 {
     uint8_t buffer[11] = {0};
 
@@ -109,8 +109,12 @@ int count_asic_chips(uint16_t asic_count, uint16_t chip_id, int chip_id_response
         }
 
         uint16_t received_chip_id = (buffer[2] << 8) | buffer[3];
-        if (received_chip_id != chip_id) {
-            ESP_LOGW(TAG, "CHIP_ID response mismatch: expected 0x%04x, got 0x%04x", chip_id, received_chip_id);
+        if (received_chip_id != chip_id && received_chip_id != chip_id_alias) {
+            if (chip_id == chip_id_alias) {
+                ESP_LOGW(TAG, "CHIP_ID response mismatch: expected 0x%04x, got 0x%04x", chip_id, received_chip_id);
+            } else {
+                ESP_LOGW(TAG, "CHIP_ID response mismatch: expected 0x%04x or 0x%04x, got 0x%04x", chip_id, chip_id_alias, received_chip_id);
+            }
             ESP_LOG_BUFFER_HEX(TAG, buffer, received);
             continue;
         }
@@ -143,6 +147,11 @@ int count_asic_chips(uint16_t asic_count, uint16_t chip_id, int chip_id_response
     }
 
     return chip_counter;
+}
+
+int count_asic_chips(uint16_t asic_count, uint16_t chip_id, int chip_id_response_length)
+{
+    return count_asic_chips_with_id_alias(asic_count, chip_id, chip_id, chip_id_response_length);
 }
 
 esp_err_t receive_work(uint8_t * buffer, int buffer_size, uint64_t *out_timestamp_us)

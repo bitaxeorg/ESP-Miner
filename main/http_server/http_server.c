@@ -1855,6 +1855,7 @@ esp_err_t start_rest_server(GlobalState * global_state)
     config.max_uri_handlers = 25;
     config.close_fn = websocket_close_fn;
     config.lru_purge_enable = true;
+    config.keep_alive_enable = true;
 
     ESP_LOGI(TAG, "Starting HTTP Server");
     REST_CHECK(httpd_start(&server, &config) == ESP_OK, "Start server failed", err_start);

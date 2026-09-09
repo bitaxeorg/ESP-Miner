@@ -240,5 +240,83 @@ describe('HomeComponent', () => {
       expect(component.systemInfoError$.value.startTime).toBeNull();
       expect(component['lastMessageTime']).toBeGreaterThan(initialTime);
     });
+
+    it('should call loadPreviousData and not prematurely updateChart when awayTime exceeds threshold', () => {
+      spyOnProperty(document, 'visibilityState', 'get').and.returnValue('visible');
+      const loadSpy = spyOn<any>(component, 'loadPreviousData');
+      const updateChartSpy = spyOn<any>(component, 'updateChart');
+
+      component.dataLabel = [Date.now() - 30000];
+      component['lastHiddenTime'] = Date.now() - 30000;
+      component['lastStatsFrequency'] = 10;
+
+      component.onVisibilityChange();
+
+      expect(loadSpy).toHaveBeenCalledWith(false);
+      expect(updateChartSpy).not.toHaveBeenCalled();
+      expect(component['lastHiddenTime']).toBe(0);
+    });
+
+    it('should call updateChart immediately when awayTime is below threshold', () => {
+      spyOnProperty(document, 'visibilityState', 'get').and.returnValue('visible');
+      const loadSpy = spyOn<any>(component, 'loadPreviousData');
+      const updateChartSpy = spyOn<any>(component, 'updateChart');
+
+      component.dataLabel = [Date.now() - 1000];
+      component['lastHiddenTime'] = Date.now() - 2000;
+      component['lastStatsFrequency'] = 10;
+
+      component.onVisibilityChange();
+
+      expect(loadSpy).not.toHaveBeenCalled();
+      expect(updateChartSpy).toHaveBeenCalledWith(undefined, true);
+      expect(component['lastHiddenTime']).toBe(0);
+    });
+
+    it('should not update chartData reference when hidden in limitDataPoints', () => {
+      spyOnProperty(document, 'visibilityState', 'get').and.returnValue('hidden');
+      component['statsLimit'] = 2;
+      component.dataLabel = [1000, 2000, 3000];
+      component.hashrateData = [100, 100, 100];
+      component.powerData = [10, 10, 10];
+      component.chartDatasets = {};
+      const originalChartData = { labels: [], datasets: [] };
+      component.chartData = originalChartData;
+
+      component.limitDataPoints(30);
+
+      expect(component.chartData).toBe(originalChartData);
+      expect(component.dataLabel.length).toBe(2);
+    });
+
+    it('should update chartData reference when visible in limitDataPoints', () => {
+      spyOnProperty(document, 'visibilityState', 'get').and.returnValue('visible');
+      component['statsLimit'] = 2;
+      component.dataLabel = [1000, 2000, 3000];
+      component.hashrateData = [100, 100, 100];
+      component.powerData = [10, 10, 10];
+      component.chartDatasets = {};
+      const originalChartData = { labels: [], datasets: [] };
+      component.chartData = originalChartData;
+
+      component.limitDataPoints(30);
+
+      expect(component.chartData).not.toBe(originalChartData);
+      expect(component.dataLabel.length).toBe(2);
+    });
+
+    it('should clear flash timeouts on destroy', () => {
+      component['shareAcceptedTimeout'] = setTimeout(() => {}, 10000) as any;
+      component['shareRejectedTimeout'] = setTimeout(() => {}, 10000) as any;
+      component['workReceivedTimeout'] = setTimeout(() => {}, 10000) as any;
+
+      spyOn(window, 'clearTimeout').and.callThrough();
+
+      component.ngOnDestroy();
+
+      expect(clearTimeout).toHaveBeenCalledWith(component['shareAcceptedTimeout']);
+      expect(clearTimeout).toHaveBeenCalledWith(component['shareRejectedTimeout']);
+      expect(clearTimeout).toHaveBeenCalledWith(component['workReceivedTimeout']);
+    });
   });
 });

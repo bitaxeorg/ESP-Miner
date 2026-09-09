@@ -108,5 +108,5 @@ esp_err_t device_config_init(GlobalState * GLOBAL_STATE)
 
     free(board_version);
 
-    return ESP_OK;
+    return device_pins_init(&GLOBAL_STATE->DEVICE_CONFIG.pins);
 }

@@ -19,7 +19,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        build_type: ["102", "201", "202", "203", "204", "205", "207", "302", "303", "400", "401", "402", "403", "601", "602", "650", "701", "702", "801"]
+        build_type: ["102", "201", "202", "203", "204", "205", "207", "302", "303", "400", "401", "402", "403", "601", "602", "650", "701", "702", "801", "1201", "1300"]
     steps:
       - name: Checkout repo
         uses: actions/checkout@v6
@@ -46,7 +46,7 @@ jobs:
         with:
           esp_idf_version: v6.0.2
           target: esp32s3
-          command: /opt/esp/idf/components/nvs_flash/nvs_partition_generator/nvs_partition_gen.py generate config-${{ matrix.build_type }}.cvs config.bin 0x6000
+          command: /opt/esp/idf/components/nvs_flash/nvs_partition_generator/nvs_partition_gen.py generate configs/config-${{ matrix.build_type }}.csv config.bin 0x6000
           path: '.'
       - uses: actions/setup-python@v6
         with:
