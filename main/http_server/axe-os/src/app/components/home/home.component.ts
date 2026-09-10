@@ -952,21 +952,17 @@ export class HomeComponent implements OnInit, OnDestroy {
         this.networkDifficultyPercentage = this.getNetworkDifficultyPercentage(info);
         this.payoutPercentage = this.getPayoutPercentage(info);
 
-        if (this.targetPoolLabel !== null) {
-          const targetMatches = (this.targetPoolLabel === 'Fallback')
-            ? (info.useFallbackStratum === 1)
-            : (info.useFallbackStratum === 0);
-          if (targetMatches) {
-            this.targetPoolLabel = null;
-          }
+        const preferredPool: PoolLabel = info.useFallbackStratum === 1 ? 'Fallback' : 'Primary';
+        const activePool: PoolLabel = info.isUsingFallbackStratum === 1 ? 'Fallback' : 'Primary';
+
+        // Keep a manual selection until its preference is acknowledged by the device.
+        if (this.targetPoolLabel === preferredPool) {
+          this.targetPoolLabel = null;
         }
 
-        if (this.targetPoolLabel !== null) {
-          this.activePoolLabel = this.targetPoolLabel;
-        } else {
-          this.activePoolLabel = info.useFallbackStratum === 1 ? 'Fallback' : 'Primary';
-        }
-        const isCurrentlyFallback = info.isUsingFallbackStratum === 1;
+        // Automatic failover changes the active pool without changing the preference.
+        this.activePoolLabel = this.targetPoolLabel ?? activePool;
+        const isCurrentlyFallback = activePool === 'Fallback';
         this.activePoolURL = isCurrentlyFallback ? info.fallbackStratumURL : info.stratumURL;
         this.activePoolUser = isCurrentlyFallback ? info.fallbackStratumUser : info.stratumUser;
         this.activePoolPort = isCurrentlyFallback ? info.fallbackStratumPort : info.stratumPort;
