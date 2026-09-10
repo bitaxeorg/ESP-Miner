@@ -2,13 +2,16 @@
 #include <sys/time.h>
 #include <limits.h>
 #include <inttypes.h>
+#include <stdint.h>
+#include <stdbool.h>
+#include <stdlib.h>
+#include <string.h>
 
 #include "global_state.h"
 #include "esp_log.h"
 #include "esp_system.h"
 #include "mining.h"
 #include "miner_job.h"
-#include "string.h"
 #include "esp_timer.h"
 
 #include "asic.h"
@@ -18,81 +21,228 @@
 
 static const char *TAG = "create_jobs_task";
 
+#define MAX_EXTRANONCE1_LEN 32
 #define MAX_EXTRANONCE2_LEN 32
-#define MAX_EXTRANONCE2_STR (MAX_EXTRANONCE2_LEN * 2 + 1)
+
+#define MAX_EXTRANONCE1_STR \
+    (MAX_EXTRANONCE1_LEN * 2 + 1)
+
+#define MAX_EXTRANONCE2_STR \
+    (MAX_EXTRANONCE2_LEN * 2 + 1)
+
 
 /*
- * extranonce1 rolling
+ * ============================================================
+ * EXTRANONCE1 INITIAL ROLL
+ * ============================================================
  *
- * Examples:
+ * Pool:
  *
- *   20045383 -> 00045383
- *   30498765 -> 10498765
- *   2ABCDEF0 -> 0ABCDEF0
- *   3ABCDEF0 -> 1ABCDEF0
+ *   20 04 53 83
  *
- * Only the FIRST hexadecimal nibble is changed.
+ * becomes:
+ *
+ *   00 04 53 83
+ *
+ *
+ * Pool:
+ *
+ *   30 49 87 65
+ *
+ * becomes:
+ *
+ *   10 49 87 65
+ *
+ *
+ * ONLY THE FIRST HEX NIBBLE IS CHANGED.
  *
  * 2 -> 0
  * 3 -> 1
  *
- * Everything else remains unchanged.
+ * The remaining 7 hexadecimal digits remain unchanged.
  */
-static void roll_extranonce1(const uint8_t *src,
-                             uint8_t *dst,
-                             size_t len)
+static bool extranonce1_make_initial_roll(
+    const uint8_t *src,
+    uint8_t *dst,
+    size_t len)
 {
     if (src == NULL || dst == NULL || len == 0) {
-        return;
+        return false;
     }
 
-    /*
-     * Copy the complete extranonce1 first.
-     * This guarantees that all bytes except the first nibble
-     * remain exactly the same.
-     */
     memcpy(dst, src, len);
 
-    /*
-     * First byte contains two hexadecimal nibbles:
-     *
-     * 0x20 -> first nibble = 2
-     * 0x30 -> first nibble = 3
-     */
-    uint8_t first_nibble = (dst[0] >> 4) & 0x0F;
+    uint8_t first_nibble =
+        (dst[0] >> 4) & 0x0F;
 
     if (first_nibble == 0x02) {
+
         /*
          * 2xxxxxxx -> 0xxxxxxx
-         *
-         * Clear the high nibble.
          */
         dst[0] &= 0x0F;
+
     }
     else if (first_nibble == 0x03) {
+
         /*
          * 3xxxxxxx -> 1xxxxxxx
-         *
-         * Clear high nibble first,
-         * then set it to 1.
          */
         dst[0] &= 0x0F;
         dst[0] |= 0x10;
+
     }
+    else {
+
+        /*
+         * We only roll extranonce1 values beginning
+         * with 2 or 3 according to the requested rule.
+         *
+         * Do not modify anything else.
+         */
+        ESP_LOGW(
+            TAG,
+            "Unsupported extranonce1 first nibble: %u",
+            first_nibble
+        );
+
+        return false;
+    }
+
+    return true;
 }
 
 
 /*
- * Convert binary extranonce1 to hexadecimal string.
+ * ============================================================
+ * EXTRANONCE1 ROLL NEXT
+ * ============================================================
  *
- * This is only used for logging/debugging if needed.
+ * Example:
+ *
+ *   00045383
+ *   00045384
+ *   00045385
+ *   ...
+ *
+ * or:
+ *
+ *   10498765
+ *   10498766
+ *   10498767
+ *   ...
+ *
+ *
+ * IMPORTANT:
+ *
+ * The FIRST HEX NIBBLE is NEVER changed here.
+ *
+ * So:
+ *
+ *   0xxxxxxx stays 0xxxxxxx
+ *
+ * or:
+ *
+ *   1xxxxxxx stays 1xxxxxxx
+ *
+ *
+ * We increment the LOWER 7 hexadecimal digits.
+ *
+ * Example:
+ *
+ *   0FFFFFFF
+ *
+ * becomes:
+ *
+ *   00000000
+ *
+ * because the 28-bit rolling area overflowed.
+ *
+ *
+ *   1FFFFFFF
+ *
+ * becomes:
+ *
+ *   10000000
  */
-static void extranonce1_to_hex(const uint8_t *data,
-                               size_t len,
-                               char *out,
-                               size_t out_size)
+static void extranonce1_roll_next(
+    uint8_t *value,
+    size_t len)
 {
-    if (data == NULL || out == NULL || out_size == 0) {
+    if (value == NULL || len == 0) {
+        return;
+    }
+
+    /*
+     * Preserve the first hexadecimal nibble.
+     *
+     * 0xxxxxxx -> prefix 0
+     * 1xxxxxxx -> prefix 1
+     */
+    uint8_t prefix =
+        value[0] & 0xF0;
+
+
+    /*
+     * Clear the first nibble temporarily.
+     *
+     * This gives us the 28-bit rolling area.
+     */
+    value[0] &= 0x0F;
+
+
+    /*
+     * Increment from the LAST byte.
+     *
+     * This treats the hexadecimal representation as:
+     *
+     *   00 04 53 83
+     *
+     * -> 00 04 53 84
+     *
+     * which corresponds to:
+     *
+     *   00045383
+     *   00045384
+     */
+    for (int i = (int)len - 1; i >= 0; i--) {
+
+        value[i]++;
+
+        if (value[i] != 0x00) {
+            /*
+             * No carry.
+             */
+            break;
+        }
+    }
+
+
+    /*
+     * Restore original prefix.
+     *
+     * Only 0x00 or 0x10 should normally be here.
+     */
+    value[0] &= 0x0F;
+    value[0] |= prefix;
+}
+
+
+/*
+ * ============================================================
+ * HEX DEBUG HELPER
+ * ============================================================
+ */
+static void extranonce_to_hex(
+    const uint8_t *data,
+    size_t len,
+    char *out,
+    size_t out_size)
+{
+    if (data == NULL ||
+        out == NULL ||
+        out_size == 0) {
+
         return;
     }
 
@@ -101,89 +251,118 @@ static void extranonce1_to_hex(const uint8_t *data,
         return;
     }
 
-    bin2hex(data, len, out, out_size);
+    bin2hex(
+        data,
+        len,
+        out,
+        out_size
+    );
 }
 
 
+/*
+ * ============================================================
+ * GENERATE WORK
+ * ============================================================
+ */
 static void generate_work_from_miner_job(
     GlobalState *GLOBAL_STATE,
     const miner_job_t *job,
-    uint64_t extranonce_2,
+    const uint8_t *rolled_extranonce1,
+    size_t rolled_extranonce1_len,
     uint32_t current_version)
 {
-    if (!job) {
+    if (GLOBAL_STATE == NULL || job == NULL) {
         return;
     }
 
-    bm_job *next_job = malloc(sizeof(bm_job));
+
+    bm_job *next_job =
+        malloc(sizeof(bm_job));
 
     if (next_job == NULL) {
-        ESP_LOGE(TAG, "Failed to allocate memory for new job");
+
+        ESP_LOGE(
+            TAG,
+            "Failed to allocate memory for new job"
+        );
+
         return;
     }
 
-    uint32_t version_mask = job->version_mask;
-    double job_diff = job->pool_diff;
 
-    uint8_t merkle_root[32];
+    uint32_t version_mask =
+        job->version_mask;
+
+    double job_diff =
+        job->pool_diff;
+
+
+    uint8_t merkle_root[32] = {0};
+
+
+    /*
+     * --------------------------------------------------------
+     * EXTRANONCE2
+     * --------------------------------------------------------
+     *
+     * ALWAYS ZERO.
+     *
+     * We do NOT receive it as a rolling value anymore.
+     */
+    uint8_t extranonce_2_bin[MAX_EXTRANONCE2_LEN] = {0};
 
     char extranonce_2_str[MAX_EXTRANONCE2_STR] = "";
 
+
+    size_t e2_len = 0;
+
+
     /*
-     * Version handling remains the same as original code.
+     * Version logic remains compatible with original code.
      */
-    uint32_t effective_version = job->version;
+    uint32_t effective_version =
+        job->version;
+
 
     if (!GLOBAL_STATE->DEVICE_CONFIG.family.asic.hardware_version_rolling &&
         !miner_job_is_rollable(job)) {
-        effective_version = current_version;
+
+        effective_version =
+            current_version;
     }
 
 
     /*
-     * ---------------------------------------------------------
-     * SV2 STANDARD JOB
-     * ---------------------------------------------------------
+     * ========================================================
+     * SV2 STANDARD
+     * ========================================================
      */
     if (job->type == JOB_TYPE_SV2_STANDARD) {
 
-        memcpy(merkle_root, job->merkle_root, 32);
+        memcpy(
+            merkle_root,
+            job->merkle_root,
+            32
+        );
 
     }
     else {
 
         /*
-         * -----------------------------------------------------
-         * EXTRANONCE2
-         * -----------------------------------------------------
-         *
-         * IMPORTANT:
-         *
-         * extranonce_2 is intentionally ALWAYS ZERO.
-         *
-         * We do NOT increment it anywhere.
-         *
-         * The requested extranonce2 length from the pool is
-         * preserved.
-         *
-         * Example:
-         *
-         * len = 4 bytes
-         * -> 00 00 00 00
-         *
-         * hex:
-         * -> 00000000
-         *
-         * len = 2 bytes
-         * -> 0000
+         * ----------------------------------------------------
+         * Check extranonce2 length
+         * ----------------------------------------------------
          */
-        size_t e2_len = job->extranonce2_len;
+        e2_len =
+            job->extranonce2_len;
+
 
         if (e2_len > MAX_EXTRANONCE2_LEN) {
 
             ESP_LOGE(
                 TAG,
-                "extranonce_2_len %u exceeds maximum %d, skipping job",
+                "extranonce2_len %u exceeds maximum %d",
                 (unsigned)e2_len,
                 MAX_EXTRANONCE2_LEN
             );
@@ -194,18 +373,14 @@ static void generate_work_from_miner_job(
 
 
         /*
-         * Completely zero extranonce2 buffer.
+         * extranonce2 is ZERO.
          *
-         * Do NOT copy extranonce_2 into this buffer.
-         */
-        uint8_t extranonce_2_bin[MAX_EXTRANONCE2_LEN] = {0};
-
-
-        /*
-         * extranonce2 string is therefore always:
+         * No matter how many times we call this function,
+         * this remains:
          *
-         * e2_len = 4 -> 00000000
-         * e2_len = 8 -> 0000000000000000
+         *   00000000
+         *
+         * for a 4-byte extranonce2.
          */
         if (e2_len > 0) {
 
@@ -219,36 +394,16 @@ static void generate_work_from_miner_job(
 
 
         /*
-         * -----------------------------------------------------
-         * EXTRANONCE1 ROLLING
-         * -----------------------------------------------------
-         *
-         * Pool extranonce1:
-         *
-         * 20 04 53 83
-         *
-         * becomes:
-         *
-         * 00 04 53 83
-         *
-         *
-         * Pool extranonce1:
-         *
-         * 30 49 87 65
-         *
-         * becomes:
-         *
-         * 10 49 87 65
+         * ----------------------------------------------------
+         * Validate rolled extranonce1
+         * ----------------------------------------------------
          */
-        uint8_t rolled_extranonce1[MAX_EXTRANONCE2_LEN] = {0};
-
-        if (job->extranonce1_len > MAX_EXTRANONCE2_LEN) {
+        if (rolled_extranonce1 == NULL ||
+            rolled_extranonce1_len != job->extranonce1_len) {
 
             ESP_LOGE(
                 TAG,
-                "extranonce1_len %u exceeds maximum %d, skipping job",
-                (unsigned)job->extranonce1_len,
-                MAX_EXTRANONCE2_LEN
+                "Invalid rolled extranonce1"
             );
 
             free(next_job);
@@ -256,64 +411,64 @@ static void generate_work_from_miner_job(
         }
 
 
-        roll_extranonce1(
-            job->extranonce1,
-            rolled_extranonce1,
-            job->extranonce1_len
-        );
+        if (rolled_extranonce1_len >
+            MAX_EXTRANONCE1_LEN) {
+
+            ESP_LOGE(
+                TAG,
+                "extranonce1_len %u exceeds maximum %d",
+                (unsigned)rolled_extranonce1_len,
+                MAX_EXTRANONCE1_LEN
+            );
+
+            free(next_job);
+            return;
+        }
 
 
         /*
-         * Optional debug output.
-         *
-         * This lets you verify exactly what is being hashed.
+         * ----------------------------------------------------
+         * DEBUG
+         * ----------------------------------------------------
          */
-        char original_extranonce1_str[MAX_EXTRANONCE2_STR] = "";
-        char rolled_extranonce1_str[MAX_EXTRANONCE2_STR] = "";
+        char rolled_extranonce1_str[
+            MAX_EXTRANONCE1_STR
+        ] = "";
 
-        extranonce1_to_hex(
-            job->extranonce1,
-            job->extranonce1_len,
-            original_extranonce1_str,
-            sizeof(original_extranonce1_str)
-        );
 
-        extranonce1_to_hex(
+        extranonce_to_hex(
             rolled_extranonce1,
-            job->extranonce1_len,
+            rolled_extranonce1_len,
             rolled_extranonce1_str,
             sizeof(rolled_extranonce1_str)
         );
 
+
         ESP_LOGI(
             TAG,
-            "Extranonce1: %s -> %s | Extranonce2: %s",
-            original_extranonce1_str,
+            "Rolling work: extranonce1=%s extranonce2=%s",
             rolled_extranonce1_str,
             extranonce_2_str
         );
 
 
         /*
-         * -----------------------------------------------------
+         * ====================================================
          * COINBASE HASH
-         * -----------------------------------------------------
-         *
-         * IMPORTANT:
-         *
-         * We use ROLLED extranonce1 here.
+         * ====================================================
          *
          * Coinbase:
          *
-         * prefix
-         * +
-         * rolled extranonce1
-         * +
-         * zero extranonce2
-         * +
-         * suffix
+         *   prefix
+         *   +
+         *   ROLLED EXTRANONCE1
+         *   +
+         *   ZERO EXTRANONCE2
+         *   +
+         *   suffix
          */
         uint8_t coinbase_tx_hash[32];
+
 
         calculate_coinbase_tx_hash_bin(
             job->coinbase_prefix,
@@ -323,7 +478,7 @@ static void generate_work_from_miner_job(
              * ROLLED EXTRANONCE1
              */
             rolled_extranonce1,
-            job->extranonce1_len,
+            rolled_extranonce1_len,
 
             /*
              * ALWAYS ZERO EXTRANONCE2
@@ -339,21 +494,27 @@ static void generate_work_from_miner_job(
 
 
         /*
-         * Calculate merkle root from the new coinbase hash.
+         * ----------------------------------------------------
+         * MERKLE ROOT
+         * ----------------------------------------------------
          */
         calculate_merkle_root_hash(
             coinbase_tx_hash,
-            (const uint8_t (*)[32])job->merkle_path,
+
+            (const uint8_t (*)[32])
+                job->merkle_path,
+
             job->merkle_path_count,
+
             merkle_root
         );
     }
 
 
     /*
-     * ---------------------------------------------------------
-     * BUILD BM JOB
-     * ---------------------------------------------------------
+     * ========================================================
+     * CONSTRUCT BM JOB
+     * ========================================================
      */
     construct_bm_job_from_miner_job(
         job,
@@ -369,26 +530,32 @@ static void generate_work_from_miner_job(
     /*
      * Job ID
      */
-    next_job->jobid = strdup(job->job_id);
+    next_job->jobid =
+        strdup(job->job_id);
 
 
     /*
-     * IMPORTANT:
+     * ========================================================
+     * EXTRANONCE2 SENT TO ASIC
+     * ========================================================
      *
-     * next_job->extranonce2 is ALWAYS the zero value.
+     * ALWAYS ZERO.
      *
-     * Examples:
+     * 4 bytes:
      *
-     * 4 bytes -> 00000000
-     * 8 bytes -> 0000000000000000
+     *   00000000
      */
-    next_job->extranonce2 = strdup(extranonce_2_str);
+    next_job->extranonce2 =
+        strdup(extranonce_2_str);
 
 
     if (next_job->jobid == NULL ||
         next_job->extranonce2 == NULL) {
 
-        ESP_LOGE(TAG, "Failed to allocate job metadata");
+        ESP_LOGE(
+            TAG,
+            "Failed to allocate job metadata"
+        );
 
         free(next_job->jobid);
         free(next_job->extranonce2);
@@ -399,7 +566,9 @@ static void generate_work_from_miner_job(
 
 
     /*
-     * ASIC initialization check.
+     * ========================================================
+     * ASIC READY?
+     * ========================================================
      */
     if (!GLOBAL_STATE->ASIC_initalized) {
 
@@ -417,7 +586,9 @@ static void generate_work_from_miner_job(
 
 
     /*
-     * Send work to ASIC.
+     * ========================================================
+     * SEND TO ASIC
+     * ========================================================
      */
     ASIC_send_work(
         GLOBAL_STATE,
@@ -426,6 +597,11 @@ static void generate_work_from_miner_job(
 }
 
 
+/*
+ * ============================================================
+ * CREATE JOBS TASK
+ * ============================================================
+ */
 void create_jobs_task(void *pvParameters)
 {
     GlobalState *GLOBAL_STATE =
@@ -433,33 +609,65 @@ void create_jobs_task(void *pvParameters)
 
 
     /*
-     * active_jobs / valid_jobs are allocated and zeroed by
-     * SYSTEM_init_system(), before any task that touches them
-     * can run.
+     * --------------------------------------------------------
+     * CURRENT JOB
+     * --------------------------------------------------------
      */
-
-    uint32_t current_version_mask = 0;
-
     miner_job_t *current_work = NULL;
 
     bool current_work_sent = false;
 
 
     /*
-     * ---------------------------------------------------------
-     * EXTRANONCE2 IS ALWAYS ZERO
-     * ---------------------------------------------------------
+     * --------------------------------------------------------
+     * ROLLING EXTRANONCE1
+     * --------------------------------------------------------
      *
-     * This variable is kept because generate_work_from_miner_job()
-     * accepts it, but it is NEVER incremented.
+     * This is the important new state.
+     *
+     * It survives between ASIC work generations.
+     */
+    uint8_t rolling_extranonce1[
+        MAX_EXTRANONCE1_LEN
+    ] = {0};
+
+
+    size_t rolling_extranonce1_len = 0;
+
+
+    /*
+     * --------------------------------------------------------
+     * EXTRANONCE2
+     * --------------------------------------------------------
+     *
+     * Kept only for compatibility.
+     *
+     * IT IS ALWAYS ZERO.
+     *
+     * NEVER increment this.
      */
     uint64_t extranonce_2 = 0;
 
 
+    /*
+     * --------------------------------------------------------
+     * VERSION
+     * --------------------------------------------------------
+     */
+    uint32_t current_version_mask = 0;
+
     uint32_t current_version = 0;
 
+
+    /*
+     * --------------------------------------------------------
+     * ASIC FREQUENCY
+     * --------------------------------------------------------
+     */
     int timeout_ms =
-        ASIC_get_asic_job_frequency_ms(GLOBAL_STATE);
+        ASIC_get_asic_job_frequency_ms(
+            GLOBAL_STATE
+        );
 
 
     ESP_LOGI(
@@ -468,16 +676,23 @@ void create_jobs_task(void *pvParameters)
         timeout_ms
     );
 
+
     ESP_LOGI(
         TAG,
         "ASIC Ready!"
     );
 
 
+    /*
+     * ========================================================
+     * MAIN LOOP
+     * ========================================================
+     */
     while (1) {
 
         uint64_t start_time =
             esp_timer_get_time();
+
 
         uint32_t slot_notify = 0;
 
@@ -498,13 +713,14 @@ void create_jobs_task(void *pvParameters)
 
 
         timeout_ms -=
-            (esp_timer_get_time() - start_time) / 1000;
+            (esp_timer_get_time() -
+             start_time) / 1000;
 
 
         /*
-         * -----------------------------------------------------
-         * NEW JOB
-         * -----------------------------------------------------
+         * ====================================================
+         * NEW POOL JOB
+         * ====================================================
          */
         if (notified == pdTRUE) {
 
@@ -512,6 +728,17 @@ void create_jobs_task(void *pvParameters)
                 miner_job_get_slot(
                     (size_t)slot_notify
                 );
+
+
+            if (new_work == NULL) {
+
+                ESP_LOGE(
+                    TAG,
+                    "miner_job_get_slot returned NULL"
+                );
+
+                continue;
+            }
 
 
             ESP_LOGI(
@@ -523,7 +750,13 @@ void create_jobs_task(void *pvParameters)
             );
 
 
-            current_work = new_work;
+            /*
+             * ------------------------------------------------
+             * Activate new job
+             * ------------------------------------------------
+             */
+            current_work =
+                new_work;
 
 
             GLOBAL_STATE->active_job_slot_idx =
@@ -533,7 +766,8 @@ void create_jobs_task(void *pvParameters)
                 );
 
 
-            current_work_sent = false;
+            current_work_sent =
+                false;
 
 
             current_version =
@@ -541,9 +775,12 @@ void create_jobs_task(void *pvParameters)
 
 
             /*
-             * Version mask handling remains unchanged.
+             * ------------------------------------------------
+             * Version mask
+             * ------------------------------------------------
              */
-            if (new_work->version_mask != current_version_mask &&
+            if (new_work->version_mask !=
+                    current_version_mask &&
                 GLOBAL_STATE->ASIC_initalized) {
 
                 ESP_LOGI(
@@ -567,22 +804,147 @@ void create_jobs_task(void *pvParameters)
 
 
             /*
-             * -------------------------------------------------
+             * =================================================
              * RESET EXTRANONCE2
-             * -------------------------------------------------
+             * =================================================
              *
-             * New job = zero again.
-             *
-             * It will remain zero forever.
+             * ALWAYS ZERO.
              */
             extranonce_2 = 0;
 
 
+            /*
+             * =================================================
+             * INITIALIZE EXTRANONCE1 ROLLING
+             * =================================================
+             */
+            if (new_work->type != JOB_TYPE_SV2_STANDARD) {
+
+                if (new_work->extranonce1_len == 0) {
+
+                    ESP_LOGW(
+                        TAG,
+                        "New job has zero extranonce1 length"
+                    );
+
+                    rolling_extranonce1_len = 0;
+
+                }
+                else if (
+                    new_work->extranonce1_len >
+                    MAX_EXTRANONCE1_LEN) {
+
+                    ESP_LOGE(
+                        TAG,
+                        "extranonce1_len %u exceeds maximum %d",
+                        (unsigned)new_work->extranonce1_len,
+                        MAX_EXTRANONCE1_LEN
+                    );
+
+                    rolling_extranonce1_len = 0;
+
+                }
+                else {
+
+                    rolling_extranonce1_len =
+                        new_work->extranonce1_len;
+
+
+                    /*
+                     * Pool value:
+                     *
+                     * 20045383
+                     *
+                     * becomes:
+                     *
+                     * 00045383
+                     */
+                    bool roll_ok =
+                        extranonce1_make_initial_roll(
+                            new_work->extranonce1,
+                            rolling_extranonce1,
+                            rolling_extranonce1_len
+                        );
+
+
+                    if (!roll_ok) {
+
+                        /*
+                         * For values not beginning with
+                         * 2 or 3 we keep the original value
+                         * rather than corrupting it.
+                         */
+                        memcpy(
+                            rolling_extranonce1,
+                            new_work->extranonce1,
+                            rolling_extranonce1_len
+                        );
+
+
+                        ESP_LOGW(
+                            TAG,
+                            "Initial extranonce1 roll not applied"
+                        );
+                    }
+
+
+                    /*
+                     * Debug
+                     */
+                    char pool_e1[
+                        MAX_EXTRANONCE1_STR
+                    ] = "";
+
+
+                    char rolled_e1[
+                        MAX_EXTRANONCE1_STR
+                    ] = "";
+
+
+                    extranonce_to_hex(
+                        new_work->extranonce1,
+                        new_work->extranonce1_len,
+                        pool_e1,
+                        sizeof(pool_e1)
+                    );
+
+
+                    extranonce_to_hex(
+                        rolling_extranonce1,
+                        rolling_extranonce1_len,
+                        rolled_e1,
+                        sizeof(rolled_e1)
+                    );
+
+
+                    ESP_LOGI(
+                        TAG,
+                        "EX1 START: pool=%s -> rolling=%s",
+                        pool_e1,
+                        rolled_e1
+                    );
+                }
+            }
+            else {
+
+                /*
+                 * SV2 Standard does not use the same
+                 * extranonce1/coinbase path.
+                 */
+                rolling_extranonce1_len = 0;
+            }
+
+
+            /*
+             * ------------------------------------------------
+             * Staged job
+             * ------------------------------------------------
+             */
             if (!current_work->clean_jobs) {
 
                 /*
-                 * Staged job for next cycle,
-                 * let current ASIC cycle finish.
+                 * Staged job for next cycle.
+                 * Let current ASIC cycle finish.
                  */
                 continue;
             }
@@ -590,7 +952,9 @@ void create_jobs_task(void *pvParameters)
         else {
 
             /*
-             * No new job.
+             * =================================================
+             * NO NEW POOL JOB
+             * =================================================
              */
             if (current_work == NULL) {
 
@@ -603,7 +967,7 @@ void create_jobs_task(void *pvParameters)
 
 
             /*
-             * Hardware version rolling handling.
+             * Original hardware-version-rolling condition.
              */
             if (!miner_job_is_rollable(current_work) &&
                 current_work_sent &&
@@ -620,31 +984,61 @@ void create_jobs_task(void *pvParameters)
 
 
         /*
-         * -----------------------------------------------------
-         * GENERATE WORK
-         * -----------------------------------------------------
+         * ====================================================
+         * GENERATE CURRENT WORK
+         * ====================================================
          *
-         * extranonce_2 is ALWAYS ZERO.
+         * On the first iteration:
          *
-         * Inside generate_work_from_miner_job():
+         *   20045383 -> 00045383
          *
-         *   extranonce1 gets rolled
-         *   extranonce2 remains zero
-         *   coinbase is hashed
-         *   merkle root is calculated
-         *   work goes to ASIC
+         * Next iteration:
+         *
+         *   00045384
+         *
+         * Next:
+         *
+         *   00045385
+         *
+         * etc.
          */
-        generate_work_from_miner_job(
-            GLOBAL_STATE,
-            current_work,
-            0,                  /* ALWAYS ZERO */
-            current_version
-        );
+        if (current_work->type ==
+                JOB_TYPE_SV2_STANDARD) {
+
+            /*
+             * Standard SV2 job.
+             */
+            generate_work_from_miner_job(
+                GLOBAL_STATE,
+                current_work,
+                NULL,
+                0,
+                current_version
+            );
+
+        }
+        else {
+
+            /*
+             * Normal Stratum-style job.
+             */
+            generate_work_from_miner_job(
+                GLOBAL_STATE,
+                current_work,
+                rolling_extranonce1,
+                rolling_extranonce1_len,
+                current_version
+            );
+        }
 
 
         /*
-         * Decode/apply coinbase only once per job,
-         * same as original logic.
+         * ====================================================
+         * COINBASE APPLY
+         * ====================================================
+         *
+         * Keep original behavior:
+         * only execute once for a newly activated job.
          */
         if (!current_work_sent) {
 
@@ -659,28 +1053,70 @@ void create_jobs_task(void *pvParameters)
 
 
         /*
-         * -----------------------------------------------------
-         * NO EXTRANONCE2 INCREMENT
-         * -----------------------------------------------------
+         * ====================================================
+         * ADVANCE EXTRANONCE1
+         * ====================================================
          *
-         * ORIGINAL:
+         * IMPORTANT:
          *
-         * if (miner_job_is_rollable(current_work)) {
-         *     extranonce_2++;
-         * }
+         * This happens AFTER the current work has been sent.
          *
-         * THAT IS INTENTIONALLY REMOVED.
+         * Therefore:
          *
-         * extranonce2 MUST stay zero.
+         * Work #1:
+         *   00045383
+         *
+         * Work #2:
+         *   00045384
+         *
+         * Work #3:
+         *   00045385
+         *
+         * etc.
+         *
+         * extranonce2 NEVER changes.
          */
+        if (current_work->type !=
+                JOB_TYPE_SV2_STANDARD &&
+            rolling_extranonce1_len > 0) {
+
+            extranonce1_roll_next(
+                rolling_extranonce1,
+                rolling_extranonce1_len
+            );
+
+
+            /*
+             * Debug next value.
+             */
+            char next_e1[
+                MAX_EXTRANONCE1_STR
+            ] = "";
+
+
+            extranonce_to_hex(
+                rolling_extranonce1,
+                rolling_extranonce1_len,
+                next_e1,
+                sizeof(next_e1)
+            );
+
+
+            ESP_LOGD(
+                TAG,
+                "Next extranonce1=%s",
+                next_e1
+            );
+        }
 
 
         /*
-         * -----------------------------------------------------
+         * ====================================================
          * SOFTWARE VERSION ROLLING
-         * -----------------------------------------------------
+         * ====================================================
          *
-         * This part is retained from the original code.
+         * Keep original behavior for ASICs without hardware
+         * version rolling.
          */
         if (!miner_job_is_rollable(current_work) &&
             !GLOBAL_STATE->DEVICE_CONFIG.family.asic.hardware_version_rolling) {
@@ -707,7 +1143,9 @@ void create_jobs_task(void *pvParameters)
 
 
         /*
-         * Reset ASIC job interval.
+         * ====================================================
+         * RESET TIMER
+         * ====================================================
          */
         timeout_ms =
             ASIC_get_asic_job_frequency_ms(
@@ -716,34 +1154,3 @@ void create_jobs_task(void *pvParameters)
     }
 }
 ```
-
-### Önemli nokta
-
-Bu sürümde örneğin pool:
-
-```text
-extranonce1 = 20045383
-extranonce2_len = 4
-```
-
-verirse ASIC tarafına hesaplanan coinbase:
-
-```text
-extranonce1 = 00045383
-extranonce2 = 00000000
-```
-
-üzerinden oluşturuluyor.
-
-`30498765` gelirse:
-
-```text
-extranonce1 = 10498765
-extranonce2 = 00000000
-```
-
-oluyor.
-
-**Ama bir noktaya dikkat:** Bu kod `extranonce1` değerini her iş üretiminde tekrar aynı şekilde `2→0 / 3→1` dönüştürüyor. Yani `20045383 → 00045383` sonrası `0045383` gibi ikinci bir rolling state üretmiyor. Senin tarif ettiğin kurala göre bu doğru davranış.
-
-Bir de mevcut `SYSTEM_decode_and_apply_coinbase()` fonksiyonunun ne yaptığını görmek önemli; eğer o fonksiyon pool'dan gelen orijinal `extranonce1` ile ayrıca coinbase oluşturuyorsa, yukarıdaki değişiklik tek başına yeterli olmayabilir. O fonksiyonun kodunu da gönderirsen, **extranonce1 → rolling → extranonce2=0 → coinbase → merkle → ASIC** zincirinin tamamını aynı mantıkta düzeltebilirim.
