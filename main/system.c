@@ -36,6 +36,7 @@
 #include "filesystem.h"
 #include "embedded_web_ui.h"
 #include "hashrate_monitor_task.h"
+#include "webhook_alerts.h"
 #include "coinbase_decoder.h"
 #include "sv2_protocol.h"
 
@@ -604,10 +605,12 @@ void SYSTEM_notify_found_nonce(GlobalState * GLOBAL_STATE, double diff, uint32_t
     }
 
     double network_diff = networkDifficulty(target);
-    if (diff >= network_diff) {
+    bool block_candidate = diff >= network_diff;
+    if (block_candidate) {
         module->block_found++;
         module->show_new_block = true;
         ESP_LOGI(TAG, "FOUND BLOCK!!!!!!!!!!!!!!!!!!!!!! %f >= %f (count: %d)", diff, network_diff, module->block_found);
+        WEBHOOK_ALERTS_notify_block_found(diff, network_diff);
     }
 
     if ((uint64_t) diff <= module->best_nonce_diff) {
@@ -621,6 +624,9 @@ void SYSTEM_notify_found_nonce(GlobalState * GLOBAL_STATE, double diff, uint32_t
     suffixString((uint64_t) diff, module->best_diff_string, DIFF_STRING_SIZE, 0);
 
     ESP_LOGI(TAG, "New best difficulty: %s", module->best_diff_string);
+    if (!block_candidate) {
+        WEBHOOK_ALERTS_notify_best_difficulty(diff, network_diff);
+    }
 }
 
 static esp_err_t ensure_overheat_mode_config() {

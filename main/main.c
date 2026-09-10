@@ -31,6 +31,7 @@
 #include "log_buffer.h"
 #include "setup_ble.h"
 #include "esp_ota_ops.h"
+#include "webhook_alerts.h"
 
 static GlobalState GLOBAL_STATE;
 
@@ -131,6 +132,10 @@ void app_main(void)
         return;
     }
 
+    if (WEBHOOK_ALERTS_init(&GLOBAL_STATE) != ESP_OK) {
+        ESP_LOGW(TAG, "Webhook alerts are unavailable");
+    }
+
     // Init I2C
     if (GLOBAL_STATE.DEVICE_CONFIG.pins.i2c != NULL) {
         ESP_ERROR_CHECK(i2c_bitaxe_init(GLOBAL_STATE.DEVICE_CONFIG.pins.i2c->sda, GLOBAL_STATE.DEVICE_CONFIG.pins.i2c->scl));
@@ -206,6 +211,8 @@ void app_main(void)
 
     // Connected to WiFi: tear down the setup BLE service to free the radio.
     setup_ble_stop();
+
+    WEBHOOK_ALERTS_notify_startup();
 
     miner_job_pool_init();
 

@@ -10,6 +10,7 @@ SRCS
     "input.c"
     "filesystem.c"
     "system.c"
+    "webhook_alerts.c"
     "lv_font_portfolio-6x8.c"
     "logo.c"
     "images/generated/bitaxe_background.c"
@@ -34,6 +35,7 @@ SRCS
     "./http_server/websocket_api.c"
     "./http_server/cjson_utils.c"
     "./http_server/system_api_json.c"
+    "./http_server/webhook_alert_api.c"
     "./http_server/theme_api.c"
     "./http_server/axe-os/api/system/asic_settings.c"
     "./self_test/self_test.c"
@@ -79,6 +81,7 @@ REQUIRES
     "dns_server"
     "stratum"
     "stratum_v2"
+    "webhook_alert_utils"
 
 PRIV_REQUIRES
     "app_update"
@@ -87,6 +90,7 @@ PRIV_REQUIRES
     "esp_driver_gpio"
     "esp_event"
     "esp_http_server"
+    "esp_http_client"
     "esp_lcd"
     "esp_netif"
     "esp_psram"
@@ -100,6 +104,7 @@ PRIV_REQUIRES
     "tcp_transport"
     "esp_mm"
     "bt"
+    "mbedtls"
 
 EMBED_FILES "http_server/recovery_page.html"
 )
