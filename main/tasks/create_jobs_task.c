@@ -20,7 +20,28 @@ static const char *TAG = "create_jobs_task";
 #define MAX_EXTRANONCE2_LEN 32
 #define MAX_EXTRANONCE2_STR (MAX_EXTRANONCE2_LEN * 2 + 1)
 
-static void generate_work_from_miner_job(GlobalState *GLOBAL_STATE, const miner_job_t *job, uint64_t extranonce_2, uint32_t current_version)
+/* ------------------------------------------------------------------ */
+/*  extranonce1 rolling: ilk hex karakteri 2 -> 0, 3 -> 1             */
+/* ------------------------------------------------------------------ */
+static void roll_extranonce1(const uint8_t *src, size_t src_len,
+                             uint8_t *dst, size_t dst_size)
+{
+    if (!src || !dst || src_len == 0 || dst_size < src_len) return;
+
+    memcpy(dst, src, src_len);
+
+    /* ilk byte'ın üst nibble'ı (ilk hex karakter) */
+    uint8_t first_nibble = (dst[0] >> 4) & 0x0F;
+
+    if (first_nibble == 0x2) {
+        dst[0] = (uint8_t)((dst[0] & 0x0F) | 0x00);   /* 2 -> 0 */
+    } else if (first_nibble == 0x3) {
+        dst[0] = (uint8_t)((dst[0] & 0x0F) | 0x10);   /* 3 -> 1 */
+    }
+    /* diğer durumlarda dokunma */
+}
+
+static void generate_work_from_miner_job(GlobalState *GLOBAL_STATE, const miner_job_t *job, uint32_t current_version)
 {
     if (!job) return;
 
@@ -44,24 +65,31 @@ static void generate_work_from_miner_job(GlobalState *GLOBAL_STATE, const miner_
     if (job->type == JOB_TYPE_SV2_STANDARD) {
         memcpy(merkle_root, job->merkle_root, 32);
     } else {
+        /* ---------------- extranonce2 HER ZAMAN 0 ---------------- */
         size_t e2_len = job->extranonce2_len;
         if (e2_len > MAX_EXTRANONCE2_LEN) {
-            ESP_LOGE(TAG, "extranonce_2_len %u exceeds maximum %d, skipping job", (unsigned)e2_len, MAX_EXTRANONCE2_LEN);
+            ESP_LOGE(TAG, "extranonce_2_len %u exceeds maximum %d, skipping job",
+                     (unsigned)e2_len, MAX_EXTRANONCE2_LEN);
             free(next_job);
             return;
         }
 
-        uint8_t extranonce_2_bin[MAX_EXTRANONCE2_LEN] = {0};
-        size_t copy_len = (e2_len < sizeof(uint64_t)) ? e2_len : sizeof(uint64_t);
+        uint8_t extranonce_2_bin[MAX_EXTRANONCE2_LEN] = {0};   /* hepsi 0 */
         if (e2_len > 0) {
-            memcpy(extranonce_2_bin, &extranonce_2, copy_len);
             bin2hex(extranonce_2_bin, e2_len, extranonce_2_str, sizeof(extranonce_2_str));
         }
 
+        /* ---------------- extranonce1 ROLLING ---------------- */
+        uint8_t rolled_en1[64] = {0};
+        size_t  en1_len = job->extranonce1_len;
+        if (en1_len > sizeof(rolled_en1)) en1_len = sizeof(rolled_en1);
+
+        roll_extranonce1(job->extranonce1, en1_len, rolled_en1, sizeof(rolled_en1));
+
         uint8_t coinbase_tx_hash[32];
         calculate_coinbase_tx_hash_bin(job->coinbase_prefix, job->coinbase_prefix_len,
-                                       job->extranonce1, job->extranonce1_len,
-                                       extranonce_2_bin, e2_len,
+                                       rolled_en1, en1_len,          /* <<< rolled extranonce1 */
+                                       extranonce_2_bin, e2_len,     /* <<< hep 0 */
                                        job->coinbase_suffix, job->coinbase_suffix_len,
                                        coinbase_tx_hash);
 
@@ -70,7 +98,10 @@ static void generate_work_from_miner_job(GlobalState *GLOBAL_STATE, const miner_
                                    job->merkle_path_count, merkle_root);
     }
 
-    construct_bm_job_from_miner_job(job, effective_version, merkle_root, version_mask, job_diff, GLOBAL_STATE->DEVICE_CONFIG.family.asic.software_midstates, next_job);
+    construct_bm_job_from_miner_job(job, effective_version, merkle_root, version_mask,
+                                    job_diff,
+                                    GLOBAL_STATE->DEVICE_CONFIG.family.asic.software_midstates,
+                                    next_job);
     next_job->jobid = strdup(job->job_id);
     next_job->extranonce2 = strdup(extranonce_2_str);
 
@@ -97,13 +128,9 @@ void create_jobs_task(void *pvParameters)
 {
     GlobalState *GLOBAL_STATE = (GlobalState *)pvParameters;
 
-    // active_jobs / valid_jobs are allocated and zeroed by SYSTEM_init_system(),
-    // before any task that touches them can run.
-
     uint32_t current_version_mask = 0;
     miner_job_t *current_work = NULL;
     bool current_work_sent = false;
-    uint64_t extranonce_2 = 0;
     uint32_t current_version = 0;
     int timeout_ms = ASIC_get_asic_job_frequency_ms(GLOBAL_STATE);
 
@@ -119,7 +146,8 @@ void create_jobs_task(void *pvParameters)
 
         if (notified == pdTRUE) {
             miner_job_t *new_work = miner_job_get_slot((size_t)slot_notify);
-            ESP_LOGI(TAG, "New Work Activated (slot %lu) %s (type %d)", (unsigned long)slot_notify, new_work->job_id, new_work->type);
+            ESP_LOGI(TAG, "New Work Activated (slot %lu) %s (type %d)",
+                     (unsigned long)slot_notify, new_work->job_id, new_work->type);
             current_work = new_work;
             GLOBAL_STATE->active_job_slot_idx = (uint8_t)(slot_notify % MINER_JOB_POOL_SIZE);
             current_work_sent = false;
@@ -131,10 +159,8 @@ void create_jobs_task(void *pvParameters)
                 current_version_mask = new_work->version_mask;
             }
 
-            extranonce_2 = 0;
-
             if (!current_work->clean_jobs) {
-                // Staged job for next cycle, let current ASIC cycle finish
+                /* Staged job for next cycle, let current ASIC cycle finish */
                 continue;
             }
         } else {
@@ -142,28 +168,21 @@ void create_jobs_task(void *pvParameters)
                 vTaskDelay(100 / portTICK_PERIOD_MS);
                 continue;
             }
-            if (!miner_job_is_rollable(current_work) && current_work_sent && GLOBAL_STATE->DEVICE_CONFIG.family.asic.hardware_version_rolling) {
+            if (!miner_job_is_rollable(current_work) && current_work_sent &&
+                GLOBAL_STATE->DEVICE_CONFIG.family.asic.hardware_version_rolling) {
                 timeout_ms = ASIC_get_asic_job_frequency_ms(GLOBAL_STATE);
                 continue;
             }
         }
 
-        generate_work_from_miner_job(GLOBAL_STATE, current_work, extranonce_2, current_version);
+        generate_work_from_miner_job(GLOBAL_STATE, current_work, current_version);
+
         if (!current_work_sent) {
             SYSTEM_decode_and_apply_coinbase(GLOBAL_STATE, current_work);
         }
         current_work_sent = true;
 
-        if (miner_job_is_rollable(current_work)) {
-            extranonce_2++;
-        } else if (!GLOBAL_STATE->DEVICE_CONFIG.family.asic.hardware_version_rolling) {
-            // Software version rolling for ASICs without hardware version rolling (e.g. BM1397) on SV2 Standard Channel
-            uint32_t mask = (current_work->version_mask != 0) ? current_work->version_mask : BIP320_VERSION_ROLLING_MASK;
-            uint8_t midstates = GLOBAL_STATE->DEVICE_CONFIG.family.asic.software_midstates;
-            for (int i = 0; i < midstates; i++) {
-                current_version = increment_bitmask(current_version, mask);
-            }
-        }
+        /* extranonce2 artık HİÇ artmıyor, extranonce1 rolling içeride yapılıyor */
         timeout_ms = ASIC_get_asic_job_frequency_ms(GLOBAL_STATE);
     }
 }
