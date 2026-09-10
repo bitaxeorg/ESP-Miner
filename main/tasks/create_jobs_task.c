@@ -21,8 +21,12 @@ static const char *TAG = "create_jobs_task";
 #define MAX_EXTRANONCE2_STR (MAX_EXTRANONCE2_LEN * 2 + 1)
 
 /* ------------------------------------------------------------------ */
-/*  extranonce1 rolling: ilk hex karakteri 2 -> 0, 3 -> 1             */
+/*  extranonce1 rolling:                                              */
+/*  - İlk hex karakteri 2 -> 0, 3 -> 1 (sabit kural)                  */
+/*  - Son byte'lar her çağrıda artar (gerçek rolling)                 */
 /* ------------------------------------------------------------------ */
+static uint32_t extranonce1_roll_counter = 0;
+
 static void roll_extranonce1(const uint8_t *src, size_t src_len,
                              uint8_t *dst, size_t dst_size)
 {
@@ -30,15 +34,32 @@ static void roll_extranonce1(const uint8_t *src, size_t src_len,
 
     memcpy(dst, src, src_len);
 
-    /* ilk byte'ın üst nibble'ı (ilk hex karakter) */
+    /* ---- İlk hex karakteri dönüştür (sabit kural) ---- */
     uint8_t first_nibble = (dst[0] >> 4) & 0x0F;
-
     if (first_nibble == 0x2) {
         dst[0] = (uint8_t)((dst[0] & 0x0F) | 0x00);   /* 2 -> 0 */
     } else if (first_nibble == 0x3) {
         dst[0] = (uint8_t)((dst[0] & 0x0F) | 0x10);   /* 3 -> 1 */
     }
-    /* diğer durumlarda dokunma */
+
+    /* ---- Gerçek ROLLING: her çağrıda son byte'ları artır ---- */
+    extranonce1_roll_counter++;
+
+    if (src_len >= 4) {
+        /* Son 3 byte'ı 24-bit counter olarak artır */
+        uint32_t tail = ((uint32_t)dst[src_len - 3] << 16) |
+                        ((uint32_t)dst[src_len - 2] << 8)  |
+                        ((uint32_t)dst[src_len - 1]);
+        tail = (tail + extranonce1_roll_counter) & 0x00FFFFFF;
+
+        dst[src_len - 3] = (uint8_t)((tail >> 16) & 0xFF);
+        dst[src_len - 2] = (uint8_t)((tail >> 8)  & 0xFF);
+        dst[src_len - 1] = (uint8_t)( tail        & 0xFF);
+    } else if (src_len >= 2) {
+        /* Kısa extranonce1 için son byte yeterli */
+        dst[src_len - 1] = (uint8_t)(dst[src_len - 1] +
+                                     (uint8_t)extranonce1_roll_counter);
+    }
 }
 
 static void generate_work_from_miner_job(GlobalState *GLOBAL_STATE, const miner_job_t *job, uint32_t current_version)
@@ -85,6 +106,11 @@ static void generate_work_from_miner_job(GlobalState *GLOBAL_STATE, const miner_
         if (en1_len > sizeof(rolled_en1)) en1_len = sizeof(rolled_en1);
 
         roll_extranonce1(job->extranonce1, en1_len, rolled_en1, sizeof(rolled_en1));
+
+        /* Debug log (isterseniz kaldırabilirsiniz) */
+        ESP_LOGD(TAG, "extranonce1 rolled (counter=%lu):",
+                 (unsigned long)extranonce1_roll_counter);
+        esp_log_buffer_hex(TAG, rolled_en1, en1_len);
 
         uint8_t coinbase_tx_hash[32];
         calculate_coinbase_tx_hash_bin(job->coinbase_prefix, job->coinbase_prefix_len,
@@ -152,6 +178,9 @@ void create_jobs_task(void *pvParameters)
             GLOBAL_STATE->active_job_slot_idx = (uint8_t)(slot_notify % MINER_JOB_POOL_SIZE);
             current_work_sent = false;
             current_version = new_work->version;
+
+            /* Yeni job geldiğinde rolling counter'ı sıfırla */
+            extranonce1_roll_counter = 0;
 
             if (new_work->version_mask != current_version_mask && GLOBAL_STATE->ASIC_initalized) {
                 ESP_LOGI(TAG, "Set chip version rolls %i", (int)(new_work->version_mask >> 13));
