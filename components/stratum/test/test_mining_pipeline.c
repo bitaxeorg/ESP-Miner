@@ -1,5 +1,6 @@
 #include "unity.h"
 
+#include "job_pipeline_fixture.h"
 #include "mining.h"
 #include "stratum_api.h"
 #include "sv2_protocol.h"
@@ -54,11 +55,12 @@ static void assert_hex32(const char *expected_hex, const uint8_t actual[32])
     TEST_ASSERT_EQUAL_UINT8_ARRAY(expected, actual, sizeof(expected));
 }
 
-static void assert_common_asic_job(const bm_job *job, miner_job_type_t type,
+static void assert_common_asic_job(const bm_job *job, uint32_t expected_version,
+                                   miner_job_type_t type,
                                    uint8_t pool_id, double pool_diff,
                                    const char *expected_merkle_root)
 {
-    TEST_ASSERT_EQUAL_HEX32(0x20000004, job->version);
+    TEST_ASSERT_EQUAL_HEX32(expected_version, job->version);
     TEST_ASSERT_EQUAL_HEX32(0x1fffe000, job->version_mask);
     TEST_ASSERT_EQUAL_HEX32(0x1705dd01, job->target);
     TEST_ASSERT_EQUAL_HEX32(0x64658bd8, job->ntime);
@@ -112,48 +114,52 @@ TEST_CASE("SV1 notify reaches the ASIC job boundary byte exact",
     miner_job->pool_diff = 2048.0;
     miner_job->version_mask = BIP320_VERSION_ROLLING_MASK;
 
-    uint8_t extranonce2[8] = {0};
-    uint8_t coinbase_hash[32];
-    calculate_coinbase_tx_hash_bin(
-        miner_job->coinbase_prefix, miner_job->coinbase_prefix_len,
-        miner_job->extranonce1, miner_job->extranonce1_len,
-        extranonce2, sizeof(extranonce2),
-        miner_job->coinbase_suffix, miner_job->coinbase_suffix_len,
-        coinbase_hash);
-
-    uint8_t merkle_root[32];
-    calculate_merkle_root_hash(
-        coinbase_hash, (const uint8_t (*)[32])miner_job->merkle_path,
-        miner_job->merkle_path_count, merkle_root);
     assert_hex32(
         "35fd44bf837bdc13c6e5607db472b528a804d248490700000000000000000000",
         miner_job->prev_hash);
-    assert_hex32(
-        "cd1be82132ef0d12053dcece1fa0247fcfdb61d4dbd3eb32ea9ef9b4c604a846",
-        merkle_root);
 
-    bm_job asic_job = {0};
-    construct_bm_job_from_miner_job(
-        miner_job, miner_job->version, merkle_root, miner_job->version_mask,
-        miner_job->pool_diff, 4, &asic_job);
+    const job_pipeline_fixture_event_t events[] = {
+        { .type = JOB_PIPELINE_FIXTURE_NOTIFY, .slot = 0 },
+    };
+    job_pipeline_fixture_result_t result;
+    job_pipeline_fixture_run(
+        (job_pipeline_fixture_config_t) {
+            .hardware_version_rolling = false,
+            .software_midstates = 4,
+            .asic_initialized = true,
+            .job_frequency_ms = 1,
+        },
+        events, sizeof(events) / sizeof(events[0]), &result);
+    TEST_ASSERT_EQUAL_UINT32(1, result.job_count);
+    TEST_ASSERT_EQUAL_UINT32(1, result.version_mask_count);
+    TEST_ASSERT_EQUAL_HEX32(BIP320_VERSION_ROLLING_MASK,
+                            result.version_masks[0]);
+    TEST_ASSERT_EQUAL_UINT32(1, result.coinbase_decode_count);
+    bm_job *asic_job = result.jobs[0];
+    TEST_ASSERT_NOT_NULL(asic_job);
 
     assert_common_asic_job(
-        &asic_job, JOB_TYPE_V1, 3, 2048.0,
+        asic_job, 0x20000004, JOB_TYPE_V1, 3, 2048.0,
         "c604a846ea9ef9b4dbd3eb32cfdb61d41fa0247f053dcece32ef0d12cd1be821");
-    TEST_ASSERT_EQUAL_UINT8(4, asic_job.num_midstates);
+    TEST_ASSERT_EQUAL_STRING("1f9a56282c", asic_job->jobid);
+    TEST_ASSERT_EQUAL_STRING("0000000000000000", asic_job->extranonce2);
+    TEST_ASSERT_EQUAL_UINT8(4, asic_job->num_midstates);
     assert_hex32(
         "4d3185f25f7d5de0e3591741cb21cae11574ddd65d490d3d68739f8a52eadf91",
-        asic_job.midstates[0]);
+        asic_job->midstates[0]);
     assert_hex32(
         "1223a956e9ef56cb49d27f0829c7afead0908ead93772919d4bc33efcb699658",
-        asic_job.midstates[1]);
+        asic_job->midstates[1]);
     assert_hex32(
         "4176317ef2641293a3effca4188675380c97daa32f37d00d3228f08966c0b97d",
-        asic_job.midstates[2]);
+        asic_job->midstates[2]);
     assert_hex32(
         "73828ae1e589678bc3f03b5a863835599cd73c42e3b67bbdc47f5b51eaec465a",
-        asic_job.midstates[3]);
+        asic_job->midstates[3]);
+    miner_job->job_id[0] = 'x';
+    TEST_ASSERT_EQUAL_STRING("1f9a56282c", asic_job->jobid);
 
+    job_pipeline_fixture_result_free(&result);
     STRATUM_V1_reset_message(&message);
 }
 
@@ -218,33 +224,112 @@ TEST_CASE("SV2 standard messages reach the ASIC job boundary byte exact",
     TEST_ASSERT_EQUAL_HEX32(channel_id, prev_channel_id);
     TEST_ASSERT_EQUAL_UINT32(job_id, prev_job_id);
 
-    miner_job_t miner_job = {
-        .type = JOB_TYPE_SV2_STANDARD,
-        .version = version,
-        .ntime = min_ntime,
-        .nbits = nbits,
-        .clean_jobs = true,
-        .pool_diff = 2048.0,
-        .version_mask = BIP320_VERSION_ROLLING_MASK,
-        .pool_id = 3,
-    };
-    (void)snprintf(miner_job.job_id, sizeof(miner_job.job_id), "%lu",
+    miner_job_pool_init();
+    miner_job_t *miner_job = miner_job_get_slot(job_id);
+    uint8_t *prefix_buffer = miner_job->coinbase_prefix;
+    uint8_t *suffix_buffer = miner_job->coinbase_suffix;
+    memset(miner_job, 0, sizeof(*miner_job));
+    miner_job->coinbase_prefix = prefix_buffer;
+    miner_job->coinbase_suffix = suffix_buffer;
+    miner_job->type = JOB_TYPE_SV2_STANDARD;
+    miner_job->version = version;
+    miner_job->ntime = min_ntime;
+    miner_job->nbits = nbits;
+    miner_job->clean_jobs = true;
+    miner_job->pool_diff = 2048.0;
+    miner_job->version_mask = BIP320_VERSION_ROLLING_MASK;
+    miner_job->pool_id = 3;
+    (void)snprintf(miner_job->job_id, sizeof(miner_job->job_id), "%lu",
                    (unsigned long)job_id);
-    memcpy(miner_job.prev_hash, prev_hash, sizeof(miner_job.prev_hash));
-    memcpy(miner_job.merkle_root, merkle_root, sizeof(miner_job.merkle_root));
+    memcpy(miner_job->prev_hash, prev_hash, sizeof(miner_job->prev_hash));
+    memcpy(miner_job->merkle_root, merkle_root,
+           sizeof(miner_job->merkle_root));
 
-    bm_job asic_job = {0};
-    construct_bm_job_from_miner_job(
-        &miner_job, miner_job.version, miner_job.merkle_root,
-        miner_job.version_mask, miner_job.pool_diff, 0, &asic_job);
+    const job_pipeline_fixture_event_t hardware_events[] = {
+        { .type = JOB_PIPELINE_FIXTURE_NOTIFY,
+          .slot = job_id % MINER_JOB_POOL_SIZE },
+        { .type = JOB_PIPELINE_FIXTURE_TIMEOUT },
+    };
+    job_pipeline_fixture_result_t result;
+    job_pipeline_fixture_run(
+        (job_pipeline_fixture_config_t) {
+            .hardware_version_rolling = true,
+            .software_midstates = 0,
+            .asic_initialized = true,
+            .job_frequency_ms = 1,
+        },
+        hardware_events,
+        sizeof(hardware_events) / sizeof(hardware_events[0]), &result);
+    TEST_ASSERT_EQUAL_UINT32(1, result.job_count);
+    TEST_ASSERT_EQUAL_UINT32(1, result.version_mask_count);
+    TEST_ASSERT_EQUAL_UINT32(1, result.coinbase_decode_count);
+    bm_job *asic_job = result.jobs[0];
+    TEST_ASSERT_NOT_NULL(asic_job);
 
     assert_common_asic_job(
-        &asic_job, JOB_TYPE_SV2_STANDARD, 3, 2048.0,
+        asic_job, 0x20000004, JOB_TYPE_SV2_STANDARD, 3, 2048.0,
         "c604a846ea9ef9b4dbd3eb32cfdb61d41fa0247f053dcece32ef0d12cd1be821");
-    TEST_ASSERT_EQUAL_UINT8(0, asic_job.num_midstates);
-    uint8_t zero_midstates[sizeof(asic_job.midstates)] = {0};
-    TEST_ASSERT_EQUAL_UINT8_ARRAY(
-        zero_midstates, asic_job.midstates, sizeof(zero_midstates));
+    TEST_ASSERT_EQUAL_STRING("42", asic_job->jobid);
+    TEST_ASSERT_EQUAL_STRING("", asic_job->extranonce2);
+    TEST_ASSERT_EQUAL_UINT8(0, asic_job->num_midstates);
+    job_pipeline_fixture_result_free(&result);
+
+    const job_pipeline_fixture_event_t software_events[] = {
+        { .type = JOB_PIPELINE_FIXTURE_NOTIFY,
+          .slot = job_id % MINER_JOB_POOL_SIZE },
+        { .type = JOB_PIPELINE_FIXTURE_TIMEOUT },
+    };
+    job_pipeline_fixture_run(
+        (job_pipeline_fixture_config_t) {
+            .hardware_version_rolling = false,
+            .software_midstates = 4,
+            .asic_initialized = true,
+            .job_frequency_ms = 1,
+        },
+        software_events,
+        sizeof(software_events) / sizeof(software_events[0]), &result);
+    TEST_ASSERT_EQUAL_UINT32(2, result.job_count);
+    TEST_ASSERT_EQUAL_HEX32(0x20000004, result.jobs[0]->version);
+    asic_job = result.jobs[1];
+    TEST_ASSERT_NOT_NULL(asic_job);
+    assert_common_asic_job(
+        asic_job, 0x20008004, JOB_TYPE_SV2_STANDARD, 3, 2048.0,
+        "c604a846ea9ef9b4dbd3eb32cfdb61d41fa0247f053dcece32ef0d12cd1be821");
+    TEST_ASSERT_EQUAL_UINT8(4, asic_job->num_midstates);
+    assert_hex32(
+        "d3e7e0f843a5eab9d8738ebae0845dc947140afd1a9e9aba63782cb00fdfee73",
+        asic_job->midstates[0]);
+    assert_hex32(
+        "bfd330725e5483e19f51a3d51bf2658bbfd65d20a7a468675e3e5569d669f1d3",
+        asic_job->midstates[1]);
+    assert_hex32(
+        "ec7ed22beb004cfedbe0afb5afe6d3674f70bbe9c99e163709d4dee2ce2d4837",
+        asic_job->midstates[2]);
+    assert_hex32(
+        "e964893f25e3f5cd668bb03bcfa87808728cd01574fe8c8ff0ec030db715a936",
+        asic_job->midstates[3]);
+    miner_job->job_id[0] = 'x';
+    TEST_ASSERT_EQUAL_STRING("42", result.jobs[0]->jobid);
+    TEST_ASSERT_EQUAL_STRING("42", result.jobs[1]->jobid);
+    miner_job->job_id[0] = '4';
+    job_pipeline_fixture_result_free(&result);
+
+    const job_pipeline_fixture_event_t unavailable_events[] = {
+        { .type = JOB_PIPELINE_FIXTURE_NOTIFY,
+          .slot = job_id % MINER_JOB_POOL_SIZE },
+    };
+    job_pipeline_fixture_run(
+        (job_pipeline_fixture_config_t) {
+            .hardware_version_rolling = true,
+            .software_midstates = 0,
+            .asic_initialized = false,
+            .job_frequency_ms = 1,
+        },
+        unavailable_events,
+        sizeof(unavailable_events) / sizeof(unavailable_events[0]), &result);
+    TEST_ASSERT_EQUAL_UINT32(0, result.job_count);
+    TEST_ASSERT_EQUAL_UINT32(0, result.version_mask_count);
+    TEST_ASSERT_EQUAL_UINT32(1, result.coinbase_decode_count);
 }
 
 TEST_CASE("SV2 extended messages roll extranonce into the ASIC job byte exact",
@@ -273,7 +358,7 @@ TEST_CASE("SV2 extended messages roll extranonce into the ASIC job byte exact",
                     SV2_MSG_NEW_EXTENDED_MINING_JOB, &payload, &payload_size);
 
     miner_job_pool_init();
-    miner_job_t *miner_job = miner_job_get_slot(1);
+    miner_job_t *miner_job = miner_job_get_slot(43);
     uint32_t channel_id = 0;
     bool has_min_ntime = false;
     bool version_rolling_allowed = false;
@@ -320,29 +405,125 @@ TEST_CASE("SV2 extended messages roll extranonce into the ASIC job byte exact",
     miner_job->extranonce1_len = 2;
     miner_job->extranonce2_len = 8;
 
-    const uint8_t extranonce2[8] = {1, 0, 0, 0, 0, 0, 0, 0};
-    uint8_t coinbase_hash[32];
-    calculate_coinbase_tx_hash_bin(
-        miner_job->coinbase_prefix, miner_job->coinbase_prefix_len,
-        miner_job->extranonce1, miner_job->extranonce1_len,
-        extranonce2, sizeof(extranonce2),
-        miner_job->coinbase_suffix, miner_job->coinbase_suffix_len,
-        coinbase_hash);
-    uint8_t merkle_root[32];
-    calculate_merkle_root_hash(
-        coinbase_hash, (const uint8_t (*)[32])miner_job->merkle_path,
-        miner_job->merkle_path_count, merkle_root);
-    assert_hex32(
-        "e706f70809a9b74cc63791d3cdd4af1801100fb9bbb6e222fa2fbcd06ad7452e",
-        merkle_root);
-
-    bm_job asic_job = {0};
-    construct_bm_job_from_miner_job(
-        miner_job, miner_job->version, merkle_root, miner_job->version_mask,
-        miner_job->pool_diff, 0, &asic_job);
+    const job_pipeline_fixture_event_t events[] = {
+        { .type = JOB_PIPELINE_FIXTURE_NOTIFY,
+          .slot = 43 % MINER_JOB_POOL_SIZE },
+        { .type = JOB_PIPELINE_FIXTURE_TIMEOUT },
+    };
+    job_pipeline_fixture_result_t result;
+    job_pipeline_fixture_run(
+        (job_pipeline_fixture_config_t) {
+            .hardware_version_rolling = true,
+            .software_midstates = 0,
+            .asic_initialized = true,
+            .job_frequency_ms = 1,
+        },
+        events, sizeof(events) / sizeof(events[0]), &result);
+    TEST_ASSERT_EQUAL_UINT32(2, result.job_count);
+    TEST_ASSERT_EQUAL_UINT32(1, result.version_mask_count);
+    TEST_ASSERT_EQUAL_UINT32(1, result.coinbase_decode_count);
+    bm_job *asic_job = result.jobs[0];
+    TEST_ASSERT_NOT_NULL(asic_job);
 
     assert_common_asic_job(
-        &asic_job, JOB_TYPE_SV2_EXTENDED, 4, 1024.0,
+        asic_job, 0x20000004, JOB_TYPE_SV2_EXTENDED, 4, 1024.0,
+        "3d5cb9a424a72f7686e8a96375cfda9bcbc74745878ad7127cdd0425ad14b09f");
+    TEST_ASSERT_EQUAL_STRING("43", asic_job->jobid);
+    TEST_ASSERT_EQUAL_STRING("0000000000000000", asic_job->extranonce2);
+    TEST_ASSERT_EQUAL_UINT8(0, asic_job->num_midstates);
+
+    asic_job = result.jobs[1];
+    TEST_ASSERT_NOT_NULL(asic_job);
+    assert_common_asic_job(
+        asic_job, 0x20000004, JOB_TYPE_SV2_EXTENDED, 4, 1024.0,
         "6ad7452efa2fbcd0bbb6e22201100fb9cdd4af18c63791d309a9b74ce706f708");
-    TEST_ASSERT_EQUAL_UINT8(0, asic_job.num_midstates);
+    TEST_ASSERT_EQUAL_STRING("43", asic_job->jobid);
+    TEST_ASSERT_EQUAL_STRING("0100000000000000", asic_job->extranonce2);
+    TEST_ASSERT_EQUAL_UINT8(0, asic_job->num_midstates);
+    miner_job->job_id[0] = 'x';
+    TEST_ASSERT_EQUAL_STRING("43", result.jobs[0]->jobid);
+    TEST_ASSERT_EQUAL_STRING("43", result.jobs[1]->jobid);
+    job_pipeline_fixture_result_free(&result);
+}
+
+TEST_CASE("job task fixture preserves idle and staged work behavior",
+          "[mining][characterization][job-task]")
+{
+    miner_job_pool_init();
+    miner_job_t *job = miner_job_get_slot(5);
+    uint8_t *prefix_buffer = job->coinbase_prefix;
+    uint8_t *suffix_buffer = job->coinbase_suffix;
+    memset(job, 0, sizeof(*job));
+    job->coinbase_prefix = prefix_buffer;
+    job->coinbase_suffix = suffix_buffer;
+    job->type = JOB_TYPE_SV2_STANDARD;
+    (void)snprintf(job->job_id, sizeof(job->job_id), "staged");
+    job->version = 0x20000004;
+    job->ntime = 0x64658bd8;
+    job->nbits = 0x1705dd01;
+    job->clean_jobs = false;
+    job->pool_diff = 512.0;
+    job->pool_id = 2;
+    TEST_ASSERT_EQUAL_UINT32(
+        32, hex2bin(
+                "35fd44bf837bdc13c6e5607db472b528a804d248490700000000000000000000",
+                job->prev_hash, sizeof(job->prev_hash)));
+    TEST_ASSERT_EQUAL_UINT32(
+        32, hex2bin(
+                "cd1be82132ef0d12053dcece1fa0247fcfdb61d4dbd3eb32ea9ef9b4c604a846",
+                job->merkle_root, sizeof(job->merkle_root)));
+
+    const job_pipeline_fixture_event_t events[] = {
+        { .type = JOB_PIPELINE_FIXTURE_TIMEOUT },
+        { .type = JOB_PIPELINE_FIXTURE_NOTIFY, .slot = 5 },
+        { .type = JOB_PIPELINE_FIXTURE_TIMEOUT },
+    };
+    job_pipeline_fixture_result_t result;
+    job_pipeline_fixture_run(
+        (job_pipeline_fixture_config_t) {
+            .hardware_version_rolling = true,
+            .software_midstates = 0,
+            .asic_initialized = true,
+            .job_frequency_ms = 1,
+        },
+        events, sizeof(events) / sizeof(events[0]), &result);
+
+    TEST_ASSERT_EQUAL_UINT32(1, result.delay_count);
+    TEST_ASSERT_EQUAL_UINT32(1, result.job_count);
+    TEST_ASSERT_EQUAL_UINT32(1, result.coinbase_decode_count);
+    TEST_ASSERT_EQUAL_UINT32(0, result.version_mask_count);
+    TEST_ASSERT_EQUAL_UINT8(5, result.active_job_slot);
+    TEST_ASSERT_EQUAL_STRING("staged", result.jobs[0]->jobid);
+    job_pipeline_fixture_result_free(&result);
+}
+
+TEST_CASE("job task fixture rejects oversized extranonce work",
+          "[mining][characterization][job-task]")
+{
+    miner_job_pool_init();
+    miner_job_t *job = miner_job_get_slot(6);
+    (void)snprintf(job->job_id, sizeof(job->job_id), "oversized");
+    job->type = JOB_TYPE_V1;
+    job->version = 0x20000004;
+    job->clean_jobs = true;
+    job->coinbase_prefix[0] = 0x01;
+    job->coinbase_prefix_len = 1;
+    job->extranonce2_len = 33;
+
+    const job_pipeline_fixture_event_t events[] = {
+        { .type = JOB_PIPELINE_FIXTURE_NOTIFY, .slot = 6 },
+    };
+    job_pipeline_fixture_result_t result;
+    job_pipeline_fixture_run(
+        (job_pipeline_fixture_config_t) {
+            .hardware_version_rolling = true,
+            .software_midstates = 0,
+            .asic_initialized = true,
+            .job_frequency_ms = 1,
+        },
+        events, sizeof(events) / sizeof(events[0]), &result);
+
+    TEST_ASSERT_EQUAL_UINT32(0, result.job_count);
+    TEST_ASSERT_EQUAL_UINT32(1, result.coinbase_decode_count);
+    job_pipeline_fixture_result_free(&result);
 }

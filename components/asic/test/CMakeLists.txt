@@ -1,3 +1,3 @@
 idf_component_register(SRC_DIRS "."
-                       INCLUDE_DIRS "."
-                       REQUIRES cmock stratum asic)
+                       INCLUDE_DIRS "." "../../stratum/test/fixtures"
+                       REQUIRES cmock stratum stratum_v2 asic)
