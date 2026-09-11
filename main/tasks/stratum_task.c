@@ -129,6 +129,8 @@ void stratum_notify_pool_selection_changed(GlobalState *gs)
 
     if (target_idx != s_running_pool_idx) {
         stratum_request_reconnect();
+    } else if (gs->SYSTEM_MODULE.is_using_fallback && !gs->SYSTEM_MODULE.use_fallback_stratum) {
+        stratum_trigger_heartbeat_check();
     }
 }
 

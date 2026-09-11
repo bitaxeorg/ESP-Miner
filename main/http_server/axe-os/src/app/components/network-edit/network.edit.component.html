@@ -43,6 +43,17 @@
           </div>
         </div>
       </div>
+      <div class="flex flex-col md:flex-row md:items-center mb-4 gap-2">
+        <label for="useNTP" class="w-full md:w-2/12 font-medium cursor-pointer select-none">
+            <tooltip-text-icon
+              text="Enable Time Sync"
+              tooltip="Your device will sync with a DHCP-provided NTP server, or the nearest if not provided"
+            />
+        </label>
+        <div class="w-full md:w-10/12 flex items-center">
+          <app-checkbox name="useNTP" formControlName="useNTP" inputId="useNTP" [binary]="true"></app-checkbox>
+        </div>
+      </div>
       <div class="flex mt-5 gap-3">
         <button [disabled]="!form.dirty || form.invalid" (click)="updateSystem()"
         class="btn">Save</button>

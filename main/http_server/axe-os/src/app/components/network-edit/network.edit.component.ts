@@ -48,6 +48,7 @@ export class NetworkEditComponent implements OnInit {
           hostname: [info.hostname, [Validators.required]],
           ssid: [info.ssid, [Validators.required]],
           wifiPass: ['*****'],
+          useNTP: [info.useNTP],
         });
         this.formSubject.next(this.form);
       });

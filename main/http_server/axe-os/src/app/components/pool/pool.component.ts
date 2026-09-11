@@ -177,6 +177,7 @@ export class PoolComponent implements OnInit {
           const secVal = this.form.get('secondaryPoolIndex')?.value;
           if (primVal === secVal) {
             this.form.get('secondaryPoolIndex')?.setValue(this.previousPrim, { emitEvent: false });
+            this.form.get('secondaryPoolIndex')?.markAsDirty();
             this.previousSec = this.previousPrim;
           }
           this.previousPrim = primVal;
@@ -186,7 +187,8 @@ export class PoolComponent implements OnInit {
           const primVal = this.form.get('primaryPoolIndex')?.value;
           if (secVal === primVal) {
             this.form.get('primaryPoolIndex')?.setValue(this.previousSec, { emitEvent: false });
-            this.previousSec = secVal;
+            this.form.get('primaryPoolIndex')?.markAsDirty();
+            this.previousPrim = this.previousSec;
           }
           this.previousSec = secVal;
         });
@@ -358,6 +360,8 @@ export class PoolComponent implements OnInit {
     this.toastr.success(successMessage);
     this.pendingDeletePoolIds = [];
     this.form.markAsPristine();
+    this.previousPrim = this.form.get('primaryPoolIndex')?.value ?? 0;
+    this.previousSec = this.form.get('secondaryPoolIndex')?.value ?? 1;
   }
 
   private extractPort(url: string): { cleanUrl: string, port?: number } {

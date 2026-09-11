@@ -458,10 +458,14 @@ void SYSTEM_notify_rejected_share(GlobalState * GLOBAL_STATE, char * error_msg)
             sizeof(module->rejected_reason_stats[0]), compare_rejected_reason_stats);
     }    
 }
-
 void SYSTEM_notify_new_ntime(GlobalState * GLOBAL_STATE, uint32_t ntime)
 {
     SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
+
+    // NTP handles sync itself
+    if (nvs_config_get_bool(NVS_CONFIG_USE_NTP)) {
+        return;
+    }
 
     // Hourly clock sync
     if (module->lastClockSync + (60 * 60) > ntime) {

@@ -281,7 +281,6 @@ esp_err_t stratum_v1_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
             free(line);
             continue;
         }
-        free(line);
 
         switch (s_v1_msg->method) {
             case METHOD_UNKNOWN:
@@ -417,6 +416,8 @@ esp_err_t stratum_v1_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
             }
         }
 
+        ESP_LOGI(TAG, "rx: %s", line);
+        free(line);
         STRATUM_V1_reset_message(s_v1_msg);
         if (reconnect_requested) {
             run_result = ESP_FAIL;

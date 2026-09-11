@@ -1007,6 +1007,7 @@ bool check_settings_and_update(const cJSON * const root, char **redirect_url)
             }
         }
 
+        bool modified_pools[MAX_POOLS] = {false};
         // Save pools array to NVS
         if (pools_item && cJSON_IsArray(pools_item)) {
             int size = cJSON_GetArraySize(pools_item);
@@ -1017,7 +1018,7 @@ bool check_settings_and_update(const cJSON * const root, char **redirect_url)
                     int idx = id_item->valueint;
                     if (idx >= 0 && idx < MAX_POOLS) {
                         if (update_pool_nvs(pool_item, idx)) {
-                            stratum_notify_pool_modified(GLOBAL_STATE, idx);
+                            modified_pools[idx] = true;
                         }
                     }
                 }
@@ -1033,6 +1034,14 @@ bool check_settings_and_update(const cJSON * const root, char **redirect_url)
 
             if (use_fallback_item) {
                 GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback = GLOBAL_STATE->SYSTEM_MODULE.use_fallback_stratum;
+            } else if (cJSON_GetObjectItem(root, "primaryPoolIndex") != NULL && !GLOBAL_STATE->SYSTEM_MODULE.use_fallback_stratum) {
+                GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback = false;
+            }
+
+            for (int i = 0; i < MAX_POOLS; i++) {
+                if (modified_pools[i]) {
+                    stratum_notify_pool_modified(GLOBAL_STATE, i);
+                }
             }
 
             if (pool_selection_changed) {
