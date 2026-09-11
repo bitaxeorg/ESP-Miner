@@ -80,6 +80,7 @@ const mockSystemInfo: ISystemInfo = {
   fallbackStratumTLS: false,
   temptarget: 60,
   useCustomWWW: 0,
+  useNTP: true,
   power_fault: '',
   blockFound: 0,
   sharesAccepted: 100,
