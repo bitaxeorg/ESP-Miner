@@ -45,7 +45,7 @@ static void spy_task_delay(TickType_t ticks)
     harness_result->delay_count++;
 }
 
-static void spy_asic_send_work(GlobalState *state, bm_job *job)
+void spy_asic_send_work(GlobalState *state, bm_job *job)
 {
     (void)state;
     if (harness_result->job_count >= JOB_PIPELINE_HARNESS_MAX_JOBS) {
@@ -87,6 +87,7 @@ static void spy_decode_coinbase(GlobalState *state, const miner_job_t *job)
 #define xTaskNotifyWait fake_task_notify_wait
 #define vTaskDelay spy_task_delay
 #define ASIC_send_work spy_asic_send_work
+#define ASIC_send_job test_asic_send_job
 #define ASIC_set_version_mask spy_asic_set_version_mask
 #define ASIC_get_asic_job_frequency_ms stub_asic_get_job_frequency
 #define SYSTEM_decode_and_apply_coinbase spy_decode_coinbase
@@ -95,6 +96,7 @@ static void spy_decode_coinbase(GlobalState *state, const miner_job_t *job)
 #undef ASIC_get_asic_job_frequency_ms
 #undef ASIC_set_version_mask
 #undef ASIC_send_work
+#undef ASIC_send_job
 #undef vTaskDelay
 #undef xTaskNotifyWait
 
@@ -146,4 +148,16 @@ void job_pipeline_harness_result_free(job_pipeline_harness_result_t *result)
         result->jobs[index] = NULL;
     }
     result->job_count = 0;
+}
+
+void job_pipeline_harness_send_common(uint8_t software_midstates,
+    const asic_job_t *job, job_pipeline_harness_result_t *result)
+{
+    memset(result, 0, sizeof(*result));
+    harness_state = (GlobalState) {
+        .DEVICE_CONFIG.family.asic.software_midstates = software_midstates,
+    };
+    harness_result = result;
+    test_asic_send_job(&harness_state, job);
+    harness_result = NULL;
 }

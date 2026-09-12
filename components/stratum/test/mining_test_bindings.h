@@ -6,6 +6,7 @@
 
 /* Give the private test instance unique symbols so unrelated tests and system
  * tasks cannot consume an injected allocation failure. */
+#define mining_build_asic_job mining_test_build_asic_job
 #define free_bm_job mining_test_free_bm_job
 #define calculate_coinbase_tx_hash_bin mining_test_calculate_coinbase_tx_hash_bin
 #define calculate_merkle_root_hash mining_test_calculate_merkle_root_hash

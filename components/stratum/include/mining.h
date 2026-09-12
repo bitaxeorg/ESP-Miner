@@ -5,6 +5,11 @@
 #include <stddef.h>
 #include "miner_job.h"
 
+/* Build complete owned work from an accepted pool job. The destination is
+ * unchanged on failure. Version zero keeps the existing source fallback. */
+bool mining_build_asic_job(const miner_job_t *source, uint64_t extranonce2,
+                           uint32_t version, asic_job_t *destination);
+
 #define BM_JOB_MAX_MIDSTATES 4
 
 typedef struct bm_job

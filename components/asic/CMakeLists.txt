@@ -9,13 +9,19 @@ SRCS
     "crc.c"
     "asic_common.c"
     "asic.c"
+    "asic_submit.c"
+    "bm_job.c"
     "frequency_transition_bmXX.c"
     "pll.c"
 
 INCLUDE_DIRS 
     "include"
 
+PRIV_INCLUDE_DIRS
+    "private_include"
+
 REQUIRES 
+    "mining_job"
     "freertos"
     "esp_driver_uart"
     "stratum"

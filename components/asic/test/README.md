@@ -32,6 +32,8 @@ logic under test is unchanged.
 | `bm1397_test_harness.*` | Creates BM1397 state, provides scripted ASIC responses, and records serial packets. |
 | `bm1397_test_bindings.h` | Gives the BM1397 driver private test names and connects its external calls to test doubles. |
 | `bm1397_test_instance.c` | Builds an isolated instance of the real BM1397 driver. |
+| `asic_submit_test_instance.c`, `bm_job_test_instance.c` | Build the real common-job adapter with private symbols; record final work through the job pipeline harness. |
+| `bitmain_job_test_bindings.h`, `bitmain_job_allocator_fault_injector.*` | Inject isolated adapter allocation failures without affecting unrelated tasks. |
 | `result_task_test_bindings.h` | Gives the result task a private test name. It connects ASIC results, share submission, scoring, self-test, and register calls to test doubles. |
 | `result_task_test_instance.c` | Builds an isolated instance of the real ASIC result task. |
 
@@ -47,6 +49,7 @@ logic under test is unchanged.
 
 | File | Unit behavior |
 | --- | --- |
+| `test_bm_job.c` | Conversion compatibility, metadata ownership, partial allocation cleanup, and send-adapter recovery. |
 | `test_pll.c` | PLL divider selection and the calculated ASIC frequency. |
 | `test_timeout.c` | ASIC timeout calculation for different chips, chain sizes, version spaces, and the zero-chip default. |
 

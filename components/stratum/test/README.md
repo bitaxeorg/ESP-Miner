@@ -25,7 +25,7 @@ job-task code with controlled inputs and recorded outputs.
 | --- | --- |
 | `job_pipeline_test_harness.*` | Runs the real `create_jobs_task()` with a short event script. It records generated jobs, version masks, delays, and coinbase decode calls. It also stops the task after the script ends. |
 | `mining_test_bindings.h` | Gives the mining functions private test names and sends selected allocations through the fault injector. This keeps allocation tests separate from other test tasks. |
-| `mining_test_instance.c` | Builds an isolated instance of the real mining source. |
+| `mining_test_instance.c` | Builds isolated instances of the real mining source and common-job builder. |
 | `mining_allocator_fault_injector.*` | Fails one selected allocation and records allocation calls. A test can then check error handling and recovery. |
 | `stubs/` | Provides small replacement headers with only the platform types and state needed by these tests. |
 
@@ -42,6 +42,7 @@ job-task code with controlled inputs and recorded outputs.
 | `test_base58.c` | Base58 P2PKH and P2SH address encoding, including a small output buffer. |
 | `test_bech32.c` | Bech32 and Bech32m address encoding for several witness types and networks, including invalid inputs. |
 | `test_coinbase_decoder.c` | Varint bounds, payout address decoding, network formats, BIP-110 signaling, job input, and transaction locktime checks. |
+| `test_common_jobs.c` | Common-job ownership, metadata validation, extranonce encoding, rolling eligibility, and coinbase allocation failure. |
 | `test_job_building.c` | Coinbase hashing at stack and heap limits, allocation failure recovery, ASIC job defaults, copied metadata, and software midstates. |
 | `test_miner_job.c` | Miner-job pool slots, buffer ownership, index wraparound, and rollable-job checks. |
 | `test_mining.c` | Coinbase hashes, Merkle roots, midstates, version-mask changes, and nonce difficulty. |
