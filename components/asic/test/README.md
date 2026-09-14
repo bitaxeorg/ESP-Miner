@@ -36,7 +36,7 @@ logic under test is unchanged.
 | `bitmain_job_test_bindings.h`, `bitmain_job_allocator_fault_injector.*` | Inject isolated adapter allocation failures without affecting unrelated tasks. |
 | `result_task_test_bindings.h` | Gives the result task a private test name. It connects ASIC results, share submission, scoring, self-test, and register calls to test doubles. |
 | `result_task_test_instance.c` | Builds an isolated instance of the real ASIC result task. |
-| `asic_job_store_test_instance.c`, `asic_job_store_test_bindings.h` | Build the real locked job snapshot accessor against the same test state as the result task. |
+| `bm_job_store_test_instance.c`, `bm_job_store_test_bindings.h` | Build the real locked job snapshot accessor against the same test state as the result task. |
 | `job_pipeline_test_harness.*`, `stubs/` | Run the real create-jobs task and common-job adapter with scripted events and application state. |
 | `bm_job_reference.*` | Reference constructor from PR #1969 (`9af07d7c`) used only for conversion tests; excluded from the production component. |
 
@@ -53,7 +53,7 @@ logic under test is unchanged.
 
 | File | Unit behavior |
 | --- | --- |
-| `test_asic_job_store.c` | Complete common snapshots, metadata limits, invalid slots, lock release, and ownership after slot replacement. |
+| `test_bm_job_store.c` | Complete common snapshots, metadata limits, invalid slots, lock release, and ownership after slot replacement. |
 | `test_bm_job_building.c` | Golden software midstate, exact common metadata, and midstate-count limits. |
 | `test_bm_job.c` | Conversion compatibility, metadata ownership, partial allocation cleanup, and send-adapter recovery. |
 | `test_pll.c` | PLL divider selection and the calculated ASIC frequency. |

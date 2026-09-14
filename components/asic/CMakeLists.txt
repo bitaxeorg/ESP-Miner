@@ -12,7 +12,7 @@ SRCS
     "asic_submit.c"
     "bm_job.c"
     "bm_job_midstate.c"
-    "asic_job_store.c"
+    "bm_job_store.c"
     "frequency_transition_bmXX.c"
     "pll.c"
 
