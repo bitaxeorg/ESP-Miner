@@ -68,17 +68,35 @@ struct dns_server_handle
 
 /*
     Parse the name from the packet from the DNS name format to a regular .-seperated name
-    returns the pointer to the next part of the packet
+    returns the pointer to the next part of the packet, or NULL on malformed input.
+
+    Security fix: the label walk is bounded by the end of the received
+    packet. Without an end pointer a truncated or crafted packet makes the walk
+    read out of bounds. Compression pointers (labels with the top two bits set)
+    are rejected outright: following them can loop forever and this responder
+    only ever parses the question section, where pointers are not needed.
 */
-static char * parse_dns_name(char * raw_name, char * parsed_name, size_t parsed_name_max_len)
+static char * parse_dns_name(char * raw_name, char * packet_end, char * parsed_name, size_t parsed_name_max_len)
 {
 
     char * label = raw_name;
     char * name_itr = parsed_name;
     int name_len = 0;
 
-    do {
+    while (true) {
+        if (label >= packet_end) {
+            return NULL; // truncated packet: label length byte out of bounds
+        }
         int sub_name_len = *label;
+        if (sub_name_len == 0) {
+            break;
+        }
+        if ((sub_name_len & 0xC0) != 0) {
+            return NULL; // compression pointer or reserved label type: refuse
+        }
+        if (label + 1 + sub_name_len > packet_end) {
+            return NULL; // label body runs past the end of the packet
+        }
         // (len + 1) since we are adding  a '.'
         name_len += (sub_name_len + 1);
         if (name_len > parsed_name_max_len) {
@@ -90,10 +108,14 @@ static char * parse_dns_name(char * raw_name, char * parsed_name, size_t parsed_
         name_itr[sub_name_len] = '.';
         name_itr += (sub_name_len + 1);
         label += sub_name_len + 1;
-    } while (*label != 0);
+    }
 
-    // Terminate the final string, replacing the last '.'
-    parsed_name[name_len - 1] = '\0';
+    // Terminate the final string, replacing the last '.' (root name = empty string)
+    if (name_len == 0) {
+        parsed_name[0] = '\0';
+    } else {
+        parsed_name[name_len - 1] = '\0';
+    }
     // Return pointer to first char after the name
     return label + 1;
 }
@@ -109,6 +131,11 @@ static int parse_dns_request(char * req, size_t req_len, char * dns_reply, size_
     // Prepare the reply
     memset(dns_reply, 0, dns_reply_max_len);
     memcpy(dns_reply, req, req_len);
+
+    // A well-formed query must at least hold the header
+    if (req_len < sizeof(dns_header_t)) {
+        return -1;
+    }
 
     // Endianess of NW packet different from chip
     dns_header_t * header = (dns_header_t *) dns_reply;
@@ -134,13 +161,18 @@ static int parse_dns_request(char * req, size_t req_len, char * dns_reply, size_
     // Pointer to current answer and question
     char * cur_ans_ptr = dns_reply + req_len;
     char * cur_qd_ptr = dns_reply + sizeof(dns_header_t);
+    char * packet_end = dns_reply + req_len;
     char name[128];
 
     // Respond to all questions based on configured rules
     for (int qd_i = 0; qd_i < qd_count; qd_i++) {
-        char * name_end_ptr = parse_dns_name(cur_qd_ptr, name, sizeof(name));
+        char * name_end_ptr = parse_dns_name(cur_qd_ptr, packet_end, name, sizeof(name));
         if (name_end_ptr == NULL) {
-            ESP_LOGE(TAG, "Failed to parse DNS question: %s", cur_qd_ptr);
+            ESP_LOGE(TAG, "Failed to parse DNS question");
+            return -1;
+        }
+        if (name_end_ptr + sizeof(dns_question_t) > packet_end) {
+            ESP_LOGE(TAG, "Truncated DNS question");
             return -1;
         }
 
@@ -210,7 +242,18 @@ void dns_server_task(void * pvParameters)
     while (handle->started) {
 
         struct sockaddr_in dest_addr;
-        dest_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+        // Security fix: this responder exists for the captive portal on
+        // the softAP. Binding INADDR_ANY also exposes it on the station interface,
+        // where it answers every LAN DNS query with the AP address. Bind to the
+        // softAP netif's address only; refuse to start if it has none.
+        esp_netif_ip_info_t ap_ip_info;
+        esp_netif_t * ap_netif = esp_netif_get_handle_from_ifkey("WIFI_AP_DEF");
+        if (ap_netif == NULL || esp_netif_get_ip_info(ap_netif, &ap_ip_info) != ESP_OK ||
+            ap_ip_info.ip.addr == IPADDR_ANY) {
+            ESP_LOGE(TAG, "softAP interface has no IP, not starting DNS responder");
+            break;
+        }
+        dest_addr.sin_addr.s_addr = ap_ip_info.ip.addr;
         dest_addr.sin_family = AF_INET;
         dest_addr.sin_port = htons(DNS_PORT);
         addr_family = AF_INET;
@@ -227,6 +270,8 @@ void dns_server_task(void * pvParameters)
         int err = bind(sock, (struct sockaddr *) &dest_addr, sizeof(dest_addr));
         if (err < 0) {
             ESP_LOGE(TAG, "Socket unable to bind: errno %d", errno);
+            close(sock);
+            break;
         }
         ESP_LOGI(TAG, "Socket bound, port %d", DNS_PORT);
 
