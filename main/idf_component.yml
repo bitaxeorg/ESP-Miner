@@ -3,7 +3,7 @@ dependencies:
   espressif/cjson: "^1.7.19"
   lvgl/lvgl: "9.5.0"
   espressif/esp_lvgl_port: "2.8.0"
-  esp_lcd_sh1107: "1.1.0"  
+  esp_lcd_sh1107: "^1.2.0"  
   # 1.13.0 fails -Werror=stringop-truncation with ESP-IDF 6.0.2.
   espressif/mdns: "1.12.0"
   ## Required IDF version

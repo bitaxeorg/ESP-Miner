@@ -6,6 +6,8 @@ SRCS
     "log_buffer.c"
     "nvs_config.c"
     "display.c"
+    "display_oled.c"
+    "display_st7789.c"
     "screen.c"
     "input.c"
     "filesystem.c"
