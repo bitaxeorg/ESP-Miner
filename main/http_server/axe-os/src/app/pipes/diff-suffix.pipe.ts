@@ -8,11 +8,11 @@ export class DiffSuffixPipe implements PipeTransform {
 
   private static _this = new DiffSuffixPipe();
 
-  public static transform(value: number): string {
-    return this._this.transform(value);
+  public static transform(value: number, digits: number = 2): string {
+    return this._this.transform(value, digits);
   }
 
-  public transform(value: number): string {
+  public transform(value: number, digits: number = 2): string {
     if (value == null || value < 0) {
       return '0';
     }
@@ -25,7 +25,7 @@ export class DiffSuffixPipe implements PipeTransform {
     const space = suffix ? ' ' : '';
 
     if (power > 0) {
-      return scaledValue.toFixed(2) + space + suffix;
+      return scaledValue.toFixed(digits) + space + suffix;
     } else {
       return scaledValue.toFixed(0) + space + suffix;
     }
