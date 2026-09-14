@@ -11,3 +11,21 @@ include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 
 project(esp-miner)
 
+# Native tests use an independent CMake build under build/host. Keeping this as
+# an explicit target avoids adding host-toolchain requirements to normal
+# firmware build and flash commands.
+add_custom_target(host-test
+    COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/tools/run_host_tests.sh" --all
+    WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+    USES_TERMINAL
+    VERBATIM
+)
+
+# Coverage uses a separate GCC build because sanitizer and gcov
+# instrumentation serve different validation purposes.
+add_custom_target(host-coverage
+    COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/tools/run_host_coverage.sh"
+    WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+    USES_TERMINAL
+    VERBATIM
+)

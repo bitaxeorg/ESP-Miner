@@ -1,0 +1,13 @@
+# Shared by CMake and tools/test_inventory.py.
+# One repository-relative test source per line; # starts a comment.
+components/stratum/test/test_stratum_json.c
+components/stratum/test/test_sv1_protocol_encode.c
+components/stratum/test/test_miner_job.c
+components/stratum/test/test_coinbase_decoder.c
+components/stratum/test/test_base58.c
+components/stratum/test/test_bech32.c
+components/stratum/test/test_mining.c
+components/stratum/test/test_utils.c
+components/stratum_v2/test/test_sv2.c
+components/asic/test/test_pll.c
+components/asic/test/test_timeout.c

@@ -1,9 +1,9 @@
 #include <string.h>
 #include <stdio.h>
 #include <limits.h>
+#include <stdlib.h>
 #include "esp_log.h"
 #include "mining.h"
-#include "stratum_api.h"
 #include "utils.h"
 
 static const char *TAG = "mining";
