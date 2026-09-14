@@ -15,6 +15,9 @@ jobs:
         with:
           submodules: 'recursive'
 
+      - name: Check mining component boundary
+        run: python3 tools/check_mining_boundary.py
+
       - name: esp-idf build
         uses: espressif/esp-idf-ci-action@v1
         with:

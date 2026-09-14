@@ -7,6 +7,9 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
+/* Convert the Bitmain hash counter register to GH/s. */
+float hashCounterToGhs(uint64_t duration_us, uint32_t counter);
+
 #define ASIC_INIT_CORE_REGISTER_DELAY_MS 10
 
 static inline void asic_init_core_register_delay(void)

@@ -2,6 +2,7 @@
 #define RESULT_TASK_TEST_BINDINGS_H_
 
 #include <inttypes.h>
+#include "asic_job_store_test_bindings.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 

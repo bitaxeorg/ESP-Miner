@@ -1,0 +1,6 @@
+#ifndef ASIC_JOB_STORE_TEST_BINDINGS_H_
+#define ASIC_JOB_STORE_TEST_BINDINGS_H_
+
+#define ASIC_get_job_snapshot test_asic_get_job_snapshot
+
+#endif

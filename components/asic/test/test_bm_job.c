@@ -1,6 +1,7 @@
 #include "unity.h"
 #include "bitmain_job_test_bindings.h"
 #include "bm_job.h"
+#include "legacy_bm_job.h"
 #include "job_pipeline_test_harness.h"
 #include <string.h>
 #undef malloc
@@ -29,7 +30,7 @@ TEST_CASE("common Bitmain conversion matches the existing constructor across rol
                 };
                 memcpy(legacy.prev_hash, source.prev_hash, 32);
                 bm_job expected = {0}, actual = {0};
-                construct_bm_job_from_miner_job(&legacy, source.version, source.merkle_root,
+                legacy_construct_bm_job(&legacy, source.version, source.merkle_root,
                     source.version_mask, source.pool_diff, counts[n], &expected);
                 bitmain_job_allocator_fault_injector_reset(0);
                 TEST_ASSERT_TRUE(bm_job_build_from_asic_job(&source, counts[n], &actual));

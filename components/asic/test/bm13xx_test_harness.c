@@ -1,3 +1,4 @@
+#include "bm_job.h"
 #include "bm13xx_test_bindings.h"
 #include "bm13xx_test_harness.h"
 

@@ -1,3 +1,4 @@
+#include "bm_job.h"
 #include "result_task_test_bindings.h"
 
 #include "asic.h"
@@ -68,7 +69,7 @@ task_result *result_task_fake_process_work(GlobalState *state)
     longjmp(fixture_done, 1);
 }
 
-int result_task_fake_submit_share(GlobalState *state, const bm_job *job,
+int result_task_fake_submit_share(GlobalState *state, const asic_job_t *job,
                                   uint32_t nonce, uint32_t version,
                                   uint64_t *sent_time)
 {
@@ -76,11 +77,11 @@ int result_task_fake_submit_share(GlobalState *state, const bm_job *job,
     TEST_ASSERT_EQUAL_HEX32(7, nonce);
     TEST_ASSERT_EQUAL_HEX32(0x20000004, version);
     TEST_ASSERT_EQUAL_UINT32(123, job->ntime);
-    TEST_ASSERT_EQUAL(fixture_case.protocol, job->job_type);
-    TEST_ASSERT_NOT_NULL(job->jobid);
+    TEST_ASSERT_EQUAL(fixture_case.protocol, job->source_type);
+    TEST_ASSERT_NOT_NULL(job->job_id);
     TEST_ASSERT_NOT_NULL(job->extranonce2);
     snprintf(fixture_submitted_id, sizeof(fixture_submitted_id), "%s",
-             job->jobid);
+             job->job_id);
 
     fixture_submissions++;
     if (fixture_case.replace_during_submit) {

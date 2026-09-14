@@ -1,3 +1,4 @@
+#include "bm_job.h"
 #include "mining_test_bindings.h"
 #include "job_pipeline_test_harness.h"
 

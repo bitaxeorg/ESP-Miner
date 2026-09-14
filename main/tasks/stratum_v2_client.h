@@ -4,7 +4,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include "esp_err.h"
-#include "mining.h"
+#include "asic_job.h"
 
 typedef struct GlobalState GlobalState;
 
@@ -12,7 +12,7 @@ typedef struct GlobalState GlobalState;
 esp_err_t stratum_v2_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx);
 
 void stratum_v2_close_connection(GlobalState *GLOBAL_STATE);
-int stratum_v2_submit_share(GlobalState *GLOBAL_STATE, const bm_job *active_job,
+int stratum_v2_submit_share(GlobalState *GLOBAL_STATE, const asic_job_t *active_job,
                             uint32_t nonce, uint32_t rolled_version, uint64_t *sent_time_us);
 
 // Probe a Stratum V2 pool to check reachability, Noise handshake, and credentials

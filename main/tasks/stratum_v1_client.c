@@ -67,7 +67,7 @@ static void stratum_v1_reset_uid(GlobalState *GLOBAL_STATE)
     pthread_mutex_unlock(&GLOBAL_STATE->transport_mutex);
 }
 
-int stratum_v1_submit_share(GlobalState *GLOBAL_STATE, const bm_job *active_job,
+int stratum_v1_submit_share(GlobalState *GLOBAL_STATE, const asic_job_t *active_job,
                             uint32_t nonce, uint32_t rolled_version, uint64_t *sent_time_us)
 {
     if (!GLOBAL_STATE || !active_job) return -1;
@@ -85,7 +85,7 @@ int stratum_v1_submit_share(GlobalState *GLOBAL_STATE, const bm_job *active_job,
         transport,
         uid,
         s_v1_conn->user,
-        active_job->jobid,
+        active_job->job_id,
         active_job->extranonce2,
         active_job->ntime,
         nonce,

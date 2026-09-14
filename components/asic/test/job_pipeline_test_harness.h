@@ -6,6 +6,7 @@
 #include <stdint.h>
 
 #include "mining.h"
+#include "bm_job.h"
 
 typedef struct GlobalState GlobalState;
 void spy_asic_send_work(GlobalState *state, bm_job *job);

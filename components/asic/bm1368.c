@@ -1,3 +1,4 @@
+#include "bm_job.h"
 #include "bm1368.h"
 
 #include "crc.h"

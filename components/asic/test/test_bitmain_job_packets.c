@@ -1,3 +1,4 @@
+#include "bm_job.h"
 #include "unity.h"
 
 #include "bm13xx_test_harness.h"

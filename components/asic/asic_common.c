@@ -252,3 +252,13 @@ double calculate_bm_timeout_ms(float frequency_mhz, size_t asic_count, size_t sm
 
     return (double)timeout_percent * fullspace_timeout_ms;
 }
+
+#define HASH_CNT_LSB 0x100000000uLL // Bitmain counter unit: 2^32 hashes
+
+float hashCounterToGhs(uint64_t duration_us, uint32_t counter)
+{
+    if (duration_us == 0) return 0.0f;
+    float seconds = duration_us / 1000000.0;
+    float hashrate = counter / seconds * (float)HASH_CNT_LSB; // Make sure it stays in float
+    return hashrate / 1e9f; // Convert to Gh/s
+}

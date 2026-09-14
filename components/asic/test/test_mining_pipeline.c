@@ -1,3 +1,4 @@
+#include "bm_job.h"
 #include "unity.h"
 
 #include "job_pipeline_test_harness.h"
@@ -10,12 +11,12 @@
 #include <string.h>
 
 /*
- * Golden characterization fixtures for the boundary that exists before the
- * ASIC refactor: Stratum input -> miner_job_t -> bm_job.  bm_job is currently
- * the value consumed by every ASIC_send_work implementation.
+ * Golden characterization fixtures across the complete job path:
+ * Stratum input -> miner_job_t -> asic_job_t -> private Bitmain work.
+ * Expected packet fields are preserved from the pre-refactor implementation.
  *
  * The SV1 fixture, merkle root, and base-version midstate are also documented
- * by components/stratum/test/verifiers/bm1397.py. The additional midstates
+ * by components/asic/test/verifiers/bm1397.py. The additional midstates
  * lock the existing BIP320 version-roll order.
  */
 static const char *SV1_NOTIFY_FIXTURE =

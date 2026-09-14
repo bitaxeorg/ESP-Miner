@@ -36,11 +36,15 @@ logic under test is unchanged.
 | `bitmain_job_test_bindings.h`, `bitmain_job_allocator_fault_injector.*` | Inject isolated adapter allocation failures without affecting unrelated tasks. |
 | `result_task_test_bindings.h` | Gives the result task a private test name. It connects ASIC results, share submission, scoring, self-test, and register calls to test doubles. |
 | `result_task_test_instance.c` | Builds an isolated instance of the real ASIC result task. |
+| `asic_job_store_test_instance.c`, `asic_job_store_test_bindings.h` | Build the real locked job snapshot accessor against the same test state as the result task. |
+| `job_pipeline_test_harness.*`, `stubs/` | Run the real create-jobs task and common-job adapter with scripted events and application state. |
+| `legacy_bm_job.*` | Frozen pre-refactor constructor used only as the adapter compatibility oracle; excluded from the production component. |
 
 ## Component tests
 
 | File | Production components and behavior |
 | --- | --- |
+| `test_mining_pipeline.c` | Runs SV1/SV2 job creation through the real common builder and Bitmain adapter; preserves golden packet fields, version rolling, ownership, and allocation recovery. |
 | `test_bitmain_job_packets.c` | Runs the BM13xx and BM1397 drivers with the active-job store. It checks work packets, slot replacement, share and register responses, inactive jobs, and repeated nonces. |
 | `test_version_rolling.c` | Runs the BM13xx drivers, active-job store, and SV1 and SV2 share encoders. It checks version-mask commands, driver setup, response decoding, write retries, and submitted version fields. |
 | `test_asic_result_task.c` | Runs the ASIC result task with the active-job store and mining checks. It checks owned job snapshots, all job protocols, register routing, unavailable slots, share thresholds, self-test results, and repeated results. |
@@ -49,6 +53,8 @@ logic under test is unchanged.
 
 | File | Unit behavior |
 | --- | --- |
+| `test_asic_job_store.c` | Complete common snapshots, metadata limits, invalid slots, lock release, and ownership after slot replacement. |
+| `test_bm_job_building.c` | Golden software midstate, exact common metadata, and midstate-count limits. |
 | `test_bm_job.c` | Conversion compatibility, metadata ownership, partial allocation cleanup, and send-adapter recovery. |
 | `test_pll.c` | PLL divider selection and the calculated ASIC frequency. |
 | `test_timeout.c` | ASIC timeout calculation for different chips, chain sizes, version spaces, and the zero-chip default. |

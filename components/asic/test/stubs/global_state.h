@@ -13,6 +13,8 @@
  * Shared test view for the real job task and isolated BM13xx driver copies.
  * Only the fields read by those production files belong here.
  */
+#define MAX_ASIC_JOBS 128
+
 typedef struct GlobalState {
     void *create_jobs_task_handle;
     volatile uint8_t active_job_slot_idx;
