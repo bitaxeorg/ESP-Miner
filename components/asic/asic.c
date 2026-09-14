@@ -1,3 +1,4 @@
+#include "bm_job.h"
 #include <string.h>
 
 #include <esp_log.h>

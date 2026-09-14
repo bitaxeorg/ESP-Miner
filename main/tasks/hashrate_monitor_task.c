@@ -80,7 +80,7 @@ void update_hash_counter(measurement_t * measurement, uint32_t value, uint64_t t
             return;
         }
         uint32_t counter = value - measurement->value; // Compute counter difference, handling uint32_t wraparound
-        measurement->hashrate = hashCounterToGhs(duration_us, counter);
+        measurement->hashrate = asic_hash_counter_to_ghs(duration_us, counter);
     }
 
     measurement->value = value;

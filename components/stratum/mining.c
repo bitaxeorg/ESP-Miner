@@ -1,20 +1,12 @@
 #include <string.h>
-#include <stdio.h>
+#include <stdlib.h>
+#include <math.h>
 #include <limits.h>
 #include "esp_log.h"
 #include "mining.h"
-#include "stratum_api.h"
 #include "utils.h"
 
 static const char *TAG = "mining";
-
-void free_bm_job(bm_job *job)
-{
-    free(job->jobid);
-    free(job->extranonce2);
-    free(job);
-}
-
 
 void calculate_coinbase_tx_hash_bin(const uint8_t *prefix, size_t prefix_len,
                                     const uint8_t *extranonce_prefix, size_t ep_len,
@@ -55,51 +47,6 @@ void calculate_coinbase_tx_hash_bin(const uint8_t *prefix, size_t prefix_len,
     }
 }
 
-void construct_bm_job_from_miner_job(const miner_job_t *job, const uint32_t version, const uint8_t merkle_root[32], const uint32_t version_mask, const double difficulty, const uint8_t software_midstates, bm_job *new_job)
-{
-    new_job->version = (version != 0) ? version : job->version;
-    new_job->target = job->nbits;
-    new_job->ntime = job->ntime;
-    new_job->starting_nonce = 0;
-    new_job->pool_diff = (job->pool_diff > 0) ? job->pool_diff : difficulty;
-    new_job->pool_id = job->pool_id;
-    new_job->job_type = job->type;
-    uint32_t effective_mask = (job->version_mask != 0) ? job->version_mask : version_mask;
-    new_job->version_mask = effective_mask;
-    new_job->num_midstates = 0;
-    reverse_32bit_words(merkle_root, new_job->merkle_root);
-    reverse_32bit_words(job->prev_hash, new_job->prev_block_hash);
-
-    if (software_midstates == 0)
-    {
-        return;
-    }
-
-    // make the midstate hash
-    uint8_t midstate_data[64];
-    memcpy(midstate_data + 4, job->prev_hash, 32);
-    memcpy(midstate_data + 36, merkle_root, 28);
-
-    uint32_t current_ver = new_job->version;
-    uint8_t midstate[32];
-
-    for (int i = 0; i < software_midstates && i < BM_JOB_MAX_MIDSTATES; i++)
-    {
-        if (i > 0)
-        {
-            if (effective_mask == 0)
-            {
-                break;
-            }
-            current_ver = increment_bitmask(current_ver, effective_mask);
-        }
-        memcpy(midstate_data, &current_ver, 4);
-        midstate_sha256_bin(midstate_data, 64, midstate);
-        reverse_32bit_words(midstate, new_job->midstates[i]);
-        new_job->num_midstates++;
-    }
-}
-
 void calculate_merkle_root_hash(const uint8_t coinbase_tx_hash[32], const uint8_t merkle_branches[][32], const int num_merkle_branches, uint8_t dest[32])
 {
     uint8_t both_merkles[64];
@@ -113,8 +60,6 @@ void calculate_merkle_root_hash(const uint8_t coinbase_tx_hash[32], const uint8_
 }
 
 
-#include <math.h>
-
 double hash_to_pdiff(const uint8_t hash[32])
 {
     if (!hash) return (double)UINT32_MAX;
@@ -125,29 +70,12 @@ double hash_to_pdiff(const uint8_t hash[32])
     return diff;
 }
 
-///////cgminer nonce testing
-/* testing a nonce and return the diff - 0 means invalid */
-double test_nonce_value(const bm_job *job, const uint32_t nonce, const uint32_t rolled_version)
+double mining_nonce_difficulty(const asic_job_t *job, uint32_t nonce, uint32_t rolled_version)
 {
     uint8_t header[80];
-
-    // // TODO: use the midstate hash instead of hashing the whole header
-    // uint32_t rolled_version = job->version;
-    // for (int i = 0; i < midstate_index; i++) {
-    //     rolled_version = increment_bitmask(rolled_version, job->version_mask);
-    // }
-
-    // copy data from job to header
-    memcpy(header, &rolled_version, 4);
-    reverse_32bit_words(job->prev_block_hash, header + 4);
-    reverse_32bit_words(job->merkle_root, header + 36);
-    memcpy(header + 68, &job->ntime, 4);
-    memcpy(header + 72, &job->target, 4);
-    memcpy(header + 76, &nonce, 4);
-
     uint8_t hash_result[32];
-    double_sha256_bin(header, 80, hash_result);
-
+    asic_job_header(job, nonce, rolled_version, header);
+    double_sha256_bin(header, sizeof(header), hash_result);
     return hash_to_pdiff(hash_result);
 }
 

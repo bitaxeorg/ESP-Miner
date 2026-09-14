@@ -35,8 +35,9 @@ void sha256_bin(const uint8_t *data, size_t data_len, uint8_t dest[32]);
 
 void double_sha256_bin(const uint8_t *data, const size_t data_len, uint8_t dest[32]);
 
-void midstate_sha256_bin(const uint8_t *data, const size_t data_len, uint8_t dest[32]);
 
+/* Hash byte helpers accept buffers at any byte alignment. Source and
+ * destination must not overlap for reverse_32bit_words(). */
 void reverse_32bit_words(const uint8_t src[32], uint8_t dest[32]);
 
 void reverse_endianness_per_word(uint8_t data[32]);
@@ -51,15 +52,12 @@ double networkDifficulty(uint32_t nBits);
 
 void suffixString(uint64_t val, char * buf, size_t bufsiz, int sigdigits);
 
-float hashCounterToGhs(uint64_t duration_us, uint32_t counter);
 
 void url_decode(char *dst, const char *src);
 
 char *strdup_psram(const char *str);
 
 // BIP320 16-bit version rolling mask (bits 13..28: 0x1fffe000).
-// BM13xx ASICs program version rolling as a 16-bit field shifted by 13 (version_mask >> 13).
-// This is a strict hardware-compatible subset of the BIP323 mask.
 #define BIP320_VERSION_ROLLING_MASK 0x1fffe000U
 
 #endif // STRATUM_UTILS_H

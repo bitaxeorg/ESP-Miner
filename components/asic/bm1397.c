@@ -1,3 +1,4 @@
+#include "bm_job.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -265,7 +266,7 @@ void BM1397_send_work(GlobalState * GLOBAL_STATE, bm_job * next_bm_job)
     job.job_id = id;
     job.num_midstates = next_bm_job->num_midstates;
     memcpy(&job.starting_nonce, &next_bm_job->starting_nonce, 4);
-    memcpy(&job.nbits, &next_bm_job->target, 4);
+    memcpy(&job.nbits, &next_bm_job->nbits, 4);
     memcpy(&job.ntime, &next_bm_job->ntime, 4);
     memcpy(&job.merkle4, next_bm_job->merkle_root, 4);
     memcpy(job.midstates, next_bm_job->midstates, next_bm_job->num_midstates * 32);

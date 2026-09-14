@@ -105,32 +105,6 @@ TEST_CASE("Validate another merkle root calculation", "[mining]")
     TEST_ASSERT_EQUAL_STRING("5cc58f5e84aafc740d521b92a7bf72f4e56c4cc3ad1c2159f1d094f97ac34eee", root_hash);
 }
 
-// Values calculated from esp-miner/components/stratum/test/verifiers/bm1397.py
-TEST_CASE("Validate midstate generation", "[mining]")
-{
-    static miner_job_t mjob;
-    memset(&mjob, 0, sizeof(mjob));
-    hex2bin("bf44fd3513dc7b837d60e5c628b572b448d204a8000007490000000000000000", mjob.prev_hash, 32);
-    reverse_endianness_per_word(mjob.prev_hash);
-    mjob.version = 0x20000004;
-    mjob.nbits = 0x1705dd01;
-    mjob.ntime = 0x64658bd8;
-    mjob.pool_diff = 1000;
-
-    uint8_t merkle_root[32];
-    hex2bin("cd1be82132ef0d12053dcece1fa0247fcfdb61d4dbd3eb32ea9ef9b4c604a846", merkle_root, 32);
-    bm_job job = { 0 };
-    construct_bm_job_from_miner_job(&mjob, mjob.version, merkle_root, 0, 1000, 1, &job);
-
-    uint8_t expected_midstate_bin[32];
-    hex2bin("91DFEA528A9F73683D0D495DD6DD7415E1CA21CB411759E3E05D7D5FF285314D", expected_midstate_bin, 32);
-    // bytes are reversed for the midstate on the bm job command packet
-    uint8_t expected_midstate_bin_reversed[32];
-    reverse_32bit_words(expected_midstate_bin, expected_midstate_bin_reversed);
-    reverse_endianness_per_word(expected_midstate_bin_reversed);
-    TEST_ASSERT_EQUAL_UINT8_ARRAY(expected_midstate_bin_reversed, job.midstates[0], 32);
-}
-
 TEST_CASE("Validate version mask incrementing", "[mining]")
 {
     uint32_t version = 0x20000004;
@@ -146,11 +120,13 @@ TEST_CASE("Validate version mask incrementing", "[mining]")
     TEST_ASSERT_EQUAL_UINT32(0x20000404, rolled_version);
 }
 
-TEST_CASE("Test nonce diff checking", "[mining test_nonce][not-on-qemu]")
+TEST_CASE("Test nonce diff checking", "[mining][test-nonce]")
 {
-    static miner_job_t mjob;
+    asic_job_t mjob;
     memset(&mjob, 0, sizeof(mjob));
     hex2bin("d02b10fc0d4711eae1a805af50a8a83312a2215e00017f2b0000000000000000", mjob.prev_hash, 32);
+    // Normalize the SV1 fixture to header bytes, as the pool parser does.
+    reverse_endianness_per_word(mjob.prev_hash);
     mjob.version = 0x20000004;
     mjob.nbits = 0x1705ae3a;
     mjob.ntime = 0x646ff1a9;
@@ -158,21 +134,22 @@ TEST_CASE("Test nonce diff checking", "[mining test_nonce][not-on-qemu]")
 
     uint8_t merkle_root[32];
     hex2bin("6d0359c451434605c52a5a9ce074340be47c2c63840731f9edf1db3f26b1cdd9", merkle_root, 32);
-    bm_job job = { 0 };
-    construct_bm_job_from_miner_job(&mjob, mjob.version, merkle_root, 0, 1000, 1, &job);
+    memcpy(mjob.merkle_root, merkle_root, sizeof(mjob.merkle_root));
 
     uint32_t nonce = 0x276E8947;
     uint32_t version_bits = 0;
-    uint32_t rolled_version = job.version | version_bits;
-    double diff = test_nonce_value(&job, nonce, rolled_version);
+    uint32_t rolled_version = mjob.version | version_bits;
+    double diff = mining_nonce_difficulty(&mjob, nonce, rolled_version);
     TEST_ASSERT_EQUAL_INT(18, (int)diff);
 }
 
-TEST_CASE("Test nonce diff checking 2", "[mining test_nonce][not-on-qemu]")
+TEST_CASE("Test nonce diff checking 2", "[mining][test-nonce]")
 {
-    static miner_job_t mjob;
+    asic_job_t mjob;
     memset(&mjob, 0, sizeof(mjob));
     hex2bin("0c859545a3498373a57452fac22eb7113df2a465000543520000000000000000", mjob.prev_hash, 32);
+    // Normalize the SV1 fixture to header bytes, as the pool parser does.
+    reverse_endianness_per_word(mjob.prev_hash);
     mjob.version = 0x20000004;
     mjob.nbits = 0x1705ae3a;
     mjob.ntime = 0x647025b5;
@@ -214,12 +191,11 @@ TEST_CASE("Test nonce diff checking 2", "[mining test_nonce][not-on-qemu]")
     bin2hex(merkle_root_hash, 32, merkle_root, 65);
     TEST_ASSERT_EQUAL_STRING("5bdc1968499c3393873edf8e07a1c3a50a97fc3a9d1a376bbf77087dd63778eb", merkle_root);
 
-    bm_job job = { 0 };
-    construct_bm_job_from_miner_job(&mjob, mjob.version, merkle_root_hash, 0, 1000, 1, &job);
+    memcpy(mjob.merkle_root, merkle_root_hash, sizeof(mjob.merkle_root));
 
     uint32_t nonce = 0x0a029ed1;
     uint32_t version_bits = 0;
-    uint32_t rolled_version = job.version | version_bits;
-    double diff = test_nonce_value(&job, nonce, rolled_version);
+    uint32_t rolled_version = mjob.version | version_bits;
+    double diff = mining_nonce_difficulty(&mjob, nonce, rolled_version);
     TEST_ASSERT_EQUAL_INT(683, (int)diff);
 }
