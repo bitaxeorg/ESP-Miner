@@ -26,6 +26,7 @@ SRCS
     "./bap/bap_subscription.c"
     "device_pins.c"
     "device_config.c"
+    "difficulty_controller.c"
     "setup_ble.c"
     "task_monitor.c"
     "./http_server/http_server.c"

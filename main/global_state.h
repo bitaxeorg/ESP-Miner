@@ -165,6 +165,8 @@ typedef struct GlobalState
     SelfTestModule SELF_TEST_MODULE;
     HashrateMonitorModule HASHRATE_MONITOR_MODULE;
 
+    double current_difficulty;
+    double target_share_interval_s;
     esp_transport_handle_t transport;
     pthread_mutex_t transport_mutex;
 

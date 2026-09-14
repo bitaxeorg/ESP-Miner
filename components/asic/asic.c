@@ -1,4 +1,5 @@
 #include <string.h>
+#include <math.h>
 
 #include <esp_log.h>
 
@@ -9,6 +10,7 @@
 #include "bm1373.h"
 
 #include "asic.h"
+#include "asic_common.h"
 #include "global_state.h"
 #include "mining.h"
 #include "device_config.h"
@@ -242,4 +244,30 @@ esp_err_t ASIC_get_domain_measurement(GlobalState * GLOBAL_STATE, uint8_t asic_n
     measurement->time_us = register_measurement.time_us;
     measurement->hashrate = register_measurement.hashrate * scale;
     return ESP_OK;
+}
+
+void ASIC_set_difficulty(GlobalState * GLOBAL_STATE, double difficulty)
+{
+    if (!GLOBAL_STATE || !GLOBAL_STATE->ASIC_initalized || difficulty <= 0.0) {
+        return;
+    }
+
+    switch (GLOBAL_STATE->DEVICE_CONFIG.family.asic.id) {
+        case BM1397:
+            BM1397_set_difficulty(difficulty);
+            return;
+        case BM1366:
+            BM1366_set_difficulty(difficulty);
+            return;
+        case BM1368:
+            BM1368_set_difficulty(difficulty);
+            return;
+        case BM1370:
+            BM1370_set_difficulty(difficulty);
+            return;
+        case BM1373:
+            BM1373_set_difficulty(difficulty);
+            return;
+    }
+    ESP_LOGE(TAG, "Unknown ASIC id %d — cannot set difficulty", GLOBAL_STATE->DEVICE_CONFIG.family.asic.id);
 }

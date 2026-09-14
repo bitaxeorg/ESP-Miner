@@ -7,6 +7,7 @@
 #include "asic_common.h"
 #include "serial.h"
 #include "asic_reset.h"
+#include "difficulty_controller.h"
 
 static const char *TAG = "asic_init";
 
@@ -96,6 +97,7 @@ uint8_t asic_initialize(GlobalState *GLOBAL_STATE, asic_init_mode_t mode, uint32
     SERIAL_clear_buffer();
 
     GLOBAL_STATE->ASIC_initalized = true;
+    difficulty_controller_update(GLOBAL_STATE);
     
     if (stabilization_delay_ms > 0) {
         ESP_LOGI(TAG, "Waiting %u ms for tasks to stabilize...", stabilization_delay_ms);

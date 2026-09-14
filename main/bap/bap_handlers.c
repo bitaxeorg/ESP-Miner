@@ -17,7 +17,6 @@
 #include "bap_uart.h"
 #include "bap_subscription.h"
 #include "bap.h"
-#include "asic.h"
 
 static const char *TAG = "BAP_HANDLERS";
 
@@ -311,20 +310,12 @@ void BAP_handle_settings(const char *parameter, const char *value) {
                     return;
                 }
                 
-                //ESP_LOGI(TAG, "Setting ASIC frequency to %.2f MHz", target_frequency);
-                
-                bap_global_state->POWER_MANAGEMENT_MODULE.frequency_value = target_frequency;
-
-                ASIC_set_frequency(bap_global_state);
-                ASIC_set_nonce_space(bap_global_state);
-
-                //ESP_LOGI(TAG, "Frequency successfully set to %.2f MHz", target_frequency);
-
                 nvs_config_set_float(NVS_CONFIG_ASIC_FREQUENCY, target_frequency);
 
                 char freq_str[32];
                 snprintf(freq_str, sizeof(freq_str), "%.2f", target_frequency);
-                BAP_send_message(BAP_CMD_ACK, parameter, freq_str);            }
+                BAP_send_message(BAP_CMD_ACK, parameter, freq_str);
+            }
             break;
 
         case BAP_PARAM_ASIC_VOLTAGE:
@@ -337,10 +328,7 @@ void BAP_handle_settings(const char *parameter, const char *value) {
                     return;
                 }
 
-                //ESP_LOGI(TAG, "Setting ASIC voltage to %d mV", target_voltage_mv);
-
                 nvs_config_set_u16(NVS_CONFIG_ASIC_VOLTAGE, target_voltage_mv);
-                //ESP_LOGI(TAG, "Voltage successfully set to %d mV", target_voltage_mv);
 
                 char voltage_str[32];
                 snprintf(voltage_str, sizeof(voltage_str), "%d", target_voltage_mv);

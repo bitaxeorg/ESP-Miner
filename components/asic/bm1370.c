@@ -263,16 +263,7 @@ uint8_t BM1370_init(GlobalState * GLOBAL_STATE)
     BM1370_write_clock_delay_ctrl(0x00, (TYPE_CMD | GROUP_ALL | CMD_WRITE));
     asic_init_core_register_delay();
 
-    // Present in the S21 XP init between core register control and analog mux.
     _send_BM1370((TYPE_CMD | GROUP_ALL | CMD_WRITE), (uint8_t[]){0x00, 0x14, 0x00, 0x00, 0x00, 0xFF}, 6, BM1370_SERIALTX_DEBUG);
-    asic_init_core_register_delay();
-
-    uint16_t difficulty = GLOBAL_STATE->DEVICE_CONFIG.family.asic.difficulty;
-    
-    //set difficulty mask
-    uint8_t difficulty_mask[6];
-    get_difficulty_mask(difficulty, difficulty_mask);
-    _send_BM1370((TYPE_CMD | GROUP_ALL | CMD_WRITE), difficulty_mask, 6, BM1370_SERIALTX_DEBUG);
     asic_init_core_register_delay();
 
     //Analog Mux Control
@@ -443,4 +434,11 @@ void BM1370_read_registers(GlobalState * GLOBAL_STATE)
             }
         }
     }
+}
+
+void BM1370_set_difficulty(double difficulty)
+{
+    uint8_t difficulty_mask[6];
+    get_difficulty_mask(difficulty, difficulty_mask);
+    _send_BM1370((TYPE_CMD | GROUP_ALL | CMD_WRITE), difficulty_mask, 6, BM1370_SERIALTX_DEBUG);
 }

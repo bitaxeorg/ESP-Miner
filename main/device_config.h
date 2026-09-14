@@ -7,8 +7,6 @@
 #include "device_pins.h"
 
 #define THERMAL_MAX_SENSORS 2
-#define NAJA_DUO_VOLTAGE_DOMAINS 2
-#define GAMMA_HEX_VOLTAGE_DOMAINS 2
 
 typedef struct GlobalState GlobalState;
 typedef struct TPS546_CONFIG TPS546_CONFIG;
@@ -37,7 +35,6 @@ typedef struct AsicConfig {
     uint16_t default_voltage_mv;
     const uint16_t* voltage_options;
     uint16_t hashrate_target;
-    uint16_t difficulty;
     uint16_t core_count;
     uint16_t small_core_count;
     uint8_t hash_domains;
@@ -117,13 +114,13 @@ static const uint16_t BM1368_VOLTAGE_OPTIONS[] = {1100, 1150, 1166, 1200, 1250, 
 static const uint16_t BM1370_VOLTAGE_OPTIONS[] = {1000, 1060, 1100, 1150, 1200, 1250,                   0};
 static const uint16_t BM1373_VOLTAGE_OPTIONS[] = {1000, 1060, 1100, 1150, 1200, 1250,                   0};
 
-static const AsicConfig ASIC_BM1397 = { .id = BM1397, .name = "BM1397", .chip_id = 1397, .default_frequency_mhz = 425, .frequency_options = BM1397_FREQUENCY_OPTIONS, .default_voltage_mv = 1400, .voltage_options = BM1397_VOLTAGE_OPTIONS, .difficulty = 256, .core_count = 168, .small_core_count =  672, .hash_domains = 1, .default_asic_timeout = 20, .hardware_version_rolling = false, .software_midstates = 4, .hashrate_test_percentage_target = 0.85};
-static const AsicConfig ASIC_BM1366 = { .id = BM1366, .name = "BM1366", .chip_id = 1366, .default_frequency_mhz = 485, .frequency_options = BM1366_FREQUENCY_OPTIONS, .default_voltage_mv = 1200, .voltage_options = BM1366_VOLTAGE_OPTIONS, .difficulty = 256, .core_count = 112, .small_core_count =  894, .hash_domains = 4, .default_asic_timeout = 2000, .hardware_version_rolling = true, .software_midstates = 0, .hashrate_test_percentage_target = 0.85};
-static const AsicConfig ASIC_BM1368 = { .id = BM1368, .name = "BM1368", .chip_id = 1368, .default_frequency_mhz = 490, .frequency_options = BM1368_FREQUENCY_OPTIONS, .default_voltage_mv = 1166, .voltage_options = BM1368_VOLTAGE_OPTIONS, .difficulty = 256, .core_count =  80, .small_core_count = 1276, .hash_domains = 4, .default_asic_timeout = 500, .hardware_version_rolling = true, .software_midstates = 0, .hashrate_test_percentage_target = 0.80};
-static const AsicConfig ASIC_BM1370 = { .id = BM1370, .name = "BM1370", .chip_id = 1370, .default_frequency_mhz = 525, .frequency_options = BM1370_FREQUENCY_OPTIONS, .default_voltage_mv = 1150, .voltage_options = BM1370_VOLTAGE_OPTIONS, .difficulty = 256, .core_count = 128, .small_core_count = 2040, .hash_domains = 4, .default_asic_timeout = 500, .hardware_version_rolling = true, .software_midstates = 0, .hashrate_test_percentage_target = 0.85};
-static const AsicConfig ASIC_BM1370XP = { .id = BM1370, .name = "BM1370", .chip_id = 1370, .default_frequency_mhz = 400, .frequency_options = BM1370_FRQUENCY_XP_OPTIONS, .default_voltage_mv = 1150, .voltage_options = BM1370_VOLTAGE_OPTIONS, .difficulty = 256, .core_count = 128, .small_core_count = 2040, .hash_domains = 4, .default_asic_timeout = 500, .hardware_version_rolling = true, .software_midstates = 0, .hashrate_test_percentage_target = 0.85};
-static const AsicConfig ASIC_BM1370_HEX = { .id = BM1370, .name = "BM1370", .chip_id = 1370, .default_frequency_mhz = 690, .frequency_options = BM1370_FREQUENCY_OPTIONS, .default_voltage_mv = 1200, .voltage_options = BM1370_VOLTAGE_OPTIONS, .difficulty = 256, .core_count = 128, .small_core_count = 2040, .hash_domains = 4, .default_asic_timeout = 500, .hardware_version_rolling = true, .software_midstates = 0, .hashrate_test_percentage_target = 0.85};
-static const AsicConfig ASIC_BM1373 = { .id = BM1373, .name = "BM1372/BM1373", .chip_id = 1372, .default_frequency_mhz = 327, .frequency_options = BM1373_FREQUENCY_OPTIONS, .default_voltage_mv = 1000, .voltage_options = BM1373_VOLTAGE_OPTIONS, .difficulty = 256, .core_count = 128, .small_core_count = 6725, .hash_domains = 4, .default_asic_timeout = 500, .hardware_version_rolling = true, .software_midstates = 0, .init_retry_attempts = 3, .domain_hashrate_scale = 2.0f, .hashrate_test_percentage_target = 0.85};
+static const AsicConfig ASIC_BM1397 = { .id = BM1397, .name = "BM1397", .chip_id = 1397, .default_frequency_mhz = 425, .frequency_options = BM1397_FREQUENCY_OPTIONS, .default_voltage_mv = 1400, .voltage_options = BM1397_VOLTAGE_OPTIONS, .core_count = 168, .small_core_count =  672, .hash_domains = 1, .default_asic_timeout = 20, .hardware_version_rolling = false, .software_midstates = 4, .hashrate_test_percentage_target = 0.85};
+static const AsicConfig ASIC_BM1366 = { .id = BM1366, .name = "BM1366", .chip_id = 1366, .default_frequency_mhz = 485, .frequency_options = BM1366_FREQUENCY_OPTIONS, .default_voltage_mv = 1200, .voltage_options = BM1366_VOLTAGE_OPTIONS, .core_count = 112, .small_core_count =  894, .hash_domains = 4, .default_asic_timeout = 2000, .hardware_version_rolling = true, .software_midstates = 0, .hashrate_test_percentage_target = 0.85};
+static const AsicConfig ASIC_BM1368 = { .id = BM1368, .name = "BM1368", .chip_id = 1368, .default_frequency_mhz = 490, .frequency_options = BM1368_FREQUENCY_OPTIONS, .default_voltage_mv = 1166, .voltage_options = BM1368_VOLTAGE_OPTIONS, .core_count =  80, .small_core_count = 1276, .hash_domains = 4, .default_asic_timeout = 500, .hardware_version_rolling = true, .software_midstates = 0, .hashrate_test_percentage_target = 0.80};
+static const AsicConfig ASIC_BM1370 = { .id = BM1370, .name = "BM1370", .chip_id = 1370, .default_frequency_mhz = 525, .frequency_options = BM1370_FREQUENCY_OPTIONS, .default_voltage_mv = 1150, .voltage_options = BM1370_VOLTAGE_OPTIONS, .core_count = 128, .small_core_count = 2040, .hash_domains = 4, .default_asic_timeout = 500, .hardware_version_rolling = true, .software_midstates = 0, .hashrate_test_percentage_target = 0.85};
+static const AsicConfig ASIC_BM1370XP = { .id = BM1370, .name = "BM1370", .chip_id = 1370, .default_frequency_mhz = 400, .frequency_options = BM1370_FRQUENCY_XP_OPTIONS, .default_voltage_mv = 1150, .voltage_options = BM1370_VOLTAGE_OPTIONS, .core_count = 128, .small_core_count = 2040, .hash_domains = 4, .default_asic_timeout = 500, .hardware_version_rolling = true, .software_midstates = 0, .hashrate_test_percentage_target = 0.85};
+static const AsicConfig ASIC_BM1370_HEX = { .id = BM1370, .name = "BM1370", .chip_id = 1370, .default_frequency_mhz = 690, .frequency_options = BM1370_FREQUENCY_OPTIONS, .default_voltage_mv = 1200, .voltage_options = BM1370_VOLTAGE_OPTIONS, .core_count = 128, .small_core_count = 2040, .hash_domains = 4, .default_asic_timeout = 500, .hardware_version_rolling = true, .software_midstates = 0, .hashrate_test_percentage_target = 0.85};
+static const AsicConfig ASIC_BM1373 = { .id = BM1373, .name = "BM1372/BM1373", .chip_id = 1372, .default_frequency_mhz = 327, .frequency_options = BM1373_FREQUENCY_OPTIONS, .default_voltage_mv = 1000, .voltage_options = BM1373_VOLTAGE_OPTIONS, .core_count = 128, .small_core_count = 6725, .hash_domains = 4, .default_asic_timeout = 500, .hardware_version_rolling = true, .software_midstates = 0, .init_retry_attempts = 3, .domain_hashrate_scale = 2.0f, .hashrate_test_percentage_target = 0.85};
 
 static const AsicConfig default_asic_configs[] = {
     ASIC_BM1397,
@@ -131,6 +128,7 @@ static const AsicConfig default_asic_configs[] = {
     ASIC_BM1368,
     ASIC_BM1370,
     ASIC_BM1370XP,
+    ASIC_BM1370_HEX,
     ASIC_BM1373,
 };
 
@@ -142,8 +140,8 @@ static const FamilyConfig FAMILY_GAMMA       = { .id = GAMMA,       .name = "Gam
 static const FamilyConfig FAMILY_GAMMA_DUO   = { .id = GAMMA_DUO,   .name = "GammaDuo",   .asic = ASIC_BM1370XP, .asic_count = 2, .max_power =  40, .power_offset = 5,  .nominal_voltage = 5,  .voltage_domains = 1, .swarm_color = "green",    .tps546_config = &TPS546_CONFIG_DEFAULT, };
 static const FamilyConfig FAMILY_SUPRA_HEX   = { .id = SUPRA_HEX,   .name = "SupraHex",   .asic = ASIC_BM1368,   .asic_count = 6, .max_power = 120, .power_offset = 25, .nominal_voltage = 12, .voltage_domains = 3, .swarm_color = "darkblue", .tps546_config = &TPS546_CONFIG_HEX, };
 static const FamilyConfig FAMILY_GAMMA_TURBO = { .id = GAMMA_TURBO, .name = "GammaTurbo", .asic = ASIC_BM1370,   .asic_count = 2, .max_power =  60, .power_offset = 10, .nominal_voltage = 12, .voltage_domains = 1, .swarm_color = "cyan",     .tps546_config = &TPS546_CONFIG_GAMMA_TURBO, };
-static const FamilyConfig FAMILY_NAJA_DUO    = { .id = NAJA_DUO,    .name = "NajaDuo",    .asic = ASIC_BM1373,   .asic_count = 2, .max_power =  60, .power_offset = 0,  .nominal_voltage = 12, .voltage_domains = NAJA_DUO_VOLTAGE_DOMAINS, .swarm_color = "magenta",  .tps546_config = &TPS546_CONFIG_NAJA_DUO, };
-static const FamilyConfig FAMILY_GAMMA_HEX   = { .id = GAMMA_HEX,   .name = "GammaHex",   .asic = ASIC_BM1370_HEX, .asic_count = 6, .max_power = 180, .power_offset = 25, .nominal_voltage = 12, .voltage_domains = GAMMA_HEX_VOLTAGE_DOMAINS, .swarm_color = "cyan", .tps546_config = &TPS546_CONFIG_GAMMA_HEX, };
+static const FamilyConfig FAMILY_NAJA_DUO    = { .id = NAJA_DUO,    .name = "NajaDuo",    .asic = ASIC_BM1373,   .asic_count = 2, .max_power =  60, .power_offset = 0,  .nominal_voltage = 12, .voltage_domains = 2, .swarm_color = "magenta",  .tps546_config = &TPS546_CONFIG_NAJA_DUO, };
+static const FamilyConfig FAMILY_GAMMA_HEX   = { .id = GAMMA_HEX,   .name = "GammaHex",   .asic = ASIC_BM1370_HEX, .asic_count = 6, .max_power = 180, .power_offset = 25, .nominal_voltage = 12, .voltage_domains = 2, .swarm_color = "cyan", .tps546_config = &TPS546_CONFIG_GAMMA_HEX, };
 
 static const FamilyConfig default_families[] = {
     FAMILY_MAX,
@@ -151,6 +149,7 @@ static const FamilyConfig default_families[] = {
     FAMILY_HEX,
     FAMILY_SUPRA,
     FAMILY_GAMMA,
+    FAMILY_GAMMA_DUO,
     FAMILY_SUPRA_HEX,
     FAMILY_GAMMA_HEX,
     FAMILY_GAMMA_TURBO,
