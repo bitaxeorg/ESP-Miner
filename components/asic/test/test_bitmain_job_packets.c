@@ -21,10 +21,8 @@ static bm_job *make_job(void)
     job->pool_diff = 256.125;
     job->pool_id = UINT8_MAX;
     job->job_type = JOB_TYPE_V1;
-    job->job_id = strdup("packet-job");
-    job->extranonce2 = strdup("0001020304050607");
-    TEST_ASSERT_NOT_NULL(job->job_id);
-    TEST_ASSERT_NOT_NULL(job->extranonce2);
+    strcpy(job->job_id, "packet-job");
+    strcpy(job->extranonce2, "0001020304050607");
     for (size_t index = 0; index < 32; ++index) {
         job->merkle_root[index] = (uint8_t)index;
         job->prev_block_hash[index] = (uint8_t)(0x20 + index);

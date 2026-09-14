@@ -87,6 +87,7 @@ TEST_CASE("ASIC snapshots reject unavailable jobs without modifying the destinat
     valid[0] = 1;
     TEST_ASSERT_FALSE(ASIC_get_job_snapshot(&state, 0, &output));
     bm_job incomplete = {0};
+    memset(incomplete.job_id, 'x', sizeof(incomplete.job_id));
     slots[0] = &incomplete;
     TEST_ASSERT_FALSE(ASIC_get_job_snapshot(&state, 0, &output));
     TEST_ASSERT_EQUAL_MEMORY(&original, &output, sizeof(output));
@@ -95,25 +96,24 @@ TEST_CASE("ASIC snapshots reject unavailable jobs without modifying the destinat
     TEST_ASSERT_EQUAL_INT(0, pthread_mutex_destroy(&state.ASIC_TASK_MODULE.valid_jobs_lock));
 }
 
-TEST_CASE("Bitmain snapshot conversion rejects oversized metadata without truncation",
+TEST_CASE("Bitmain snapshot conversion rejects unterminated metadata without truncation",
           "[asic-job][ownership]")
 {
-    char long_id[ASIC_JOB_ID_LEN + 1], long_en2[ASIC_JOB_EXTRANONCE2_HEX_SIZE + 1];
-    memset(long_id, 'x', sizeof(long_id));
-    memset(long_en2, 'a', sizeof(long_en2));
-    long_id[sizeof(long_id) - 1] = 0;
-    long_en2[sizeof(long_en2) - 1] = 0;
-    bm_job source = {.job_id = long_id, .extranonce2 = ""};
+    bm_job source = {0};
+    memset(source.job_id, 'x', sizeof(source.job_id));
     asic_job_t output, original;
     memset(&original, 0xa5, sizeof(original));
     memcpy(&output, &original, sizeof(output));
     TEST_ASSERT_FALSE(bm_job_to_asic_job(NULL, &output));
     TEST_ASSERT_FALSE(bm_job_to_asic_job(&source, NULL));
     TEST_ASSERT_FALSE(bm_job_to_asic_job(&source, &output));
-    source.job_id = "";
-    source.extranonce2 = long_en2;
-    TEST_ASSERT_FALSE(bm_job_to_asic_job(&source, &output));
-    source.extranonce2 = NULL;
+    TEST_ASSERT_EQUAL_MEMORY(&original, &output, sizeof(output));
+    source.job_id[0] = 0;
+    memset(source.extranonce2, 'a', sizeof(source.extranonce2));
     TEST_ASSERT_FALSE(bm_job_to_asic_job(&source, &output));
     TEST_ASSERT_EQUAL_MEMORY(&original, &output, sizeof(output));
+    source.extranonce2[0] = 0;
+    TEST_ASSERT_TRUE(bm_job_to_asic_job(&source, &output));
+    TEST_ASSERT_EQUAL_STRING("", output.job_id);
+    TEST_ASSERT_EQUAL_STRING("", output.extranonce2);
 }

@@ -1,6 +1,7 @@
 idf_component_register(
 SRCS
     "utils.c"
+    "hash_bytes.c"
     "mining.c"
     "mining_job.c"
     "stratum_api.c"

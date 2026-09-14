@@ -5,7 +5,6 @@
 #include "job_pipeline_test_harness.h"
 #include <string.h>
 #undef malloc
-#undef strdup
 
 TEST_CASE("Bitmain conversion matches reference values across rolling modes",
           "[asic-job][bitmain]")
@@ -49,14 +48,12 @@ TEST_CASE("Bitmain conversion matches reference values across rolling modes",
                 memset(&source, 0, sizeof(source));
                 TEST_ASSERT_EQUAL_STRING("42", actual.job_id);
                 TEST_ASSERT_EQUAL_STRING("aabb", actual.extranonce2);
-                free(actual.job_id);
-                free(actual.extranonce2);
             }
         }
     }
 }
 
-TEST_CASE("Bitmain conversion rejects invalid metadata and releases partial allocations",
+TEST_CASE("Bitmain conversion rejects invalid metadata and copies without allocation",
           "[asic-job][bitmain]")
 {
     asic_job_t source = {0};
@@ -67,21 +64,19 @@ TEST_CASE("Bitmain conversion rejects invalid metadata and releases partial allo
     TEST_ASSERT_FALSE(bm_job_build_from_asic_job(&source, 4, NULL));
     memset(source.job_id, 'x', sizeof(source.job_id));
     TEST_ASSERT_FALSE(bm_job_build_from_asic_job(&source, 4, &output));
+    TEST_ASSERT_EQUAL_MEMORY(&original, &output, sizeof(output));
     source.job_id[0] = 0;
     memset(source.extranonce2, 'a', sizeof(source.extranonce2));
     TEST_ASSERT_FALSE(bm_job_build_from_asic_job(&source, 4, &output));
+    TEST_ASSERT_EQUAL_MEMORY(&original, &output, sizeof(output));
     source.extranonce2[0] = 0;
-    for (size_t failure = 1; failure <= 2; ++failure) {
-        bitmain_job_allocator_fault_injector_reset(failure);
-        TEST_ASSERT_FALSE(bm_job_build_from_asic_job(&source, 4, &output));
-        TEST_ASSERT_EQUAL_UINT32(2, bitmain_job_allocator_fault_injector_calls());
-        TEST_ASSERT_EQUAL_MEMORY(&original, &output, sizeof(output));
-    }
-    bitmain_job_allocator_fault_injector_reset(0);
+    bitmain_job_allocator_fault_injector_reset(1);
     TEST_ASSERT_TRUE(bm_job_build_from_asic_job(&source, 4, &output));
+    TEST_ASSERT_EQUAL_UINT32(0, bitmain_job_allocator_fault_injector_calls());
     TEST_ASSERT_EQUAL_UINT8(1, output.num_midstates);
-    free(output.job_id);
-    free(output.extranonce2);
+    TEST_ASSERT_EQUAL_STRING("", output.job_id);
+    TEST_ASSERT_EQUAL_STRING("", output.extranonce2);
+    bitmain_job_allocator_fault_injector_reset(0);
 }
 
 TEST_CASE("job submission owns metadata and recovers from allocation failures",
@@ -92,16 +87,17 @@ TEST_CASE("job submission owns metadata and recovers from allocation failures",
         .job_id = "send", .extranonce2 = "aabbcc", .pool_diff = 256,
     };
     job_pipeline_harness_result_t result;
-    for (size_t failure = 1; failure <= 3; ++failure) {
-        bitmain_job_allocator_fault_injector_reset(failure);
-        job_pipeline_harness_send_job(4, &source, &result);
-        TEST_ASSERT_EQUAL_UINT32(0, result.job_count);
-    }
+    bitmain_job_allocator_fault_injector_reset(1);
+    job_pipeline_harness_send_job(4, &source, &result);
+    TEST_ASSERT_EQUAL_UINT32(0, result.job_count);
+    TEST_ASSERT_EQUAL_UINT32(1, bitmain_job_allocator_fault_injector_calls());
     bitmain_job_allocator_fault_injector_reset(0);
     job_pipeline_harness_send_job(4, NULL, &result);
     TEST_ASSERT_EQUAL_UINT32(0, result.job_count);
+    bitmain_job_allocator_fault_injector_reset(2);
     job_pipeline_harness_send_job(4, &source, &result);
     TEST_ASSERT_EQUAL_UINT32(1, result.job_count);
+    TEST_ASSERT_EQUAL_UINT32(1, bitmain_job_allocator_fault_injector_calls());
     memset(&source, 0, sizeof(source));
     TEST_ASSERT_EQUAL_STRING("send", result.jobs[0]->job_id);
     TEST_ASSERT_EQUAL_STRING("aabbcc", result.jobs[0]->extranonce2);

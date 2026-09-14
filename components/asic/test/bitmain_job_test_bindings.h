@@ -11,6 +11,5 @@
 #define free_bm_job test_free_bm_job
 #endif
 #define malloc(size) bitmain_job_allocator_fault_injector_malloc(size)
-#define strdup(text) bitmain_job_allocator_fault_injector_strdup(text)
 
 #endif

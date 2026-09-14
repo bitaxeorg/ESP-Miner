@@ -98,60 +98,7 @@ void double_sha256_bin(const uint8_t *data, const size_t data_len, uint8_t dest[
     sha256_bin(first_hash_output, sizeof(first_hash_output), dest);
 }
 
-void reverse_32bit_words(const uint8_t src[32], uint8_t dest[32])
-{
-    const uint32_t *s = (const uint32_t *)src;
-    uint32_t *d = (uint32_t *)dest;
-    
-    d[0] = s[7];
-    d[1] = s[6];
-    d[2] = s[5];
-    d[3] = s[4];
-    d[4] = s[3];
-    d[5] = s[2];
-    d[6] = s[1];
-    d[7] = s[0];    
-}
-
-void reverse_endianness_per_word(uint8_t data[32])
-{
-    uint32_t *d = (uint32_t *)data;
-
-    d[0] = __builtin_bswap32(d[0]);
-    d[1] = __builtin_bswap32(d[1]);
-    d[2] = __builtin_bswap32(d[2]);
-    d[3] = __builtin_bswap32(d[3]);
-    d[4] = __builtin_bswap32(d[4]);
-    d[5] = __builtin_bswap32(d[5]);
-    d[6] = __builtin_bswap32(d[6]);
-    d[7] = __builtin_bswap32(d[7]);
-}
-
 const double truediffone = 26959535291011309493156476344723991336010898738574164086137773096960.0;
-static const double bits192 = 6277101735386680763835789423207666416102355444464034512896.0;
-static const double bits128 = 340282366920938463463374607431768211456.0;
-static const double bits64 = 18446744073709551616.0;
-
-/* Converts a little endian 256 bit value to a double */
-double le256todouble(const void *target)
-{
-    uint64_t *data64;
-    double dcut64;
-
-    data64 = (uint64_t *)(target + 24);
-    dcut64 = *data64 * bits192;
-
-    data64 = (uint64_t *)(target + 16);
-    dcut64 += *data64 * bits128;
-
-    data64 = (uint64_t *)(target + 8);
-    dcut64 += *data64 * bits64;
-
-    data64 = (uint64_t *)(target);
-    dcut64 += *data64;
-
-    return dcut64;
-}
 
 void prettyHex(unsigned char *buf, int len)
 {

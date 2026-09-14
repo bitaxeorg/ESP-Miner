@@ -36,6 +36,8 @@ void sha256_bin(const uint8_t *data, size_t data_len, uint8_t dest[32]);
 void double_sha256_bin(const uint8_t *data, const size_t data_len, uint8_t dest[32]);
 
 
+/* Hash byte helpers accept buffers at any byte alignment. Source and
+ * destination must not overlap for reverse_32bit_words(). */
 void reverse_32bit_words(const uint8_t src[32], uint8_t dest[32]);
 
 void reverse_endianness_per_word(uint8_t data[32]);

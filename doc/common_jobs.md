@@ -12,9 +12,10 @@ limits and full pool ID range are preserved.
 
 The create-jobs task builds common work through `mining_build_asic_job()`
 and lends it to `ASIC_send_job()` for one call. The Bitmain adapter creates
-an independent `bm_job`, including metadata and software midstates, before
-transferring ownership to the existing send functions. Failed allocations
-release partial work. The producer frees its common job after the call.
+an independent `bm_job`, including inline metadata and software midstates,
+before transferring ownership to the existing send functions. Allocating the
+Bitmain job is the adapter's only allocation; the metadata copies cannot fail
+due to heap exhaustion. The producer frees its common job after the call.
 
 ## Component ownership
 
@@ -23,7 +24,7 @@ release partial work. The producer frees its common job after the call.
 - `stratum` owns pool jobs, coinbase/Merkle construction, common-job creation,
   generic version rolling, and Bitcoin nonce difficulty checks. Its production
   and test components have no dependency on `asic`.
-- `asic` owns the private `bm_job` representation, metadata allocation/freeing,
+- `asic` owns the private `bm_job` representation and its inline metadata,
   software midstates, Bitmain hash-counter conversion, and driver dispatch.
   `ASIC_send_work()` and `bm_job.h` are private implementation interfaces.
 
@@ -32,6 +33,10 @@ release partial work. The producer frees its common job after the call.
 SV1/SV2 submission path use that common snapshot after unlocking. Slot reuse
 cannot invalidate its header or metadata, and taking a snapshot requires no
 heap allocation. Invalid slots or metadata leave the output unchanged.
+
+Both job types use the same fixed-size metadata arrays. Conversion rejects
+unterminated metadata, accepts empty strings, and copies the terminator.
+The retained Bitmain job is freed with one `free()` when its slot is replaced.
 
 Nonce validation encodes the common Bitcoin header directly; Stratum no longer
 reconstructs headers from Bitmain byte ordering. The old pool-to-Bitmain
@@ -48,6 +53,21 @@ of metadata allocations with inline owned strings.
 CI runs `python3 tools/check_mining_boundary.py` to reject Bitmain types,
 helpers, or ASIC dependencies in Stratum code and its tests, and to keep the
 common ASIC API free of Bitmain work.
+
+## Hash byte alignment
+
+`reverse_32bit_words()`, `reverse_endianness_per_word()`, and `le256todouble()`
+operate on byte buffers in `components/stratum/hash_bytes.c`. They use byte
+accesses and `memcpy`, with no casts to integer pointers and no alignment
+requirement on hash arrays or software midstates. The 256-bit conversion
+decodes little-endian limbs explicitly and preserves high-to-low accumulation.
+
+`bash tools/run_hash_bytes_tests.sh` compiles this production file on the host
+with AddressSanitizer, UndefinedBehaviorSanitizer, and strict cast-alignment
+warnings. CI runs it before the QEMU build. It checks all source/destination
+offsets modulo eight, guard bytes, reversal vectors, all 256 target bits,
+zero/max targets, and a value spanning two limbs. These tests detect C alignment
+violations even though ESP32-S3 and its QEMU model support unaligned accesses.
 
 ## Downstream compatibility
 
@@ -72,6 +92,21 @@ submission. Driver capabilities, timestamp-rolling permissions, and wider
 self-test refactoring remain outside this change.
 
 ## Validation
+
+### Review follow-up
+
+- Fresh ESP-IDF 6.0.2 / ESP32-S3 QEMU build: **141 tests, 0 failures,
+  0 ignored**. This covers maximum-length metadata, empty and unterminated
+  strings, ownership after slot replacement, and the remaining job-allocation
+  failure/recovery path.
+- Host hash-byte tests pass under ASan/UBSan at `-O2`; the same regression
+  fails on the previous implementation with a misaligned-write diagnostic.
+  Leak checking was disabled for the local sandbox's ptrace restriction.
+- Full firmware build passes with the existing web UI bundle and 35% app
+  partition space free. The mining boundary check and `git diff --check` pass.
+
+Local QEMU logs are in `build/pr1972-review-validation/`. No physical miner was
+flashed for this follow-up.
 
 ### Completed component boundary (2026-09-14)
 

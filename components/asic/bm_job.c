@@ -23,13 +23,8 @@ bool bm_job_build_from_asic_job(const asic_job_t *source,
         .pool_id = source->pool_id,
         .job_type = source->source_type,
     };
-    job.job_id = strdup(source->job_id);
-    job.extranonce2 = strdup(source->extranonce2);
-    if (job.job_id == NULL || job.extranonce2 == NULL) {
-        free(job.job_id);
-        free(job.extranonce2);
-        return false;
-    }
+    memcpy(job.job_id, source->job_id, strlen(source->job_id) + 1);
+    memcpy(job.extranonce2, source->extranonce2, strlen(source->extranonce2) + 1);
     reverse_32bit_words(source->prev_hash, job.prev_block_hash);
     reverse_32bit_words(source->merkle_root, job.merkle_root);
     uint8_t header[80];
@@ -53,15 +48,12 @@ bool bm_job_build_from_asic_job(const asic_job_t *source,
 
 void free_bm_job(bm_job *job)
 {
-    free(job->job_id);
-    free(job->extranonce2);
     free(job);
 }
 
 bool bm_job_to_asic_job(const bm_job *source, asic_job_t *destination)
 {
-    if (source == NULL || destination == NULL || source->job_id == NULL ||
-        source->extranonce2 == NULL) {
+    if (source == NULL || destination == NULL) {
         return false;
     }
     size_t job_id_length = strnlen(source->job_id, ASIC_JOB_ID_LEN);
