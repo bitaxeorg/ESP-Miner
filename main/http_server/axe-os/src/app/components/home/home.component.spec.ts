@@ -168,6 +168,7 @@ const mockLiveDataService = {
 };
 
 const mockSystemApiService = {
+  getAsicSettings: () => of({ frequencyOptions: [400, 490, 525] }),
   getStatistics: () => of(mockSystemStatistics),
   updateSystem: (_uri: string, _update: Pick<ISystemInfo, 'useFallbackStratum'>) => of(null),
   restart: () => of(null),
@@ -240,6 +241,38 @@ describe('HomeComponent', () => {
 
   it('should create', () => {
     expect(component).toBeTruthy();
+  });
+
+  it('uses the device presets for frequency messages', () => {
+    const info = { ...mockSystemInfo, frequency: 327 };
+    const error = { duration: 0, startTime: null };
+    component.handleSystemMessages(info, error, [327, 350, 410]);
+    expect(component.messages.some(message => message.type === 'FREQUENCY_LOW')).toBeFalse();
+    component.handleSystemMessages({ ...info, frequency: 326 }, error, [327, 350, 410]);
+    expect(component.messages.some(message => message.type === 'FREQUENCY_LOW')).toBeTrue();
+    component.handleSystemMessages(info, error, [327, 350, 410]);
+    expect(component.messages.some(message => message.type === 'FREQUENCY_LOW')).toBeFalse();
+  });
+
+  it('keeps telemetry and messages live while settings load and after settings fail', () => {
+    fixture.destroy();
+    const settings = new Subject<{ frequencyOptions: number[] }>();
+    spyOn(mockSystemApiService, 'getAsicSettings').and.returnValue(settings);
+    mockLiveDataService.info$.next({ ...mockSystemInfo, frequency: 327 });
+    fixture = TestBed.createComponent(HomeComponent);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+
+    expect(component.messages.some(message => message.type === 'FREQUENCY_LOW')).toBeFalse();
+    expect(component['latestInfo']?.frequency).toBe(327);
+    settings.next({ frequencyOptions: [327, 350, 410] });
+    mockLiveDataService.info$.next({ ...mockSystemInfo, frequency: 326 });
+    expect(component.messages.some(message => message.type === 'FREQUENCY_LOW')).toBeTrue();
+
+    settings.error(new Error('Settings unavailable'));
+    expect(component.messages.some(message => message.type === 'FREQUENCY_LOW')).toBeFalse();
+    mockLiveDataService.info$.next({ ...mockSystemInfo, frequency: 0 });
+    expect(component.messages.some(message => message.type === 'FREQUENCY_LOW')).toBeTrue();
   });
 
   it('should render the dashboard widgets and dropdowns when info is loaded', () => {

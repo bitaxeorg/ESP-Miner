@@ -65,6 +65,20 @@ describe('SwarmComponent', () => {
     expect(component).toBeTruthy();
   });
 
+  it('uses each peer\'s own presets, including different BM1370 boards', () => {
+    expect(component.getDeviceNotification({ frequency: 327, frequencyOptions: [327, 350, 410] })).toBeUndefined();
+    expect(component.getDeviceNotification({ ASICModel: 'BM1370', frequency: 350, frequencyOptions: [350, 375, 400] })).toBeUndefined();
+    expect(component.getDeviceNotification({ ASICModel: 'BM1370', frequency: 490, frequencyOptions: [400, 490, 525] })).toBeUndefined();
+    expect(component.getDeviceNotification({ ASICModel: 'BM1370', frequency: 490, frequencyOptions: [500, 525, 600] })?.msg).toBe('Frequency Low');
+  });
+
+  it('does not guess a minimum for a legacy peer or hide higher-priority faults', () => {
+    expect(component.getDeviceNotification({ frequency: 327 })).toBeUndefined();
+    expect(component.getDeviceNotification({ frequency: 0 })?.msg).toBe('Frequency Low');
+    expect(component.getDeviceNotification({ frequency: 100, frequencyOptions: [327], overheat_mode: 1 })?.msg).toBe('Overheated');
+    expect(component.getDeviceNotification({ frequency: 100, frequencyOptions: [327], miningPaused: true })?.msg).toBe('Paused');
+  });
+
   it('should render swarm list details and custom components when devices are present', () => {
     component.swarm = [
       {
