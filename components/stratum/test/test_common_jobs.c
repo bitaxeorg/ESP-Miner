@@ -17,7 +17,7 @@ TEST_CASE("job rolling requires a job extranonce and coinbase prefix together",
     TEST_ASSERT_FALSE(miner_job_is_rollable(&source));
 }
 
-TEST_CASE("common builder rejects incomplete metadata without changing output",
+TEST_CASE("job builder rejects invalid metadata without changing output",
           "[mining][asic-job]")
 {
     miner_job_t source = { .type = JOB_TYPE_SV2_STANDARD };
@@ -35,7 +35,7 @@ TEST_CASE("common builder rejects incomplete metadata without changing output",
     TEST_ASSERT_EQUAL_MEMORY(&original, &output, sizeof(output));
 }
 
-TEST_CASE("standard common jobs own headers and preserve version and metadata rules",
+TEST_CASE("standard jobs copy header fields and submission metadata",
           "[mining][asic-job]")
 {
     miner_job_t source = {
@@ -67,7 +67,7 @@ TEST_CASE("standard common jobs own headers and preserve version and metadata ru
     TEST_ASSERT_EQUAL_HEX32(0x20002004, job.version);
 }
 
-TEST_CASE("common extranonce encoding preserves zero short and wide lengths",
+TEST_CASE("job builder encodes zero short and wide extranonces",
           "[mining][asic-job]")
 {
     const uint8_t lengths[] = {0, 1, 8, 9, 32};
@@ -92,7 +92,7 @@ TEST_CASE("common extranonce encoding preserves zero short and wide lengths",
     TEST_ASSERT_EQUAL_UINT32(0, mining_allocator_fault_injector_calls());
 }
 
-TEST_CASE("common builder retains the existing coinbase allocation failure result",
+TEST_CASE("coinbase allocation failure produces a zero merkle root",
           "[mining][asic-job]")
 {
     static uint8_t bytes[1025];

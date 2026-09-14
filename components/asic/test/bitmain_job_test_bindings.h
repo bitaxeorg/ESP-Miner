@@ -1,5 +1,5 @@
-#ifndef BITMAIN_JOB_FIXTURE_BINDINGS_H_
-#define BITMAIN_JOB_FIXTURE_BINDINGS_H_
+#ifndef BITMAIN_JOB_TEST_BINDINGS_H_
+#define BITMAIN_JOB_TEST_BINDINGS_H_
 
 #include <stdlib.h>
 #include <string.h>

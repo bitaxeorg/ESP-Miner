@@ -9,7 +9,7 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 BITMAIN = re.compile(
     r"\b(?:bm_job|BM_JOB_\w+|[Bb][Mm]\d+\w*|construct_bm_job_from_miner_job|"
-    r"free_bm_job|midstate_sha256_bin|hashCounterToGhs)\b"
+    r"free_bm_job|midstate_sha256_bin|hashCounterToGhs|asic_hash_counter_to_ghs)\b"
 )
 HARDWARE_INCLUDE = re.compile(r'#\s*include\s*[<"](?:asic\.h|bm[^/]*\.h)[>"]')
 

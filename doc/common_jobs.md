@@ -35,8 +35,8 @@ heap allocation. Invalid slots or metadata leave the output unchanged.
 
 Nonce validation encodes the common Bitcoin header directly; Stratum no longer
 reconstructs headers from Bitmain byte ordering. The old pool-to-Bitmain
-constructor is removed from production. A frozen copy exists only under
-`components/asic/test` for compatibility comparisons. Bitmain-specific tests,
+constructor is removed from production. The reference implementation lives only in
+`components/asic/test/bm_job_reference.c` for compatibility comparisons. Bitmain-specific tests,
 the task pipeline harness, and its application stubs also live there.
 
 The chip packet formats, rolling decisions, retained-slot behavior, pool
@@ -53,7 +53,7 @@ common ASIC API free of Bitmain work.
 
 Bonanza 1002/BZM adopted this common-job interface unchanged in
 [`a6ee24e4`](https://github.com/johnny9/ESP-Miner-Bonanza/commit/a6ee24e4).
-The `asic_job.h` declaration and header encoder are byte-identical, and
+The `asic_job.h` data layout and header encoding are unchanged, and
 `ASIC_send_job()` retains its void return and borrowed-pointer contract.
 Bonanza keeps generation, original version, clean-job state, retry decisions,
 and engine assignments in its internal bookkeeping. These do not require
@@ -112,8 +112,8 @@ Revalidated on 2026-09-14 after rebasing onto #1969 head `9af07d7c`:
 - The same compiler failure was reproduced with mDNS 1.13.0 on upstream
   `1df7ba1e`, immediately before the #1914 swarm merge. Reverting that merge
   would retain the failing dependency resolution.
-- The common-job header and encoder match the original proposal and Bonanza
-  byte for byte. `git diff --check` passes.
+- The common-job data layout and header encoding match the original proposal
+  and Bonanza. `git diff --check` passes.
 
 Current local logs are in `build/stage03-pr-validation/`. No physical miner was
 flashed or exercised for this upstream PR; the downstream runs above validate

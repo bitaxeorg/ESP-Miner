@@ -260,7 +260,7 @@ void BM1368_send_work(GlobalState * GLOBAL_STATE, bm_job * next_bm_job)
     job.job_id = id;
     job.num_midstates = 0x01;
     memcpy(&job.starting_nonce, &next_bm_job->starting_nonce, 4);
-    memcpy(&job.nbits, &next_bm_job->target, 4);
+    memcpy(&job.nbits, &next_bm_job->nbits, 4);
     memcpy(&job.ntime, &next_bm_job->ntime, 4);
     memcpy(job.merkle_root, next_bm_job->merkle_root, 32);
     memcpy(job.prev_block_hash, next_bm_job->prev_block_hash, 32);

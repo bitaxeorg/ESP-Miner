@@ -7,7 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-TEST_CASE("ASIC snapshots preserve complete common jobs after slot replacement",
+TEST_CASE("job snapshots retain header fields and metadata after slot replacement",
           "[asic-job][ownership]")
 {
     static bm_job *slots[MAX_ASIC_JOBS];
@@ -56,8 +56,8 @@ TEST_CASE("ASIC snapshots preserve complete common jobs after slot replacement",
         TEST_ASSERT_EQUAL_INT(original.source_type, snapshot.source_type);
         TEST_ASSERT_EQUAL_STRING(original.job_id, snapshot.job_id);
         TEST_ASSERT_EQUAL_STRING(original.extranonce2, snapshot.extranonce2);
-        TEST_ASSERT_EQUAL_DOUBLE(test_nonce_value(&original, 7, 0x20002004),
-                                 test_nonce_value(&snapshot, 7, 0x20002004));
+        TEST_ASSERT_EQUAL_DOUBLE(mining_nonce_difficulty(&original, 7, 0x20002004),
+                                 mining_nonce_difficulty(&snapshot, 7, 0x20002004));
     }
     TEST_ASSERT_EQUAL_INT(0, pthread_mutex_destroy(&state.ASIC_TASK_MODULE.valid_jobs_lock));
 }
@@ -103,14 +103,14 @@ TEST_CASE("Bitmain snapshot conversion rejects oversized metadata without trunca
     memset(long_en2, 'a', sizeof(long_en2));
     long_id[sizeof(long_id) - 1] = 0;
     long_en2[sizeof(long_en2) - 1] = 0;
-    bm_job source = {.jobid = long_id, .extranonce2 = ""};
+    bm_job source = {.job_id = long_id, .extranonce2 = ""};
     asic_job_t output, original;
     memset(&original, 0xa5, sizeof(original));
     memcpy(&output, &original, sizeof(output));
     TEST_ASSERT_FALSE(bm_job_to_asic_job(NULL, &output));
     TEST_ASSERT_FALSE(bm_job_to_asic_job(&source, NULL));
     TEST_ASSERT_FALSE(bm_job_to_asic_job(&source, &output));
-    source.jobid = "";
+    source.job_id = "";
     source.extranonce2 = long_en2;
     TEST_ASSERT_FALSE(bm_job_to_asic_job(&source, &output));
     source.extranonce2 = NULL;

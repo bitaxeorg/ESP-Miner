@@ -38,7 +38,7 @@ logic under test is unchanged.
 | `result_task_test_instance.c` | Builds an isolated instance of the real ASIC result task. |
 | `asic_job_store_test_instance.c`, `asic_job_store_test_bindings.h` | Build the real locked job snapshot accessor against the same test state as the result task. |
 | `job_pipeline_test_harness.*`, `stubs/` | Run the real create-jobs task and common-job adapter with scripted events and application state. |
-| `legacy_bm_job.*` | Frozen pre-refactor constructor used only as the adapter compatibility oracle; excluded from the production component. |
+| `bm_job_reference.*` | Reference constructor from PR #1969 (`9af07d7c`) used only for conversion tests; excluded from the production component. |
 
 ## Component tests
 

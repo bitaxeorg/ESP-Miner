@@ -1,13 +1,13 @@
 #include "unity.h"
 #include "bitmain_job_test_bindings.h"
 #include "bm_job.h"
-#include "legacy_bm_job.h"
+#include "bm_job_reference.h"
 #include "job_pipeline_test_harness.h"
 #include <string.h>
 #undef malloc
 #undef strdup
 
-TEST_CASE("common Bitmain conversion matches the existing constructor across rolling modes",
+TEST_CASE("Bitmain conversion matches reference values across rolling modes",
           "[asic-job][bitmain]")
 {
     const uint8_t counts[] = {0, 1, 4, 5};
@@ -23,21 +23,21 @@ TEST_CASE("common Bitmain conversion matches the existing constructor across rol
                 };
                 memset(source.prev_hash, 0x5a, 32);
                 memset(source.merkle_root, 0x71, 32);
-                miner_job_t legacy = {
+                miner_job_t pool_job = {
                     .type = (miner_job_type_t)type, .version = source.version,
                     .version_mask = source.version_mask, .ntime = source.ntime,
                     .nbits = source.nbits, .pool_diff = source.pool_diff, .pool_id = source.pool_id,
                 };
-                memcpy(legacy.prev_hash, source.prev_hash, 32);
+                memcpy(pool_job.prev_hash, source.prev_hash, 32);
                 bm_job expected = {0}, actual = {0};
-                legacy_construct_bm_job(&legacy, source.version, source.merkle_root,
+                build_reference_bm_job(&pool_job, source.version, source.merkle_root,
                     source.version_mask, source.pool_diff, counts[n], &expected);
                 bitmain_job_allocator_fault_injector_reset(0);
                 TEST_ASSERT_TRUE(bm_job_build_from_asic_job(&source, counts[n], &actual));
                 TEST_ASSERT_EQUAL_HEX32(expected.version, actual.version);
                 TEST_ASSERT_EQUAL_HEX32(expected.version_mask, actual.version_mask);
                 TEST_ASSERT_EQUAL_HEX32(expected.ntime, actual.ntime);
-                TEST_ASSERT_EQUAL_HEX32(expected.target, actual.target);
+                TEST_ASSERT_EQUAL_HEX32(expected.nbits, actual.nbits);
                 TEST_ASSERT_EQUAL_HEX32(expected.starting_nonce, actual.starting_nonce);
                 TEST_ASSERT_EQUAL_MEMORY(expected.prev_block_hash, actual.prev_block_hash, 32);
                 TEST_ASSERT_EQUAL_MEMORY(expected.merkle_root, actual.merkle_root, 32);
@@ -47,9 +47,9 @@ TEST_CASE("common Bitmain conversion matches the existing constructor across rol
                 TEST_ASSERT_EQUAL_UINT8(expected.pool_id, actual.pool_id);
                 TEST_ASSERT_EQUAL(expected.job_type, actual.job_type);
                 memset(&source, 0, sizeof(source));
-                TEST_ASSERT_EQUAL_STRING("42", actual.jobid);
+                TEST_ASSERT_EQUAL_STRING("42", actual.job_id);
                 TEST_ASSERT_EQUAL_STRING("aabb", actual.extranonce2);
-                free(actual.jobid);
+                free(actual.job_id);
                 free(actual.extranonce2);
             }
         }
@@ -80,11 +80,11 @@ TEST_CASE("Bitmain conversion rejects invalid metadata and releases partial allo
     bitmain_job_allocator_fault_injector_reset(0);
     TEST_ASSERT_TRUE(bm_job_build_from_asic_job(&source, 4, &output));
     TEST_ASSERT_EQUAL_UINT8(1, output.num_midstates);
-    free(output.jobid);
+    free(output.job_id);
     free(output.extranonce2);
 }
 
-TEST_CASE("common send adapter transfers only complete independent jobs and recovers",
+TEST_CASE("job submission owns metadata and recovers from allocation failures",
           "[asic-job][bitmain]")
 {
     asic_job_t source = {
@@ -94,16 +94,16 @@ TEST_CASE("common send adapter transfers only complete independent jobs and reco
     job_pipeline_harness_result_t result;
     for (size_t failure = 1; failure <= 3; ++failure) {
         bitmain_job_allocator_fault_injector_reset(failure);
-        job_pipeline_harness_send_common(4, &source, &result);
+        job_pipeline_harness_send_job(4, &source, &result);
         TEST_ASSERT_EQUAL_UINT32(0, result.job_count);
     }
     bitmain_job_allocator_fault_injector_reset(0);
-    job_pipeline_harness_send_common(4, NULL, &result);
+    job_pipeline_harness_send_job(4, NULL, &result);
     TEST_ASSERT_EQUAL_UINT32(0, result.job_count);
-    job_pipeline_harness_send_common(4, &source, &result);
+    job_pipeline_harness_send_job(4, &source, &result);
     TEST_ASSERT_EQUAL_UINT32(1, result.job_count);
     memset(&source, 0, sizeof(source));
-    TEST_ASSERT_EQUAL_STRING("send", result.jobs[0]->jobid);
+    TEST_ASSERT_EQUAL_STRING("send", result.jobs[0]->job_id);
     TEST_ASSERT_EQUAL_STRING("aabbcc", result.jobs[0]->extranonce2);
     TEST_ASSERT_EQUAL_UINT32(0x12345678, result.jobs[0]->starting_nonce);
     TEST_ASSERT_EQUAL_UINT32(0x20000004, result.jobs[0]->version);

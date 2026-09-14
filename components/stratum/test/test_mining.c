@@ -139,7 +139,7 @@ TEST_CASE("Test nonce diff checking", "[mining][test-nonce]")
     uint32_t nonce = 0x276E8947;
     uint32_t version_bits = 0;
     uint32_t rolled_version = mjob.version | version_bits;
-    double diff = test_nonce_value(&mjob, nonce, rolled_version);
+    double diff = mining_nonce_difficulty(&mjob, nonce, rolled_version);
     TEST_ASSERT_EQUAL_INT(18, (int)diff);
 }
 
@@ -196,6 +196,6 @@ TEST_CASE("Test nonce diff checking 2", "[mining][test-nonce]")
     uint32_t nonce = 0x0a029ed1;
     uint32_t version_bits = 0;
     uint32_t rolled_version = mjob.version | version_bits;
-    double diff = test_nonce_value(&mjob, nonce, rolled_version);
+    double diff = mining_nonce_difficulty(&mjob, nonce, rolled_version);
     TEST_ASSERT_EQUAL_INT(683, (int)diff);
 }

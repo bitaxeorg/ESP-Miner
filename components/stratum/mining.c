@@ -70,7 +70,7 @@ double hash_to_pdiff(const uint8_t hash[32])
     return diff;
 }
 
-double test_nonce_value(const asic_job_t *job, uint32_t nonce, uint32_t rolled_version)
+double mining_nonce_difficulty(const asic_job_t *job, uint32_t nonce, uint32_t rolled_version)
 {
     uint8_t header[80];
     uint8_t hash_result[32];

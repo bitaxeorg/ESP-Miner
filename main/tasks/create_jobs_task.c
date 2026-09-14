@@ -31,7 +31,7 @@ static void generate_work_from_miner_job(GlobalState *GLOBAL_STATE, const miner_
         effective_version = current_version;
     }
     if (!mining_build_asic_job(job, extranonce_2, effective_version, next_job)) {
-        ESP_LOGE(TAG, "Failed to build common mining job");
+        ESP_LOGE(TAG, "Failed to build ASIC job");
         free(next_job);
         return;
     }

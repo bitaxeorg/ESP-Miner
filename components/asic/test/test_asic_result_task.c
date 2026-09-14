@@ -160,12 +160,12 @@ static void run_result_case(result_case_t test_case)
     TEST_ASSERT_NOT_NULL(fixture_slots[8]);
     fixture_slots[8]->version = 0x20000004;
     fixture_slots[8]->ntime = 123;
-    fixture_slots[8]->target = 0x1705dd01;
+    fixture_slots[8]->nbits = 0x1705dd01;
     fixture_slots[8]->pool_diff = fixture_case.pool_diff;
     fixture_slots[8]->job_type = fixture_case.protocol;
-    fixture_slots[8]->jobid = strdup("42");
+    fixture_slots[8]->job_id = strdup("42");
     fixture_slots[8]->extranonce2 = strdup("aabb");
-    TEST_ASSERT_NOT_NULL(fixture_slots[8]->jobid);
+    TEST_ASSERT_NOT_NULL(fixture_slots[8]->job_id);
     TEST_ASSERT_NOT_NULL(fixture_slots[8]->extranonce2);
     fixture_valid[8] = !fixture_case.invalid;
     if (fixture_case.missing) {

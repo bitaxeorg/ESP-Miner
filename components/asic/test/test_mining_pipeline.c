@@ -10,15 +10,7 @@
 #include <stdio.h>
 #include <string.h>
 
-/*
- * Golden characterization fixtures across the complete job path:
- * Stratum input -> miner_job_t -> asic_job_t -> private Bitmain work.
- * Expected packet fields are preserved from the pre-refactor implementation.
- *
- * The SV1 fixture, merkle root, and base-version midstate are also documented
- * by components/asic/test/verifiers/bm1397.py. The additional midstates
- * lock the existing BIP320 version-roll order.
- */
+/* Fixture calculations: verifiers/bm1397.py. */
 static const char *SV1_NOTIFY_FIXTURE =
     "{\"id\":null,\"method\":\"mining.notify\",\"params\":["
     "\"1f9a56282c\","
@@ -56,14 +48,14 @@ static void assert_hex32(const char *expected_hex, const uint8_t actual[32])
     TEST_ASSERT_EQUAL_UINT8_ARRAY(expected, actual, sizeof(expected));
 }
 
-static void assert_common_asic_job(const bm_job *job, uint32_t expected_version,
+static void assert_bitmain_job_fields(const bm_job *job, uint32_t expected_version,
                                    miner_job_type_t type,
                                    uint8_t pool_id, double pool_diff,
                                    const char *expected_merkle_root)
 {
     TEST_ASSERT_EQUAL_HEX32(expected_version, job->version);
     TEST_ASSERT_EQUAL_HEX32(0x1fffe000, job->version_mask);
-    TEST_ASSERT_EQUAL_HEX32(0x1705dd01, job->target);
+    TEST_ASSERT_EQUAL_HEX32(0x1705dd01, job->nbits);
     TEST_ASSERT_EQUAL_HEX32(0x64658bd8, job->ntime);
     TEST_ASSERT_EQUAL_UINT32(0, job->starting_nonce);
     TEST_ASSERT_EQUAL_UINT8(pool_id, job->pool_id);
@@ -91,7 +83,7 @@ static void parse_sv2_frame(const uint8_t *frame, size_t frame_size,
     *payload_size = header.msg_length;
 }
 
-TEST_CASE("SV1 notify reaches the ASIC job boundary byte exact",
+TEST_CASE("SV1 notify produces expected Bitmain job fields",
           "[stratum][mining][characterization]")
 {
     miner_job_pool_init();
@@ -139,10 +131,10 @@ TEST_CASE("SV1 notify reaches the ASIC job boundary byte exact",
     bm_job *asic_job = result.jobs[0];
     TEST_ASSERT_NOT_NULL(asic_job);
 
-    assert_common_asic_job(
+    assert_bitmain_job_fields(
         asic_job, 0x20000004, JOB_TYPE_V1, 3, 2048.0,
         "c604a846ea9ef9b4dbd3eb32cfdb61d41fa0247f053dcece32ef0d12cd1be821");
-    TEST_ASSERT_EQUAL_STRING("1f9a56282c", asic_job->jobid);
+    TEST_ASSERT_EQUAL_STRING("1f9a56282c", asic_job->job_id);
     TEST_ASSERT_EQUAL_STRING("0000000000000000", asic_job->extranonce2);
     TEST_ASSERT_EQUAL_UINT8(4, asic_job->num_midstates);
     assert_hex32(
@@ -158,13 +150,13 @@ TEST_CASE("SV1 notify reaches the ASIC job boundary byte exact",
         "73828ae1e589678bc3f03b5a863835599cd73c42e3b67bbdc47f5b51eaec465a",
         asic_job->midstates[3]);
     miner_job->job_id[0] = 'x';
-    TEST_ASSERT_EQUAL_STRING("1f9a56282c", asic_job->jobid);
+    TEST_ASSERT_EQUAL_STRING("1f9a56282c", asic_job->job_id);
 
     job_pipeline_harness_result_free(&result);
     STRATUM_V1_reset_message(&message);
 }
 
-TEST_CASE("SV2 standard messages reach the ASIC job boundary byte exact",
+TEST_CASE("SV2 standard messages produce expected Bitmain job fields",
           "[sv2][mining][characterization]")
 {
     uint8_t new_job_frame[SV2_FRAME_HEADER_SIZE + 45] = {
@@ -267,10 +259,10 @@ TEST_CASE("SV2 standard messages reach the ASIC job boundary byte exact",
     bm_job *asic_job = result.jobs[0];
     TEST_ASSERT_NOT_NULL(asic_job);
 
-    assert_common_asic_job(
+    assert_bitmain_job_fields(
         asic_job, 0x20000004, JOB_TYPE_SV2_STANDARD, 3, 2048.0,
         "c604a846ea9ef9b4dbd3eb32cfdb61d41fa0247f053dcece32ef0d12cd1be821");
-    TEST_ASSERT_EQUAL_STRING("42", asic_job->jobid);
+    TEST_ASSERT_EQUAL_STRING("42", asic_job->job_id);
     TEST_ASSERT_EQUAL_STRING("", asic_job->extranonce2);
     TEST_ASSERT_EQUAL_UINT8(0, asic_job->num_midstates);
     job_pipeline_harness_result_free(&result);
@@ -293,7 +285,7 @@ TEST_CASE("SV2 standard messages reach the ASIC job boundary byte exact",
     TEST_ASSERT_EQUAL_HEX32(0x20000004, result.jobs[0]->version);
     asic_job = result.jobs[1];
     TEST_ASSERT_NOT_NULL(asic_job);
-    assert_common_asic_job(
+    assert_bitmain_job_fields(
         asic_job, 0x20008004, JOB_TYPE_SV2_STANDARD, 3, 2048.0,
         "c604a846ea9ef9b4dbd3eb32cfdb61d41fa0247f053dcece32ef0d12cd1be821");
     TEST_ASSERT_EQUAL_UINT8(4, asic_job->num_midstates);
@@ -310,8 +302,8 @@ TEST_CASE("SV2 standard messages reach the ASIC job boundary byte exact",
         "e964893f25e3f5cd668bb03bcfa87808728cd01574fe8c8ff0ec030db715a936",
         asic_job->midstates[3]);
     miner_job->job_id[0] = 'x';
-    TEST_ASSERT_EQUAL_STRING("42", result.jobs[0]->jobid);
-    TEST_ASSERT_EQUAL_STRING("42", result.jobs[1]->jobid);
+    TEST_ASSERT_EQUAL_STRING("42", result.jobs[0]->job_id);
+    TEST_ASSERT_EQUAL_STRING("42", result.jobs[1]->job_id);
     miner_job->job_id[0] = '4';
     job_pipeline_harness_result_free(&result);
 
@@ -426,24 +418,24 @@ TEST_CASE("SV2 extended messages roll extranonce into the ASIC job byte exact",
     bm_job *asic_job = result.jobs[0];
     TEST_ASSERT_NOT_NULL(asic_job);
 
-    assert_common_asic_job(
+    assert_bitmain_job_fields(
         asic_job, 0x20000004, JOB_TYPE_SV2_EXTENDED, 4, 1024.0,
         "3d5cb9a424a72f7686e8a96375cfda9bcbc74745878ad7127cdd0425ad14b09f");
-    TEST_ASSERT_EQUAL_STRING("43", asic_job->jobid);
+    TEST_ASSERT_EQUAL_STRING("43", asic_job->job_id);
     TEST_ASSERT_EQUAL_STRING("0000000000000000", asic_job->extranonce2);
     TEST_ASSERT_EQUAL_UINT8(0, asic_job->num_midstates);
 
     asic_job = result.jobs[1];
     TEST_ASSERT_NOT_NULL(asic_job);
-    assert_common_asic_job(
+    assert_bitmain_job_fields(
         asic_job, 0x20000004, JOB_TYPE_SV2_EXTENDED, 4, 1024.0,
         "6ad7452efa2fbcd0bbb6e22201100fb9cdd4af18c63791d309a9b74ce706f708");
-    TEST_ASSERT_EQUAL_STRING("43", asic_job->jobid);
+    TEST_ASSERT_EQUAL_STRING("43", asic_job->job_id);
     TEST_ASSERT_EQUAL_STRING("0100000000000000", asic_job->extranonce2);
     TEST_ASSERT_EQUAL_UINT8(0, asic_job->num_midstates);
     miner_job->job_id[0] = 'x';
-    TEST_ASSERT_EQUAL_STRING("43", result.jobs[0]->jobid);
-    TEST_ASSERT_EQUAL_STRING("43", result.jobs[1]->jobid);
+    TEST_ASSERT_EQUAL_STRING("43", result.jobs[0]->job_id);
+    TEST_ASSERT_EQUAL_STRING("43", result.jobs[1]->job_id);
     job_pipeline_harness_result_free(&result);
 }
 
@@ -494,7 +486,7 @@ TEST_CASE("job task harness preserves idle and staged work behavior",
     TEST_ASSERT_EQUAL_UINT32(1, result.coinbase_decode_count);
     TEST_ASSERT_EQUAL_UINT32(0, result.version_mask_count);
     TEST_ASSERT_EQUAL_UINT8(5, result.active_job_slot);
-    TEST_ASSERT_EQUAL_STRING("staged", result.jobs[0]->jobid);
+    TEST_ASSERT_EQUAL_STRING("staged", result.jobs[0]->job_id);
     job_pipeline_harness_result_free(&result);
 }
 
@@ -572,8 +564,8 @@ TEST_CASE("job task preserves maximum accepted metadata and detached ownership",
     memset(job->job_id, 'x', sizeof(job->job_id));
     memset(job->coinbase_prefix, 0, job->coinbase_prefix_len);
     memset(job->coinbase_suffix, 0, job->coinbase_suffix_len);
-    TEST_ASSERT_EQUAL_STRING(job_id, result.jobs[0]->jobid);
-    TEST_ASSERT_EQUAL_STRING(job_id, result.jobs[1]->jobid);
+    TEST_ASSERT_EQUAL_STRING(job_id, result.jobs[0]->job_id);
+    TEST_ASSERT_EQUAL_STRING(job_id, result.jobs[1]->job_id);
     TEST_ASSERT_EQUAL_STRING(
         "0000000000000000000000000000000000000000000000000000000000000000",
         result.jobs[0]->extranonce2);
@@ -608,7 +600,7 @@ TEST_CASE("job allocation failure skips a send and permits the next cycle",
     TEST_ASSERT_EQUAL_UINT32(1, result.job_count);
     TEST_ASSERT_EQUAL_UINT32(1, result.coinbase_decode_count);
     TEST_ASSERT_EQUAL_UINT32(1, result.version_mask_count);
-    TEST_ASSERT_EQUAL_STRING("followup", result.jobs[0]->jobid);
+    TEST_ASSERT_EQUAL_STRING("followup", result.jobs[0]->job_id);
     TEST_ASSERT_EQUAL_STRING("01", result.jobs[0]->extranonce2);
     assert_hex32("c528516952ea823ab4cd034973550175c63ebf0f49cb126ccee58049a3fc487c",
                  result.jobs[0]->merkle_root);
@@ -637,12 +629,12 @@ TEST_CASE("zero-length extranonce waits for new work and preserves owned metadat
     TEST_ASSERT_EQUAL_UINT32(2, result.coinbase_decode_count);
     job->job_id[0] = 'x';
     for (size_t i = 0; i < result.job_count; ++i) {
-        TEST_ASSERT_EQUAL_STRING("followup", result.jobs[i]->jobid);
+        TEST_ASSERT_EQUAL_STRING("followup", result.jobs[i]->job_id);
         TEST_ASSERT_EQUAL_STRING("", result.jobs[i]->extranonce2);
         TEST_ASSERT_EQUAL_HEX32(0x20000004, result.jobs[i]->version);
         TEST_ASSERT_EQUAL_HEX32(0x1fffe000, result.jobs[i]->version_mask);
         TEST_ASSERT_EQUAL_HEX32(0x64658bd8, result.jobs[i]->ntime);
-        TEST_ASSERT_EQUAL_HEX32(0x1705dd01, result.jobs[i]->target);
+        TEST_ASSERT_EQUAL_HEX32(0x1705dd01, result.jobs[i]->nbits);
         assert_hex32("3a649bdbf2ac5b0eb5b71ca2aa5cd632c378b2e83dcd84c2d915d25176a56ace",
                      result.jobs[i]->merkle_root);
     }

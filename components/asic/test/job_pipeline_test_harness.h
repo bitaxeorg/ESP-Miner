@@ -44,11 +44,7 @@ typedef struct {
     size_t allocation_count;
 } job_pipeline_harness_result_t;
 
-/*
- * Run the real create_jobs_task() and common-job send adapter against a deterministic event
- * script and recording ASIC boundary. Captured jobs have the same ownership
- * production transfers to ASIC_send_work().
- */
+/* Captured jobs are owned by result; release them with job_pipeline_harness_result_free(). */
 void job_pipeline_harness_run(
     job_pipeline_harness_config_t config,
     const job_pipeline_harness_event_t *events, size_t event_count,
@@ -56,7 +52,7 @@ void job_pipeline_harness_run(
 
 void job_pipeline_harness_result_free(job_pipeline_harness_result_t *result);
 
-void job_pipeline_harness_send_common(uint8_t software_midstates,
+void job_pipeline_harness_send_job(uint8_t software_midstates,
     const asic_job_t *job, job_pipeline_harness_result_t *result);
 
 #endif /* JOB_PIPELINE_TEST_HARNESS_H */

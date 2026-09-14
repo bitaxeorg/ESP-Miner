@@ -23,19 +23,19 @@ bool mining_build_asic_job(const miner_job_t *source, uint64_t extranonce2,
     if (source->type == JOB_TYPE_SV2_STANDARD) {
         memcpy(job.merkle_root, source->merkle_root, sizeof(job.merkle_root));
     } else {
-        size_t e2_len = source->extranonce2_len;
-        if (e2_len > ASIC_JOB_EXTRANONCE2_SIZE) {
+        size_t extranonce2_length = source->extranonce2_len;
+        if (extranonce2_length > ASIC_JOB_EXTRANONCE2_SIZE) {
             return false;
         }
-        uint8_t e2[ASIC_JOB_EXTRANONCE2_SIZE] = {0};
-        for (size_t i = 0; i < e2_len && i < sizeof(extranonce2); ++i) {
-            e2[i] = (uint8_t)(extranonce2 >> (8 * i));
+        uint8_t extranonce2_bytes[ASIC_JOB_EXTRANONCE2_SIZE] = {0};
+        for (size_t i = 0; i < extranonce2_length && i < sizeof(extranonce2); ++i) {
+            extranonce2_bytes[i] = (uint8_t)(extranonce2 >> (8 * i));
         }
-        bin2hex(e2, e2_len, job.extranonce2, sizeof(job.extranonce2));
+        bin2hex(extranonce2_bytes, extranonce2_length, job.extranonce2, sizeof(job.extranonce2));
         uint8_t coinbase_hash[32];
         calculate_coinbase_tx_hash_bin(source->coinbase_prefix,
             source->coinbase_prefix_len, source->extranonce1,
-            source->extranonce1_len, e2, e2_len, source->coinbase_suffix,
+            source->extranonce1_len, extranonce2_bytes, extranonce2_length, source->coinbase_suffix,
             source->coinbase_suffix_len, coinbase_hash);
         calculate_merkle_root_hash(coinbase_hash,
             (const uint8_t (*)[32])source->merkle_path,

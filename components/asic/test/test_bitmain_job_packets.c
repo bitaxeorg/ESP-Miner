@@ -14,16 +14,16 @@ static bm_job *make_job(void)
     TEST_ASSERT_NOT_NULL(job);
     job->version = 0x20000004;
     job->version_mask = 0x1fffe000;
-    job->target = 0x1705dd01;
+    job->nbits = 0x1705dd01;
     job->ntime = 0x64658bd8;
     job->starting_nonce = 0x12345678;
     job->num_midstates = 4;
     job->pool_diff = 256.125;
     job->pool_id = UINT8_MAX;
     job->job_type = JOB_TYPE_V1;
-    job->jobid = strdup("packet-job");
+    job->job_id = strdup("packet-job");
     job->extranonce2 = strdup("0001020304050607");
-    TEST_ASSERT_NOT_NULL(job->jobid);
+    TEST_ASSERT_NOT_NULL(job->job_id);
     TEST_ASSERT_NOT_NULL(job->extranonce2);
     for (size_t index = 0; index < 32; ++index) {
         job->merkle_root[index] = (uint8_t)index;

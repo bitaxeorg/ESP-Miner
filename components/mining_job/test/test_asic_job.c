@@ -1,7 +1,7 @@
 #include "unity.h"
 #include "asic_job.h"
 
-TEST_CASE("common header uses exact hash bytes and little endian integers",
+TEST_CASE("Bitcoin header encodes hash bytes and little-endian integers",
           "[asic-job]")
 {
     asic_job_t job = {

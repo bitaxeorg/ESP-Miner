@@ -77,8 +77,6 @@ static void spy_decode_coinbase(GlobalState *state, const miner_job_t *job)
     harness_result->coinbase_decode_count++;
 }
 
-/* Test components cannot attach compile definitions to one source, so compile
- * the task into this test-only translation unit and interpose its boundaries. */
 #ifdef xTaskNotifyWait
 #undef xTaskNotifyWait
 #endif
@@ -151,7 +149,7 @@ void job_pipeline_harness_result_free(job_pipeline_harness_result_t *result)
     result->job_count = 0;
 }
 
-void job_pipeline_harness_send_common(uint8_t software_midstates,
+void job_pipeline_harness_send_job(uint8_t software_midstates,
     const asic_job_t *job, job_pipeline_harness_result_t *result)
 {
     memset(result, 0, sizeof(*result));

@@ -27,11 +27,11 @@ TEST_CASE("Validate midstate generation", "[asic-job][bitmain]")
     reverse_32bit_words(expected_midstate_bin, expected_midstate_bin_reversed);
     reverse_endianness_per_word(expected_midstate_bin_reversed);
     TEST_ASSERT_EQUAL_UINT8_ARRAY(expected_midstate_bin_reversed, job.midstates[0], 32);
-    free(job.jobid);
+    free(job.job_id);
     free(job.extranonce2);
 }
 
-TEST_CASE("Bitmain conversion preserves common job values without protocol fallbacks",
+TEST_CASE("Bitmain conversion copies zero and nonzero header fields",
           "[asic-job][bitmain]")
 {
     asic_job_t source = {
@@ -45,12 +45,12 @@ TEST_CASE("Bitmain conversion preserves common job values without protocol fallb
     TEST_ASSERT_EQUAL_HEX32(0, result.version_mask);
     TEST_ASSERT_EQUAL_DOUBLE(0, result.pool_diff);
     TEST_ASSERT_EQUAL_UINT8(0, result.num_midstates);
-    TEST_ASSERT_EQUAL_HEX32(source.nbits, result.target);
+    TEST_ASSERT_EQUAL_HEX32(source.nbits, result.nbits);
     TEST_ASSERT_EQUAL_HEX32(source.ntime, result.ntime);
     TEST_ASSERT_EQUAL_UINT8(source.pool_id, result.pool_id);
     TEST_ASSERT_EQUAL_INT(source.source_type, result.job_type);
     TEST_ASSERT_EQUAL_UINT32(0, result.starting_nonce);
-    free(result.jobid);
+    free(result.job_id);
     free(result.extranonce2);
 
     source.version = 0x20002000;
@@ -60,7 +60,7 @@ TEST_CASE("Bitmain conversion preserves common job values without protocol fallb
     TEST_ASSERT_EQUAL_HEX32(source.version, result.version);
     TEST_ASSERT_EQUAL_HEX32(source.version_mask, result.version_mask);
     TEST_ASSERT_EQUAL_DOUBLE(source.pool_diff, result.pool_diff);
-    free(result.jobid);
+    free(result.job_id);
     free(result.extranonce2);
 }
 
@@ -71,7 +71,7 @@ TEST_CASE("Bitmain software midstate count honors zero mask and the buffer limit
     bm_job first, limited;
     TEST_ASSERT_TRUE(bm_job_build_from_asic_job(&source, 4, &first));
     TEST_ASSERT_EQUAL_UINT8(1, first.num_midstates);
-    free(first.jobid);
+    free(first.job_id);
     free(first.extranonce2);
 
     source.version_mask = 0x1fffe000;
@@ -80,8 +80,8 @@ TEST_CASE("Bitmain software midstate count honors zero mask and the buffer limit
     TEST_ASSERT_EQUAL_UINT8(BM_JOB_MAX_MIDSTATES, first.num_midstates);
     TEST_ASSERT_EQUAL_UINT8(BM_JOB_MAX_MIDSTATES, limited.num_midstates);
     TEST_ASSERT_EQUAL_HEX8_ARRAY(first.midstates, limited.midstates, sizeof(first.midstates));
-    free(first.jobid);
+    free(first.job_id);
     free(first.extranonce2);
-    free(limited.jobid);
+    free(limited.job_id);
     free(limited.extranonce2);
 }

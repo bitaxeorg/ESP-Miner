@@ -13,9 +13,8 @@ typedef enum {
     JOB_TYPE_SV2_EXTENDED,
 } mining_job_source_t;
 
-/* Complete owned work. Hash arrays contain the exact bytes in the Bitcoin
- * header; integers use host byte order. Metadata strings are terminated.
- * No member points into a parser, coinbase buffer, or hardware job slot. */
+/* Hash arrays use Bitcoin header byte order; integers use host byte order.
+ * Metadata strings must be null-terminated. */
 typedef struct asic_job {
     uint32_t version;
     uint32_t version_mask;
@@ -31,8 +30,7 @@ typedef struct asic_job {
     char extranonce2[ASIC_JOB_EXTRANONCE2_HEX_SIZE];
 } asic_job_t;
 
-/* The caller supplies valid work and an 80-byte output buffer. Encode all
- * integers explicitly as little endian, independent of the host CPU. */
+/* Writes an 80-byte Bitcoin header with little-endian integers. */
 void asic_job_header(const asic_job_t *job, uint32_t nonce,
                      uint32_t version, uint8_t header[80]);
 

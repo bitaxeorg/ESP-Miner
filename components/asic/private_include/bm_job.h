@@ -13,7 +13,7 @@ typedef struct bm_job
     uint8_t prev_block_hash[32];
     uint8_t merkle_root[32];
     uint32_t ntime;
-    uint32_t target; // aka difficulty, aka nbits
+    uint32_t nbits;
     uint32_t starting_nonce;
 
     uint8_t num_midstates;
@@ -21,23 +21,21 @@ typedef struct bm_job
     double pool_diff;
     uint8_t pool_id;
     mining_job_source_t job_type;
-    char *jobid;
+    char *job_id;
     char *extranonce2;
 } bm_job;
 
 void free_bm_job(bm_job *job);
 
 typedef struct GlobalState GlobalState;
-/* Takes ownership of a complete Bitmain job. Internal driver dispatch only. */
+/* Takes ownership of the job. */
 void ASIC_send_work(GlobalState *state, bm_job *job);
 
-/* Copy back to common header bytes and owned metadata for result consumers.
- * The destination is unchanged on failure. */
+/* Destination is unchanged if metadata is missing or too long. */
 bool bm_job_to_asic_job(const bm_job *source, asic_job_t *destination);
 
-/* Convert common work at the Bitmain boundary. On success the destination
- * owns its metadata and can be transferred to the existing send functions.
- * On failure it is unchanged. Release successful jobs with free_bm_job. */
+/* Allocates destination metadata on success; leaves destination unchanged
+ * on failure. The caller owns the allocated strings. */
 bool bm_job_build_from_asic_job(const asic_job_t *source,
                                uint8_t software_midstates, bm_job *destination);
 
