@@ -164,24 +164,39 @@ static bool ensure_json_buffer_capacity(size_t required_size)
     return true;
 }
 
-char * STRATUM_V1_receive_jsonrpc_line(esp_transport_handle_t transport)
+char * STRATUM_V1_receive_jsonrpc_line(esp_transport_handle_t transport, int timeout_ms)
 {
     if (json_rpc_buffer == NULL) {
         if (!STRATUM_V1_initialize_buffer()) {
             return NULL;
         }
     }
+    if (timeout_ms <= 0) {
+        json_rpc_buffer_len = 0;
+        json_rpc_buffer[0] = '\0';
+        return NULL;
+    }
+    // Transport poll timeouts return zero. Bound the entire line receive,
+    // including partial data, so a connected but silent pool can fail over.
+    const int64_t deadline_us = esp_timer_get_time() + (int64_t)timeout_ms * 1000;
     char *line = NULL;
     char recv_buffer[BUFFER_SIZE];
     int nbytes;
 
     char *newline_pos = memchr(json_rpc_buffer, '\n', json_rpc_buffer_len);
     while (newline_pos == NULL) {
+        const int64_t remaining_us = deadline_us - esp_timer_get_time();
+        if (remaining_us <= 0) {
+            ESP_LOGW(TAG, "Timed out waiting for a complete JSON-RPC line");
+            json_rpc_buffer_len = 0;
+            json_rpc_buffer[0] = '\0';
+            return NULL;
+        }
+        const int read_timeout_ms = MIN(TRANSPORT_TIMEOUT_MS, (remaining_us + 999) / 1000);
         size_t receive_capacity =
             (STRATUM_V1_MAX_JSON_LINE_SIZE + 1U) - json_rpc_buffer_len;
         size_t receive_size = MIN(sizeof(recv_buffer), receive_capacity);
-        nbytes = esp_transport_read(transport, recv_buffer, receive_size,
-                                    TRANSPORT_TIMEOUT_MS);
+        nbytes = esp_transport_read(transport, recv_buffer, receive_size, read_timeout_ms);
         if (nbytes < 0) {
             const char *err_str;
             switch(nbytes) {
