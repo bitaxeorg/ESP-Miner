@@ -1,0 +1,4 @@
+#ifndef TEST_STUB_ESP_SYSTEM_H
+#define TEST_STUB_ESP_SYSTEM_H
+
+#endif /* TEST_STUB_ESP_SYSTEM_H */
