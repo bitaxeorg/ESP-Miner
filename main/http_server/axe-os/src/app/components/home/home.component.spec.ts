@@ -69,12 +69,14 @@ const mockSystemInfo: ISystemInfo = {
   statsLimit: 720,
   stratumCert: '',
   stratumDecodeCoinbase: true,
+  stratumShareWarning: true,
   stratumExtranonceSubscribe: false,
   stratumSuggestedDifficulty: 1000,
   stratumTLS: false,
   stratumV2AuthorityPubkey: '',
   fallbackStratumCert: '',
   fallbackStratumDecodeCoinbase: true,
+  fallbackStratumShareWarning: true,
   fallbackStratumExtranonceSubscribe: false,
   fallbackStratumSuggestedDifficulty: 1000,
   fallbackStratumTLS: false,
@@ -114,6 +116,8 @@ const mockSystemInfo: ISystemInfo = {
   networkDifficulty: 5000000,
   scriptsig: 'test-scriptsig',
   coinbaseOutputs: [],
+  coinbaseOthersCount: 0,
+  coinbaseOthersValueSatoshis: 0,
   coinbaseValueTotalSatoshis: 625000000,
   hashrateMonitor: {
     asics: [
