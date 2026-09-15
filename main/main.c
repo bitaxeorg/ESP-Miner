@@ -4,7 +4,7 @@
 #include "esp_log.h"
 #include "esp_psram.h"
 #include "esp_heap_caps.h"
-#include "cJSON.h"
+#include "cjson_allocator.h"
 
 #include "asic_result_task.h"
 #include "create_jobs_task.h"
@@ -48,28 +48,11 @@ static void heap_alloc_failed_hook(size_t requested_size, uint32_t caps, const c
     }
 }
 
-static void *cjson_malloc_psram(size_t size)
-{
-    if (esp_psram_is_initialized()) {
-        return heap_caps_malloc(size, MALLOC_CAP_SPIRAM);
-    }
-    return malloc(size);
-}
-
-static void cjson_free_psram(void *ptr)
-{
-    free(ptr);
-}
-
 void app_main(void)
 {
     ESP_ERROR_CHECK(heap_caps_register_failed_alloc_callback(heap_alloc_failed_hook));
 
-    cJSON_Hooks hooks = {
-        .malloc_fn = cjson_malloc_psram,
-        .free_fn = cjson_free_psram
-    };
-    cJSON_InitHooks(&hooks);
+    cjson_allocator_init();
     if (esp_psram_is_initialized()) {
         GLOBAL_STATE.psram_is_available = true;
         log_buffer_init();

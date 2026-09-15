@@ -1,11 +1,13 @@
 #include <stdio.h>
 #include <string.h>
 #include "unity.h"
+#include "cjson_allocator.h"
 
 static void print_banner(const char *text);
 
 void app_main(void)
 {
+    cjson_allocator_init();
     print_banner("Running all the registered tests");
     UNITY_BEGIN();
     unity_run_all_tests();

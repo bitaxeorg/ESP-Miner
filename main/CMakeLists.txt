@@ -74,6 +74,7 @@ INCLUDE_DIRS
     "${CMAKE_CURRENT_BINARY_DIR}"
 
 REQUIRES
+    cjson_allocator
     "asic"
     "connect"
     "dns_server"

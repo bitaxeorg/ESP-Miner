@@ -8,19 +8,34 @@ permissions:
 
 jobs:
   build-and-test:
+    name: ${{ matrix.name }}
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: build-and-test
+            ubsan: 'OFF'
+            artifact: test-results
+          - name: build-and-test-ubsan
+            ubsan: 'ON'
+            artifact: test-results-ubsan
     steps:
       - name: Checkout repo
         uses: actions/checkout@v6
         with:
           submodules: 'recursive'
 
+      - name: Check QEMU runner
+        if: matrix.ubsan == 'OFF'
+        run: python3 -m unittest discover -s tools/tests -p 'test_qemu_runner.py'
+
       - name: esp-idf build
         uses: espressif/esp-idf-ci-action@v1
         with:
           esp_idf_version: v6.0.2
           target: esp32s3
-          command: GITHUB_ACTIONS="true" idf.py build
+          command: GITHUB_ACTIONS="true" idf.py -D ENABLE_UBSAN=${{ matrix.ubsan }} build
           path: 'test-ci'
 
       - name: Run tests
@@ -29,6 +44,7 @@ jobs:
           path: 'test-ci'
 
       - name: Upload event file
+        if: always() && matrix.ubsan == 'OFF'
         uses: actions/upload-artifact@v4
         with:
           name: event-file
@@ -38,17 +54,31 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: test-results
-          path: report.xml
+          name: ${{ matrix.artifact }}
+          path: |
+            report.xml
+            test-ci/build/output.log
+            test-ci/build/unit_test_stratum.elf
 
       - name: Check for test failures
         if: always()
         run: |
-          FAILURES=$(grep -oP 'failures="\K[0-9]+' report.xml || echo 0)
-          if [ "$FAILURES" -gt 0 ]; then
-            echo "::error ::Detected $FAILURES test failures."
+          if grep -q 'Undefined behavior of type ' test-ci/build/output.log; then
+            echo "::error ::UBSan detected undefined behavior."
             exit 1
           fi
+          if [ ! -s report.xml ]; then
+            echo "::error ::QEMU did not produce a test report."
+            exit 1
+          fi
+          python3 - <<'PY'
+          import xml.etree.ElementTree as ET
+
+          report = ET.parse("report.xml").getroot()
+          if any(int(node.get(attr, "0")) for node in report.iter()
+                 for attr in ("failures", "errors")):
+              raise SystemExit("Detected QEMU test failures or errors.")
+          PY
 
   frontend-test:
     runs-on: ubuntu-latest
