@@ -61,3 +61,16 @@ p {
         margin-bottom: 0;
     }
 }
+
+/* Live readouts re-render roughly once a second. With proportional digits the
+   numbers change width as they tick, so a value like the hashrate visibly
+   shuffles left and right while it updates and the labels beside it move with
+   it. Tabular figures give every digit the same advance width, which holds the
+   layout still. Applied to the readout sizes the dashboard uses for values
+   rather than globally, so body copy keeps its normal spacing. */
+.text-2xl,
+.text-xl,
+.text-lg {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'tnum' 1;
+}

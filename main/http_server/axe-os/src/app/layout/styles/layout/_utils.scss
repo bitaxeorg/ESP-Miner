@@ -1,10 +1,28 @@
 .card {
-    background: var(--color-bg-card);
+    /* The gradient sits on top of the flat card colour so the panel catches a
+       little light at its top edge instead of reading as a uniform fill. */
+    background:
+        var(--card-surface, none),
+        var(--color-bg-card);
     border: 1px solid var(--card-border);
+    /* A single brighter line along the top edge does most of the work of
+       making a dark panel look lit rather than printed. */
+    border-top-color: var(--card-border-top, var(--card-border));
     padding: 1.5rem;
     margin-bottom: 1rem;
     box-shadow: var(--card-shadow);
     border-radius: $borderRadius;
+    transition:
+        box-shadow var(--transition-duration) ease,
+        border-color var(--transition-duration) ease;
+
+    &:hover {
+        box-shadow: var(--card-shadow-hover, var(--card-shadow));
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        transition: none;
+    }
 
     &.chart {
         padding: 10px;

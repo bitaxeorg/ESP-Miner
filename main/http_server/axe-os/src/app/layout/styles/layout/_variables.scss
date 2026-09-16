@@ -4,4 +4,7 @@ $borderRadius:0px;             /* border radius of layout element e.g. card, sid
 $transitionDuration:.2s;        /* transition duration of layout elements e.g. sidebar, overlay menus */
 
 $tooltipBg: var(--color-bg-hover);
-$borderRadius: 2px;
+
+/* Card and control corners. Driven by --border-radius so a theme can retune
+   the whole surface language from one place. */
+$borderRadius: var(--border-radius);
