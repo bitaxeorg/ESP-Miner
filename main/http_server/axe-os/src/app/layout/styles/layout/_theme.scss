@@ -11,6 +11,10 @@
     --color-overlay-select-bg: #0B1219;
     --color-overlay-select-border: #1A2632;
 
+    /* Second chart axis (the temperature group), distinct from the accent
+       that draws the hashrate group and legible on the card. */
+    --chart-axis2-color: #7bd8c0;
+
     /* Theme Settings & Sizing Defaults */
     --color-bg-hover: rgba(255, 255, 255, 0.05);
     --border-radius: 2px;
@@ -75,4 +79,5 @@
     --color-overlay-select-bg: #f1f5f9;
     --color-overlay-select-border: #e2e8f0;
     --color-bg-hover: rgba(0, 0, 0, 0.04);
+    --chart-axis2-color: #0b7f68;
 }
