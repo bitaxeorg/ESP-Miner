@@ -1,24 +1,9 @@
-/**
- * The available surface schemes.
- *
- * Single source of truth. The scheme id becomes a `theme-<id>` class on the
- * document element and the matching block in
- * `layout/styles/layout/_theme.scss` supplies the tokens. Adding a scheme
- * previously meant editing the radio buttons, the class list that
- * LayoutService clears before applying the new one, and the stylesheet — and
- * missing the second of those left the old scheme's class in place alongside
- * the new one.
- */
+/** Surface schemes. The id becomes a `theme-<id>` class and a block in _theme.scss. */
 export interface ColorScheme {
-  /** Matches the `theme-<id>` class and the value persisted to NVS. */
   id: string;
   label: string;
-  /**
-   * Whether the scheme paints a dark surface. Drives the `dark-mode` class,
-   * which several components key off independently of the theme tokens.
-   */
+  /** Drives the `dark-mode` class. */
   dark: boolean;
-  /** Shown under the label so the difference between schemes is legible. */
   description: string;
 }
 
@@ -55,7 +40,6 @@ export const COLOR_SCHEMES: ColorScheme[] = [
   },
 ];
 
-/** Every `theme-*` class the layout may have applied, for removal. */
 export const COLOR_SCHEME_CLASSES: string[] = COLOR_SCHEMES.map(s => `theme-${s.id}`);
 
 export const DEFAULT_COLOR_SCHEME = 'dark';

@@ -145,9 +145,7 @@ export class LayoutService {
         const config = this.config();
         const root = document.documentElement;
 
-        // Toggle theme CSS classes. The removal list comes from the scheme
-        // registry so a new scheme cannot be left applied alongside the one
-        // replacing it.
+        // Toggle theme CSS classes.
         root.classList.remove(...COLOR_SCHEME_CLASSES);
         root.classList.add(`theme-${config.colorScheme}`);
 
