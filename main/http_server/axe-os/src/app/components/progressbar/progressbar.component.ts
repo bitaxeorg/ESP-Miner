@@ -7,15 +7,7 @@ export interface ProgressBarMarker {
   visible?: boolean;   // Optional visibility condition
 }
 
-/**
- * How the filled portion is coloured.
- *
- * 'brand' keeps the accent colour and is the default, so a bar that has not
- * opted in looks exactly as it did before. 'auto' derives the colour from how
- * close the value is to its maximum, which is only meaningful for bars where
- * approaching the maximum is a problem — temperature, say, but not clock
- * frequency, where running at the top of the range is the goal.
- */
+/** Fill colour. 'auto' derives it from how close the value is to its maximum. */
 export type ProgressBarTone = 'brand' | 'neutral' | 'auto' | 'ok' | 'warn' | 'critical';
 
 @Component({
@@ -52,12 +44,7 @@ export class ProgressbarComponent {
   @Input() heightClass: string = 'h-[6px]';  // Custom height class (e.g. h-6 for updates)
   @Input() tone: ProgressBarTone = 'brand';
 
-  /**
-   * Thresholds for 'auto'. Deliberately high: a Bitaxe sits around 80% of its
-   * 75 C ceiling in normal operation, so warning at anything lower would mean
-   * the dashboard is amber whenever the miner is simply working. 85% and 95%
-   * of the ceiling land near where the firmware actually starts throttling.
-   */
+  /* 'auto' thresholds: a Bitaxe idles near 80% of its 75 C ceiling. */
   private static readonly WARN_AT = 85;
   private static readonly CRITICAL_AT = 95;
 

@@ -5,6 +5,4 @@ $transitionDuration:.2s;        /* transition duration of layout elements e.g. s
 
 $tooltipBg: var(--color-bg-hover);
 
-/* Card and control corners. Driven by --border-radius so a theme can retune
-   the whole surface language from one place. */
 $borderRadius: var(--border-radius);

@@ -535,9 +535,7 @@ export class HomeComponent implements OnInit, OnDestroy {
       const borderColor = index === 0
         ? baseColor
         : `color-mix(in srgb, ${baseColor} ${100 - index * 15}%, ${mixColor} ${index * 15}%)`;
-      // Only the leading series in a group is filled. Filling all of them
-      // stacked four translucent reds on top of each other, and the overlap
-      // merged into one wash that hid both the lines and the grid behind it.
+      // Only the leading series in a group is filled.
       const filled = fill && index === 0;
       const backgroundColor = `color-mix(in srgb, ${borderColor}, transparent 81%)`;
 
@@ -567,9 +565,6 @@ export class HomeComponent implements OnInit, OnDestroy {
 
     const datasets = [
       ...this.createChartDatasets('chartY1Unit', primaryColor, textColor, true, 'y'),
-      // Mixing toward black made each successive temperature series darker on
-      // an already near-black card, so the later ones were invisible. Mix
-      // toward the body text colour, which is legible in every theme.
       ...this.createChartDatasets('chartY2Unit', axis2Color, textColor, false, 'y2')
     ];
 
@@ -598,8 +593,7 @@ export class HomeComponent implements OnInit, OnDestroy {
       this.chartOptions.scales.x.grid.color = surfaceBorder;
       this.chartOptions.scales.y.ticks.color = primaryColor;
       this.chartOptions.scales.y.grid.color = surfaceBorder;
-      // Match each axis to the colour of the series it scales, so a dual-axis
-      // reader can tell which numbers belong to which lines.
+      // Match each axis to the colour of the series it scales.
       this.chartOptions.scales.y2.ticks.color = axis2Color;
       this.chartOptions.scales.y2.grid.color = surfaceBorder;
     }

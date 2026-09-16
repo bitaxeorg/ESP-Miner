@@ -16,25 +16,19 @@
     --border-radius: 10px;
     --font-family: 'Nippo-Regular';
 
-    /* Surface treatment. A card is not a flat fill: it catches a little light
-       at its top edge, the way a physical panel does. The gradient is a two
-       stop wash over --color-bg-card, and --card-border-top is the lit edge. */
+    /* Card surface: gradient wash over --color-bg-card, lit top edge. */
     --card-surface: linear-gradient(180deg, rgba(255, 255, 255, 0.045) 0%, rgba(255, 255, 255, 0) 120px);
     --card-border-top: rgba(255, 255, 255, 0.10);
     --card-shadow-hover: 0 1px 0 0 rgba(255, 255, 255, 0.05) inset, 0 12px 32px -12px rgba(0, 0, 0, 0.7);
 
-    /* Status palette. Previously every bar and meter was --color-primary, so a
-       healthy 60 C ASIC and a thermally throttling one were the same red. */
+    /* Status palette for meters that report a health state. */
     --color-status-ok: #2fd4a0;
     --color-status-warn: #f5a524;
     --color-status-critical: #f04438;
-    /* For meters that report a level rather than a health state — supply
-       voltage, clock, fan duty. These have no danger threshold, so colouring
-       them with the alarm-red accent told the reader nothing. */
+    /* Meters that report a level, not a health state. */
     --color-meter-neutral: #5b9cff;
 
-    /* Second chart axis (the temperature group). Needs to be distinct from the
-       accent that draws the hashrate group, and legible on the card. */
+    /* Second chart axis (temperature group). */
     --chart-axis2-color: #7bd8c0;
 
     /* Layout & Sizing */
@@ -51,18 +45,10 @@
 
     /* Dynamic Theme variables calculated from --color-primary */
     --focus-ring: 0 0 0 0.2rem oklch(from var(--color-primary) l c h / 0.2);
-    /* Track for progress bars and sliders. This was #dee2e6 for every theme,
-       which put a near-white rail on a near-black card. */
+    /* Track for progress bars and sliders. */
     --slider-bg: rgba(255, 255, 255, 0.10);
 
-    /* Message severity styles.
-       These were the Material light palette — #ffcdd2 on #73000c and friends —
-       declared only here and never overridden, so a transient network blip
-       painted a bright pink block with dark red text across the top of a
-       near-black dashboard, louder than anything it was reporting on.
-       Derived from the status palette instead: a tinted wash of the severity
-       colour, a border of the same hue, and text light enough to read on the
-       card. The light theme restores the original values below. */
+    /* Message severity, derived from the status palette. */
     --color-message-warn-bg: color-mix(in srgb, var(--color-status-warn) 14%, transparent);
     --color-message-warn-text: #ffd89a;
     --color-message-warn-border: color-mix(in srgb, var(--color-status-warn) 38%, transparent);
@@ -109,7 +95,6 @@
     --color-overlay-select-bg: #f1f5f9;
     --color-overlay-select-border: #e2e8f0;
     --color-bg-hover: rgba(0, 0, 0, 0.04);
-    /* On a light surface the lit edge reads as white fill, not a highlight. */
     --card-surface: linear-gradient(180deg, rgba(255, 255, 255, 0.85) 0%, rgba(255, 255, 255, 0) 120px);
     --card-border-top: rgba(15, 23, 42, 0.10);
     --card-shadow-hover: 0 12px 28px -14px rgba(15, 23, 42, 0.28);
@@ -120,7 +105,6 @@
     --color-meter-neutral: #2f6fd0;
     --chart-axis2-color: #0b7f68;
 
-    /* The Material light palette is correct on a light surface. */
     --color-message-warn-bg: #ffecb3;
     --color-message-warn-text: #614a00;
     --color-message-warn-border: #ffe082;

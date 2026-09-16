@@ -162,8 +162,6 @@
           </div>
           @if (info.sharesRejected === 0) {
             <div>
-              <!-- Zero rejections is the healthy case; it read as an error
-                   while it was styled with the same red as a real rejection. -->
               <span class="font-medium" style="color: var(--color-status-ok)">0 </span>
               <span class="text-secondary">rejected</span>
             </div>
@@ -347,8 +345,7 @@
               <h6 class="flex justify-between mb-1">
                 Voltage Regulator Temperature<span>{{info.vrTemp}} °C</span>
               </h6>
-              <!-- Tied to the same 105 C the warning below already uses, rather
-                   than a second, invented threshold. -->
+              <!-- Same 105 C as the warning below. -->
               <app-progressbar
                 [tone]="info.vrTemp >= 105 ? 'critical' : 'ok'"
                 [value]="(info.vrTemp / 120) * 100"></app-progressbar>
