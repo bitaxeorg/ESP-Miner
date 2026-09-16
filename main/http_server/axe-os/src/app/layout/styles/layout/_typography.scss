@@ -61,11 +61,3 @@ p {
         margin-bottom: 0;
     }
 }
-
-/* Tabular figures so live readouts don't shift width as they tick. */
-.text-2xl,
-.text-xl,
-.text-lg {
-    font-variant-numeric: tabular-nums;
-    font-feature-settings: 'tnum' 1;
-}

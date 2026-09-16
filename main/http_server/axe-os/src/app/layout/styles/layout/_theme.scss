@@ -13,23 +13,8 @@
 
     /* Theme Settings & Sizing Defaults */
     --color-bg-hover: rgba(255, 255, 255, 0.05);
-    --border-radius: 10px;
+    --border-radius: 2px;
     --font-family: 'Nippo-Regular';
-
-    /* Card surface: gradient wash over --color-bg-card, lit top edge. */
-    --card-surface: linear-gradient(180deg, rgba(255, 255, 255, 0.045) 0%, rgba(255, 255, 255, 0) 120px);
-    --card-border-top: rgba(255, 255, 255, 0.10);
-    --card-shadow-hover: 0 1px 0 0 rgba(255, 255, 255, 0.05) inset, 0 12px 32px -12px rgba(0, 0, 0, 0.7);
-
-    /* Status palette for meters that report a health state. */
-    --color-status-ok: #2fd4a0;
-    --color-status-warn: #f5a524;
-    --color-status-critical: #f04438;
-    /* Meters that report a level, not a health state. */
-    --color-meter-neutral: #5b9cff;
-
-    /* Second chart axis (temperature group). */
-    --chart-axis2-color: #7bd8c0;
 
     /* Layout & Sizing */
     font-size: 14px;
@@ -45,22 +30,28 @@
 
     /* Dynamic Theme variables calculated from --color-primary */
     --focus-ring: 0 0 0 0.2rem oklch(from var(--color-primary) l c h / 0.2);
-    /* Track for progress bars and sliders. */
+    /* Track behind progress bars and sliders. */
     --slider-bg: rgba(255, 255, 255, 0.10);
 
-    /* Message severity, derived from the status palette. */
-    --color-message-warn-bg: color-mix(in srgb, var(--color-status-warn) 14%, transparent);
-    --color-message-warn-text: #ffd89a;
-    --color-message-warn-border: color-mix(in srgb, var(--color-status-warn) 38%, transparent);
-    --color-message-error-bg: color-mix(in srgb, var(--color-status-critical) 14%, transparent);
-    --color-message-error-text: #ffb4ad;
-    --color-message-error-border: color-mix(in srgb, var(--color-status-critical) 38%, transparent);
-    --color-message-info-bg: color-mix(in srgb, var(--color-meter-neutral) 14%, transparent);
-    --color-message-info-text: #bcd4ff;
-    --color-message-info-border: color-mix(in srgb, var(--color-meter-neutral) 38%, transparent);
-    --color-message-success-bg: color-mix(in srgb, var(--color-status-ok) 14%, transparent);
-    --color-message-success-text: #9af0d2;
-    --color-message-success-border: color-mix(in srgb, var(--color-status-ok) 38%, transparent);
+    /* Meter status colours. Okabe-Ito orange and vermillion: they stay
+       distinguishable from each other, and from --color-primary, under
+       deuteranopia, protanopia and tritanopia. */
+    --color-status-warn: #e69f00;
+    --color-status-critical: #d55e00;
+
+    /* Custom Message severity styles */
+    --color-message-warn-bg: #ffecb3;
+    --color-message-warn-text: #614a00;
+    --color-message-warn-border: #ffe082;
+    --color-message-error-bg: #ffcdd2;
+    --color-message-error-text: #73000c;
+    --color-message-error-border: #ef9a9a;
+    --color-message-info-bg: #b3e5fc;
+    --color-message-info-text: #01579b;
+    --color-message-info-border: #81d4fa;
+    --color-message-success-bg: #c8e6c9;
+    --color-message-success-text: #256029;
+    --color-message-success-border: #a5d6a7;
 }
 
 .theme-light {
@@ -76,10 +67,6 @@
     --color-overlay-select-bg: #1a2632;
     --color-overlay-select-border: #2f4562;
     --color-bg-hover: rgba(255, 255, 255, 0.05);
-    --card-surface: linear-gradient(180deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0) 120px);
-    --card-border-top: rgba(255, 255, 255, 0.12);
-    --card-shadow-hover: 0 1px 0 0 rgba(255, 255, 255, 0.06) inset, 0 12px 32px -12px rgba(0, 0, 0, 0.55);
-    --slider-bg: rgba(255, 255, 255, 0.12);
 }
 
 .theme-white {
@@ -95,26 +82,8 @@
     --color-overlay-select-bg: #f1f5f9;
     --color-overlay-select-border: #e2e8f0;
     --color-bg-hover: rgba(0, 0, 0, 0.04);
-    --card-surface: linear-gradient(180deg, rgba(255, 255, 255, 0.85) 0%, rgba(255, 255, 255, 0) 120px);
-    --card-border-top: rgba(15, 23, 42, 0.10);
-    --card-shadow-hover: 0 12px 28px -14px rgba(15, 23, 42, 0.28);
     --slider-bg: rgba(15, 23, 42, 0.10);
-    --color-status-ok: #0f9d70;
-    --color-status-warn: #b26a00;
-    --color-status-critical: #c8362a;
-    --color-meter-neutral: #2f6fd0;
-    --chart-axis2-color: #0b7f68;
-
-    --color-message-warn-bg: #ffecb3;
-    --color-message-warn-text: #614a00;
-    --color-message-warn-border: #ffe082;
-    --color-message-error-bg: #ffcdd2;
-    --color-message-error-text: #73000c;
-    --color-message-error-border: #ef9a9a;
-    --color-message-info-bg: #b3e5fc;
-    --color-message-info-text: #01579b;
-    --color-message-info-border: #81d4fa;
-    --color-message-success-bg: #c8e6c9;
-    --color-message-success-text: #256029;
-    --color-message-success-border: #a5d6a7;
+    /* Darkened for contrast against the light card. */
+    --color-status-warn: #a86800;
+    --color-status-critical: #9c4300;
 }

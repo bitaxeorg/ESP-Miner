@@ -7,8 +7,14 @@ export interface ProgressBarMarker {
   visible?: boolean;   // Optional visibility condition
 }
 
-/** Fill colour. 'auto' derives it from how close the value is to its maximum. */
-export type ProgressBarTone = 'brand' | 'neutral' | 'auto' | 'ok' | 'warn' | 'critical';
+/**
+ * Fill colour for a meter.
+ *   'brand'    - the theme colour, and the default
+ *   'auto'     - brand until the value nears its maximum, then warn/critical
+ *   'warn'     - caller decides
+ *   'critical' - caller decides
+ */
+export type ProgressBarTone = 'brand' | 'auto' | 'warn' | 'critical';
 
 @Component({
   selector: 'app-progressbar',
@@ -17,9 +23,9 @@ export type ProgressBarTone = 'brand' | 'neutral' | 'auto' | 'ok' | 'warn' | 'cr
   template: `
     <div class="relative w-full">
       <!-- Progress Bar Track -->
-      <div class="w-full bg-progressbar rounded-full overflow-hidden" [ngClass]="heightClass">
+      <div class="w-full bg-progressbar rounded-sm overflow-hidden" [ngClass]="heightClass">
         <div
-          class="h-full rounded-full transition-[width,background-color] duration-300"
+          class="bg-progressbar-value h-full transition-[width,background-color] duration-300"
           [style.width.%]="progressValue"
           [style.background]="fillColor"></div>
       </div>
@@ -44,7 +50,8 @@ export class ProgressbarComponent {
   @Input() heightClass: string = 'h-[6px]';  // Custom height class (e.g. h-6 for updates)
   @Input() tone: ProgressBarTone = 'brand';
 
-  /* 'auto' thresholds: a Bitaxe idles near 80% of its 75 C ceiling. */
+  /* A working Bitaxe idles near 80% of its temperature ceiling, so 'auto'
+     stays on the theme colour until well above that. */
   private static readonly WARN_AT = 85;
   private static readonly CRITICAL_AT = 95;
 
@@ -57,10 +64,8 @@ export class ProgressbarComponent {
 
   get fillColor(): string {
     switch (this.resolvedTone) {
-      case 'ok': return 'var(--color-status-ok)';
       case 'warn': return 'var(--color-status-warn)';
       case 'critical': return 'var(--color-status-critical)';
-      case 'neutral': return 'var(--color-meter-neutral)';
       default: return 'var(--color-primary)';
     }
   }
@@ -75,6 +80,6 @@ export class ProgressbarComponent {
     if (this.progressValue >= ProgressbarComponent.WARN_AT) {
       return 'warn';
     }
-    return 'ok';
+    return 'brand';
   }
 }

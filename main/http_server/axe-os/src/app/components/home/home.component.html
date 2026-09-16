@@ -81,7 +81,7 @@
                 <tbody>
                   <tr>
                     @for (i of hashrateAverages; track i.key) {
-                      <td class="p-0 text-center text-main font-medium">
+                      <td class="p-0 text-center text-primary font-medium">
                         {{ info[i.key] | hashSuffix }}
                       </td>
                     }
@@ -127,7 +127,7 @@
               </div>
 
               <div>
-                <span class="text-main font-medium whitespace-nowrap">
+                <span class="text-primary font-medium whitespace-nowrap">
                   {{efficiencyAverage | number: '1.2-2'}} J/Th
                 </span>
                 <span class="text-secondary">
@@ -162,7 +162,7 @@
           </div>
           @if (info.sharesRejected === 0) {
             <div>
-              <span class="font-medium" style="color: var(--color-status-ok)">0 </span>
+              <span class="text-red-500 font-medium">0 </span>
               <span class="text-secondary">rejected</span>
             </div>
           } @else {
@@ -241,7 +241,7 @@
     <div class="grid-stack-item" gs-id="power">
       <div class="grid-stack-item-content">
         <div class="card">
-          <h4 class="font-medium">Power</h4>
+          <h4 class="text-center font-medium">Power</h4>
 
           <div class="mb-4">
             <h6 class="flex justify-between mb-1">
@@ -255,7 +255,6 @@
               Input Voltage<span>{{info.voltage}} V</span>
             </h6>
             <app-progressbar
-              tone="neutral"
               [value]="((info.voltage / (info.nominalVoltage + .5)) * 100)"
               [markers]="[{ value: (info.nominalVoltage / (info.nominalVoltage + .5)) * 100, label: info.nominalVoltage + ' V' }]">
             </app-progressbar>
@@ -271,14 +270,14 @@
             <h6 class="flex justify-between mb-1">
               ASIC Frequency<span>{{info.actualFrequency | number: '1.0-4'}} MHz</span>
             </h6>
-            <app-progressbar tone="neutral" [value]="(info.actualFrequency / maxFrequency) * 100"></app-progressbar>
+            <app-progressbar [value]="(info.actualFrequency / maxFrequency) * 100"></app-progressbar>
           </div>
 
           <div>
             <h6 class="flex justify-between mb-1">
               Measured ASIC Voltage<span>{{info.coreVoltageActual}} V</span>
             </h6>
-            <app-progressbar tone="neutral" [value]="(info.coreVoltageActual / 1.8) * 100"></app-progressbar>
+            <app-progressbar [value]="(info.coreVoltageActual / 1.8) * 100"></app-progressbar>
           </div>
         </div>
       </div>
@@ -288,7 +287,7 @@
     <div class="grid-stack-item" gs-id="heat">
       <div class="grid-stack-item-content">
         <div class="card">
-          <h4 class="font-medium">Heat</h4>
+          <h4 class="text-center font-medium">Heat</h4>
 
           <div class="mb-4">
             <h6 class="flex justify-between mb-1">
@@ -345,9 +344,9 @@
               <h6 class="flex justify-between mb-1">
                 Voltage Regulator Temperature<span>{{info.vrTemp}} °C</span>
               </h6>
-              <!-- Same 105 C as the warning below. -->
+              <!-- Same 105 C threshold as the warning directly below. -->
               <app-progressbar
-                [tone]="info.vrTemp >= 105 ? 'critical' : 'ok'"
+                [tone]="info.vrTemp >= 105 ? 'critical' : 'brand'"
                 [value]="(info.vrTemp / 120) * 100"></app-progressbar>
 
               @if (info.vrTemp >= 105) {
@@ -365,7 +364,7 @@
     <div class="grid-stack-item" gs-id="fan">
       <div class="grid-stack-item-content">
         <div class="card">
-          <h4 class="font-medium">Fan</h4>
+          <h4 class="text-center font-medium">Fan</h4>
 
           <div class="mb-4">
             <h6 class="flex justify-between mb-1" tooltipPosition="top"
@@ -379,7 +378,7 @@
 
               <span>{{info.fanspeed.toFixed(1)}} %</span>
             </h6>
-            <app-progressbar tone="neutral" [value]="info.fanspeed"></app-progressbar>
+            <app-progressbar [value]="info.fanspeed"></app-progressbar>
           </div>
         </div>
       </div>
