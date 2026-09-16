@@ -2,6 +2,7 @@ import { Injectable, effect, signal } from '@angular/core';
 import { BehaviorSubject, Subject } from 'rxjs';
 import { ThemeService } from '../../services/theme.service';
 import { LocalStorageService } from '../../local-storage.service';
+import { COLOR_SCHEME_CLASSES, isDarkScheme } from '../color-schemes';
 
 const STATIC_MENU_DESKTOP_INACTIVE = 'STATIC_MENU_DESKTOP_INACTIVE'
 
@@ -144,15 +145,17 @@ export class LayoutService {
         const config = this.config();
         const root = document.documentElement;
 
-        // Toggle theme CSS classes
-        root.classList.remove('theme-dark', 'theme-light', 'theme-white');
+        // Toggle theme CSS classes. The removal list comes from the scheme
+        // registry so a new scheme cannot be left applied alongside the one
+        // replacing it.
+        root.classList.remove(...COLOR_SCHEME_CLASSES);
         root.classList.add(`theme-${config.colorScheme}`);
 
         // Toggle dark-mode class for theme switching
-        if (config.colorScheme === 'white') {
-            root.classList.remove('dark-mode');
-        } else {
+        if (isDarkScheme(config.colorScheme)) {
             root.classList.add('dark-mode');
+        } else {
+            root.classList.remove('dark-mode');
         }
 
         // Load theme settings from NVS

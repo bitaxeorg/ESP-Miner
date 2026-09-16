@@ -3,6 +3,7 @@ import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { LayoutService } from '../../layout/service/app.layout.service';
 import { ThemeService } from '../../services/theme.service';
+import { COLOR_SCHEMES, ColorScheme } from '../../layout/color-schemes';
 
 interface ThemeOption {
   name: string;
@@ -18,6 +19,7 @@ interface ThemeOption {
 export class ThemeConfigComponent implements OnInit {
   selectedScheme: string;
   currentColor: string = '';
+  readonly colorSchemes: ColorScheme[] = COLOR_SCHEMES;
   themes: ThemeOption[] = [
     // === Reds & Oranges (energetic & warm) ===
     { name: 'Bright Red', primaryColor: '#F80421' },
