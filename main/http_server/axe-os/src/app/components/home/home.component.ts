@@ -532,16 +532,20 @@ export class HomeComponent implements OnInit, OnDestroy {
 
     return labels.filter(label => this.isSensorSupported(label, this.latestInfo)).map((labelKey, index) => {
       const label = chartLabelValue(labelKey) || labelKey;
-      const borderColor = index === 0 
-        ? baseColor 
+      const borderColor = index === 0
+        ? baseColor
         : `color-mix(in srgb, ${baseColor} ${100 - index * 15}%, ${mixColor} ${index * 15}%)`;
+      // Only the leading series in a group is filled. Filling all of them
+      // stacked four translucent reds on top of each other, and the overlap
+      // merged into one wash that hid both the lines and the grid behind it.
+      const filled = fill && index === 0;
       const backgroundColor = `color-mix(in srgb, ${borderColor}, transparent 81%)`;
 
       return {
         type: 'line',
         label,
         data: this.chartDatasets[labelKey] || (this.chartDatasets[labelKey] = []),
-        fill,
+        fill: filled,
         backgroundColor,
         borderColor,
         tension: 0,
@@ -559,10 +563,14 @@ export class HomeComponent implements OnInit, OnDestroy {
     const primaryColor = documentStyle.getPropertyValue('--color-primary').trim() || '#F80421';
     const textColor = documentStyle.getPropertyValue('--color-text-main').trim() || '#ffffff';
     const textColorSecondary = documentStyle.getPropertyValue('--color-text-secondary').trim() || '#808080';
+    const axis2Color = documentStyle.getPropertyValue('--chart-axis2-color').trim() || textColorSecondary;
 
     const datasets = [
       ...this.createChartDatasets('chartY1Unit', primaryColor, textColor, true, 'y'),
-      ...this.createChartDatasets('chartY2Unit', textColorSecondary, 'black', false, 'y2')
+      // Mixing toward black made each successive temperature series darker on
+      // an already near-black card, so the later ones were invisible. Mix
+      // toward the body text colour, which is legible in every theme.
+      ...this.createChartDatasets('chartY2Unit', axis2Color, textColor, false, 'y2')
     ];
 
     if (this.chartData) {
@@ -579,6 +587,7 @@ export class HomeComponent implements OnInit, OnDestroy {
     const textColorSecondary = documentStyle.getPropertyValue('--color-text-secondary').trim();
     const surfaceBorder = documentStyle.getPropertyValue('--color-border-content').trim();
     const primaryColor = documentStyle.getPropertyValue('--color-primary').trim();
+    const axis2Color = documentStyle.getPropertyValue('--chart-axis2-color').trim() || textColorSecondary;
     this.primaryColorRgb = this.hexToRgb(primaryColor);
 
     this.rebuildChartDatasets();
@@ -589,7 +598,9 @@ export class HomeComponent implements OnInit, OnDestroy {
       this.chartOptions.scales.x.grid.color = surfaceBorder;
       this.chartOptions.scales.y.ticks.color = primaryColor;
       this.chartOptions.scales.y.grid.color = surfaceBorder;
-      this.chartOptions.scales.y2.ticks.color = textColorSecondary;
+      // Match each axis to the colour of the series it scales, so a dual-axis
+      // reader can tell which numbers belong to which lines.
+      this.chartOptions.scales.y2.ticks.color = axis2Color;
       this.chartOptions.scales.y2.grid.color = surfaceBorder;
     }
 
