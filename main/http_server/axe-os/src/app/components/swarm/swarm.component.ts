@@ -1,5 +1,5 @@
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
-import { isFrequencyLow } from 'src/app/utils/frequency-warning';
+import { isFrequencyLow } from 'src/app/utils/common-functions';
 import { Component, OnDestroy, OnInit, ViewChild, HostListener } from '@angular/core';
 import { AbstractControl, FormBuilder, FormGroup, Validators, FormControl, ValidationErrors } from '@angular/forms';
 import { ToastrService } from 'ngx-toastr';
