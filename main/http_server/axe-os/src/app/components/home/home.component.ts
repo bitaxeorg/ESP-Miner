@@ -530,21 +530,34 @@ export class HomeComponent implements OnInit, OnDestroy {
     const unit = this.form?.get(formControlName)?.value;
     const labels = ChartUnitGroups.find(g => g.value === unit)?.labels || [];
 
-    return labels.filter(label => this.isSensorSupported(label, this.latestInfo)).map((labelKey, index) => {
-      const label = chartLabelValue(labelKey) || labelKey;
-      const borderColor = index === 0 
-        ? baseColor 
+    const entries = labels
+      .filter(label => this.isSensorSupported(label, this.latestInfo))
+      .map((labelKey, index) => {
+        const label = chartLabelValue(labelKey) || labelKey;
+        return {
+          labelKey,
+          label,
+          index,
+          hidden: this.chartHiddenSensors[label] ?? DEFAULT_HIDDEN_SENSORS.has(labelKey)
+        };
+      });
+
+    // Fill one series, not every series in the group: overlapping translucent
+    // fills stack into a solid block. Pick the first *visible* one, so hiding a
+    // series from the legend moves the fill on rather than removing it.
+    const fillIndex = fill ? entries.findIndex(entry => !entry.hidden) : -1;
+
+    return entries.map(({ labelKey, label, index, hidden }) => {
+      const borderColor = index === 0
+        ? baseColor
         : `color-mix(in srgb, ${baseColor} ${100 - index * 15}%, ${mixColor} ${index * 15}%)`;
-      // Only the leading series in a group is filled. Filling every series
-      // stacks translucent washes on top of each other.
-      const filled = fill && index === 0;
       const backgroundColor = `color-mix(in srgb, ${borderColor}, transparent 81%)`;
 
       return {
         type: 'line',
         label,
         data: this.chartDatasets[labelKey] || (this.chartDatasets[labelKey] = []),
-        fill: filled,
+        fill: index === fillIndex,
         backgroundColor,
         borderColor,
         tension: 0,
@@ -552,8 +565,21 @@ export class HomeComponent implements OnInit, OnDestroy {
         pointHoverRadius: 5,
         borderWidth: 1,
         yAxisID,
-        hidden: this.chartHiddenSensors[label] ?? DEFAULT_HIDDEN_SENSORS.has(labelKey)
+        hidden
       };
+    });
+  }
+
+  /**
+   * Move the fill to the first visible series on the filled axis. The legend
+   * toggles `hidden` in place without rebuilding the datasets, so the choice
+   * made at build time has to be revisited here.
+   */
+  private refreshChartFill(): void {
+    const onFilledAxis = (this.chartData?.datasets ?? []).filter((dataset: any) => dataset.yAxisID === 'y');
+    const target = onFilledAxis.find((dataset: any) => !dataset.hidden);
+    onFilledAxis.forEach((dataset: any) => {
+      dataset.fill = dataset === target;
     });
   }
 
@@ -675,6 +701,8 @@ export class HomeComponent implements OnInit, OnDestroy {
                 this.chartHiddenSensors[label] = !!legendItem.hidden;
                 this.storageService.setItem(HOME_CHART_HIDDEN_SENSORS, JSON.stringify(this.chartHiddenSensors));
               }
+              this.refreshChartFill();
+              ci.update();
             }
           }
         },
