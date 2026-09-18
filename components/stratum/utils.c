@@ -199,33 +199,55 @@ void midstate_sha256_bin(const uint8_t *data, const size_t data_len, uint8_t des
     }
 }
 
+static inline void reverse_32bit_words_impl(const uint8_t src[32], uint8_t dest[32])
+{
+    uint32_t source[8];
+    uint32_t reversed[8];
+
+    // Built-in copies let GCC optimize aligned accesses despite ESP-IDF's
+    // -fno-builtin-memcpy, while keeping byte-buffer accesses valid.
+    __builtin_memcpy(source, src, sizeof(source));
+
+    reversed[0] = source[7];
+    reversed[1] = source[6];
+    reversed[2] = source[5];
+    reversed[3] = source[4];
+    reversed[4] = source[3];
+    reversed[5] = source[2];
+    reversed[6] = source[1];
+    reversed[7] = source[0];
+
+    __builtin_memcpy(dest, reversed, sizeof(reversed));
+}
+
 void reverse_32bit_words(const uint8_t src[32], uint8_t dest[32])
 {
-    const uint32_t *s = (const uint32_t *)src;
-    uint32_t *d = (uint32_t *)dest;
-    
-    d[0] = s[7];
-    d[1] = s[6];
-    d[2] = s[5];
-    d[3] = s[4];
-    d[4] = s[3];
-    d[5] = s[2];
-    d[6] = s[1];
-    d[7] = s[0];    
+    if ((uintptr_t)src % _Alignof(uint32_t) == 0 &&
+        (uintptr_t)dest % _Alignof(uint32_t) == 0) {
+        reverse_32bit_words_impl(__builtin_assume_aligned(src, _Alignof(uint32_t)),
+                                __builtin_assume_aligned(dest, _Alignof(uint32_t)));
+    } else {
+        reverse_32bit_words_impl(src, dest);
+    }
 }
 
 void reverse_endianness_per_word(uint8_t data[32])
 {
-    uint32_t *d = (uint32_t *)data;
+    uint32_t words[8];
 
-    d[0] = __builtin_bswap32(d[0]);
-    d[1] = __builtin_bswap32(d[1]);
-    d[2] = __builtin_bswap32(d[2]);
-    d[3] = __builtin_bswap32(d[3]);
-    d[4] = __builtin_bswap32(d[4]);
-    d[5] = __builtin_bswap32(d[5]);
-    d[6] = __builtin_bswap32(d[6]);
-    d[7] = __builtin_bswap32(d[7]);
+    // Work on aligned words while allowing an unaligned byte buffer.
+    memcpy(words, data, sizeof(words));
+
+    words[0] = __builtin_bswap32(words[0]);
+    words[1] = __builtin_bswap32(words[1]);
+    words[2] = __builtin_bswap32(words[2]);
+    words[3] = __builtin_bswap32(words[3]);
+    words[4] = __builtin_bswap32(words[4]);
+    words[5] = __builtin_bswap32(words[5]);
+    words[6] = __builtin_bswap32(words[6]);
+    words[7] = __builtin_bswap32(words[7]);
+
+    memcpy(data, words, sizeof(words));
 }
 
 const double truediffone = 26959535291011309493156476344723991336010898738574164086137773096960.0;
@@ -236,20 +258,19 @@ static const double bits64 = 18446744073709551616.0;
 /* Converts a little endian 256 bit value to a double */
 double le256todouble(const void *target)
 {
-    uint64_t *data64;
-    double dcut64;
+    const uint8_t *bytes = target;
+    uint64_t words[4] = {0};
 
-    data64 = (uint64_t *)(target + 24);
-    dcut64 = *data64 * bits192;
+    for (size_t word = 0; word < 4; word++) {
+        for (size_t byte = 0; byte < 8; byte++) {
+            words[word] |= (uint64_t)bytes[word * 8 + byte] << (byte * 8);
+        }
+    }
 
-    data64 = (uint64_t *)(target + 16);
-    dcut64 += *data64 * bits128;
-
-    data64 = (uint64_t *)(target + 8);
-    dcut64 += *data64 * bits64;
-
-    data64 = (uint64_t *)(target);
-    dcut64 += *data64;
+    double dcut64 = words[3] * bits192;
+    dcut64 += words[2] * bits128;
+    dcut64 += words[1] * bits64;
+    dcut64 += words[0];
 
     return dcut64;
 }

@@ -11,6 +11,41 @@ cd test
 idf.py build
 ```
 
+### QEMU and UBSan
+
+With ESP-IDF 6.0.2 sourced and `qemu-system-xtensa` on `PATH`, run the ordinary
+suite or enable UndefinedBehaviorSanitizer (UBSan):
+
+```sh
+bash tools/run_qemu_tests.sh
+bash tools/run_qemu_tests.sh --ubsan
+```
+
+CI runs both variants on every push and pull request as `build-and-test` and
+`build-and-test-ubsan`. Each check fails on a test failure, UBSan report, or
+missing or malformed test report. The `test-results` and `test-results-ubsan`
+artifacts retain the test report, serial log, and ELF for decoding backtraces.
+
+The local runner uses separate build directories (`.cache/qemu-test-build` and
+`.cache/qemu-ubsan-test-build`) and generated sdkconfig files for each mode.
+`ESP_QEMU_BUILD_DIR` overrides the build directory. `QEMU_TIMEOUT` overrides the
+five-minute emulator timeout. The runner prints serial output on failure and
+requires a passing Unity summary.
+
+Direct ESP-IDF builds in `test` or `test-ci` can enable UBSan with
+`idf.py -D ENABLE_UBSAN=ON build`; the CMake option defaults to `OFF`.
+Instrumentation covers repository components and their test libraries.
+ESP-IDF components remain uninstrumented to limit RAM usage. Alignment and
+shift-base checks are enabled. Firmware and both test apps share the cJSON
+allocator, which requests the type's required alignment and uses PSRAM when
+available. Stratum timing records also request their required alignment.
+
+Check the local runner without building firmware:
+
+```sh
+python3 -m unittest discover -s tools/tests -p 'test_qemu_runner.py'
+```
+
 ### Flashing
 **NOTE: Flashing the unit test binary will replace the existing firmware on the ESP32. For example, you will no longer have access to the AxeOS web UI and must flash a release or build and flash a non-test binary to recover. Do not attempt to do this unless you are willing to spend time recovering (or have dedicated test devices)**
 
@@ -111,5 +146,3 @@ Running Foo returns what is provided...
 /home/dev/myrepos/ESP-Miner/components/foo/test/test_foo.c:4:Foo returns what is provided:PASS
 ...
 ```
-
-

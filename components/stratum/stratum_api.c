@@ -117,9 +117,11 @@ bool STRATUM_V1_initialize_buffer(void)
     json_rpc_buffer[0] = '\0';
 
     if (request_timings == NULL) {
-        request_timings = heap_caps_malloc(sizeof(RequestTiming) * MAX_REQUEST_IDS, MALLOC_CAP_SPIRAM);
+        request_timings = heap_caps_aligned_alloc(_Alignof(RequestTiming),
+                                                 sizeof(RequestTiming) * MAX_REQUEST_IDS,
+                                                 MALLOC_CAP_SPIRAM);
         if (request_timings == NULL) {
-            request_timings = malloc(sizeof(RequestTiming) * MAX_REQUEST_IDS);
+            request_timings = aligned_alloc(_Alignof(RequestTiming), sizeof(RequestTiming) * MAX_REQUEST_IDS);
         }
         if (request_timings == NULL) {
             ESP_LOGE(TAG, "Failed to allocate memory for request_timings");
