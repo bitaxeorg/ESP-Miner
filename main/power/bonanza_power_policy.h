@@ -12,9 +12,6 @@ typedef struct {
     bonanza_power_health_t health;
     bool vreg_valid;
     float vreg_c;
-    bool off_asic_sensor_required;
-    bool asic_valid;
-    float asic_c;
     char detail[160];
 } bonanza_power_sample_t;
 typedef struct {

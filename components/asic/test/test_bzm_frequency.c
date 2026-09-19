@@ -56,35 +56,4 @@ TEST_CASE("BZM startup shortcut is target minus 100 MHz, capped at 1425",
     TEST_ASSERT_FLOAT_WITHIN(
         0.001f, 1425.0f, bzm_frequency_initial_mhz(2000.0f));
 
-    float next = 0.0f;
-    TEST_ASSERT_TRUE(
-        bzm_frequency_next_ramp_mhz(800.0f, 1200.0f, &next));
-    TEST_ASSERT_FLOAT_WITHIN(0.001f, 1100.0f, next);
-    TEST_ASSERT_TRUE(
-        bzm_frequency_next_ramp_mhz(next, 1200.0f, &next));
-    TEST_ASSERT_FLOAT_WITHIN(0.001f, 1125.0f, next);
-    TEST_ASSERT_TRUE(
-        bzm_frequency_next_ramp_mhz(1175.0f, 1200.0f, &next));
-    TEST_ASSERT_FLOAT_WITHIN(0.001f, 1200.0f, next);
-    TEST_ASSERT_FALSE(
-        bzm_frequency_next_ramp_mhz(1200.0f, 1200.0f, &next));
-}
-
-TEST_CASE("BZM live ramp moves 25 MHz in either direction",
-          "[asic][bzm][frequency]")
-{
-    float next = 0.0f;
-    TEST_ASSERT_TRUE(
-        bzm_frequency_next_live_ramp_mhz(800.0f, 1500.0f, &next));
-    TEST_ASSERT_FLOAT_WITHIN(0.001f, 825.0f, next);
-    TEST_ASSERT_TRUE(
-        bzm_frequency_next_live_ramp_mhz(1500.0f, 800.0f, &next));
-    TEST_ASSERT_FLOAT_WITHIN(0.001f, 1475.0f, next);
-    TEST_ASSERT_TRUE(
-        bzm_frequency_next_live_ramp_mhz(1475.0f, 1490.0f, &next));
-    TEST_ASSERT_FLOAT_WITHIN(0.001f, 1487.5f, next);
-    TEST_ASSERT_FALSE(
-        bzm_frequency_next_live_ramp_mhz(1200.0f, 1201.0f, &next));
-    TEST_ASSERT_FALSE(
-        bzm_frequency_next_live_ramp_mhz(799.0f, 900.0f, &next));
 }

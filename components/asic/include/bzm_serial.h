@@ -42,7 +42,6 @@ int BZM_SERIAL_send(uint8_t *, int, bool);
 esp_err_t BZM_SERIAL_init(void);
 esp_err_t BZM_SERIAL_ensure_initialized(int baud);
 esp_err_t BZM_SERIAL_prepare_session(int baud);
-void BZM_SERIAL_debug_rx(void);
 int16_t BZM_SERIAL_rx(uint8_t *, uint16_t, uint16_t);
 void BZM_SERIAL_clear_buffer(void);
 esp_err_t BZM_SERIAL_set_baud(int baud);

@@ -15,7 +15,7 @@
 #define BZM_TDM_RESULT_FRAME_SIZE (BZM_RESULT_FRAME_SIZE + 2)
 #define BZM_MAX_ENGINE_COUNT 4096
 #define BZM_VERSION_VARIANTS 4
-/* Qualified on the Bitaxe 1002 at the Stage-7 0x04 engine profile. Seven
+/* Qualified on the Bitaxe 1002 with the 0x04 engine profile. Seven
  * independent hardware results reproduced their ASIC 34-bit filter exactly
  * after subtracting 0x4c; the former 0x28 assumption reproduced none. */
 #define BZM_NONCE_GAP_1002 0x4cU
@@ -36,7 +36,6 @@ typedef struct {
     uint8_t timestamp_count;
     uint32_t starting_nonce;
     uint32_t end_nonce;
-    uint8_t midstate_count;
     uint8_t midstates[BZM_VERSION_VARIANTS][32];
     uint32_t versions[BZM_VERSION_VARIANTS];
     uint32_t merkle_residue;
@@ -58,19 +57,13 @@ typedef struct {
 
 bool bzm_work_build(const bzm_work_ref_t *source, uint16_t engine_id,
                     uint8_t logical_sequence, uint8_t timestamp_count,
-                    uint8_t lead_zeros, bool enhanced_mode,
+                    uint8_t lead_zeros,
                     bzm_work_t *work);
 
 bool bzm_result_decode(const uint8_t frame[BZM_RESULT_FRAME_SIZE],
                        uint64_t timestamp_us, bzm_raw_result_t *result);
-bool bzm_tdm_result_decode(
-    const uint8_t frame[BZM_TDM_RESULT_FRAME_SIZE], uint64_t timestamp_us,
-    bzm_raw_result_t *result);
 bool bzm_raw_result_has_valid_nonce(const bzm_raw_result_t *result);
-bool bzm_engine_physical_id(uint16_t logical_engine_id,
-                            uint16_t *physical_engine_id);
 bool bzm_engine_logical_id(uint16_t physical_engine_id,
                            uint16_t *logical_engine_id);
-float bzm_temperature_from_code(uint16_t code);
 
 #endif // BZM_H

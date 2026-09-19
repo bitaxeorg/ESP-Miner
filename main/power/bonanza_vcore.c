@@ -1,6 +1,5 @@
 #include "bonanza_vcore.h"
 #include <math.h>
-#include <string.h>
 #include "esp_check.h"
 #include "esp_log.h"
 #include "driver/gpio.h"
@@ -14,70 +13,6 @@
 static const char *TAG = "bonanza_vcore";
 esp_err_t BONANZA_VCORE_init(GlobalState *GLOBAL_STATE)
 {
-    BONANZA_TPS546_CONFIG config = {0};
-    const bzm_tps546_profile_t *profile = &BZM_TPS546_BIRDS_PROFILE;
-    config.BONANZA_TPS546_EXTENDED_CONFIG = true;
-    config.BONANZA_TPS546_INIT_PHASE = profile->phase;
-    memcpy(config.BONANZA_TPS546_INIT_SMBALERT_MASK, profile->smbalert_mask,
-           sizeof(config.BONANZA_TPS546_INIT_SMBALERT_MASK));
-    config.BONANZA_TPS546_INIT_FREQUENCY = profile->frequency_switch_khz;
-    config.BONANZA_TPS546_INIT_VIN_ON = profile->vin_on;
-    config.BONANZA_TPS546_INIT_VIN_OFF = profile->vin_off;
-    config.BONANZA_TPS546_INIT_VIN_UV_WARN_LIMIT = profile->vin_uv_warn_limit;
-    config.BONANZA_TPS546_INIT_VIN_OV_FAULT_LIMIT = profile->vin_ov_fault_limit;
-    config.BONANZA_TPS546_INIT_SCALE_LOOP = profile->vout_scale_loop;
-    config.BONANZA_TPS546_INIT_VOUT_MIN = profile->vout_min;
-    config.BONANZA_TPS546_INIT_VOUT_MAX = profile->vout_max;
-    config.BONANZA_TPS546_INIT_VOUT_COMMAND = profile->vout_command;
-    config.BONANZA_TPS546_INIT_IOUT_OC_WARN_LIMIT = profile->iout_oc_warn_limit;
-    config.BONANZA_TPS546_INIT_IOUT_OC_FAULT_LIMIT = profile->iout_oc_fault_limit;
-    config.BONANZA_TPS546_INIT_STACK_CONFIG = profile->stack_config;
-    config.BONANZA_TPS546_INIT_SYNC_CONFIG = profile->sync_config;
-    config.BONANZA_TPS546_INIT_INTERLEAVE = profile->interleave;
-    config.BONANZA_TPS546_INIT_MISC_OPTIONS = profile->misc_options;
-    config.BONANZA_TPS546_INIT_PIN_DETECT_OVERRIDE =
-        profile->pin_detect_override;
-    memcpy(config.BONANZA_TPS546_INIT_COMPENSATION_CONFIG,
-           profile->compensation_config,
-           sizeof(config.BONANZA_TPS546_INIT_COMPENSATION_CONFIG));
-    config.BONANZA_TPS546_INIT_POWER_STAGE_CONFIG = profile->power_stage_config;
-    memcpy(config.BONANZA_TPS546_INIT_TELEMETRY_CONFIG,
-           profile->telemetry_config,
-           sizeof(config.BONANZA_TPS546_INIT_TELEMETRY_CONFIG));
-    config.BONANZA_TPS546_INIT_VOUT_TRIM = profile->vout_trim;
-    config.BONANZA_TPS546_INIT_VOUT_TRANSITION_RATE =
-        profile->vout_transition_rate;
-    config.BONANZA_TPS546_INIT_IOUT_CAL_GAIN = profile->iout_cal_gain;
-    config.BONANZA_TPS546_INIT_IOUT_CAL_OFFSET = profile->iout_cal_offset;
-    config.BONANZA_TPS546_EXT_VOUT_MARGIN_HIGH = profile->vout_margin_high;
-    config.BONANZA_TPS546_EXT_VOUT_MARGIN_LOW = profile->vout_margin_low;
-    config.BONANZA_TPS546_EXT_VOUT_OV_FAULT_LIMIT =
-        profile->vout_ov_fault_limit;
-    config.BONANZA_TPS546_EXT_VOUT_OV_FAULT_RESPONSE =
-        profile->vout_ov_fault_response;
-    config.BONANZA_TPS546_EXT_VOUT_OV_WARN_LIMIT =
-        profile->vout_ov_warn_limit;
-    config.BONANZA_TPS546_EXT_VOUT_UV_WARN_LIMIT =
-        profile->vout_uv_warn_limit;
-    config.BONANZA_TPS546_EXT_VOUT_UV_FAULT_LIMIT =
-        profile->vout_uv_fault_limit;
-    config.BONANZA_TPS546_EXT_VOUT_UV_FAULT_RESPONSE =
-        profile->vout_uv_fault_response;
-    config.BONANZA_TPS546_EXT_IOUT_OC_FAULT_RESPONSE =
-        profile->iout_oc_fault_response;
-    config.BONANZA_TPS546_EXT_OT_FAULT_LIMIT = profile->ot_fault_limit;
-    config.BONANZA_TPS546_EXT_OT_FAULT_RESPONSE = profile->ot_fault_response;
-    config.BONANZA_TPS546_EXT_OT_WARN_LIMIT = profile->ot_warn_limit;
-    config.BONANZA_TPS546_EXT_VIN_OV_FAULT_RESPONSE =
-        profile->vin_ov_fault_response;
-    config.BONANZA_TPS546_EXT_TON_DELAY = profile->ton_delay;
-    config.BONANZA_TPS546_EXT_TON_RISE = profile->ton_rise;
-    config.BONANZA_TPS546_EXT_TON_MAX_FAULT_LIMIT =
-        profile->ton_max_fault_limit;
-    config.BONANZA_TPS546_EXT_TON_MAX_FAULT_RESPONSE =
-        profile->ton_max_fault_response;
-    config.BONANZA_TPS546_EXT_TOFF_DELAY = profile->toff_delay;
-    config.BONANZA_TPS546_EXT_TOFF_FALL = profile->toff_fall;
     gpio_config_t enable = {
         .pin_bit_mask = 1ULL << GPIO_ASIC_ENABLE,
         .mode = GPIO_MODE_OUTPUT,
@@ -110,7 +45,7 @@ esp_err_t BONANZA_VCORE_init(GlobalState *GLOBAL_STATE)
                  "keeping the TPS546 off for HTTP bridge recovery",
                  esp_err_to_name(bridge_err));
     }
-    return BONANZA_TPS546_init(config);
+    return BONANZA_TPS546_init();
 }
 static esp_err_t bonanza_set_5v_enabled(void *context, bool enabled)
 {

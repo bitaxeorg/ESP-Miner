@@ -13,7 +13,6 @@
 #define BZM_TDM_NOOP_PAYLOAD_SIZE 3U
 #define BZM_TDM_MAX_REGISTER_PAYLOAD_SIZE 32U
 #define BZM_TDM_MAX_FRAME_SIZE (BZM_TDM_HEADER_SIZE + BZM_TDM_MAX_REGISTER_PAYLOAD_SIZE)
-#define BZM_FRAME_PARSER_DISCARD_TRACE_SIZE 16U
 
 typedef enum
 {
@@ -43,11 +42,6 @@ typedef struct
     void * handler_context;
     uint32_t emitted_frames;
     uint32_t discarded_bytes;
-    uint32_t emitted_frames_at_last_discard;
-    uint32_t unexpected_register_headers;
-    uint8_t discard_trace[BZM_FRAME_PARSER_DISCARD_TRACE_SIZE];
-    size_t discard_trace_next;
-    size_t discard_trace_length;
 } bzm_frame_parser_t;
 
 void bzm_frame_parser_init(bzm_frame_parser_t * parser, bzm_frame_handler_t handler, void * handler_context);
@@ -66,7 +60,5 @@ bool bzm_frame_parser_cancel_register(bzm_frame_parser_t * parser, uint8_t asic_
 
 size_t bzm_frame_parser_feed(bzm_frame_parser_t * parser, const uint8_t * data, size_t data_length, uint64_t timestamp_us);
 size_t bzm_frame_parser_pending_bytes(const bzm_frame_parser_t * parser);
-/* Copy the most recent discarded bytes in chronological order. */
-size_t bzm_frame_parser_recent_discards(const bzm_frame_parser_t * parser, uint8_t * output, size_t capacity);
 
 #endif // BZM_FRAME_PARSER_H

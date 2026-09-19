@@ -18,7 +18,6 @@ typedef enum
 {
     BZM_BRINGUP_GOOD = 0,
     BZM_BRINGUP_BAD,
-    BZM_BRINGUP_BLOCKED,
 } bzm_bringup_outcome_t;
 
 typedef enum
@@ -26,7 +25,6 @@ typedef enum
     BZM_BRINGUP_REASON_NONE = 0,
     BZM_BRINGUP_REASON_INVALID_ARGUMENT,
     BZM_BRINGUP_REASON_PREREQUISITE,
-    BZM_BRINGUP_REASON_CAPABILITY_UNAVAILABLE,
     BZM_BRINGUP_REASON_IO,
     BZM_BRINGUP_REASON_CHAIN_MISSING,
     BZM_BRINGUP_REASON_CHAIN_ID_MISMATCH,
@@ -38,7 +36,6 @@ typedef enum
     BZM_BRINGUP_REASON_TELEMETRY_UNSAFE,
     BZM_BRINGUP_REASON_PLL_UNLOCKED,
     BZM_BRINGUP_REASON_TOPOLOGY,
-    BZM_BRINGUP_REASON_BALANCED_PAIR_UNAVAILABLE,
     BZM_BRINGUP_REASON_BALANCED_PAIR_COMMIT,
     BZM_BRINGUP_REASON_ACTIVATION_BARRIER,
     BZM_BRINGUP_REASON_BALANCED_BATCH,
@@ -53,57 +50,20 @@ typedef enum
 
 typedef struct
 {
-    bzm_bringup_outcome_t outcome;
     bzm_bringup_reason_t reason;
     uint8_t asic_id;
     uint8_t pll_index;
     uint8_t register_offset;
     uint32_t expected;
     uint32_t actual;
-    uint16_t completed_items;
 } bzm_bringup_report_t;
 
 typedef struct
 {
-    bool chain_verified;
-    bool sensors_verified;
-    bool clocks_verified;
-    bool balanced_ramp_verified;
-    bool running_verified;
-    uint64_t sensors_configured_us;
-    uint64_t clocks_configured_us;
+    bool running;
     float clock_mhz;
     float domain_clock_mhz[BZM_BRINGUP_ASIC_COUNT][BZM_BRINGUP_PLL_COUNT];
 } bzm_bringup_state_t;
-
-typedef struct
-{
-    uint8_t slow_clock_divider;
-    uint8_t tdm_slot_bit_count;
-    uint8_t tdm_slot_count;
-    uint8_t tdm_delay;
-    uint8_t sensor_clock_divider;
-    uint8_t tdm_gap_count;
-    uint8_t thermal_threshold_count;
-    uint8_t voltage_threshold_count;
-    uint16_t thermal_trip_code;
-    uint16_t voltage_ch0_shutdown_code;
-    uint16_t voltage_ch1_shutdown_code;
-    uint16_t settle_delay_ms;
-} bzm_bringup_sensor_profile_t;
-
-typedef struct
-{
-    uint16_t target_mhz;
-    uint8_t reference_mhz;
-    uint8_t reference_divider;
-    uint8_t post1_divider;
-    uint8_t post2_divider;
-    uint16_t feedback_divider;
-    uint32_t postdiv_register;
-    uint8_t lock_attempts;
-    uint16_t lock_poll_delay_ms;
-} bzm_bringup_pll_profile_t;
 
 typedef struct
 {
@@ -122,10 +82,10 @@ typedef struct
     bool (*read_u32)(void * context, uint8_t asic_id, uint16_t engine_id, uint8_t offset, uint32_t * value);
     void (*delay_ms)(void * context, uint32_t delay_ms);
     uint64_t (*now_us)(void * context);
-    bool (*telemetry_snapshot)(void * context, bzm_telemetry_store_t * store);
+    bool (*telemetry_snapshot)(void * context, bzm_telemetry_store_t * store, uint16_t timeout_ms);
 
     /*
-     * All four callbacks are mandatory for BALANCED_RAMP. The batch hooks
+     * The batch hooks and activation barrier are required for startup. The batch hooks
      * bracket one pair across all ASICs so the adapter can pause unsolicited
      * telemetry while collecting addressed acknowledgements. pair_commit
      * activates the higher-voltage stack first and must complete the other
@@ -136,27 +96,20 @@ typedef struct
     bool (*balanced_batch_begin)(void * context, uint16_t pair_index);
     bool (*balanced_pair_commit)(void * context, uint8_t asic_id, const bzm_engine_pair_t * pair);
     bool (*balanced_batch_end)(void * context, uint16_t pair_index);
-    bool (*activation_barrier)(void * context, size_t asic_count, size_t pairs_per_asic);
+    bool (*activation_barrier)(void * context);
 } bzm_bringup_ops_t;
 
 void bzm_bringup_init(bzm_bringup_state_t * state);
-void bzm_bringup_reference_sensor_profile(bzm_bringup_sensor_profile_t * profile);
-void bzm_bringup_pll_800_profile(bzm_bringup_pll_profile_t * profile);
 uint32_t bzm_bringup_reference_tdm_control(void);
 
-const char * bzm_bringup_outcome_name(bzm_bringup_outcome_t outcome);
+/* Configure the fixed Bonanza chain, then enable mining only after every
+ * engine is active. Live tuning retains only running state and domain clocks. */
+bzm_bringup_outcome_t bzm_bringup_start(bzm_bringup_state_t *state, const bzm_bringup_ops_t *ops,
+                                       void *context, const bzm_bringup_telemetry_policy_t *policy,
+                                       bzm_bringup_report_t *report);
+
 const char * bzm_bringup_reason_name(bzm_bringup_reason_t reason);
 
-bzm_bringup_outcome_t bzm_bringup_stage_chain4(bzm_bringup_state_t * state, const bzm_bringup_ops_t * ops, void * ops_context,
-                                               bzm_bringup_report_t * report);
-bzm_bringup_outcome_t bzm_bringup_stage_sensors(bzm_bringup_state_t * state, const bzm_bringup_ops_t * ops, void * ops_context,
-                                                const bzm_bringup_sensor_profile_t * profile,
-                                                const bzm_bringup_telemetry_policy_t * telemetry_policy,
-                                                bzm_bringup_report_t * report);
-bzm_bringup_outcome_t bzm_bringup_stage_clocks(bzm_bringup_state_t * state, const bzm_bringup_ops_t * ops, void * ops_context,
-                                               const bzm_bringup_pll_profile_t * profile,
-                                               const bzm_bringup_telemetry_policy_t * telemetry_policy,
-                                               bzm_bringup_report_t * report);
 /*
  * Apply one live tuning transaction across the eight ASIC/PLL
  * domains. TDM and mining remain active. Ordinary steps are limited to
@@ -169,11 +122,5 @@ bzm_bringup_outcome_t bzm_bringup_live_frequency_domains_step(
     const float
         target_mhz[BZM_BRINGUP_ASIC_COUNT][BZM_BRINGUP_PLL_COUNT],
     bool allow_initial_jump, bzm_bringup_report_t *report);
-bzm_bringup_outcome_t bzm_bringup_stage_balanced_ramp(bzm_bringup_state_t * state, const bzm_bringup_ops_t * ops,
-                                                      void * ops_context, const bzm_bringup_telemetry_policy_t * telemetry_policy,
-                                                      bzm_bringup_report_t * report);
-bzm_bringup_outcome_t bzm_bringup_check_running(bzm_bringup_state_t * state, const bzm_bringup_ops_t * ops, void * ops_context,
-                                                const bzm_bringup_telemetry_policy_t * telemetry_policy,
-                                                bzm_bringup_report_t * report);
 
 #endif // BZM_BRINGUP_H

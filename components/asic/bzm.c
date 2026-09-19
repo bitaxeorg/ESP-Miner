@@ -6,35 +6,9 @@
 #include "bm_job_midstate.h"
 #include "utils.h"
 
-static size_t bzm_build_versions(uint32_t base_version,
-                                 uint32_t version_mask,
-                                 bool enhanced_mode,
-                                 uint32_t versions[BZM_VERSION_VARIANTS])
-{
-    versions[0] = base_version;
-    if (!enhanced_mode) {
-        return 1;
-    }
-    if (version_mask == 0) {
-        // Hardware remains in enhanced mode when pool negotiation declines
-        // rolling. Keep four sequence/FIFO entries, all at the base version.
-        for (size_t i = 1; i < BZM_VERSION_VARIANTS; ++i)
-            versions[i] = base_version;
-        return BZM_VERSION_VARIANTS;
-    }
-
-    /* Consume the same consecutive version range that the producer skips
-     * between finite-midstate jobs. OR-ing mask fragments into each base
-     * repeats headers both within a job and across neighboring engines. */
-    for (size_t i = 1; i < BZM_VERSION_VARIANTS; ++i) {
-        versions[i] = increment_bitmask(versions[i - 1], version_mask);
-    }
-    return BZM_VERSION_VARIANTS;
-}
-
 bool bzm_work_build(const bzm_work_ref_t *source, uint16_t engine_id,
                     uint8_t logical_sequence, uint8_t timestamp_count,
-                    uint8_t lead_zeros, bool enhanced_mode,
+                    uint8_t lead_zeros,
                     bzm_work_t *work)
 {
     if (source == NULL || source->template == NULL || work == NULL ||
@@ -61,11 +35,13 @@ bool bzm_work_build(const bzm_work_ref_t *source, uint16_t engine_id,
     uint8_t midstate_data[80];
     uint8_t digest[32];
 
-    size_t count = bzm_build_versions(template->version,
-                                      template->version_mask,
-                                      enhanced_mode, work->versions);
-    for (size_t i = 0; i < count; ++i) {
-        uint32_t version = work->versions[i];
+    /* Bonanza always uses four FIFO entries. Without version rolling they
+     * share the base version; otherwise consume consecutive negotiated bits. */
+    uint32_t version = template->version;
+    for (size_t i = 0; i < BZM_VERSION_VARIANTS; ++i) {
+        if (i != 0 && template->version_mask != 0)
+            version = increment_bitmask(version, template->version_mask);
+        work->versions[i] = version;
         asic_job_header(template, template->starting_nonce, version, midstate_data);
         midstate_sha256_bin(midstate_data, 64, digest);
         /* mbedTLS exposes each SHA-256 state word as big-endian bytes.
@@ -75,7 +51,6 @@ bool bzm_work_build(const bzm_work_ref_t *source, uint16_t engine_id,
         reverse_endianness_per_word(digest);
         memcpy(work->midstates[i], digest, sizeof(digest));
     }
-    work->midstate_count = count;
     return true;
 }
 
@@ -100,31 +75,9 @@ bool bzm_result_decode(const uint8_t frame[BZM_RESULT_FRAME_SIZE],
     return result->engine_id < BZM_MAX_ENGINE_COUNT;
 }
 
-bool bzm_tdm_result_decode(
-    const uint8_t frame[BZM_TDM_RESULT_FRAME_SIZE], uint64_t timestamp_us,
-    bzm_raw_result_t *result)
-{
-    if (frame == NULL || result == NULL || frame[1] != 0x01) return false;
-    if (!bzm_result_decode(frame + 2, timestamp_us, result)) return false;
-    result->asic_id = frame[0];
-    return true;
-}
-
 bool bzm_raw_result_has_valid_nonce(const bzm_raw_result_t *result)
 {
     return result != NULL && (result->status & 0x08U) != 0U;
-}
-
-bool bzm_engine_physical_id(uint16_t logical_engine_id,
-                            uint16_t *physical_engine_id)
-{
-    bzm_engine_location_t engine;
-    if (physical_engine_id == NULL ||
-        !bzm_topology_engine_at(logical_engine_id, &engine)) {
-        return false;
-    }
-    *physical_engine_id = engine.physical_id;
-    return true;
 }
 
 bool bzm_engine_logical_id(uint16_t physical_engine_id,
@@ -137,10 +90,4 @@ bool bzm_engine_logical_id(uint16_t physical_engine_id,
     }
     *logical_engine_id = engine.topology_index;
     return true;
-}
-
-float bzm_temperature_from_code(uint16_t code)
-{
-    return -293.8f + (631.8f * (((float)(code & 0x0fff)) - 0.5f) /
-                               4096.0f);
 }

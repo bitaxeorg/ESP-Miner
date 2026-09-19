@@ -11,8 +11,6 @@ enum
     BZM_POST2_DIVIDER = 1,
 };
 
-static const float BZM_FREQUENCY_EPSILON_MHZ = 0.001f;
-
 static float clamp_frequency(float frequency_mhz, float minimum_mhz,
                              float maximum_mhz)
 {
@@ -69,81 +67,4 @@ float bzm_frequency_initial_mhz(float target_mhz)
                         BZM_FREQUENCY_INITIAL_MAX_MHZ);
     if (!bzm_frequency_resolve_target(initial_mhz, &resolved)) return NAN;
     return resolved.actual_mhz;
-}
-
-bool bzm_frequency_next_ramp_mhz(float current_mhz, float target_mhz,
-                                 float *next_mhz)
-{
-    bzm_frequency_target_t resolved_target;
-    if (next_mhz == NULL || !isfinite(current_mhz) ||
-        !bzm_frequency_request_is_valid(target_mhz) ||
-        !bzm_frequency_resolve_target(target_mhz, &resolved_target) ||
-        current_mhz <
-            BZM_FREQUENCY_POWER_ON_MHZ - BZM_FREQUENCY_EPSILON_MHZ) {
-        return false;
-    }
-
-    target_mhz = resolved_target.actual_mhz;
-    if (current_mhz >= target_mhz - BZM_FREQUENCY_EPSILON_MHZ) return false;
-
-    float candidate_mhz;
-    if (fabsf(current_mhz - BZM_FREQUENCY_POWER_ON_MHZ) <=
-        BZM_FREQUENCY_EPSILON_MHZ) {
-        candidate_mhz = bzm_frequency_initial_mhz(target_mhz);
-        if (!isfinite(candidate_mhz) ||
-            candidate_mhz <= current_mhz + BZM_FREQUENCY_EPSILON_MHZ) {
-            candidate_mhz = current_mhz + BZM_FREQUENCY_RAMP_STEP_MHZ;
-        }
-    } else {
-        candidate_mhz = current_mhz + BZM_FREQUENCY_RAMP_STEP_MHZ;
-    }
-
-    if (candidate_mhz > target_mhz) candidate_mhz = target_mhz;
-
-    bzm_frequency_target_t resolved;
-    if (!bzm_frequency_resolve_target(candidate_mhz, &resolved) ||
-        resolved.actual_mhz <= current_mhz + BZM_FREQUENCY_EPSILON_MHZ) {
-        return false;
-    }
-    *next_mhz = resolved.actual_mhz;
-    return true;
-}
-
-bool bzm_frequency_next_live_ramp_mhz(float current_mhz, float target_mhz,
-                                      float *next_mhz)
-{
-    bzm_frequency_target_t resolved_current;
-    bzm_frequency_target_t resolved_target;
-    if (next_mhz == NULL ||
-        !bzm_frequency_request_is_valid(current_mhz) ||
-        !bzm_frequency_request_is_valid(target_mhz) ||
-        !bzm_frequency_resolve_target(current_mhz, &resolved_current) ||
-        !bzm_frequency_resolve_target(target_mhz, &resolved_target) ||
-        fabsf(resolved_current.actual_mhz - current_mhz) >=
-            BZM_FREQUENCY_EPSILON_MHZ) {
-        return false;
-    }
-
-    current_mhz = resolved_current.actual_mhz;
-    target_mhz = resolved_target.actual_mhz;
-    float delta_mhz = target_mhz - current_mhz;
-    if (fabsf(delta_mhz) < BZM_FREQUENCY_EPSILON_MHZ) return false;
-
-    float candidate_mhz =
-        current_mhz +
-        (delta_mhz > 0.0f ? BZM_FREQUENCY_RAMP_STEP_MHZ
-                          : -BZM_FREQUENCY_RAMP_STEP_MHZ);
-    if ((delta_mhz > 0.0f && candidate_mhz > target_mhz) ||
-        (delta_mhz < 0.0f && candidate_mhz < target_mhz)) {
-        candidate_mhz = target_mhz;
-    }
-
-    bzm_frequency_target_t resolved_next;
-    if (!bzm_frequency_resolve_target(candidate_mhz, &resolved_next) ||
-        fabsf(resolved_next.actual_mhz - current_mhz) <
-            BZM_FREQUENCY_EPSILON_MHZ) {
-        return false;
-    }
-    *next_mhz = resolved_next.actual_mhz;
-    return true;
 }

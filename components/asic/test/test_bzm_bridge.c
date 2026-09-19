@@ -106,50 +106,12 @@ TEST_CASE("Bonanza bridge decodes bounded version information",
         bad_character, sizeof(bad_character), &info));
 
     TEST_ASSERT_TRUE(bzm_bridge_info_supports_safety(&info));
-    TEST_ASSERT_TRUE(bzm_bridge_info_supports_raw_rx(&info));
     info.protocol_major++;
     TEST_ASSERT_FALSE(bzm_bridge_info_supports_safety(&info));
-    TEST_ASSERT_FALSE(bzm_bridge_info_supports_raw_rx(&info));
     info.protocol_major = BZM_BRIDGE_PROTOCOL_MAJOR;
     info.schema_version++;
     TEST_ASSERT_FALSE(bzm_bridge_info_supports_safety(&info));
-    TEST_ASSERT_FALSE(bzm_bridge_info_supports_raw_rx(&info));
     TEST_ASSERT_FALSE(bzm_bridge_info_supports_safety(NULL));
-    TEST_ASSERT_FALSE(bzm_bridge_info_supports_raw_rx(NULL));
-}
-
-TEST_CASE("Bonanza bridge decodes fixed-width RX loss counters",
-          "[asic][bzm][bridge][rx-stats][qemu-integration]")
-{
-    const uint8_t payload[] = {
-        BZM_BRIDGE_RX_STATS_SCHEMA_VERSION,
-        0x78, 0x56, 0x34, 0x12,
-        0xef, 0xcd, 0xab, 0x90,
-    };
-    bzm_bridge_rx_stats_t stats;
-    TEST_ASSERT_EQUAL(ESP_OK, bzm_bridge_decode_rx_stats(
-        payload, sizeof(payload), &stats));
-    TEST_ASSERT_TRUE(stats.valid);
-    TEST_ASSERT_EQUAL_UINT8(BZM_BRIDGE_RX_STATS_SCHEMA_VERSION,
-                            stats.schema_version);
-    TEST_ASSERT_EQUAL_HEX32(0x12345678, stats.pio_fifo_overflows);
-    TEST_ASSERT_EQUAL_HEX32(0x90abcdef, stats.software_ring_overflows);
-
-    uint8_t bad_schema[sizeof(payload)];
-    memcpy(bad_schema, payload, sizeof(payload));
-    bad_schema[0]++;
-    TEST_ASSERT_EQUAL(ESP_ERR_INVALID_RESPONSE, bzm_bridge_decode_rx_stats(
-        bad_schema, sizeof(bad_schema), &stats));
-    TEST_ASSERT_FALSE(stats.valid);
-
-    TEST_ASSERT_EQUAL(ESP_ERR_INVALID_RESPONSE, bzm_bridge_decode_rx_stats(
-        payload, sizeof(payload) - 1, &stats));
-    TEST_ASSERT_FALSE(stats.valid);
-    TEST_ASSERT_EQUAL(ESP_ERR_INVALID_ARG, bzm_bridge_decode_rx_stats(
-        NULL, sizeof(payload), &stats));
-    TEST_ASSERT_FALSE(stats.valid);
-    TEST_ASSERT_EQUAL(ESP_ERR_INVALID_ARG, bzm_bridge_decode_rx_stats(
-        payload, sizeof(payload), NULL));
 }
 
 TEST_CASE("Bonanza bridge decodes coherent safety status evidence",
@@ -308,11 +270,9 @@ TEST_CASE("Bonanza bridge command constants encode every owned peripheral",
     const command_t commands[] = {
         {BZM_BRIDGE_PAGE_GPIO, BZM_BRIDGE_GPIO_5V_ENABLE},
         {BZM_BRIDGE_PAGE_GPIO, BZM_BRIDGE_GPIO_ASIC_RESET},
-        {BZM_BRIDGE_PAGE_GPIO, BZM_BRIDGE_GPIO_ASIC_TRIP},
         {BZM_BRIDGE_PAGE_FAN, BZM_BRIDGE_FAN_SET_SPEED},
         {BZM_BRIDGE_PAGE_FAN, BZM_BRIDGE_FAN_GET_TACH},
         {BZM_BRIDGE_PAGE_SYSTEM, BZM_BRIDGE_SYSTEM_GET_INFO},
-        {BZM_BRIDGE_PAGE_SYSTEM, BZM_BRIDGE_SYSTEM_GET_RX_STATS},
         {BZM_BRIDGE_PAGE_SYSTEM, BZM_BRIDGE_SYSTEM_GET_SAFETY_STATUS},
         {BZM_BRIDGE_PAGE_SYSTEM, BZM_BRIDGE_SYSTEM_ARM_SAFETY_LEASE},
         {BZM_BRIDGE_PAGE_SYSTEM, BZM_BRIDGE_SYSTEM_SAFETY_HEARTBEAT},
@@ -332,12 +292,9 @@ TEST_CASE("Bonanza bridge command constants encode every owned peripheral",
 TEST_CASE("Bonanza bridge operations fail closed while unavailable",
           "[asic][bzm][bridge][unavailable][qemu-integration]")
 {
-    bool tripped = false;
     uint16_t rpm = 0;
     bzm_bridge_info_t info;
-    bzm_bridge_rx_stats_t rx_stats;
     bzm_bridge_safety_status_t status;
-    TEST_ASSERT_FALSE(BZM_bridge_is_initialized());
     TEST_ASSERT_EQUAL(ESP_ERR_INVALID_STATE,
                       BZM_bridge_set_5v_enabled(true));
     TEST_ASSERT_EQUAL(ESP_ERR_INVALID_STATE,
@@ -345,16 +302,11 @@ TEST_CASE("Bonanza bridge operations fail closed while unavailable",
     TEST_ASSERT_EQUAL(ESP_ERR_INVALID_STATE,
                       BZM_bridge_pulse_asic_reset());
     TEST_ASSERT_EQUAL(ESP_ERR_INVALID_STATE,
-                      BZM_bridge_get_asic_trip(&tripped));
-    TEST_ASSERT_EQUAL(ESP_ERR_INVALID_STATE,
                       BZM_bridge_set_fan_percent(1.0f));
     TEST_ASSERT_EQUAL(ESP_ERR_INVALID_STATE,
                       BZM_bridge_get_fan_rpm(&rpm));
     TEST_ASSERT_EQUAL(ESP_ERR_INVALID_STATE,
                       BZM_bridge_get_info(&info));
-    TEST_ASSERT_EQUAL(ESP_ERR_INVALID_STATE,
-                      BZM_bridge_get_rx_stats(&rx_stats));
-    TEST_ASSERT_FALSE(rx_stats.valid);
     TEST_ASSERT_EQUAL(ESP_ERR_INVALID_STATE,
                       BZM_bridge_get_safety_status(&status));
     TEST_ASSERT_FALSE(status.valid);
@@ -372,8 +324,6 @@ TEST_CASE("Bonanza bridge operations fail closed while unavailable",
     TEST_ASSERT_FALSE(status.valid);
     TEST_ASSERT_EQUAL(ESP_ERR_INVALID_ARG,
                       BZM_bridge_get_safety_status(NULL));
-    TEST_ASSERT_EQUAL(ESP_ERR_INVALID_ARG,
-                      BZM_bridge_get_rx_stats(NULL));
     TEST_ASSERT_EQUAL(ESP_ERR_INVALID_ARG,
                       BZM_bridge_set_fan_percent(-0.1f));
     TEST_ASSERT_EQUAL(ESP_ERR_INVALID_ARG,

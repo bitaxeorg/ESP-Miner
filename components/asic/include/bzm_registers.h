@@ -74,7 +74,4 @@ enum
 /* All currently documented control-register reads are 32-bit little-endian. */
 #define BZM_CONTROL_REGISTER_WIDTH 4U
 
-const char * bzm_local_register_name(uint8_t offset);
-size_t bzm_local_register_width(uint8_t offset);
-
 #endif // BZM_REGISTERS_H

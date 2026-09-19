@@ -26,7 +26,6 @@ static void queue_result_locked(bzm_serial_transport_t * transport, const bzm_ra
     if (io->pending_result_length == BZM_PENDING_RESULT_COUNT) {
         io->pending_result_head = (io->pending_result_head + 1) % BZM_PENDING_RESULT_COUNT;
         io->pending_result_length--;
-        io->dropped_results++;
     }
     size_t tail = (io->pending_result_head + io->pending_result_length) % BZM_PENDING_RESULT_COUNT;
     io->pending_results[tail] = *result;
@@ -42,7 +41,6 @@ static void transport_frame_handler(void * context, const bzm_frame_t * frame)
     case BZM_FRAME_RESULT: {
         bzm_raw_result_t result;
         if (!addressed_asic(frame->asic_id) || !bzm_result_decode(frame->payload, frame->timestamp_us, &result)) {
-            io->rejected_result_frames++;
             break;
         }
         result.asic_id = frame->asic_id;
@@ -51,16 +49,13 @@ static void transport_frame_handler(void * context, const bzm_frame_t * frame)
     }
     case BZM_FRAME_REGISTER:
         if (!io->register_pending || frame->asic_id != io->register_asic_id || frame->payload_length != io->register_length) {
-            io->unmatched_register_frames++;
             break;
         }
         memcpy(io->register_data, frame->payload, frame->payload_length);
         io->register_ready = true;
         break;
     case BZM_FRAME_TELEMETRY:
-        if (!bzm_telemetry_store_apply_frame(&io->telemetry, frame)) {
-            io->telemetry_decode_failures++;
-        }
+        (void)bzm_telemetry_store_apply_frame(&io->telemetry, frame);
         break;
     case BZM_FRAME_NOOP:
         if (frame->payload_length != BZM_TDM_NOOP_PAYLOAD_SIZE || memcmp(frame->payload, "2ZB", BZM_TDM_NOOP_PAYLOAD_SIZE) != 0) {
@@ -68,7 +63,6 @@ static void transport_frame_handler(void * context, const bzm_frame_t * frame)
             break;
         }
         if (!io->noop_pending || (io->noop_asic_id != BZM_BROADCAST_ASIC && io->noop_asic_id != frame->asic_id)) {
-            io->unsolicited_noop_frames++;
             break;
         }
         io->noop_ready = true;
@@ -117,16 +111,7 @@ static void reset_io_state(bzm_serial_transport_t * transport, bool reset_teleme
     if (reset_counters) {
         io->parser.emitted_frames = 0;
         io->parser.discarded_bytes = 0;
-        io->parser.emitted_frames_at_last_discard = 0;
-        io->parser.unexpected_register_headers = 0;
-        io->parser.discard_trace_next = 0;
-        io->parser.discard_trace_length = 0;
-        io->dropped_results = 0;
-        io->rejected_result_frames = 0;
-        io->unmatched_register_frames = 0;
-        io->unsolicited_noop_frames = 0;
         io->invalid_noop_frames = 0;
-        io->telemetry_decode_failures = 0;
     }
     pthread_mutex_unlock(&io->lock);
 }
@@ -204,44 +189,6 @@ size_t bzm_transport_encode_noop(uint8_t asic_id, uint8_t * encoded, size_t enco
                : 0;
 }
 
-size_t bzm_discover_chain(size_t expected_count, uint8_t * asic_ids, size_t asic_ids_capacity,
-                          const bzm_chain_ops_t * ops, void * ops_context)
-{
-    if (expected_count == 0 || expected_count > BZM_MAX_ASIC_COUNT || asic_ids == NULL || asic_ids_capacity < expected_count ||
-        ops == NULL || ops->noop == NULL || ops->write_register == NULL || ops->read_register == NULL) {
-        return 0;
-    }
-
-    size_t detected = 0;
-    for (size_t i = 0; i < expected_count; ++i) {
-        uint8_t asic_id = bzm_asic_wire_ids[i];
-        uint8_t id_config[4] = {
-            asic_id,
-            i == 0 ? 0x00 : 0x01,
-            0x00,
-            0x00,
-        };
-        uint8_t readback[4] = {0};
-
-        if (!ops->noop(ops_context, BZM_BROADCAST_ASIC) ||
-            !ops->write_register(ops_context, BZM_BROADCAST_ASIC, BZM_CONTROL_ENGINE_ID, BZM_REG_ASIC_ID, id_config,
-                                 sizeof(id_config))) {
-            break;
-        }
-        if (ops->delay_ms != NULL)
-            ops->delay_ms(ops_context, 200);
-        /* Default-address NOOPs enumerate unassigned ASICs. The exact
-         * addressed register readback is the supported post-assignment proof;
-         * BIRDS does not issue addressed NOOPs during discovery. */
-        if (!ops->read_register(ops_context, asic_id, BZM_CONTROL_ENGINE_ID, BZM_REG_ASIC_ID, readback, sizeof(readback)) ||
-            readback[0] != asic_id || (readback[1] & 0x01) != (i == 0 ? 0 : 1)) {
-            break;
-        }
-        asic_ids[detected++] = asic_id;
-    }
-    return detected;
-}
-
 bool bzm_partition_nonce_range(uint32_t starting_nonce, uint32_t end_nonce, size_t partition, size_t partition_count,
                                uint32_t * partition_start, uint32_t * partition_end)
 {
@@ -265,14 +212,6 @@ static bool serial_write_register_raw(uint8_t asic_id, uint16_t engine_id, uint8
         return false;
     size_t length = bzm_transport_encode_write(asic_id, engine_id, offset, data, data_len, encoded, sizeof(encoded));
     return length != 0 && BZM_SERIAL_send(encoded, (int)length, false) == (int)length;
-}
-
-bool bzm_serial_write_register(bzm_serial_transport_t * transport, uint16_t engine_id, uint8_t offset, const void * data,
-                               size_t data_len)
-{
-    if (transport == NULL || transport->asic_count == 0)
-        return false;
-    return serial_write_register_raw(transport->asic_ids[0], engine_id, offset, data, data_len);
 }
 
 bool bzm_serial_write_register_to(bzm_serial_transport_t * transport, uint8_t asic_id, uint16_t engine_id, uint8_t offset,
@@ -402,19 +341,9 @@ bool bzm_serial_get_parser_stats(bzm_serial_transport_t * transport, bzm_serial_
     *stats = (bzm_serial_parser_stats_t){
         .emitted_frames = io->parser.emitted_frames,
         .discarded_bytes = io->parser.discarded_bytes,
-        .emitted_frames_at_last_discard = io->parser.emitted_frames_at_last_discard,
-        .unexpected_register_headers = io->parser.unexpected_register_headers,
-        .dropped_results = io->dropped_results,
-        .rejected_result_frames = io->rejected_result_frames,
-        .unmatched_register_frames = io->unmatched_register_frames,
-        .unsolicited_noop_frames = io->unsolicited_noop_frames,
         .invalid_noop_frames = io->invalid_noop_frames,
-        .telemetry_decode_failures = io->telemetry_decode_failures,
         .buffered_bytes = io->parser.buffered_length,
-        .queued_results = io->pending_result_length,
     };
-    stats->recent_discarded_length = bzm_frame_parser_recent_discards(
-        &io->parser, stats->recent_discarded_bytes, sizeof(stats->recent_discarded_bytes));
     pthread_mutex_unlock(&io->lock);
     return true;
 }
@@ -566,18 +495,6 @@ IO_ERROR:
     return BZM_SERIAL_PROBE_IO_ERROR;
 }
 
-static bool serial_noop(void * context, uint8_t asic_id)
-{
-    return bzm_serial_probe_noop(context, asic_id) == BZM_SERIAL_PROBE_RESPONSE;
-}
-
-static bool serial_write_register_op(void * context, uint8_t asic_id, uint16_t engine_id, uint8_t offset, const void * data,
-                                     size_t data_len)
-{
-    (void) context;
-    return serial_write_register_raw(asic_id, engine_id, offset, data, data_len);
-}
-
 static bool serial_read_register_op(void * context, uint8_t asic_id, uint16_t engine_id, uint8_t offset, void * data,
                                     size_t data_len)
 {
@@ -620,29 +537,6 @@ bool bzm_serial_read_register(bzm_serial_transport_t * transport, uint8_t asic_i
     if (transport == NULL)
         return false;
     return serial_read_register_op(transport, asic_id, engine_id, offset, data, data_len);
-}
-
-static void serial_delay_ms(void * context, uint32_t delay_ms)
-{
-    (void) context;
-    vTaskDelay(pdMS_TO_TICKS(delay_ms));
-}
-
-size_t bzm_serial_discover_chain(bzm_serial_transport_t * transport, size_t expected_count)
-{
-    if (transport == NULL || !bzm_serial_transport_init(transport))
-        return 0;
-    static const bzm_chain_ops_t ops = {
-        .noop = serial_noop,
-        .write_register = serial_write_register_op,
-        .read_register = serial_read_register_op,
-        .delay_ms = serial_delay_ms,
-    };
-    BZM_SERIAL_clear_buffer();
-    reset_io_state(transport, true, true);
-    transport->asic_count =
-        bzm_discover_chain(expected_count, transport->asic_ids, sizeof(transport->asic_ids), &ops, transport);
-    return transport->asic_count;
 }
 
 static bool serial_register_writer(void * context, uint16_t engine_id, uint8_t offset, const void * data, size_t data_len)
@@ -694,7 +588,7 @@ bool bzm_serial_flush(void * context)
     };
     bool success = transport->asic_count != 0 &&
         bzm_transport_program_flush(
-            transport->engine_count, transport->enhanced_mode,
+            transport->engine_count,
             serial_register_writer, &writer);
     BZM_SERIAL_clear_buffer();
     if (transport->io.initialized)
@@ -719,8 +613,3 @@ bool bzm_serial_read_result(bzm_serial_transport_t * transport, bzm_raw_result_t
             return true;
     }
 }
-
-const bzm_transport_ops_t BZM_SERIAL_TRANSPORT_OPS = {
-    .write_work = bzm_serial_write_work,
-    .flush = bzm_serial_flush,
-};

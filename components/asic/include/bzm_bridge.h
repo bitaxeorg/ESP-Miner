@@ -16,7 +16,6 @@
 #define BZM_BRIDGE_PAGE_SYSTEM 0x00
 
 #define BZM_BRIDGE_SYSTEM_GET_INFO 0x01
-#define BZM_BRIDGE_SYSTEM_GET_RX_STATS 0x02
 #define BZM_BRIDGE_SYSTEM_GET_SAFETY_STATUS 0x10
 #define BZM_BRIDGE_SYSTEM_ARM_SAFETY_LEASE 0x11
 #define BZM_BRIDGE_SYSTEM_SAFETY_HEARTBEAT 0x12
@@ -27,8 +26,6 @@
 
 #define BZM_BRIDGE_PROTOCOL_MAJOR 1
 #define BZM_BRIDGE_PROTOCOL_MINOR 0
-#define BZM_BRIDGE_RX_STATS_SCHEMA_VERSION 0x01
-#define BZM_BRIDGE_RX_STATS_LENGTH 9
 #define BZM_BRIDGE_SAFETY_STATUS_SCHEMA_VERSION 0x01
 #define BZM_BRIDGE_SAFETY_STATUS_LENGTH 17
 
@@ -51,7 +48,6 @@
 
 #define BZM_BRIDGE_GPIO_5V_ENABLE 0x01
 #define BZM_BRIDGE_GPIO_ASIC_RESET 0x02
-#define BZM_BRIDGE_GPIO_ASIC_TRIP 0x03
 #define BZM_BRIDGE_FAN_SET_SPEED 0x10
 #define BZM_BRIDGE_FAN_GET_TACH 0x20
 
@@ -64,13 +60,6 @@ typedef struct {
     uint8_t protocol_minor;
     char version[BZM_BRIDGE_VERSION_MAX_LENGTH + 1];
 } bzm_bridge_info_t;
-
-typedef struct {
-    bool valid;
-    uint8_t schema_version;
-    uint32_t pio_fifo_overflows;
-    uint32_t software_ring_overflows;
-} bzm_bridge_rx_stats_t;
 
 typedef enum {
     BZM_BRIDGE_SAFETY_STAGE_BOOT_SAFE = 0,
@@ -143,10 +132,6 @@ esp_err_t bzm_bridge_decode_info(const uint8_t *payload,
                                  size_t payload_length,
                                  bzm_bridge_info_t *info);
 bool bzm_bridge_info_supports_safety(const bzm_bridge_info_t *info);
-bool bzm_bridge_info_supports_raw_rx(const bzm_bridge_info_t *info);
-esp_err_t bzm_bridge_decode_rx_stats(const uint8_t *payload,
-                                     size_t payload_length,
-                                     bzm_bridge_rx_stats_t *stats);
 /* Pure protocol decoder: requires the exact schema-1 17-byte payload. */
 esp_err_t bzm_bridge_decode_safety_status(
     const uint8_t *payload, size_t payload_length,
@@ -158,9 +143,7 @@ bool bzm_bridge_safety_status_allows_fault_clear(
     const bzm_bridge_safety_status_t *status);
 
 esp_err_t BZM_bridge_init(void);
-bool BZM_bridge_is_initialized(void);
 esp_err_t BZM_bridge_get_info(bzm_bridge_info_t *info);
-esp_err_t BZM_bridge_get_rx_stats(bzm_bridge_rx_stats_t *stats);
 esp_err_t BZM_bridge_get_safety_status(bzm_bridge_safety_status_t *status);
 esp_err_t BZM_bridge_arm_safety(bzm_bridge_safety_status_t *status);
 esp_err_t BZM_bridge_safety_heartbeat(bzm_bridge_safety_status_t *status);
@@ -169,7 +152,6 @@ esp_err_t BZM_bridge_disarm_safety(bzm_bridge_safety_status_t *status);
 esp_err_t BZM_bridge_set_5v_enabled(bool enabled);
 esp_err_t BZM_bridge_set_asic_reset(bool high);
 esp_err_t BZM_bridge_pulse_asic_reset(void);
-esp_err_t BZM_bridge_get_asic_trip(bool *asserted);
 esp_err_t BZM_bridge_set_fan_percent(float percent);
 esp_err_t BZM_bridge_get_fan_rpm(uint16_t *rpm);
 

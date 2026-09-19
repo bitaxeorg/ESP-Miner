@@ -110,7 +110,7 @@ esp_err_t BZM_SERIAL_prepare_session(int baud)
     }
 
     /* A stopped validation can leave complete result or TDM frames in the
-     * ESP UART driver's RX ring.  The staged transport installs a fresh
+     * ESP UART driver's RX ring.  The driver transport installs a fresh
      * parser for every run, so carrying those bytes into the next session
      * would make its first chain probe fail as malformed I/O. */
     return uart_flush_input(UART_NUM_1);
@@ -155,20 +155,6 @@ int16_t BZM_SERIAL_rx(uint8_t * buf, uint16_t size, uint16_t timeout_ms)
 #endif
 
     return bytes_read;
-}
-
-void BZM_SERIAL_debug_rx(void)
-{
-    int ret;
-    uint8_t buf[100];
-
-    ret = BZM_SERIAL_rx(buf, 100, 20);
-    if (ret < 0) {
-        fprintf(stderr, "unable to read data\n");
-        return;
-    }
-
-    memset(buf, 0, 100);
 }
 
 void BZM_SERIAL_clear_buffer(void)

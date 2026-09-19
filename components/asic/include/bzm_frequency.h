@@ -25,9 +25,5 @@ bool bzm_frequency_request_is_valid(float requested_mhz);
 bool bzm_frequency_resolve_target(float requested_mhz,
                                   bzm_frequency_target_t *target);
 float bzm_frequency_initial_mhz(float target_mhz);
-bool bzm_frequency_next_ramp_mhz(float current_mhz, float target_mhz,
-                                 float *next_mhz);
-bool bzm_frequency_next_live_ramp_mhz(float current_mhz, float target_mhz,
-                                      float *next_mhz);
 
 #endif // BZM_FREQUENCY_H

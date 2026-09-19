@@ -17,7 +17,7 @@ typedef struct
     uint64_t last_renewal_ms;
 } bzm_lease_guard_schedule_t;
 
-/* Pure status predicate used by the staged production adapter. */
+/* Pure status predicate used by the board startup adapter. */
 bool bzm_lease_guard_status_is_controlled(const bzm_bridge_safety_status_t * status);
 
 /* Sleep in bounded chunks, renewing immediately before every chunk. */

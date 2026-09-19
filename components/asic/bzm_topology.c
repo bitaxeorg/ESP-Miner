@@ -11,15 +11,6 @@ _Static_assert(BZM_FIRST_ASIC_ID == BZM_ASIC_ID_STRIDE, "first BZM wire ID must 
 _Static_assert(BZM_LAST_ASIC_ID == BZM_ASIC_ID_STRIDE * BZM_MAX_ASIC_COUNT,
                "last BZM wire ID must match the spaced four-ASIC topology");
 
-bool bzm_topology_asic_id_at(size_t logical_index, uint8_t * asic_id)
-{
-    if (logical_index >= BZM_MAX_ASIC_COUNT || asic_id == NULL) {
-        return false;
-    }
-    *asic_id = bzm_asic_wire_ids[logical_index];
-    return true;
-}
-
 bool bzm_topology_asic_index(uint8_t asic_id, size_t * logical_index)
 {
     for (size_t index = 0; index < BZM_MAX_ASIC_COUNT; ++index) {
@@ -76,7 +67,6 @@ static bool locate_coordinate(uint8_t requested_row, uint8_t requested_column, b
                     .column = column,
                     .stack = stack,
                     .physical_id = ((uint16_t) column << 6) | row,
-                    .grid_id = (uint16_t) column * BZM_TOPOLOGY_ROWS + row,
                     .topology_index = topology_index,
                     .stack_index = stack_index,
                 };
@@ -95,21 +85,6 @@ static bool locate_coordinate(uint8_t requested_row, uint8_t requested_column, b
     return false;
 }
 
-bool bzm_topology_from_coordinate(uint8_t row, uint8_t column, bzm_engine_location_t * engine)
-{
-    return locate_coordinate(row, column, engine);
-}
-
-bool bzm_topology_from_grid_id(uint16_t grid_id, bzm_engine_location_t * engine)
-{
-    if (grid_id >= BZM_TOPOLOGY_GRID_ENGINE_COUNT)
-        return false;
-
-    uint8_t row = grid_id % BZM_TOPOLOGY_ROWS;
-    uint8_t column = grid_id / BZM_TOPOLOGY_ROWS;
-    return locate_coordinate(row, column, engine);
-}
-
 bool bzm_topology_from_physical_id(uint16_t physical_id, bzm_engine_location_t * engine)
 {
     uint8_t row = physical_id & 0x3fU;
@@ -118,27 +93,6 @@ bool bzm_topology_from_physical_id(uint16_t physical_id, bzm_engine_location_t *
         return false;
 
     return locate_coordinate(row, (uint8_t) column, engine);
-}
-
-bool bzm_topology_engine_at(uint16_t topology_index, bzm_engine_location_t * engine)
-{
-    if (engine == NULL || topology_index >= BZM_TOPOLOGY_ENGINE_COUNT) {
-        return false;
-    }
-
-    uint16_t current = 0;
-    for (uint8_t column = 0; column < BZM_TOPOLOGY_COLUMNS; ++column) {
-        for (uint8_t row = 0; row < BZM_TOPOLOGY_ROWS; ++row) {
-            if (!bzm_topology_coordinate_is_valid(row, column))
-                continue;
-            if (current == topology_index) {
-                return locate_coordinate(row, column, engine);
-            }
-            ++current;
-        }
-    }
-
-    return false;
 }
 
 bool bzm_topology_stack_engine_at(bzm_engine_stack_t stack, uint16_t stack_index, bzm_engine_location_t * engine)

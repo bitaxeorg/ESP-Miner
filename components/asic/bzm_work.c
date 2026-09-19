@@ -8,7 +8,7 @@ static bool program_work(const bzm_work_t *work,
                          void *writer_context,
                          bool include_nonce_range)
 {
-    if (work == NULL || writer == NULL || work->midstate_count == 0 || work->midstate_count > BZM_VERSION_VARIANTS) {
+    if (work == NULL || writer == NULL) {
         return false;
     }
 
@@ -40,13 +40,13 @@ static bool program_work(const bzm_work_t *work,
 
     // The BZM engine has separate midstate and sequence FIFOs. Match the
     // reference transport by filling each FIFO in order before starting work.
-    for (size_t i = 0; i < work->midstate_count; ++i) {
+    for (size_t i = 0; i < BZM_VERSION_VARIANTS; ++i) {
         if (!writer(writer_context, work->engine_id, BZM_REG_MIDSTATE, work->midstates[i], 32)) {
             return false;
         }
     }
-    for (size_t i = 0; i < work->midstate_count; ++i) {
-        uint8_t sequence = work->midstate_count > 1 ? (uint8_t) ((work->logical_sequence << 2) | i) : work->logical_sequence;
+    for (size_t i = 0; i < BZM_VERSION_VARIANTS; ++i) {
+        uint8_t sequence = (uint8_t) ((work->logical_sequence << 2) | i);
         if (!writer(writer_context, work->engine_id, BZM_REG_SEQUENCE_ID, &sequence, 1)) {
             return false;
         }
@@ -70,7 +70,7 @@ bool bzm_transport_program_broadcast_work(const bzm_work_t *work,
     return program_work(work, writer, writer_context, false);
 }
 
-static bool program_flush_job(uint16_t engine, bool enhanced_mode, uint8_t job_control, bzm_register_writer_t writer,
+static bool program_flush_job(uint16_t engine, uint8_t job_control, bzm_register_writer_t writer,
                               void * writer_context)
 {
     uint8_t timestamp_count = 0xff;
@@ -78,10 +78,8 @@ static bool program_flush_job(uint16_t engine, bool enhanced_mode, uint8_t job_c
         return false;
     }
 
-    uint8_t sequence = enhanced_mode ? 0xfc : 0xff;
-    size_t sequence_count = enhanced_mode ? BZM_VERSION_VARIANTS : 1;
-    for (size_t i = 0; i < sequence_count; ++i) {
-        uint8_t value = sequence + i;
+    for (size_t i = 0; i < BZM_VERSION_VARIANTS; ++i) {
+        uint8_t value = 0xfc + i;
         if (!writer(writer_context, engine, BZM_REG_SEQUENCE_ID, &value, 1)) {
             return false;
         }
@@ -89,15 +87,15 @@ static bool program_flush_job(uint16_t engine, bool enhanced_mode, uint8_t job_c
     return writer(writer_context, engine, BZM_REG_JOB_CONTROL, &job_control, 1);
 }
 
-bool bzm_transport_program_stage6_sentinel(uint16_t engine_id, bzm_register_writer_t writer, void * writer_context)
+bool bzm_transport_program_startup_work(uint16_t engine_id, bzm_register_writer_t writer, void * writer_context)
 {
     if (engine_id >= BZM_MAX_ENGINE_COUNT || writer == NULL) {
         return false;
     }
 
     /* SHA-256 initialization words, varied per TCE. These are deterministic
-     * workload data rather than a pool job. A 64-leading-zero filter makes
-     * an emitted result vanishingly unlikely and therefore a Stage-6 fault. */
+     * startup load for stack balancing. A 64-leading-zero filter suppresses
+     * results until ordinary pool work replaces it. */
     static const uint32_t sha256_initial_state[8] = {
         0x6a09e667U, 0xbb67ae85U, 0x3c6ef372U, 0xa54ff53aU,
         0x510e527fU, 0x9b05688cU, 0x1f83d9abU, 0x5be0cd19U,
@@ -107,7 +105,6 @@ bool bzm_transport_program_stage6_sentinel(uint16_t engine_id, bzm_register_writ
         .timestamp_count = 0xff,
         .starting_nonce = 0,
         .end_nonce = UINT32_MAX,
-        .midstate_count = BZM_VERSION_VARIANTS,
         .merkle_residue = 0x1002b0a0U,
         .start_ntime = 0x65010002U,
         .target = 0x1d00ffffU,
@@ -122,10 +119,10 @@ bool bzm_transport_program_stage6_sentinel(uint16_t engine_id, bzm_register_writ
     }
 
     return bzm_transport_program_work(&work, writer, writer_context) &&
-           program_flush_job(engine_id, true, 1, writer, writer_context);
+           program_flush_job(engine_id, 1, writer, writer_context);
 }
 
-bool bzm_transport_program_flush(uint16_t engine_count, bool enhanced_mode, bzm_register_writer_t writer, void * writer_context)
+bool bzm_transport_program_flush(uint16_t engine_count, bzm_register_writer_t writer, void * writer_context)
 {
     if (engine_count == 0 || engine_count > BZM_ENGINES_PER_ASIC || writer == NULL) {
         return false;
@@ -133,13 +130,12 @@ bool bzm_transport_program_flush(uint16_t engine_count, bool enhanced_mode, bzm_
 
     for (uint16_t logical_engine = 0; logical_engine < engine_count; ++logical_engine) {
         bzm_engine_location_t engine;
-        // Balanced write order limits stack skew. The production supervisor
-        // independently gates RUNNING on its acknowledged Stage-6 barrier.
+        // Balanced write order limits transient stack skew.
         if (!bzm_topology_activation_at(logical_engine, BZM_ENGINE_STACK_BOTTOM, &engine)) {
             return false;
         }
-        if (!program_flush_job(engine.physical_id, enhanced_mode, 3, writer, writer_context) ||
-            !program_flush_job(engine.physical_id, enhanced_mode, 1, writer, writer_context)) {
+        if (!program_flush_job(engine.physical_id, 3, writer, writer_context) ||
+            !program_flush_job(engine.physical_id, 1, writer, writer_context)) {
             return false;
         }
     }

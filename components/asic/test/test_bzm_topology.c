@@ -15,7 +15,6 @@ static void assert_same_engine(const bzm_engine_location_t * expected, const bzm
     TEST_ASSERT_EQUAL_UINT8(expected->column, actual->column);
     TEST_ASSERT_EQUAL_INT(expected->stack, actual->stack);
     TEST_ASSERT_EQUAL_UINT16(expected->physical_id, actual->physical_id);
-    TEST_ASSERT_EQUAL_UINT16(expected->grid_id, actual->grid_id);
     TEST_ASSERT_EQUAL_UINT16(expected->topology_index, actual->topology_index);
     TEST_ASSERT_EQUAL_UINT16(expected->stack_index, actual->stack_index);
 }
@@ -26,16 +25,14 @@ TEST_CASE("BZM ASIC topology uses the spaced TDM wire IDs", "[asic][bzm][topolog
 
     TEST_ASSERT_EQUAL_UINT8_ARRAY(expected, bzm_asic_wire_ids, BZM_MAX_ASIC_COUNT);
     for (size_t index = 0; index < BZM_MAX_ASIC_COUNT; ++index) {
-        uint8_t asic_id = 0;
+        uint8_t asic_id = bzm_asic_wire_ids[index];
         size_t round_trip = BZM_MAX_ASIC_COUNT;
-        TEST_ASSERT_TRUE(bzm_topology_asic_id_at(index, &asic_id));
+
         TEST_ASSERT_EQUAL_HEX8(expected[index], asic_id);
         TEST_ASSERT_TRUE(bzm_topology_asic_index(asic_id, &round_trip));
         TEST_ASSERT_EQUAL_UINT32(index, round_trip);
     }
 
-    TEST_ASSERT_FALSE(bzm_topology_asic_id_at(BZM_MAX_ASIC_COUNT, NULL));
-    TEST_ASSERT_FALSE(bzm_topology_asic_id_at(BZM_MAX_ASIC_COUNT, &(uint8_t){0}));
     TEST_ASSERT_FALSE(bzm_topology_asic_index(0x00, NULL));
     TEST_ASSERT_FALSE(bzm_topology_asic_index(0x0b, NULL));
     TEST_ASSERT_FALSE(bzm_topology_asic_index(0x13, NULL));
@@ -50,11 +47,18 @@ TEST_CASE("BZM 1002 topology contains exactly the 236 usable engines", "[asic][b
 
     for (uint16_t index = 0; index < BZM_TOPOLOGY_ENGINE_COUNT; ++index) {
         bzm_engine_location_t engine;
-        TEST_ASSERT_TRUE(bzm_topology_engine_at(index, &engine));
+        /* Iterate physical coordinates in the compact-ID order; explicitly
+         * skip the four disabled locations in the hardware layout. */
+        uint16_t grid = index;
+        if (grid >= 80) ++grid;
+        if (grid >= 100) ++grid;
+        if (grid >= 119) ++grid;
+        uint8_t row = grid % BZM_TOPOLOGY_ROWS;
+        uint8_t column = grid / BZM_TOPOLOGY_ROWS;
+        TEST_ASSERT_TRUE(bzm_topology_from_physical_id(((uint16_t)column << 6) | row, &engine));
         TEST_ASSERT_EQUAL_UINT16(index, engine.topology_index);
         TEST_ASSERT_TRUE(bzm_topology_coordinate_is_valid(engine.row, engine.column));
         TEST_ASSERT_EQUAL_UINT16(((uint16_t) engine.column << 6) | engine.row, engine.physical_id);
-        TEST_ASSERT_EQUAL_UINT16((uint16_t) engine.column * BZM_TOPOLOGY_ROWS + engine.row, engine.grid_id);
 
         size_t slot = coordinate_slot(engine.row, engine.column);
         TEST_ASSERT_FALSE(seen[slot]);
@@ -94,8 +98,7 @@ TEST_CASE("BZM 1002 topology rejects all four disabled engines", "[asic][bzm][to
         uint8_t row = holes[i][0];
         uint8_t column = holes[i][1];
         TEST_ASSERT_FALSE(bzm_topology_coordinate_is_valid(row, column));
-        TEST_ASSERT_FALSE(bzm_topology_from_coordinate(row, column, &engine));
-        TEST_ASSERT_FALSE(bzm_topology_from_grid_id((uint16_t) column * BZM_TOPOLOGY_ROWS + row, &engine));
+
         TEST_ASSERT_FALSE(bzm_topology_from_physical_id(((uint16_t) column << 6) | row, &engine));
     }
 }
@@ -105,13 +108,7 @@ TEST_CASE("BZM topology identifiers round trip for every usable engine", "[asic]
     for (uint16_t index = 0; index < BZM_TOPOLOGY_ENGINE_COUNT; ++index) {
         bzm_engine_location_t expected;
         bzm_engine_location_t actual;
-        TEST_ASSERT_TRUE(bzm_topology_engine_at(index, &expected));
-
-        TEST_ASSERT_TRUE(bzm_topology_from_coordinate(expected.row, expected.column, &actual));
-        assert_same_engine(&expected, &actual);
-
-        TEST_ASSERT_TRUE(bzm_topology_from_grid_id(expected.grid_id, &actual));
-        assert_same_engine(&expected, &actual);
+        TEST_ASSERT_TRUE(bzm_topology_activation_at(index, BZM_ENGINE_STACK_BOTTOM, &expected));
 
         TEST_ASSERT_TRUE(bzm_topology_from_physical_id(expected.physical_id, &actual));
         assert_same_engine(&expected, &actual);
@@ -194,16 +191,10 @@ TEST_CASE("BZM topology APIs reject invalid input", "[asic][bzm][topology]")
 
     TEST_ASSERT_FALSE(bzm_topology_coordinate_is_valid(20, 0));
     TEST_ASSERT_FALSE(bzm_topology_coordinate_is_valid(0, 12));
-    TEST_ASSERT_FALSE(bzm_topology_from_coordinate(20, 0, &engine));
-    TEST_ASSERT_FALSE(bzm_topology_from_coordinate(0, 12, &engine));
-    TEST_ASSERT_FALSE(bzm_topology_from_coordinate(0, 0, NULL));
-    TEST_ASSERT_FALSE(bzm_topology_from_grid_id(BZM_TOPOLOGY_GRID_ENGINE_COUNT, &engine));
-    TEST_ASSERT_FALSE(bzm_topology_from_grid_id(0, NULL));
+
     TEST_ASSERT_FALSE(bzm_topology_from_physical_id(20, &engine));
     TEST_ASSERT_FALSE(bzm_topology_from_physical_id(12U << 6, &engine));
     TEST_ASSERT_FALSE(bzm_topology_from_physical_id(0, NULL));
-    TEST_ASSERT_FALSE(bzm_topology_engine_at(BZM_TOPOLOGY_ENGINE_COUNT, &engine));
-    TEST_ASSERT_FALSE(bzm_topology_engine_at(0, NULL));
     TEST_ASSERT_FALSE(bzm_topology_stack_engine_at(BZM_ENGINE_STACK_COUNT, 0, &engine));
     TEST_ASSERT_FALSE(bzm_topology_stack_engine_at(BZM_ENGINE_STACK_BOTTOM, BZM_TOPOLOGY_STACK_ENGINE_COUNT, &engine));
     TEST_ASSERT_FALSE(bzm_topology_stack_engine_at(BZM_ENGINE_STACK_BOTTOM, 0, NULL));

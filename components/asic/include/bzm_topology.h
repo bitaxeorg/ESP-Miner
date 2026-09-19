@@ -28,8 +28,7 @@ typedef enum
 /**
  * A usable Bonanza engine and all of its stable identifiers.
  *
- * grid_id is the legacy column-major grid identifier (column * 20 + row),
- * and therefore has holes. topology_index and stack_index are compact.
+ * topology_index and stack_index are compact, excluding disabled engines.
  */
 typedef struct
 {
@@ -37,7 +36,6 @@ typedef struct
     uint8_t column;
     bzm_engine_stack_t stack;
     uint16_t physical_id;
-    uint16_t grid_id;
     uint16_t topology_index;
     uint16_t stack_index;
 } bzm_engine_location_t;
@@ -58,16 +56,12 @@ typedef struct
  * IDs. This mapping matches the BIRDS reference firmware. */
 extern const uint8_t bzm_asic_wire_ids[BZM_MAX_ASIC_COUNT];
 
-bool bzm_topology_asic_id_at(size_t logical_index, uint8_t * asic_id);
 bool bzm_topology_asic_index(uint8_t asic_id, size_t * logical_index);
 
 bool bzm_topology_coordinate_is_valid(uint8_t row, uint8_t column);
 
-bool bzm_topology_from_coordinate(uint8_t row, uint8_t column, bzm_engine_location_t * engine);
-bool bzm_topology_from_grid_id(uint16_t grid_id, bzm_engine_location_t * engine);
 bool bzm_topology_from_physical_id(uint16_t physical_id, bzm_engine_location_t * engine);
 
-bool bzm_topology_engine_at(uint16_t topology_index, bzm_engine_location_t * engine);
 bool bzm_topology_stack_engine_at(bzm_engine_stack_t stack, uint16_t stack_index, bzm_engine_location_t * engine);
 
 bool bzm_topology_balanced_pair_at(uint16_t pair_index, bzm_engine_pair_t * pair);

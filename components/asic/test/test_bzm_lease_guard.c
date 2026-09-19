@@ -37,7 +37,7 @@ static bzm_bridge_safety_status_t controlled_status(void)
     };
 }
 
-TEST_CASE("BZM staged lease status requires live controlled evidence", "[asic][bzm][lease_guard]")
+TEST_CASE("BZM startup lease status requires live controlled evidence", "[asic][bzm][lease_guard]")
 {
     bzm_bridge_safety_status_t status = controlled_status();
     TEST_ASSERT_TRUE(bzm_lease_guard_status_is_controlled(&status));
@@ -55,7 +55,7 @@ TEST_CASE("BZM staged lease status requires live controlled evidence", "[asic][b
     TEST_ASSERT_FALSE(bzm_lease_guard_status_is_controlled(&status));
 }
 
-TEST_CASE("BZM staged lease delay renews at intervals no longer than 250 ms", "[asic][bzm][lease_guard]")
+TEST_CASE("BZM startup lease delay renews at intervals no longer than 250 ms", "[asic][bzm][lease_guard]")
 {
     lease_mock_t mock = {0};
     TEST_ASSERT_TRUE(bzm_lease_guard_delay(760, mock_renew, mock_sleep, &mock));
@@ -67,7 +67,7 @@ TEST_CASE("BZM staged lease delay renews at intervals no longer than 250 ms", "[
     TEST_ASSERT_EQUAL_UINT32(10, mock.sleeps[3]);
 }
 
-TEST_CASE("BZM staged lease delay stops before a failed-renewal chunk", "[asic][bzm][lease_guard]")
+TEST_CASE("BZM startup lease delay stops before a failed-renewal chunk", "[asic][bzm][lease_guard]")
 {
     lease_mock_t mock = {.fail_renew_at = 3};
     TEST_ASSERT_FALSE(bzm_lease_guard_delay(1000, mock_renew, mock_sleep, &mock));

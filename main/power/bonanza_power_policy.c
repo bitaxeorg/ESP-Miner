@@ -125,13 +125,6 @@ void bonanza_power_policy_step(bonanza_power_policy_t *policy, uint64_t now_ms,
     if (policy->cooling) {
         if (policy->cooling_since_ms == UINT64_MAX) policy->cooling_since_ms = now_ms;
         if (!policy->stopped || !sample.vreg_valid || !isfinite(sample.vreg_c)) return;
-        if (sample.off_asic_sensor_required) {
-            if (!sample.asic_valid || !isfinite(sample.asic_c)) return;
-            if (sample.asic_c > 45.0f) {
-                policy->cooling_since_ms = now_ms;
-                return;
-            }
-        }
         if (now_ms < policy->cooling_since_ms ||
             now_ms - policy->cooling_since_ms < 30000 || sample.vreg_c > 95.0f) return;
         if (!policy->reduced_target_saved) {

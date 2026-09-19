@@ -20,7 +20,7 @@
 #include "i2c_bitaxe.h"
 #include "global_state.h"
 #include "bonanza_tps546.h"
-#include "bzm_tps546_verify.h"
+#include "bzm_power.h"
 
 //#define DEBUG_TPS546_MEAS 1 //uncomment to debug TPS546 measurements
 //#define DEBUG_TPS546_STATUS 1 //uncomment to debug TPS546 status bits
@@ -38,11 +38,8 @@
 #define BONANZA_TPS546_I2C_TIMEOUT_MS 500
 
 static const char *TAG = "TPS546";
-static esp_err_t write_entire_config_checked(void);
 static void BONANZA_TPS546_read_mfr_info(uint8_t *read_mfr_revision);
-static void BONANZA_TPS546_show_voltage_settings(void);
 static esp_err_t BONANZA_TPS546_clear_faults(void);
-
 
 static uint8_t DEVICE_ID_TPS546D24A[] = {0x54, 0x49, 0x54, 0x6D, 0x24, 0x41};
 static uint8_t DEVICE_ID_TPS546D24S[] = {0x54, 0x49, 0x54, 0x6D, 0x24, 0x62};
@@ -51,9 +48,9 @@ static uint8_t DEVICE_ID_TPS546D24S[] = {0x54, 0x49, 0x54, 0x6D, 0x24, 0x62};
 
 static i2c_master_dev_handle_t tps546_i2c_handle;
 
-static BONANZA_TPS546_CONFIG tps546_config;
-static uint8_t tps546_extended_vout_mode;
-static bool tps546_extended_config_written;
+static const bzm_tps546_profile_t *const tps546_config = &BZM_TPS546_BIRDS_PROFILE;
+static uint8_t tps546_vout_mode;
+static bool tps546_config_written;
 static TickType_t tps546_power_good_grace_until = 0;
 static i2c_master_dev_handle_t tps546_alert_i2c_handle;
 
@@ -62,7 +59,6 @@ static float last_vin = 0.0f;
 static float last_iout = 0.0f;
 static float last_vout = 0.0f;
 static int last_temp = 0;
-
 
 static esp_err_t BONANZA_TPS546_parse_status(uint16_t);
 
@@ -180,7 +176,7 @@ static esp_err_t smb_read_block_exact(uint8_t command, uint8_t *data,
  * @param data The data to write
  * @param len The number of bytes to write
  */
-static esp_err_t smb_write_block(uint8_t command, uint8_t *data, uint8_t len)
+static esp_err_t smb_write_block(uint8_t command, const uint8_t *data, uint8_t len)
 {
     //malloc a buffer len+2 to store the command byte and then the length byte
     uint8_t *buf = (uint8_t *)malloc(len+2);
@@ -342,22 +338,18 @@ static uint16_t float_2_slinear11(float value)
  * The mantissa occupies the full 16-bits of the value
  * @param value The ULINEAR16 value to convert
  */
+static float ulinear16_2_float_mode(uint16_t value, uint8_t mode)
+{
+    int exponent = mode & 0x1f;
+    if (exponent & 0x10) exponent -= 32;
+    return value * powf(2.0f, exponent);
+}
+
 static float ulinear16_2_float(uint16_t value)
 {
-    uint8_t voutmode;
-    int exponent;
-    float result;
-
-    smb_read_byte(PMBUS_VOUT_MODE, &voutmode);
-
-    if (voutmode & 0x10) {
-        // exponent is negative
-        exponent = -1 * ((~voutmode & 0x1F) + 1);
-    } else {
-        exponent = (voutmode & 0x1F);
-    }
-    result = (value * powf(2.0, exponent));
-    return result;
+    uint8_t mode;
+    if (smb_read_byte(PMBUS_VOUT_MODE, &mode) != ESP_OK) return NAN;
+    return ulinear16_2_float_mode(value, mode);
 }
 
 /**
@@ -397,7 +389,7 @@ static uint16_t float_2_ulinear16_mode(float value, uint8_t voutmode)
     return (uint16_t)(value / powf(2.0f, exponent));
 }
 
-static esp_err_t BONANZA_TPS546_write_extended_config(void)
+static esp_err_t write_config(void)
 {
     static const uint8_t status_selectors[] = {
         PMBUS_STATUS_VOUT_SELECTOR,
@@ -410,225 +402,220 @@ static esp_err_t BONANZA_TPS546_write_extended_config(void)
     };
 
     uint8_t vout_mode = 0;
-    tps546_extended_config_written = false;
+    tps546_config_written = false;
     ESP_RETURN_ON_ERROR(smb_read_byte(PMBUS_VOUT_MODE, &vout_mode),
-                        TAG, "read VOUT_MODE for extended config failed");
+                        TAG, "read VOUT_MODE for Bonanza profile failed");
 
     uint8_t on_off_config = ON_OFF_CONFIG_DELAY | ON_OFF_CONFIG_POLARITY |
                             ON_OFF_CONFIG_CMD | ON_OFF_CONFIG_PU;
     ESP_RETURN_ON_ERROR(smb_write_byte(PMBUS_ON_OFF_CONFIG, on_off_config),
                         TAG, "write ON_OFF_CONFIG failed");
     ESP_RETURN_ON_ERROR(smb_write_byte(PMBUS_PHASE,
-                                       tps546_config.BONANZA_TPS546_INIT_PHASE),
+                                       tps546_config->phase),
                         TAG, "write PHASE failed");
     for (size_t i = 0; i < sizeof(status_selectors); ++i) {
-        uint16_t value = tps546_config.BONANZA_TPS546_INIT_SMBALERT_MASK[i] |
+        uint16_t value = tps546_config->smbalert_mask[i] |
                          status_selectors[i];
         ESP_RETURN_ON_ERROR(smb_write_word(PMBUS_SMBALERT_MASK, value),
                             TAG, "write SMBALERT_MASK failed");
     }
     ESP_RETURN_ON_ERROR(smb_write_word(
                             PMBUS_FREQUENCY_SWITCH,
-                            int_2_slinear11(tps546_config.BONANZA_TPS546_INIT_FREQUENCY)),
+                            int_2_slinear11(tps546_config->frequency_switch_khz)),
                         TAG, "write FREQUENCY_SWITCH failed");
     ESP_RETURN_ON_ERROR(smb_write_byte(
                             PMBUS_SYNC_CONFIG,
-                            tps546_config.BONANZA_TPS546_INIT_SYNC_CONFIG),
+                            tps546_config->sync_config),
                         TAG, "write SYNC_CONFIG failed");
     ESP_RETURN_ON_ERROR(smb_write_word(
                             PMBUS_STACK_CONFIG,
-                            tps546_config.BONANZA_TPS546_INIT_STACK_CONFIG),
+                            tps546_config->stack_config),
                         TAG, "write STACK_CONFIG failed");
     ESP_RETURN_ON_ERROR(smb_write_word(
                             PMBUS_INTERLEAVE,
-                            tps546_config.BONANZA_TPS546_INIT_INTERLEAVE),
+                            tps546_config->interleave),
                         TAG, "write INTERLEAVE failed");
     ESP_RETURN_ON_ERROR(smb_write_word(
                             PMBUS_MISC_OPTIONS,
-                            tps546_config.BONANZA_TPS546_INIT_MISC_OPTIONS),
+                            tps546_config->misc_options),
                         TAG, "write MISC_OPTIONS failed");
     ESP_RETURN_ON_ERROR(smb_write_word(
                             PMBUS_PIN_DETECT_OVERRIDE,
-                            tps546_config.BONANZA_TPS546_INIT_PIN_DETECT_OVERRIDE),
+                            tps546_config->pin_detect_override),
                         TAG, "write PIN_DETECT_OVERRIDE failed");
     ESP_RETURN_ON_ERROR(smb_write_byte(PMBUS_SLAVE_ADDRESS,
                                        BONANZA_TPS546_I2CADDR),
                         TAG, "write SLAVE_ADDRESS failed");
     ESP_RETURN_ON_ERROR(smb_write_block(
                             PMBUS_COMPENSATION_CONFIG,
-                            tps546_config.BONANZA_TPS546_INIT_COMPENSATION_CONFIG, 5),
+                            tps546_config->compensation_config, 5),
                         TAG, "write COMPENSATION_CONFIG failed");
     vTaskDelay(pdMS_TO_TICKS(100));
     ESP_RETURN_ON_ERROR(smb_write_block(
                             PMBUS_POWER_STAGE_CONFIG,
-                            &tps546_config.BONANZA_TPS546_INIT_POWER_STAGE_CONFIG, 1),
+                            &tps546_config->power_stage_config, 1),
                         TAG, "write POWER_STAGE_CONFIG failed");
     ESP_RETURN_ON_ERROR(smb_write_block(
                             PMBUS_TELEMETRY_CFG,
-                            tps546_config.BONANZA_TPS546_INIT_TELEMETRY_CONFIG, 6),
+                            tps546_config->telemetry_config, 6),
                         TAG, "write TELEMETRY_CONFIG failed");
 
     ESP_RETURN_ON_ERROR(smb_write_word(
                             PMBUS_VOUT_COMMAND,
                             float_2_ulinear16_mode(
-                                tps546_config.BONANZA_TPS546_INIT_VOUT_COMMAND,
+                                tps546_config->vout_command,
                                 vout_mode)),
                         TAG, "write VOUT_COMMAND failed");
     ESP_RETURN_ON_ERROR(smb_write_word(
                             PMBUS_VOUT_TRIM,
-                            tps546_config.BONANZA_TPS546_INIT_VOUT_TRIM),
+                            tps546_config->vout_trim),
                         TAG, "write VOUT_TRIM failed");
     ESP_RETURN_ON_ERROR(smb_write_word(
                             PMBUS_VOUT_MAX,
                             float_2_ulinear16_mode(
-                                tps546_config.BONANZA_TPS546_INIT_VOUT_MAX,
+                                tps546_config->vout_max,
                                 vout_mode)),
                         TAG, "write VOUT_MAX failed");
     ESP_RETURN_ON_ERROR(smb_write_word(
                             PMBUS_VOUT_MARGIN_HIGH,
                             float_2_ulinear16_mode(
-                                tps546_config.BONANZA_TPS546_EXT_VOUT_MARGIN_HIGH,
+                                tps546_config->vout_margin_high,
                                 vout_mode)),
                         TAG, "write VOUT_MARGIN_HIGH failed");
     ESP_RETURN_ON_ERROR(smb_write_word(
                             PMBUS_VOUT_MARGIN_LOW,
                             float_2_ulinear16_mode(
-                                tps546_config.BONANZA_TPS546_EXT_VOUT_MARGIN_LOW,
+                                tps546_config->vout_margin_low,
                                 vout_mode)),
                         TAG, "write VOUT_MARGIN_LOW failed");
     ESP_RETURN_ON_ERROR(smb_write_word(
                             PMBUS_VOUT_TRANSITION_RATE,
-                            tps546_config.BONANZA_TPS546_INIT_VOUT_TRANSITION_RATE),
+                            tps546_config->vout_transition_rate),
                         TAG, "write VOUT_TRANSITION_RATE failed");
     ESP_RETURN_ON_ERROR(smb_write_word(
                             PMBUS_VOUT_SCALE_LOOP,
-                            float_2_slinear11(tps546_config.BONANZA_TPS546_INIT_SCALE_LOOP)),
+                            float_2_slinear11(tps546_config->vout_scale_loop)),
                         TAG, "write VOUT_SCALE_LOOP failed");
     ESP_RETURN_ON_ERROR(smb_write_word(
                             PMBUS_VOUT_MIN,
                             float_2_ulinear16_mode(
-                                tps546_config.BONANZA_TPS546_INIT_VOUT_MIN,
+                                tps546_config->vout_min,
                                 vout_mode)),
                         TAG, "write VOUT_MIN failed");
 
     ESP_RETURN_ON_ERROR(smb_write_word(
                             PMBUS_VIN_ON,
-                            float_2_slinear11(tps546_config.BONANZA_TPS546_INIT_VIN_ON)),
+                            float_2_slinear11(tps546_config->vin_on)),
                         TAG, "write VIN_ON failed");
     ESP_RETURN_ON_ERROR(smb_write_word(
                             PMBUS_VIN_OFF,
-                            float_2_slinear11(tps546_config.BONANZA_TPS546_INIT_VIN_OFF)),
+                            float_2_slinear11(tps546_config->vin_off)),
                         TAG, "write VIN_OFF failed");
     ESP_RETURN_ON_ERROR(smb_write_word(
                             PMBUS_IOUT_CAL_GAIN,
-                            tps546_config.BONANZA_TPS546_INIT_IOUT_CAL_GAIN),
+                            tps546_config->iout_cal_gain),
                         TAG, "write IOUT_CAL_GAIN failed");
     ESP_RETURN_ON_ERROR(smb_write_word(
                             PMBUS_IOUT_CAL_OFFSET,
-                            tps546_config.BONANZA_TPS546_INIT_IOUT_CAL_OFFSET),
+                            tps546_config->iout_cal_offset),
                         TAG, "write IOUT_CAL_OFFSET failed");
 
     ESP_RETURN_ON_ERROR(smb_write_word(
                             PMBUS_VOUT_OV_FAULT_LIMIT,
                             float_2_ulinear16_mode(
-                                tps546_config.BONANZA_TPS546_EXT_VOUT_OV_FAULT_LIMIT,
+                                tps546_config->vout_ov_fault_limit,
                                 vout_mode)),
                         TAG, "write VOUT_OV_FAULT_LIMIT failed");
     ESP_RETURN_ON_ERROR(smb_write_byte(PMBUS_VOUT_OV_FAULT_RESPONSE,
-                                       tps546_config.BONANZA_TPS546_EXT_VOUT_OV_FAULT_RESPONSE),
+                                       tps546_config->vout_ov_fault_response),
                         TAG, "write VOUT_OV_FAULT_RESPONSE failed");
     ESP_RETURN_ON_ERROR(smb_write_word(
                             PMBUS_VOUT_OV_WARN_LIMIT,
                             float_2_ulinear16_mode(
-                                tps546_config.BONANZA_TPS546_EXT_VOUT_OV_WARN_LIMIT,
+                                tps546_config->vout_ov_warn_limit,
                                 vout_mode)),
                         TAG, "write VOUT_OV_WARN_LIMIT failed");
     ESP_RETURN_ON_ERROR(smb_write_word(
                             PMBUS_VOUT_UV_WARN_LIMIT,
                             float_2_ulinear16_mode(
-                                tps546_config.BONANZA_TPS546_EXT_VOUT_UV_WARN_LIMIT,
+                                tps546_config->vout_uv_warn_limit,
                                 vout_mode)),
                         TAG, "write VOUT_UV_WARN_LIMIT failed");
     ESP_RETURN_ON_ERROR(smb_write_word(
                             PMBUS_VOUT_UV_FAULT_LIMIT,
                             float_2_ulinear16_mode(
-                                tps546_config.BONANZA_TPS546_EXT_VOUT_UV_FAULT_LIMIT,
+                                tps546_config->vout_uv_fault_limit,
                                 vout_mode)),
                         TAG, "write VOUT_UV_FAULT_LIMIT failed");
     ESP_RETURN_ON_ERROR(smb_write_byte(PMBUS_VOUT_UV_FAULT_RESPONSE,
-                                       tps546_config.BONANZA_TPS546_EXT_VOUT_UV_FAULT_RESPONSE),
+                                       tps546_config->vout_uv_fault_response),
                         TAG, "write VOUT_UV_FAULT_RESPONSE failed");
     ESP_RETURN_ON_ERROR(smb_write_word(
                             PMBUS_IOUT_OC_FAULT_LIMIT,
-                            float_2_slinear11(tps546_config.BONANZA_TPS546_INIT_IOUT_OC_FAULT_LIMIT)),
+                            float_2_slinear11(tps546_config->iout_oc_fault_limit)),
                         TAG, "write IOUT_OC_FAULT_LIMIT failed");
     ESP_RETURN_ON_ERROR(smb_write_byte(PMBUS_IOUT_OC_FAULT_RESPONSE,
-                                       tps546_config.BONANZA_TPS546_EXT_IOUT_OC_FAULT_RESPONSE),
+                                       tps546_config->iout_oc_fault_response),
                         TAG, "write IOUT_OC_FAULT_RESPONSE failed");
     ESP_RETURN_ON_ERROR(smb_write_word(
                             PMBUS_IOUT_OC_WARN_LIMIT,
-                            float_2_slinear11(tps546_config.BONANZA_TPS546_INIT_IOUT_OC_WARN_LIMIT)),
+                            float_2_slinear11(tps546_config->iout_oc_warn_limit)),
                         TAG, "write IOUT_OC_WARN_LIMIT failed");
 
     ESP_RETURN_ON_ERROR(smb_write_word(PMBUS_OT_FAULT_LIMIT,
-                                       int_2_slinear11(tps546_config.BONANZA_TPS546_EXT_OT_FAULT_LIMIT)),
+                                       int_2_slinear11(tps546_config->ot_fault_limit)),
                         TAG, "write OT_FAULT_LIMIT failed");
     ESP_RETURN_ON_ERROR(smb_write_byte(PMBUS_OT_FAULT_RESPONSE,
-                                       tps546_config.BONANZA_TPS546_EXT_OT_FAULT_RESPONSE),
+                                       tps546_config->ot_fault_response),
                         TAG, "write OT_FAULT_RESPONSE failed");
     ESP_RETURN_ON_ERROR(smb_write_word(PMBUS_OT_WARN_LIMIT,
-                                       int_2_slinear11(tps546_config.BONANZA_TPS546_EXT_OT_WARN_LIMIT)),
+                                       int_2_slinear11(tps546_config->ot_warn_limit)),
                         TAG, "write OT_WARN_LIMIT failed");
     ESP_RETURN_ON_ERROR(smb_write_word(
                             PMBUS_VIN_OV_FAULT_LIMIT,
-                            float_2_slinear11(tps546_config.BONANZA_TPS546_INIT_VIN_OV_FAULT_LIMIT)),
+                            float_2_slinear11(tps546_config->vin_ov_fault_limit)),
                         TAG, "write VIN_OV_FAULT_LIMIT failed");
     ESP_RETURN_ON_ERROR(smb_write_byte(PMBUS_VIN_OV_FAULT_RESPONSE,
-                                       tps546_config.BONANZA_TPS546_EXT_VIN_OV_FAULT_RESPONSE),
+                                       tps546_config->vin_ov_fault_response),
                         TAG, "write VIN_OV_FAULT_RESPONSE failed");
     ESP_RETURN_ON_ERROR(smb_write_word(
                             PMBUS_VIN_UV_WARN_LIMIT,
-                            float_2_slinear11(tps546_config.BONANZA_TPS546_INIT_VIN_UV_WARN_LIMIT)),
+                            float_2_slinear11(tps546_config->vin_uv_warn_limit)),
                         TAG, "write VIN_UV_WARN_LIMIT failed");
 
     ESP_RETURN_ON_ERROR(smb_write_word(PMBUS_TON_DELAY,
-                                       int_2_slinear11(tps546_config.BONANZA_TPS546_EXT_TON_DELAY)),
+                                       int_2_slinear11(tps546_config->ton_delay)),
                         TAG, "write TON_DELAY failed");
     ESP_RETURN_ON_ERROR(smb_write_word(PMBUS_TON_RISE,
-                                       int_2_slinear11(tps546_config.BONANZA_TPS546_EXT_TON_RISE)),
+                                       int_2_slinear11(tps546_config->ton_rise)),
                         TAG, "write TON_RISE failed");
     ESP_RETURN_ON_ERROR(smb_write_word(PMBUS_TON_MAX_FAULT_LIMIT,
-                                       int_2_slinear11(tps546_config.BONANZA_TPS546_EXT_TON_MAX_FAULT_LIMIT)),
+                                       int_2_slinear11(tps546_config->ton_max_fault_limit)),
                         TAG, "write TON_MAX_FAULT_LIMIT failed");
     ESP_RETURN_ON_ERROR(smb_write_byte(PMBUS_TON_MAX_FAULT_RESPONSE,
-                                       tps546_config.BONANZA_TPS546_EXT_TON_MAX_FAULT_RESPONSE),
+                                       tps546_config->ton_max_fault_response),
                         TAG, "write TON_MAX_FAULT_RESPONSE failed");
     ESP_RETURN_ON_ERROR(smb_write_word(PMBUS_TOFF_DELAY,
-                                       int_2_slinear11(tps546_config.BONANZA_TPS546_EXT_TOFF_DELAY)),
+                                       int_2_slinear11(tps546_config->toff_delay)),
                         TAG, "write TOFF_DELAY failed");
     ESP_RETURN_ON_ERROR(smb_write_word(PMBUS_TOFF_FALL,
-                                       int_2_slinear11(tps546_config.BONANZA_TPS546_EXT_TOFF_FALL)),
+                                       int_2_slinear11(tps546_config->toff_fall)),
                         TAG, "write TOFF_FALL failed");
-    tps546_extended_vout_mode = vout_mode;
-    tps546_extended_config_written = true;
+    tps546_vout_mode = vout_mode;
+    tps546_config_written = true;
     return ESP_OK;
 }
 
 static esp_err_t verify_config_field(const char *name,
-                                     const uint8_t *expected,
-                                     size_t expected_len,
-                                     const uint8_t *observed,
-                                     size_t observed_len,
+                                     const uint8_t *expected, size_t expected_len,
+                                     const uint8_t *observed, size_t observed_len,
                                      char *detail, size_t detail_len)
 {
-    const bzm_tps546_verify_field_t field = {
-        .name = name,
-        .expected = expected,
-        .expected_len = expected_len,
-        .observed = observed,
-        .observed_len = observed_len,
-    };
-    return bzm_tps546_verify_fields(&field, 1, detail, detail_len);
+    if (expected_len != observed_len || memcmp(expected, observed, expected_len) != 0) {
+        snprintf(detail, detail_len, "%s readback mismatch", name);
+        return ESP_ERR_INVALID_RESPONSE;
+    }
+    return ESP_OK;
 }
 
 static esp_err_t config_read_failed(const char *name, const char *operation,
@@ -686,73 +673,12 @@ static esp_err_t verify_config_block(uint8_t command, const char *name,
                                detail, detail_len);
 }
 
-static esp_err_t verify_smbalert_mask(uint8_t selector, const char *name,
-                                      uint16_t configured_mask, char *detail,
-                                      size_t detail_len)
-{
-    if ((configured_mask & 0xff) != 0) {
-        snprintf(detail, detail_len, "%s invalid profile mask=0x%04X",
-                 name, configured_mask);
-        return ESP_ERR_INVALID_ARG;
-    }
-
-    esp_err_t err = smb_write_block(PMBUS_SMBALERT_MASK, &selector, 1);
-    if (err != ESP_OK) {
-        return config_read_failed(name, "select", err, detail, detail_len);
-    }
-
-    uint8_t observed = 0;
-    err = smb_read_block_exact(PMBUS_SMBALERT_MASK, &observed, 1);
-    if (err != ESP_OK) {
-        return config_read_failed(name, "read", err, detail, detail_len);
-    }
-
-    uint8_t expected = (uint8_t)(configured_mask >> 8);
-    return verify_config_field(name, &expected, 1, &observed, 1,
-                               detail, detail_len);
-}
-
-static esp_err_t BONANZA_TPS546_write_vout_limit_ratios(float vout_command)
-{
-    ESP_LOGI(TAG, "Setting VOUT_OV_FAULT_LIMIT: %.2fx (%.2fV)", BONANZA_TPS546_INIT_VOUT_OV_FAULT_LIMIT,
-             vout_command * BONANZA_TPS546_INIT_VOUT_OV_FAULT_LIMIT);
-    ESP_RETURN_ON_ERROR(smb_write_word(PMBUS_VOUT_OV_FAULT_LIMIT, float_2_ulinear16(BONANZA_TPS546_INIT_VOUT_OV_FAULT_LIMIT)),
-                        TAG, "Failed to write VOUT_OV_FAULT_LIMIT");
-
-    ESP_LOGI(TAG, "Setting VOUT_OV_WARN_LIMIT: %.2fx (%.2fV)", BONANZA_TPS546_INIT_VOUT_OV_WARN_LIMIT,
-             vout_command * BONANZA_TPS546_INIT_VOUT_OV_WARN_LIMIT);
-    ESP_RETURN_ON_ERROR(smb_write_word(PMBUS_VOUT_OV_WARN_LIMIT, float_2_ulinear16(BONANZA_TPS546_INIT_VOUT_OV_WARN_LIMIT)),
-                        TAG, "Failed to write VOUT_OV_WARN_LIMIT");
-
-    ESP_LOGI(TAG, "Setting VOUT_MARGIN_HIGH: %.2fx (%.2fV)", BONANZA_TPS546_INIT_VOUT_MARGIN_HIGH,
-             vout_command * BONANZA_TPS546_INIT_VOUT_MARGIN_HIGH);
-    ESP_RETURN_ON_ERROR(smb_write_word(PMBUS_VOUT_MARGIN_HIGH, float_2_ulinear16(BONANZA_TPS546_INIT_VOUT_MARGIN_HIGH)),
-                        TAG, "Failed to write VOUT_MARGIN_HIGH");
-
-    ESP_LOGI(TAG, "Setting VOUT_MARGIN_LOW: %.2fx (%.2fV)", BONANZA_TPS546_INIT_VOUT_MARGIN_LOW,
-             vout_command * BONANZA_TPS546_INIT_VOUT_MARGIN_LOW);
-    ESP_RETURN_ON_ERROR(smb_write_word(PMBUS_VOUT_MARGIN_LOW, float_2_ulinear16(BONANZA_TPS546_INIT_VOUT_MARGIN_LOW)),
-                        TAG, "Failed to write VOUT_MARGIN_LOW");
-
-    ESP_LOGI(TAG, "Setting VOUT_UV_WARN_LIMIT: %.2fx (%.2fV)", BONANZA_TPS546_INIT_VOUT_UV_WARN_LIMIT,
-             vout_command * BONANZA_TPS546_INIT_VOUT_UV_WARN_LIMIT);
-    ESP_RETURN_ON_ERROR(smb_write_word(PMBUS_VOUT_UV_WARN_LIMIT, float_2_ulinear16(BONANZA_TPS546_INIT_VOUT_UV_WARN_LIMIT)),
-                        TAG, "Failed to write VOUT_UV_WARN_LIMIT");
-
-    ESP_LOGI(TAG, "Setting VOUT_UV_FAULT_LIMIT: %.2fx (%.2fV)", BONANZA_TPS546_INIT_VOUT_UV_FAULT_LIMIT,
-             vout_command * BONANZA_TPS546_INIT_VOUT_UV_FAULT_LIMIT);
-    ESP_RETURN_ON_ERROR(smb_write_word(PMBUS_VOUT_UV_FAULT_LIMIT, float_2_ulinear16(BONANZA_TPS546_INIT_VOUT_UV_FAULT_LIMIT)),
-                        TAG, "Failed to write VOUT_UV_FAULT_LIMIT");
-
-    return ESP_OK;
-}
-
 /*--- Public TPS546 functions ---*/
 
 /**
  * @brief Set up the TPS546 regulator and turn it on
 */
-esp_err_t BONANZA_TPS546_init(BONANZA_TPS546_CONFIG config)
+esp_err_t BONANZA_TPS546_init(void)
 {
     uint8_t u8_value = 0;
     uint16_t u16_value = 0;
@@ -761,8 +687,7 @@ esp_err_t BONANZA_TPS546_init(BONANZA_TPS546_CONFIG config)
     uint8_t comp_config[5];
     uint8_t voutmode;
 
-    tps546_extended_config_written = false;
-    tps546_config = config;
+    tps546_config_written = false;
 
     ESP_LOGI(TAG, "Initializing the core voltage regulator");
 
@@ -832,7 +757,7 @@ esp_err_t BONANZA_TPS546_init(BONANZA_TPS546_CONFIG config)
     ESP_RETURN_ON_ERROR(smb_read_byte(PMBUS_VOUT_MODE, &voutmode), TAG,
                         "read VOUT_MODE failed");
     ESP_LOGI(TAG, "VOUT_MODE: %02x", voutmode);
-    ESP_RETURN_ON_ERROR(write_entire_config_checked(), TAG,
+    ESP_RETURN_ON_ERROR(write_config(), TAG,
                         "TPS546 configuration failed");
     //}
 
@@ -841,7 +766,6 @@ esp_err_t BONANZA_TPS546_init(BONANZA_TPS546_CONFIG config)
     // ESP_LOGI(TAG, "Temp: %d", BONANZA_TPS546_get_temperature());
 
     /* Show voltage settings */
-    BONANZA_TPS546_show_voltage_settings();
 
     smb_read_word(PMBUS_STATUS_WORD, &u16_value);
     ESP_LOGI(TAG, "read STATUS_WORD: %04x", u16_value);
@@ -889,8 +813,6 @@ esp_err_t BONANZA_TPS546_init(BONANZA_TPS546_CONFIG config)
     smb_read_byte(PMBUS_ON_OFF_CONFIG, &u8_value);
     ESP_LOGI(TAG, "read ON_OFF_CONFIG: %02x", u8_value);
 
-
-
     // Read the compensation config registers
     if (smb_read_block(PMBUS_COMPENSATION_CONFIG, comp_config, 5) != ESP_OK) {
         ESP_LOGE(TAG, "Failed to read COMPENSATION CONFIG");
@@ -899,7 +821,6 @@ esp_err_t BONANZA_TPS546_init(BONANZA_TPS546_CONFIG config)
     ESP_LOGI(TAG, "read COMPENSATION CONFIG");
     ESP_LOGI(TAG, "%02x %02x %02x %02x %02x", comp_config[0], comp_config[1],
         comp_config[2], comp_config[3], comp_config[4]);
-
 
     ESP_LOGI(TAG, "Clearing faults");
     BONANZA_TPS546_clear_faults();
@@ -950,198 +871,12 @@ static void BONANZA_TPS546_read_mfr_info(uint8_t *read_mfr_revision)
     ESP_LOGI(TAG, "MFR_REVISION: %02X %02X %02X", read_mfr_revision[0], read_mfr_revision[1], read_mfr_revision[2]);
 }
 
-/**
- * @brief Set all the relevant config registers for normal operation
-*/
-static esp_err_t write_entire_config_checked(void)
+esp_err_t BONANZA_TPS546_check_protection(char *detail, size_t detail_len)
 {
-    if (tps546_config.BONANZA_TPS546_EXTENDED_CONFIG) {
-        return BONANZA_TPS546_write_extended_config();
-    }
-
-    ESP_LOGI(TAG, "---Writing new config values to TPS546---");
-
-        // ON_OFF_CONFIG
-    //u8_value = (ON_OFF_CONFIG_DELAY | ON_OFF_CONFIG_POLARITY | ON_OFF_CONFIG_CP | ON_OFF_CONFIG_CMD | ON_OFF_CONFIG_PU);
-    uint8_t u8_value = (ON_OFF_CONFIG_DELAY | ON_OFF_CONFIG_POLARITY | ON_OFF_CONFIG_CMD | ON_OFF_CONFIG_PU);
-    ESP_LOGI(TAG, "Setting ON_OFF_CONFIG: %02X", u8_value);
-    smb_write_byte(PMBUS_ON_OFF_CONFIG, u8_value);
-
-
-    // STACK_CONFIG
-    ESP_LOGI(TAG, "Setting STACK_CONFIG: %04X", tps546_config.BONANZA_TPS546_INIT_STACK_CONFIG);
-    smb_write_word(PMBUS_STACK_CONFIG, tps546_config.BONANZA_TPS546_INIT_STACK_CONFIG);
-
-    // SYNC_CONFIG
-    ESP_LOGI(TAG, "Setting SYNC_CONFIG: %02X", tps546_config.BONANZA_TPS546_INIT_SYNC_CONFIG);
-    smb_write_byte(PMBUS_SYNC_CONFIG, tps546_config.BONANZA_TPS546_INIT_SYNC_CONFIG);
-
-
-    /* Phase */
-    ESP_LOGI(TAG, "Setting PHASE: %02X", tps546_config.BONANZA_TPS546_INIT_PHASE);
-    smb_write_byte(PMBUS_PHASE, tps546_config.BONANZA_TPS546_INIT_PHASE);
-
-    /* Switch frequency */
-    uint16_t freq = tps546_config.BONANZA_TPS546_INIT_FREQUENCY ? tps546_config.BONANZA_TPS546_INIT_FREQUENCY : BONANZA_TPS546_DEFAULT_FREQUENCY;
-    ESP_LOGI(TAG, "Setting FREQUENCY: %dKHz", freq);
-    smb_write_word(PMBUS_FREQUENCY_SWITCH, int_2_slinear11(freq));
-
-    if(tps546_config.BONANZA_TPS546_INIT_COMPENSATION_CONFIG[0] != 0 &&
-       tps546_config.BONANZA_TPS546_INIT_COMPENSATION_CONFIG[1] != 0 &&
-       tps546_config.BONANZA_TPS546_INIT_COMPENSATION_CONFIG[2] != 0 &&
-       tps546_config.BONANZA_TPS546_INIT_COMPENSATION_CONFIG[3] != 0 &&
-       tps546_config.BONANZA_TPS546_INIT_COMPENSATION_CONFIG[4] != 0 ) {
-        // COMPENSATION_CONFIG
-        ESP_LOGI(TAG, "Setting COMPENSATION_CONFIG: %02X %02X %02X %02X %02X",
-            tps546_config.BONANZA_TPS546_INIT_COMPENSATION_CONFIG[0], tps546_config.BONANZA_TPS546_INIT_COMPENSATION_CONFIG[1],
-            tps546_config.BONANZA_TPS546_INIT_COMPENSATION_CONFIG[2], tps546_config.BONANZA_TPS546_INIT_COMPENSATION_CONFIG[3],
-            tps546_config.BONANZA_TPS546_INIT_COMPENSATION_CONFIG[4]);
-        esp_err_t comp_err = smb_write_block(PMBUS_COMPENSATION_CONFIG,
-                                             tps546_config.BONANZA_TPS546_INIT_COMPENSATION_CONFIG,
-                                             5);
-        if (comp_err != ESP_OK) {
-            uint8_t status_cml = 0;
-            uint16_t status_word = 0;
-
-            if (smb_read_byte(PMBUS_STATUS_CML, &status_cml) == ESP_OK) {
-                ESP_LOGE(TAG, "COMPENSATION_CONFIG write failed; STATUS_CML=%02X", status_cml);
-            }
-
-            if (smb_read_word(PMBUS_STATUS_WORD, &status_word) == ESP_OK) {
-                ESP_LOGE(TAG, "COMPENSATION_CONFIG write failed; STATUS_WORD=%04X", status_word);
-            }
-        } else {
-            ESP_LOGI(TAG, "COMPENSATION_CONFIG write accepted");
-        }
-
-    }
-
-    /* vin voltage */
-
-    //deal with the UV_WARN_LIMIT bug
-    if (tps546_config.BONANZA_TPS546_INIT_VIN_UV_WARN_LIMIT > 0) {
-        ESP_LOGI(TAG, "Setting VIN_UV_WARN_LIMIT: %.2f", tps546_config.BONANZA_TPS546_INIT_VIN_UV_WARN_LIMIT);
-        smb_write_word(PMBUS_VIN_UV_WARN_LIMIT, float_2_slinear11(tps546_config.BONANZA_TPS546_INIT_VIN_UV_WARN_LIMIT));
-    }
-
-    ESP_LOGI(TAG, "Setting VIN_ON: %.2fV", tps546_config.BONANZA_TPS546_INIT_VIN_ON);
-    smb_write_word(PMBUS_VIN_ON, float_2_slinear11(tps546_config.BONANZA_TPS546_INIT_VIN_ON));
-
-    ESP_LOGI(TAG, "Setting VIN_OFF: %.2fV", tps546_config.BONANZA_TPS546_INIT_VIN_OFF);
-    smb_write_word(PMBUS_VIN_OFF, float_2_slinear11(tps546_config.BONANZA_TPS546_INIT_VIN_OFF));
-
-    ESP_LOGI(TAG, "Setting VIN_OV_FAULT_LIMIT: %.2fV", tps546_config.BONANZA_TPS546_INIT_VIN_OV_FAULT_LIMIT);
-    smb_write_word(PMBUS_VIN_OV_FAULT_LIMIT, float_2_slinear11(tps546_config.BONANZA_TPS546_INIT_VIN_OV_FAULT_LIMIT));
-
-    ESP_LOGI(TAG, "Setting VIN_OV_FAULT_RESPONSE: %02X", BONANZA_TPS546_INIT_VIN_OV_FAULT_RESPONSE);
-    smb_write_byte(PMBUS_VIN_OV_FAULT_RESPONSE, BONANZA_TPS546_INIT_VIN_OV_FAULT_RESPONSE);
-
-    /* vout voltage */
-    ESP_LOGI(TAG, "Setting VOUT SCALE: %.2f", tps546_config.BONANZA_TPS546_INIT_SCALE_LOOP);
-    smb_write_word(PMBUS_VOUT_SCALE_LOOP, float_2_slinear11(tps546_config.BONANZA_TPS546_INIT_SCALE_LOOP));
-
-    ESP_LOGI(TAG, "Setting VOUT_COMMAND: %.2fV", tps546_config.BONANZA_TPS546_INIT_VOUT_COMMAND);
-    smb_write_word(PMBUS_VOUT_COMMAND, float_2_ulinear16(tps546_config.BONANZA_TPS546_INIT_VOUT_COMMAND));
-
-    ESP_LOGI(TAG, "Setting VOUT_MAX: %.2fV", tps546_config.BONANZA_TPS546_INIT_VOUT_MAX);
-    smb_write_word(PMBUS_VOUT_MAX, float_2_ulinear16(tps546_config.BONANZA_TPS546_INIT_VOUT_MAX));
-
-    ESP_LOGI(TAG, "Setting VOUT_MIN: %.2fV", tps546_config.BONANZA_TPS546_INIT_VOUT_MIN);
-    smb_write_word(PMBUS_VOUT_MIN, float_2_ulinear16(tps546_config.BONANZA_TPS546_INIT_VOUT_MIN));
-
-    if (BONANZA_TPS546_write_vout_limit_ratios(tps546_config.BONANZA_TPS546_INIT_VOUT_COMMAND) != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to write VOUT limit ratios");
-    }
-
-    /* iout current */
-    ESP_LOGI(TAG, "----- IOUT");
-    ESP_LOGI(TAG, "Setting IOUT_OC_WARN_LIMIT: %.2fA", tps546_config.BONANZA_TPS546_INIT_IOUT_OC_WARN_LIMIT);
-    smb_write_word(PMBUS_IOUT_OC_WARN_LIMIT, float_2_slinear11(tps546_config.BONANZA_TPS546_INIT_IOUT_OC_WARN_LIMIT));
-
-    ESP_LOGI(TAG, "Setting IOUT_OC_FAULT_LIMIT: %.2fA", tps546_config.BONANZA_TPS546_INIT_IOUT_OC_FAULT_LIMIT);
-    smb_write_word(PMBUS_IOUT_OC_FAULT_LIMIT, float_2_slinear11(tps546_config.BONANZA_TPS546_INIT_IOUT_OC_FAULT_LIMIT));
-
-    ESP_LOGI(TAG, "Setting IOUT_OC_FAULT_RESPONSE: %02x", BONANZA_TPS546_INIT_IOUT_OC_FAULT_RESPONSE);
-    smb_write_byte(PMBUS_IOUT_OC_FAULT_RESPONSE, BONANZA_TPS546_INIT_IOUT_OC_FAULT_RESPONSE);
-
-    /* temperature */
-    ESP_LOGI(TAG, "----- TEMPERATURE");
-    ESP_LOGI(TAG, "Setting OT_WARN_LIMIT: %dC", BONANZA_TPS546_INIT_OT_WARN_LIMIT);
-    smb_write_word(PMBUS_OT_WARN_LIMIT, int_2_slinear11(BONANZA_TPS546_INIT_OT_WARN_LIMIT));
-    ESP_LOGI(TAG, "Setting OT_FAULT_LIMIT: %dC", BONANZA_TPS546_INIT_OT_FAULT_LIMIT);
-    smb_write_word(PMBUS_OT_FAULT_LIMIT, int_2_slinear11(BONANZA_TPS546_INIT_OT_FAULT_LIMIT));
-    ESP_LOGI(TAG, "Setting OT_FAULT_RESPONSE: %02x", BONANZA_TPS546_INIT_OT_FAULT_RESPONSE);
-    smb_write_byte(PMBUS_OT_FAULT_RESPONSE, BONANZA_TPS546_INIT_OT_FAULT_RESPONSE);
-
-    /* timing */
-    ESP_LOGI(TAG, "----- TIMING");
-    ESP_LOGI(TAG, "Setting TON_DELAY: %dms", BONANZA_TPS546_INIT_TON_DELAY);
-    smb_write_word(PMBUS_TON_DELAY, int_2_slinear11(BONANZA_TPS546_INIT_TON_DELAY));
-    ESP_LOGI(TAG, "Setting TON_RISE: %dms", BONANZA_TPS546_INIT_TON_RISE);
-    smb_write_word(PMBUS_TON_RISE, int_2_slinear11(BONANZA_TPS546_INIT_TON_RISE));
-    ESP_LOGI(TAG, "Setting TON_MAX_FAULT_LIMIT: %dms", BONANZA_TPS546_INIT_TON_MAX_FAULT_LIMIT);
-    smb_write_word(PMBUS_TON_MAX_FAULT_LIMIT, int_2_slinear11(BONANZA_TPS546_INIT_TON_MAX_FAULT_LIMIT));
-    ESP_LOGI(TAG, "Setting TON_MAX_FAULT_RESPONSE: %02x", BONANZA_TPS546_INIT_TON_MAX_FAULT_RESPONSE);
-    smb_write_byte(PMBUS_TON_MAX_FAULT_RESPONSE, BONANZA_TPS546_INIT_TON_MAX_FAULT_RESPONSE);
-    ESP_LOGI(TAG, "Setting TOFF_DELAY: %dms", BONANZA_TPS546_INIT_TOFF_DELAY);
-    smb_write_word(PMBUS_TOFF_DELAY, int_2_slinear11(BONANZA_TPS546_INIT_TOFF_DELAY));
-    ESP_LOGI(TAG, "Setting TOFF_FALL: %dms", BONANZA_TPS546_INIT_TOFF_FALL);
-    smb_write_word(PMBUS_TOFF_FALL, int_2_slinear11(BONANZA_TPS546_INIT_TOFF_FALL));
-
-    /* Compensation config */
-    //ESP_LOGI(TAG, "COMPENSATION");
-    //smb_write_block(PMBUS_COMPENSATION_CONFIG, COMPENSATION_CONFIG, 5);
-
-    /* configure the bootup behavior regarding pin detect values vs NVM values */
-    ESP_LOGI(TAG, "Setting PIN_DETECT_OVERRIDE");
-    smb_write_word(PMBUS_PIN_DETECT_OVERRIDE, tps546_config.BONANZA_TPS546_INIT_PIN_DETECT_OVERRIDE);
-
-    /* TODO write new MFR_REVISION number to reflect these parameters */
-    // ESP_LOGI(TAG, "Setting MFR ID");
-    // smb_write_block(PMBUS_MFR_ID, MFR_ID, 3);
-    // ESP_LOGI(TAG, "Setting MFR MODEL");
-    // smb_write_block(PMBUS_MFR_ID, MFR_MODEL, 3);
-    // ESP_LOGI(TAG, "Setting MFR REVISION");
-    // smb_write_block(PMBUS_MFR_ID, MFR_REVISION, 3);
-
-    /*
-    !!!!!!!!!!!!!!!!!!!!!!!!!!!
-    // Never write this to NVM as it can corrupt the TPS in an unrecoverable state, just do it on boot every time
-    !!!!!!!!!!!!!!!!!!!!!!!!!!!
-    */
-    /* store configuration in NVM */
-    // ESP_LOGI(TAG, "---Saving new config---");
-    // smb_write_byte(PMBUS_STORE_USER_ALL, 0x98);
-
-    return ESP_OK;
-}
-
-esp_err_t BONANZA_TPS546_verify_active_config(char *detail, size_t detail_len)
-{
-    static const uint8_t status_selectors[] = {
-        PMBUS_STATUS_VOUT_SELECTOR,
-        PMBUS_STATUS_IOUT_SELECTOR,
-        PMBUS_STATUS_INPUT_SELECTOR,
-        PMBUS_STATUS_TEMPERATURE_SELECTOR,
-        PMBUS_STATUS_CML_SELECTOR,
-        PMBUS_STATUS_OTHER_SELECTOR,
-        PMBUS_STATUS_MFR_SPECIFIC_SELECTOR,
-    };
-    static const char *const status_names[] = {
-        "SMBALERT_MASK_VOUT",
-        "SMBALERT_MASK_IOUT",
-        "SMBALERT_MASK_INPUT",
-        "SMBALERT_MASK_TEMPERATURE",
-        "SMBALERT_MASK_CML",
-        "SMBALERT_MASK_OTHER",
-        "SMBALERT_MASK_MFR_SPECIFIC",
-    };
-
     if (detail == NULL || detail_len == 0) return ESP_ERR_INVALID_ARG;
     detail[0] = '\0';
-    if (!tps546_config.BONANZA_TPS546_EXTENDED_CONFIG ||
-        !tps546_extended_config_written) {
-        snprintf(detail, detail_len, "EXTENDED_CONFIG not active");
+    if (!tps546_config_written) {
+        snprintf(detail, detail_len, "Bonanza profile not active");
         return ESP_ERR_INVALID_STATE;
     }
 
@@ -1161,138 +896,87 @@ esp_err_t BONANZA_TPS546_verify_active_config(char *detail, size_t detail_len)
     if (verify_err != ESP_OK) return verify_err;                               \
 } while (0)
 
+    /* Read back the power topology, feedback, and hard protection settings.
+     * Every configuration write is checked separately; optional alert routing,
+     * margins and timing settings do not require a second startup audit. */
+
     /* VOUT_MODE is an immutable dependency of every ULINEAR16 encoding. */
-    VERIFY_BYTE(PMBUS_VOUT_MODE, "VOUT_MODE", tps546_extended_vout_mode);
+    VERIFY_BYTE(PMBUS_VOUT_MODE, "VOUT_MODE", tps546_vout_mode);
 
     const uint8_t on_off_config = ON_OFF_CONFIG_DELAY | ON_OFF_CONFIG_POLARITY |
                                   ON_OFF_CONFIG_CMD | ON_OFF_CONFIG_PU;
     VERIFY_BYTE(PMBUS_ON_OFF_CONFIG, "ON_OFF_CONFIG", on_off_config);
-    VERIFY_BYTE(PMBUS_PHASE, "PHASE", tps546_config.BONANZA_TPS546_INIT_PHASE);
-
-    for (size_t i = 0; i < sizeof(status_selectors); ++i) {
-        esp_err_t err = verify_smbalert_mask(
-            status_selectors[i], status_names[i],
-            tps546_config.BONANZA_TPS546_INIT_SMBALERT_MASK[i], detail, detail_len);
-        if (err != ESP_OK) return err;
-    }
+    VERIFY_BYTE(PMBUS_PHASE, "PHASE", tps546_config->phase);
 
     VERIFY_WORD(PMBUS_FREQUENCY_SWITCH, "FREQUENCY_SWITCH",
-                int_2_slinear11(tps546_config.BONANZA_TPS546_INIT_FREQUENCY));
-    VERIFY_BYTE(PMBUS_SYNC_CONFIG, "SYNC_CONFIG",
-                tps546_config.BONANZA_TPS546_INIT_SYNC_CONFIG);
+                int_2_slinear11(tps546_config->frequency_switch_khz));
     VERIFY_WORD(PMBUS_STACK_CONFIG, "STACK_CONFIG",
-                tps546_config.BONANZA_TPS546_INIT_STACK_CONFIG);
-    VERIFY_WORD(PMBUS_INTERLEAVE, "INTERLEAVE",
-                tps546_config.BONANZA_TPS546_INIT_INTERLEAVE);
-    VERIFY_WORD(PMBUS_MISC_OPTIONS, "MISC_OPTIONS",
-                tps546_config.BONANZA_TPS546_INIT_MISC_OPTIONS);
+                tps546_config->stack_config);
     VERIFY_WORD(PMBUS_PIN_DETECT_OVERRIDE, "PIN_DETECT_OVERRIDE",
-                tps546_config.BONANZA_TPS546_INIT_PIN_DETECT_OVERRIDE);
-    VERIFY_BYTE(PMBUS_SLAVE_ADDRESS, "SLAVE_ADDRESS", BONANZA_TPS546_I2CADDR);
+                tps546_config->pin_detect_override);
     VERIFY_BLOCK(PMBUS_COMPENSATION_CONFIG, "COMPENSATION_CONFIG",
-                 tps546_config.BONANZA_TPS546_INIT_COMPENSATION_CONFIG, 5);
+                 tps546_config->compensation_config, 5);
     VERIFY_BLOCK(PMBUS_POWER_STAGE_CONFIG, "POWER_STAGE_CONFIG",
-                 &tps546_config.BONANZA_TPS546_INIT_POWER_STAGE_CONFIG, 1);
+                 &tps546_config->power_stage_config, 1);
     VERIFY_BLOCK(PMBUS_TELEMETRY_CFG, "TELEMETRY_CONFIG",
-                 tps546_config.BONANZA_TPS546_INIT_TELEMETRY_CONFIG, 6);
+                 tps546_config->telemetry_config, 6);
 
     VERIFY_WORD(PMBUS_VOUT_COMMAND, "VOUT_COMMAND",
                 float_2_ulinear16_mode(
-                    tps546_config.BONANZA_TPS546_INIT_VOUT_COMMAND,
-                    tps546_extended_vout_mode));
+                    tps546_config->vout_command,
+                    tps546_vout_mode));
     VERIFY_WORD(PMBUS_VOUT_TRIM, "VOUT_TRIM",
-                tps546_config.BONANZA_TPS546_INIT_VOUT_TRIM);
+                tps546_config->vout_trim);
     VERIFY_WORD(PMBUS_VOUT_MAX, "VOUT_MAX",
-                float_2_ulinear16_mode(tps546_config.BONANZA_TPS546_INIT_VOUT_MAX,
-                                       tps546_extended_vout_mode));
-    VERIFY_WORD(PMBUS_VOUT_MARGIN_HIGH, "VOUT_MARGIN_HIGH",
-                float_2_ulinear16_mode(
-                    tps546_config.BONANZA_TPS546_EXT_VOUT_MARGIN_HIGH,
-                    tps546_extended_vout_mode));
-    VERIFY_WORD(PMBUS_VOUT_MARGIN_LOW, "VOUT_MARGIN_LOW",
-                float_2_ulinear16_mode(
-                    tps546_config.BONANZA_TPS546_EXT_VOUT_MARGIN_LOW,
-                    tps546_extended_vout_mode));
-    VERIFY_WORD(PMBUS_VOUT_TRANSITION_RATE, "VOUT_TRANSITION_RATE",
-                tps546_config.BONANZA_TPS546_INIT_VOUT_TRANSITION_RATE);
+                float_2_ulinear16_mode(tps546_config->vout_max,
+                                       tps546_vout_mode));
     VERIFY_WORD(PMBUS_VOUT_SCALE_LOOP, "VOUT_SCALE_LOOP",
-                float_2_slinear11(tps546_config.BONANZA_TPS546_INIT_SCALE_LOOP));
+                float_2_slinear11(tps546_config->vout_scale_loop));
     VERIFY_WORD(PMBUS_VOUT_MIN, "VOUT_MIN",
-                float_2_ulinear16_mode(tps546_config.BONANZA_TPS546_INIT_VOUT_MIN,
-                                       tps546_extended_vout_mode));
+                float_2_ulinear16_mode(tps546_config->vout_min,
+                                       tps546_vout_mode));
 
     VERIFY_WORD(PMBUS_VIN_ON, "VIN_ON",
-                float_2_slinear11(tps546_config.BONANZA_TPS546_INIT_VIN_ON));
+                float_2_slinear11(tps546_config->vin_on));
     VERIFY_WORD(PMBUS_VIN_OFF, "VIN_OFF",
-                float_2_slinear11(tps546_config.BONANZA_TPS546_INIT_VIN_OFF));
+                float_2_slinear11(tps546_config->vin_off));
     VERIFY_WORD(PMBUS_IOUT_CAL_GAIN, "IOUT_CAL_GAIN",
-                tps546_config.BONANZA_TPS546_INIT_IOUT_CAL_GAIN);
+                tps546_config->iout_cal_gain);
     VERIFY_WORD(PMBUS_IOUT_CAL_OFFSET, "IOUT_CAL_OFFSET",
-                tps546_config.BONANZA_TPS546_INIT_IOUT_CAL_OFFSET);
+                tps546_config->iout_cal_offset);
 
     VERIFY_WORD(PMBUS_VOUT_OV_FAULT_LIMIT, "VOUT_OV_FAULT_LIMIT",
                 float_2_ulinear16_mode(
-                    tps546_config.BONANZA_TPS546_EXT_VOUT_OV_FAULT_LIMIT,
-                    tps546_extended_vout_mode));
+                    tps546_config->vout_ov_fault_limit,
+                    tps546_vout_mode));
     VERIFY_BYTE(PMBUS_VOUT_OV_FAULT_RESPONSE, "VOUT_OV_FAULT_RESPONSE",
-                tps546_config.BONANZA_TPS546_EXT_VOUT_OV_FAULT_RESPONSE);
-    VERIFY_WORD(PMBUS_VOUT_OV_WARN_LIMIT, "VOUT_OV_WARN_LIMIT",
-                float_2_ulinear16_mode(
-                    tps546_config.BONANZA_TPS546_EXT_VOUT_OV_WARN_LIMIT,
-                    tps546_extended_vout_mode));
-    VERIFY_WORD(PMBUS_VOUT_UV_WARN_LIMIT, "VOUT_UV_WARN_LIMIT",
-                float_2_ulinear16_mode(
-                    tps546_config.BONANZA_TPS546_EXT_VOUT_UV_WARN_LIMIT,
-                    tps546_extended_vout_mode));
+                tps546_config->vout_ov_fault_response);
     VERIFY_WORD(PMBUS_VOUT_UV_FAULT_LIMIT, "VOUT_UV_FAULT_LIMIT",
                 float_2_ulinear16_mode(
-                    tps546_config.BONANZA_TPS546_EXT_VOUT_UV_FAULT_LIMIT,
-                    tps546_extended_vout_mode));
+                    tps546_config->vout_uv_fault_limit,
+                    tps546_vout_mode));
     VERIFY_BYTE(PMBUS_VOUT_UV_FAULT_RESPONSE, "VOUT_UV_FAULT_RESPONSE",
-                tps546_config.BONANZA_TPS546_EXT_VOUT_UV_FAULT_RESPONSE);
+                tps546_config->vout_uv_fault_response);
     VERIFY_WORD(PMBUS_IOUT_OC_FAULT_LIMIT, "IOUT_OC_FAULT_LIMIT",
                 float_2_slinear11(
-                    tps546_config.BONANZA_TPS546_INIT_IOUT_OC_FAULT_LIMIT));
+                    tps546_config->iout_oc_fault_limit));
     VERIFY_BYTE(PMBUS_IOUT_OC_FAULT_RESPONSE, "IOUT_OC_FAULT_RESPONSE",
-                tps546_config.BONANZA_TPS546_EXT_IOUT_OC_FAULT_RESPONSE);
-    VERIFY_WORD(PMBUS_IOUT_OC_WARN_LIMIT, "IOUT_OC_WARN_LIMIT",
-                float_2_slinear11(
-                    tps546_config.BONANZA_TPS546_INIT_IOUT_OC_WARN_LIMIT));
+                tps546_config->iout_oc_fault_response);
 
     VERIFY_WORD(PMBUS_OT_FAULT_LIMIT, "OT_FAULT_LIMIT",
-                int_2_slinear11(tps546_config.BONANZA_TPS546_EXT_OT_FAULT_LIMIT));
+                int_2_slinear11(tps546_config->ot_fault_limit));
     VERIFY_BYTE(PMBUS_OT_FAULT_RESPONSE, "OT_FAULT_RESPONSE",
-                tps546_config.BONANZA_TPS546_EXT_OT_FAULT_RESPONSE);
-    VERIFY_WORD(PMBUS_OT_WARN_LIMIT, "OT_WARN_LIMIT",
-                int_2_slinear11(tps546_config.BONANZA_TPS546_EXT_OT_WARN_LIMIT));
+                tps546_config->ot_fault_response);
     VERIFY_WORD(PMBUS_VIN_OV_FAULT_LIMIT, "VIN_OV_FAULT_LIMIT",
                 float_2_slinear11(
-                    tps546_config.BONANZA_TPS546_INIT_VIN_OV_FAULT_LIMIT));
+                    tps546_config->vin_ov_fault_limit));
     VERIFY_BYTE(PMBUS_VIN_OV_FAULT_RESPONSE, "VIN_OV_FAULT_RESPONSE",
-                tps546_config.BONANZA_TPS546_EXT_VIN_OV_FAULT_RESPONSE);
-    VERIFY_WORD(PMBUS_VIN_UV_WARN_LIMIT, "VIN_UV_WARN_LIMIT",
-                float_2_slinear11(
-                    tps546_config.BONANZA_TPS546_INIT_VIN_UV_WARN_LIMIT));
-
-    VERIFY_WORD(PMBUS_TON_DELAY, "TON_DELAY",
-                int_2_slinear11(tps546_config.BONANZA_TPS546_EXT_TON_DELAY));
-    VERIFY_WORD(PMBUS_TON_RISE, "TON_RISE",
-                int_2_slinear11(tps546_config.BONANZA_TPS546_EXT_TON_RISE));
-    VERIFY_WORD(PMBUS_TON_MAX_FAULT_LIMIT, "TON_MAX_FAULT_LIMIT",
-                int_2_slinear11(
-                    tps546_config.BONANZA_TPS546_EXT_TON_MAX_FAULT_LIMIT));
-    VERIFY_BYTE(PMBUS_TON_MAX_FAULT_RESPONSE, "TON_MAX_FAULT_RESPONSE",
-                tps546_config.BONANZA_TPS546_EXT_TON_MAX_FAULT_RESPONSE);
-    VERIFY_WORD(PMBUS_TOFF_DELAY, "TOFF_DELAY",
-                int_2_slinear11(tps546_config.BONANZA_TPS546_EXT_TOFF_DELAY));
-    VERIFY_WORD(PMBUS_TOFF_FALL, "TOFF_FALL",
-                int_2_slinear11(tps546_config.BONANZA_TPS546_EXT_TOFF_FALL));
+                tps546_config->vin_ov_fault_response);
 
 #undef VERIFY_BYTE
 #undef VERIFY_WORD
 #undef VERIFY_BLOCK
 
-    snprintf(detail, detail_len, "%s", BZM_TPS546_VERIFY_GOOD_DETAIL);
     return ESP_OK;
 }
 
@@ -1416,7 +1100,7 @@ uint8_t BONANZA_TPS546_get_phase_count(void)
     if (smb_read_word(PMBUS_STACK_CONFIG, &stack_config) == ESP_OK) {
         return (stack_config & 0x07) + 1;
     }
-    return (tps546_config.BONANZA_TPS546_INIT_STACK_CONFIG & 0x07) + 1;
+    return (tps546_config->stack_config & 0x07) + 1;
 }
 esp_err_t BONANZA_TPS546_check_status(GlobalState * GLOBAL_STATE) {
 
@@ -1461,7 +1145,6 @@ static char tps_error_message[256] = "Power Fault Detected.";
 const char* BONANZA_TPS546_get_error_message() {
     return tps_error_message;
 }
-
 
 static esp_err_t BONANZA_TPS546_parse_status(uint16_t status) {
     uint8_t u8_value;
@@ -1661,9 +1344,7 @@ static esp_err_t BONANZA_TPS546_parse_status(uint16_t status) {
 
 /**
  * @brief Sets the core voltage
- * this function controls the regulator ontput state
- * send it the desired output in millivolts
- * A value between BONANZA_TPS546_INIT_VOUT_MIN and BONANZA_TPS546_INIT_VOUT_MAX
+ * This function controls the regulator output state within the board profile limits.
  * send a 0 to turn off the output
  * @param volts The desired output voltage
 **/
@@ -1680,7 +1361,7 @@ esp_err_t BONANZA_TPS546_set_vout(float volts) {
         tps546_power_good_grace_until = 0;
     } else {
         /* make sure we're in range */
-        if ((volts < tps546_config.BONANZA_TPS546_INIT_VOUT_MIN) || (volts > tps546_config.BONANZA_TPS546_INIT_VOUT_MAX)) {
+        if ((volts < tps546_config->vout_min) || (volts > tps546_config->vout_max)) {
             ESP_LOGE(TAG, "Voltage requested (%f V) is out of range", volts);
             return ESP_FAIL;
         } else {
@@ -1692,11 +1373,6 @@ esp_err_t BONANZA_TPS546_set_vout(float volts) {
             }
 
             ESP_LOGI(TAG, "Vout changed to %1.2f V", volts);
-
-            // Bonanza uses verified absolute protection thresholds from its board profile.
-            if (!tps546_config.BONANZA_TPS546_EXTENDED_CONFIG) {
-                ESP_RETURN_ON_ERROR(BONANZA_TPS546_write_vout_limit_ratios(volts), TAG, "Could not update Vout limit ratios");
-            }
 
             /* turn on output */
             if (smb_write_byte(PMBUS_OPERATION, OPERATION_ON) != ESP_OK) {
@@ -1720,275 +1396,49 @@ esp_err_t BONANZA_TPS546_set_vout(float volts) {
     return ESP_OK;
 }
 
-static void BONANZA_TPS546_show_voltage_settings(void)
+esp_err_t BONANZA_TPS546_snapshot_status(BONANZA_TPS546_StatusSnapshot *s)
 {
-    uint16_t u16_value = 0;
-    uint8_t u8_value;
-    float f_value;
-
-    ESP_LOGI(TAG, "-----------VOLTAGE---------------------");
-    /* VIN_ON SLINEAR11 */
-    smb_read_word(PMBUS_VIN_ON, &u16_value);
-    f_value = slinear11_2_float(u16_value);
-    ESP_LOGI(TAG, "read VIN_ON: %.2fV", f_value);
-
-    /* VIN_OFF SLINEAR11 */
-    smb_read_word(PMBUS_VIN_OFF, &u16_value);
-    f_value = slinear11_2_float(u16_value);
-    ESP_LOGI(TAG, "read VIN_OFF: %.2fV", f_value);
-
-    /* VIN_OV_FAULT_LIMIT SLINEAR11 */
-    smb_read_word(PMBUS_VIN_OV_FAULT_LIMIT, &u16_value);
-    f_value = slinear11_2_float(u16_value);
-    ESP_LOGI(TAG, "read VIN_OV_FAULT_LIMIT: %.2fV", f_value);
-
-    /* VIN_UV_WARN_LIMIT SLINEAR11 */
-    smb_read_word(PMBUS_VIN_UV_WARN_LIMIT, &u16_value);
-    f_value = slinear11_2_float(u16_value);
-    ESP_LOGI(TAG, "read VIN_UV_WARN_LIMIT: %.2fV", f_value);
-
-    /* VIN_OV_FAULT_RESPONSE */
-    smb_read_byte(PMBUS_VIN_OV_FAULT_RESPONSE, &u8_value);
-    ESP_LOGI(TAG, "read VIN_OV_FAULT_RESPONSE: %02X", u8_value);
-
-    /* VOUT_MAX */
-    smb_read_word(PMBUS_VOUT_MAX, &u16_value);
-    f_value = ulinear16_2_float(u16_value);
-    ESP_LOGI(TAG, "read VOUT_MAX: %.2fV", f_value);
-
-    /* VOUT_OV_FAULT_LIMIT */
-    smb_read_word(PMBUS_VOUT_OV_FAULT_LIMIT, &u16_value);
-    f_value = ulinear16_2_float(u16_value);
-    ESP_LOGI(TAG, "read VOUT_OV_FAULT_LIMIT: %.2fx (%.2fV)", f_value, f_value * tps546_config.BONANZA_TPS546_INIT_VOUT_COMMAND);
-
-    /* VOUT_OV_WARN_LIMIT */
-    smb_read_word(PMBUS_VOUT_OV_WARN_LIMIT, &u16_value);
-    f_value = ulinear16_2_float(u16_value);
-    ESP_LOGI(TAG, "read VOUT_OV_WARN_LIMIT: %.2fx (%.2fV)", f_value, f_value * tps546_config.BONANZA_TPS546_INIT_VOUT_COMMAND);
-
-    /* VOUT_MARGIN_HIGH */
-    smb_read_word(PMBUS_VOUT_MARGIN_HIGH, &u16_value);
-    f_value = ulinear16_2_float(u16_value);
-    ESP_LOGI(TAG, "read VOUT_MARGIN_HIGH: %.2fx (%.2fV)", f_value, f_value * tps546_config.BONANZA_TPS546_INIT_VOUT_COMMAND);
-
-    /* --- VOUT_COMMAND --- */
-    smb_read_word(PMBUS_VOUT_COMMAND, &u16_value);
-    f_value = ulinear16_2_float(u16_value);
-    ESP_LOGI(TAG, "read VOUT_COMMAND: %.2fV", f_value);
-
-    /* VOUT_MARGIN_LOW */
-    smb_read_word(PMBUS_VOUT_MARGIN_LOW, &u16_value);
-    f_value = ulinear16_2_float(u16_value);
-    ESP_LOGI(TAG, "read VOUT_MARGIN_LOW: %.2fx (%.2fV)", f_value, f_value * tps546_config.BONANZA_TPS546_INIT_VOUT_COMMAND);
-
-    /* VOUT_UV_WARN_LIMIT */
-    smb_read_word(PMBUS_VOUT_UV_WARN_LIMIT, &u16_value);
-    f_value = ulinear16_2_float(u16_value);
-    ESP_LOGI(TAG, "read VOUT_UV_WARN_LIMIT: %.2fx (%.2fV)", f_value, f_value * tps546_config.BONANZA_TPS546_INIT_VOUT_COMMAND);
-
-    /* VOUT_UV_FAULT_LIMIT */
-    smb_read_word(PMBUS_VOUT_UV_FAULT_LIMIT, &u16_value);
-    f_value = ulinear16_2_float(u16_value);
-    ESP_LOGI(TAG, "read VOUT_UV_FAULT_LIMIT: %.2fx (%.2fV)", f_value, f_value * tps546_config.BONANZA_TPS546_INIT_VOUT_COMMAND);
-
-    /* VOUT_MIN */
-    smb_read_word(PMBUS_VOUT_MIN, &u16_value);
-    f_value = ulinear16_2_float(u16_value);
-    ESP_LOGI(TAG, "read VOUT_MIN: %.2f V", f_value);
-}
-
-esp_err_t BONANZA_TPS546_snapshot_status(BONANZA_TPS546_StatusSnapshot *s) {
-    uint16_t u16 = 0;
-    uint8_t  u8  = 0;
+    if (s == NULL) return ESP_ERR_INVALID_ARG;
+    uint16_t raw;
+    uint8_t mode;
     esp_err_t err;
 
-    // 1) Top-level
+    /* Only live operating data belongs in the periodic power-health sample.
+     * Startup checks the fixed protection registers; fault decoding reads
+     * detailed status bytes on demand. */
     err = smb_read_word(PMBUS_STATUS_WORD, &s->status_word);
-    if (err != ESP_OK) { return err; }
-
-    // 2) Details (read unconditionally so we always have a complete picture)
-    err = smb_read_byte(PMBUS_STATUS_VOUT, &u8);
-    if (err != ESP_OK) { return err; }
-    s->st_vout = u8;
-
-    err = smb_read_byte(PMBUS_STATUS_INPUT, &u8);
-    if (err != ESP_OK) { return err; }
-    s->st_input = u8;
-
-    err = smb_read_byte(PMBUS_STATUS_IOUT, &u8);
-    if (err != ESP_OK) { return err; }
-    s->st_iout = u8;
-
-    err = smb_read_byte(PMBUS_STATUS_TEMPERATURE, &u8);
-    if (err != ESP_OK) { return err; }
-    s->st_temp = u8;
-
-    err = smb_read_byte(PMBUS_STATUS_CML, &u8);
-    if (err != ESP_OK) { return err; }
-    s->st_cml = u8;
-
-    err = smb_read_byte(PMBUS_STATUS_MFR_SPECIFIC, &u8);  // POR / RESET_VOUT bits
-    if (err != ESP_OK) { return err; }
-    s->st_mfr = u8;
-
-    err = smb_read_byte(PMBUS_STATUS_OTHER, &u8);
-    if (err != ESP_OK) { return err; }
-    s->st_other = u8;
-
-    // 3) Context
-    err = smb_read_byte(PMBUS_OPERATION, &u8);
-    if (err != ESP_OK) { return err; }
-    s->operation = u8;
-
-    err = smb_read_byte(PMBUS_ON_OFF_CONFIG, &u8);
-    if (err != ESP_OK) { return err; }
-    s->on_off_config = u8;
-
-    err = smb_read_byte(PMBUS_PHASE, &u8);
-    if (err != ESP_OK) { return err; }
-    s->phase = u8;
-
-    err = smb_read_word(PMBUS_STACK_CONFIG, &u16);
-    if (err != ESP_OK) { return err; }
-    s->stack_config = u16;
-
-    err = smb_read_byte(PMBUS_SYNC_CONFIG, &u8);
-    if (err != ESP_OK) { return err; }
-    s->sync_config = u8;
-
-    err = smb_read_word(PMBUS_INTERLEAVE, &u16);
-    if (err != ESP_OK) { return err; }
-    s->interleave = u16;
-
-    err = smb_read_word(PMBUS_VOUT_COMMAND, &u16);
-    if (err != ESP_OK) { return err; }
-    s->vout_command_raw = u16;
-    s->vout_command = ulinear16_2_float(u16);
+    if (err != ESP_OK) return err;
+    err = smb_read_byte(PMBUS_OPERATION, &s->operation);
+    if (err != ESP_OK) return err;
+    err = smb_read_byte(PMBUS_VOUT_MODE, &mode);
+    if (err != ESP_OK) return err;
+    err = smb_read_word(PMBUS_VOUT_COMMAND, &raw);
+    if (err != ESP_OK) return err;
+    s->vout_command_raw = raw;
+    s->vout_command = ulinear16_2_float_mode(raw, mode);
     s->vout_command_matches_active_config =
-        u16 == float_2_ulinear16_mode(tps546_config.BONANZA_TPS546_INIT_VOUT_COMMAND,
-                                     tps546_extended_vout_mode);
+        raw == float_2_ulinear16_mode(tps546_config->vout_command, tps546_vout_mode);
 
-    err = smb_read_word(PMBUS_VOUT_MIN, &u16);
-    if (err != ESP_OK) { return err; }
-    s->vout_min = ulinear16_2_float(u16);
-
-    err = smb_read_word(PMBUS_VOUT_MAX, &u16);
-    if (err != ESP_OK) { return err; }
-    s->vout_max = ulinear16_2_float(u16);
-
-    err = smb_read_word(PMBUS_VOUT_SCALE_LOOP, &u16);
-    if (err != ESP_OK) { return err; }
-    s->vout_scale_loop = slinear11_2_float(u16);
-
-    err = smb_read_word(PMBUS_READ_VOUT, &u16);
-    if (err != ESP_OK) { return err; }
-    s->read_vout = ulinear16_2_float(u16);
-
-    err = smb_read_word(PMBUS_READ_VIN, &u16);
-    if (err != ESP_OK) { return err; }
-    s->read_vin = slinear11_2_float(u16);
-
-    err = smb_read_word(PMBUS_READ_IOUT, &u16);
-    if (err != ESP_OK) { return err; }
-    s->read_iout = slinear11_2_float(u16);
-
-    err = smb_read_word(PMBUS_READ_TEMPERATURE_1, &u16);
-    if (err != ESP_OK) { return err; }
-    s->read_temp1 = slinear11_2_int(u16);
-
+    err = smb_read_word(PMBUS_READ_VOUT, &raw);
+    if (err != ESP_OK) return err;
+    s->read_vout = ulinear16_2_float_mode(raw, mode);
+    err = smb_read_word(PMBUS_READ_VIN, &raw);
+    if (err != ESP_OK) return err;
+    s->read_vin = slinear11_2_float(raw);
+    err = smb_read_word(PMBUS_READ_IOUT, &raw);
+    if (err != ESP_OK) return err;
+    s->read_iout = slinear11_2_float(raw);
+    err = smb_read_word(PMBUS_READ_TEMPERATURE_1, &raw);
+    if (err != ESP_OK) return err;
+    s->read_temp1 = slinear11_2_int(raw);
     return ESP_OK;
 }
 
- void BONANZA_TPS546_log_snapshot(const BONANZA_TPS546_StatusSnapshot *s) {
-    ESP_LOGE(TAG, "================ TPS546 SNAPSHOT ================");
-    ESP_LOGE(TAG, "STATUS_WORD: 0x%04X", s->status_word);
-
-    // Top-level flags (only print if set)
-    if (s->status_word & BONANZA_TPS546_STATUS_BUSY)    ESP_LOGE(TAG, "  BUSY");
-    if (s->status_word & BONANZA_TPS546_STATUS_OFF)     ESP_LOGE(TAG, "  OFF");
-    if (s->status_word & BONANZA_TPS546_STATUS_VOUT_OV) ESP_LOGE(TAG, "  VOUT_OV");
-    if (s->status_word & BONANZA_TPS546_STATUS_IOUT_OC) ESP_LOGE(TAG, "  IOUT_OC");
-    if (s->status_word & BONANZA_TPS546_STATUS_VIN_UV)  ESP_LOGE(TAG, "  VIN_UV");
-    if (s->status_word & BONANZA_TPS546_STATUS_TEMP)    ESP_LOGE(TAG, "  TEMP");
-    if (s->status_word & BONANZA_TPS546_STATUS_CML)     ESP_LOGE(TAG, "  CML");
-    if (s->status_word & BONANZA_TPS546_STATUS_PGOOD)   ESP_LOGE(TAG, "  PGOOD=NOT IN REGULATION");
-    if (s->status_word & BONANZA_TPS546_STATUS_OTHER)   ESP_LOGE(TAG, "  OTHER");
-    if (s->status_word & BONANZA_TPS546_STATUS_VOUT)    ESP_LOGE(TAG, "  VOUT (detail)");
-    if (s->status_word & BONANZA_TPS546_STATUS_IOUT)    ESP_LOGE(TAG, "  IOUT (detail)");
-    if (s->status_word & BONANZA_TPS546_STATUS_INPUT)   ESP_LOGE(TAG, "  INPUT (detail)");
-    if (s->status_word & BONANZA_TPS546_STATUS_MFR)     ESP_LOGE(TAG, "  MFR_SPECIFIC (detail)");
-
-    // Context (always useful)
-    ESP_LOGE(TAG, "OPERATION: 0x%02X  (ON bit: %d)", s->operation, !!(s->operation & 0x80));
-    ESP_LOGE(TAG, "ON_OFF_CONFIG: 0x%02X", s->on_off_config);
-    ESP_LOGE(TAG, "VOUT_COMMAND: %.3f V raw=0x%04x exact=%u", s->vout_command,
-             (unsigned) s->vout_command_raw,
-             (unsigned) s->vout_command_matches_active_config);
-    ESP_LOGE(TAG, "PHASE: 0x%02X", s->phase);
-    ESP_LOGE(TAG, "STACK_CONFIG: 0x%04X", s->stack_config);
-    ESP_LOGE(TAG, "SYNC_CONFIG: 0x%02X", s->sync_config);
-    ESP_LOGE(TAG, "INTERLEAVE: 0x%04X", s->interleave);
-    ESP_LOGE(TAG, "VOUT_COMMAND: %.3f V", s->vout_command);
-    ESP_LOGE(TAG, "VOUT_MIN/MAX: %.3f V / %.3f V", s->vout_min, s->vout_max);
-    ESP_LOGE(TAG, "VOUT_SCALE_LOOP: %.3f", s->vout_scale_loop);
-    ESP_LOGE(TAG, "READ_VOUT:    %.3f V", s->read_vout);
-    ESP_LOGE(TAG, "READ_VIN:     %.3f V", s->read_vin);
-    ESP_LOGE(TAG, "READ_IOUT:    %.3f A", s->read_iout);
-    ESP_LOGE(TAG, "TEMP1:        %d C",   s->read_temp1);
-
-    // Detail bytes — print only set bits
-    if (s->status_word & BONANZA_TPS546_STATUS_VOUT) {
-        ESP_LOGE(TAG, "STATUS_VOUT: 0x%02X", s->st_vout);
-        if (s->st_vout & BONANZA_TPS546_STATUS_VOUT_OVF)     ESP_LOGE(TAG, "  VOUT_OV_FAULT");
-        if (s->st_vout & BONANZA_TPS546_STATUS_VOUT_OVW)     ESP_LOGE(TAG, "  VOUT_OV_WARN");
-        if (s->st_vout & BONANZA_TPS546_STATUS_VOUT_UVW)     ESP_LOGE(TAG, "  VOUT_UV_WARN");
-        if (s->st_vout & BONANZA_TPS546_STATUS_VOUT_UVF)     ESP_LOGE(TAG, "  VOUT_UV_FAULT");
-        if (s->st_vout & BONANZA_TPS546_STATUS_VOUT_MIN_MAX) ESP_LOGE(TAG, "  VOUT_MIN_MAX");
-        if (s->st_vout & BONANZA_TPS546_STATUS_VOUT_TON_MAX) ESP_LOGE(TAG, "  TON_MAX_EXPIRED");
-    }
-
-    if (s->status_word & BONANZA_TPS546_STATUS_INPUT) {
-        ESP_LOGE(TAG, "STATUS_INPUT: 0x%02X", s->st_input);
-        if (s->st_input & BONANZA_TPS546_STATUS_VIN_OVF)     ESP_LOGE(TAG, "  VIN_OV_FAULT");
-        if (s->st_input & BONANZA_TPS546_STATUS_VIN_UVW)     ESP_LOGE(TAG, "  VIN_UV_WARN");
-        if (s->st_input & BONANZA_TPS546_STATUS_VIN_LOW_VIN) ESP_LOGE(TAG, "  LOW_VIN (live)");
-    }
-
-    if (s->status_word & BONANZA_TPS546_STATUS_IOUT) {
-        ESP_LOGE(TAG, "STATUS_IOUT: 0x%02X", s->st_iout);
-        if (s->st_iout & BONANZA_TPS546_STATUS_IOUT_OCF)     ESP_LOGE(TAG, "  IOUT_OC_FAULT");
-        if (s->st_iout & BONANZA_TPS546_STATUS_IOUT_OCW)     ESP_LOGE(TAG, "  IOUT_OC_WARN");
-    }
-
-    if (s->status_word & BONANZA_TPS546_STATUS_TEMP) {
-        ESP_LOGE(TAG, "STATUS_TEMPERATURE: 0x%02X", s->st_temp);
-        if (s->st_temp & BONANZA_TPS546_STATUS_TEMP_OTF)     ESP_LOGE(TAG, "  OT_FAULT");
-        if (s->st_temp & BONANZA_TPS546_STATUS_TEMP_OTW)     ESP_LOGE(TAG, "  OT_WARN");
-    }
-
-    if (s->status_word & BONANZA_TPS546_STATUS_CML) {
-        ESP_LOGE(TAG, "STATUS_CML: 0x%02X", s->st_cml);
-        if (s->st_cml & BONANZA_TPS546_STATUS_CML_IVC)  ESP_LOGE(TAG, "  INVALID_COMMAND");
-        if (s->st_cml & BONANZA_TPS546_STATUS_CML_IVD)  ESP_LOGE(TAG, "  INVALID_DATA");
-        if (s->st_cml & BONANZA_TPS546_STATUS_CML_PEC)  ESP_LOGE(TAG, "  PEC_ERROR");
-        if (s->st_cml & BONANZA_TPS546_STATUS_CML_MEM)  ESP_LOGE(TAG, "  MEMORY_ERROR");
-        if (s->st_cml & BONANZA_TPS546_STATUS_CML_PROC) ESP_LOGE(TAG, "  LOGIC_CORE_ERROR");
-        if (s->st_cml & BONANZA_TPS546_STATUS_CML_COMM) ESP_LOGE(TAG, "  COMM_ERROR");
-    }
-
-    if (s->status_word & BONANZA_TPS546_STATUS_MFR) {
-        ESP_LOGE(TAG, "STATUS_MFR_SPECIFIC: 0x%02X", s->st_mfr);
-        if (s->st_mfr & BONANZA_TPS546_STATUS_MFR_POR)   ESP_LOGE(TAG, "  POR_OCCURRED");
-        if (s->st_mfr & BONANZA_TPS546_STATUS_MFR_SELF)  ESP_LOGE(TAG, "  SELF_CHECK_IN_PROGRESS");
-        if (s->st_mfr & BONANZA_TPS546_STATUS_MFR_RESET) ESP_LOGE(TAG, "  RESET_VOUT_OCCURRED");
-        if (s->st_mfr & BONANZA_TPS546_STATUS_MFR_BCX)   ESP_LOGE(TAG, "  BCX_FAULT");
-        if (s->st_mfr & BONANZA_TPS546_STATUS_MFR_SYNC)  ESP_LOGE(TAG, "  SYNC_FAULT");
-    }
-
-    if (s->status_word & BONANZA_TPS546_STATUS_OTHER) {
-        ESP_LOGE(TAG, "STATUS_OTHER: 0x%02X", s->st_other);
-        if (s->st_other & BONANZA_TPS546_STATUS_OTHER_FIRST) ESP_LOGE(TAG, "  FIRST_TO_ASSERT_SMBALERT");
-    }
-
-    ESP_LOGE(TAG, "=================================================");
+void BONANZA_TPS546_log_snapshot(const BONANZA_TPS546_StatusSnapshot *s)
+{
+    ESP_LOGE(TAG, "TPS546 status=0x%04X operation=0x%02X command=%.3fV exact=%u",
+             s->status_word, s->operation, s->vout_command,
+             (unsigned)s->vout_command_matches_active_config);
+    ESP_LOGE(TAG, "TPS546 VIN=%.3fV VOUT=%.3fV IOUT=%.3fA temperature=%dC",
+             s->read_vin, s->read_vout, s->read_iout, s->read_temp1);
 }

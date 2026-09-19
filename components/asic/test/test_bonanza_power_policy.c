@@ -159,15 +159,7 @@ TEST_CASE("Failed maintenance never grants update ownership", "[power-management
     TEST_ASSERT_EQUAL(BONANZA_POWER_OWNER_NONE, p.owner); TEST_ASSERT_TRUE(p.fault);
     TEST_ASSERT_FALSE(p.stopped); TEST_ASSERT_FALSE(p.running);
 }
-TEST_CASE("Powered-down ASIC sensors reset cooling time when still hot", "[power-management]")
-{
-    board_fixture_t b = {0}; bonanza_power_policy_t p = make_policy(&b); p.ready = true;
-    bonanza_power_policy_step(&p, 0, TARGET, COOL, false, false, true);
-    bonanza_power_sample_t hot = COOL; hot.off_asic_sensor_required = true; hot.asic_valid = true; hot.asic_c = 50;
-    bonanza_power_policy_step(&p, 30000, TARGET, hot, false, false, true);
-    tick(&p, 59999); TEST_ASSERT_FALSE(p.running);
-    tick(&p, 60000); TEST_ASSERT_TRUE(p.running);
-}
+
 TEST_CASE("Overheat reduction clamps to board limits and save failures stay off", "[power-management]")
 {
     for (int fail = 0; fail <= 1; ++fail) {
@@ -208,16 +200,12 @@ TEST_CASE("Failed maintenance release returns to a fault without orphaned owners
     TEST_ASSERT_TRUE(p.fault); TEST_ASSERT_FALSE(p.stopped);
     tick(&p, 100); TEST_ASSERT_TRUE(p.stopped); TEST_ASSERT_FALSE(p.running);
 }
-TEST_CASE("Cooling rejects missing ASIC data invalid clocks and hot regulators", "[power-management]")
+TEST_CASE("Cooling rejects invalid clocks and hot regulators", "[power-management]")
 {
     board_fixture_t b = {0}; bonanza_power_policy_t p = make_policy(&b); p.ready = true;
     bonanza_power_policy_step(&p, 100, TARGET, COOL, false, false, true);
     bonanza_power_sample_t sample = COOL;
-    sample.off_asic_sensor_required = true;
-    bonanza_power_policy_step(&p, 30100, TARGET, sample, false, false, true);
-    sample.asic_valid = true; sample.asic_c = NAN;
-    bonanza_power_policy_step(&p, 30100, TARGET, sample, false, false, true);
-    sample.asic_c = 30; sample.vreg_c = NAN;
+    sample.vreg_c = NAN;
     bonanza_power_policy_step(&p, 30100, TARGET, sample, false, false, true);
     sample.vreg_c = 100;
     bonanza_power_policy_step(&p, 30100, TARGET, sample, false, false, true);

@@ -13,154 +13,18 @@ typedef struct GlobalState GlobalState;
 #define BONANZA_TPS546_MANUFACTURER_ID 0xFE  // Manufacturer ID
 #define BONANZA_TPS546_REVISION        0xFF  // Chip revision
 
-/*-------------------------*/
-/* These are the inital values for the voltage regulator configuration */
-/* when the config revision stored in the TPS546 doesn't match, these values are used */
-
-
-//#define BONANZA_TPS546_INIT_ON_OFF_CONFIG 0x18 /* use ON_OFF command to control power */
 #define OPERATION_OFF 0x00
 #define OPERATION_ON  0x80
 
-#define BONANZA_TPS546_INIT_PHASE_SINGLE 0x00  /* Single-phase (Single TPS) */
-#define BONANZA_TPS546_INIT_PHASE_MULTI   0xFF  /* Multi-phase stack (Multi TPS) */
-
-#define BONANZA_TPS546_SINGLE_PHASE_STACK_CONFIG 0x0000
-#define BONANZA_TPS546_DUAL_PHASE_STACK_CONFIG   0x0001
-#define BONANZA_TPS546_FOUR_PHASE_STACK_CONFIG   0x0003
-
-#define BONANZA_TPS546_DEFAULT_FREQUENCY 650  /* KHz */
-
 typedef struct {
   uint16_t status_word;
-  uint8_t  st_vout, st_input, st_iout, st_temp, st_cml, st_mfr, st_other;
-  uint8_t  operation, on_off_config, phase, sync_config;
-  uint16_t stack_config, interleave;
+  uint8_t  operation;
   float    read_vout, read_vin, read_iout;
   int      read_temp1;
   float    vout_command;
   uint16_t vout_command_raw;
   bool     vout_command_matches_active_config;
-  float vout_min, vout_max, vout_scale_loop;
 } BONANZA_TPS546_StatusSnapshot;
-
-typedef struct BONANZA_TPS546_CONFIG
-{
-  bool BONANZA_TPS546_EXTENDED_CONFIG;
-  /* Phase readout configuration */
-  uint8_t BONANZA_TPS546_INIT_PHASE; /* phase register configuration */
-  uint16_t BONANZA_TPS546_INIT_SMBALERT_MASK[7];
-  uint16_t BONANZA_TPS546_INIT_FREQUENCY; /* Switch frequency in KHz */
-  /* vin voltage */
-  float BONANZA_TPS546_INIT_VIN_ON;  /* V */
-  float BONANZA_TPS546_INIT_VIN_OFF; /* V */
-  float BONANZA_TPS546_INIT_VIN_UV_WARN_LIMIT; /* V */
-  float BONANZA_TPS546_INIT_VIN_OV_FAULT_LIMIT; /* V */
-  /* vout voltage */
-  float BONANZA_TPS546_INIT_SCALE_LOOP; /* Voltage Scale factor */
-  float BONANZA_TPS546_INIT_VOUT_MIN; /* V */
-  float BONANZA_TPS546_INIT_VOUT_MAX; /* V */
-  float BONANZA_TPS546_INIT_VOUT_COMMAND;  /* V absolute value */
-  /* iout current */
-  float BONANZA_TPS546_INIT_IOUT_OC_WARN_LIMIT; /* A */
-  float BONANZA_TPS546_INIT_IOUT_OC_FAULT_LIMIT; /* A */
-
-
-  uint16_t BONANZA_TPS546_INIT_STACK_CONFIG; /* Stack configuration */
-  uint8_t BONANZA_TPS546_INIT_SYNC_CONFIG; /* Sync configuration */
-  uint16_t BONANZA_TPS546_INIT_INTERLEAVE;
-  uint16_t BONANZA_TPS546_INIT_MISC_OPTIONS;
-  uint16_t BONANZA_TPS546_INIT_PIN_DETECT_OVERRIDE;
-  uint8_t BONANZA_TPS546_INIT_COMPENSATION_CONFIG[5];
-  uint8_t BONANZA_TPS546_INIT_POWER_STAGE_CONFIG;
-  uint8_t BONANZA_TPS546_INIT_TELEMETRY_CONFIG[6];
-  uint16_t BONANZA_TPS546_INIT_VOUT_TRIM;
-  uint16_t BONANZA_TPS546_INIT_VOUT_TRANSITION_RATE;
-  uint16_t BONANZA_TPS546_INIT_IOUT_CAL_GAIN;
-  uint16_t BONANZA_TPS546_INIT_IOUT_CAL_OFFSET;
-  float BONANZA_TPS546_EXT_VOUT_MARGIN_HIGH;
-  float BONANZA_TPS546_EXT_VOUT_MARGIN_LOW;
-  float BONANZA_TPS546_EXT_VOUT_OV_FAULT_LIMIT;
-  uint8_t BONANZA_TPS546_EXT_VOUT_OV_FAULT_RESPONSE;
-  float BONANZA_TPS546_EXT_VOUT_OV_WARN_LIMIT;
-  float BONANZA_TPS546_EXT_VOUT_UV_WARN_LIMIT;
-  float BONANZA_TPS546_EXT_VOUT_UV_FAULT_LIMIT;
-  uint8_t BONANZA_TPS546_EXT_VOUT_UV_FAULT_RESPONSE;
-  uint8_t BONANZA_TPS546_EXT_IOUT_OC_FAULT_RESPONSE;
-  int BONANZA_TPS546_EXT_OT_FAULT_LIMIT;
-  uint8_t BONANZA_TPS546_EXT_OT_FAULT_RESPONSE;
-  int BONANZA_TPS546_EXT_OT_WARN_LIMIT;
-  uint8_t BONANZA_TPS546_EXT_VIN_OV_FAULT_RESPONSE;
-  int BONANZA_TPS546_EXT_TON_DELAY;
-  int BONANZA_TPS546_EXT_TON_RISE;
-  int BONANZA_TPS546_EXT_TON_MAX_FAULT_LIMIT;
-  uint8_t BONANZA_TPS546_EXT_TON_MAX_FAULT_RESPONSE;
-  int BONANZA_TPS546_EXT_TOFF_DELAY;
-  int BONANZA_TPS546_EXT_TOFF_FALL;
-} BONANZA_TPS546_CONFIG;
-
-
-/* vin voltage */
-// #define BONANZA_TPS546_INIT_VIN_ON  11.0  /* V */
-// #define BONANZA_TPS546_INIT_VIN_OFF 10.5  /* V */
-// #define BONANZA_TPS546_INIT_VIN_UV_WARN_LIMIT 14.0 /* V */
-// #define BONANZA_TPS546_INIT_VIN_OV_FAULT_LIMIT 15.0 /* V */
-
-//VIN_OV_FAULT_RESPONSE pg98
-//0xB7 -> 1011 0111
-//10 -> Immediate Shutdown. Shut down and restart according to VIN_OV_RETRY.
-//110 -> After shutting down, wait one HICCUP period, and attempt to restart up to 6 times. After 6 failed restart attempts, do not attempt to restart (latch off).
-//111 -> Shutdown delay of seven PWM_CLK, HICCUP equal to 7 times TON_RISE
-#define BONANZA_TPS546_INIT_VIN_OV_FAULT_RESPONSE 0xB7
-
-  /* vout voltage */
-//#define BONANZA_TPS546_INIT_SCALE_LOOP 0.25  /* Voltage Scale factor */
-//#define BONANZA_TPS546_INIT_VOUT_MAX 3 /* V */
-#define BONANZA_TPS546_INIT_VOUT_OV_FAULT_LIMIT 1.25 /* multiplier of VOUT_COMMAND */
-#define BONANZA_TPS546_INIT_VOUT_OV_WARN_LIMIT  1.16 /* multiplier of VOUT_COMMAND */
-#define BONANZA_TPS546_INIT_VOUT_MARGIN_HIGH 1.1 /* multiplier of VOUT_COMMAND */
-//#define BONANZA_TPS546_INIT_VOUT_COMMAND 1.2  /* V absolute value */
-#define BONANZA_TPS546_INIT_VOUT_MARGIN_LOW 0.90 /* multiplier of VOUT_COMMAND */
-#define BONANZA_TPS546_INIT_VOUT_UV_WARN_LIMIT 0.90  /* multiplier of VOUT_COMMAND */
-#define BONANZA_TPS546_INIT_VOUT_UV_FAULT_LIMIT 0.75 /* multiplier of VOUT_COMMAND */
-//#define BONANZA_TPS546_INIT_VOUT_MIN 1 /* v */
-
-  /* iout current */
-// #define BONANZA_TPS546_INIT_IOUT_OC_WARN_LIMIT  50.00 /* A */
-// #define BONANZA_TPS546_INIT_IOUT_OC_FAULT_LIMIT 55.00 /* A */
-
-//IOUT_OC_FAULT_RESPONSE - pg91
-//0xC0 -> 1100 0000
-//11 -> Shutdown Immediately
-//000 -> Do not attempt to restart (latch off).
-//000 -> Shutdown delay of one PWM_CLK, HICCUP equal to TON_RISE
-#define BONANZA_TPS546_INIT_IOUT_OC_FAULT_RESPONSE 0xC0  /* shut down, no retries */
-
-  /* temperature */
-// It is better to set the temperature warn limit for TPS546 more higher than Ultra
-#define BONANZA_TPS546_INIT_OT_WARN_LIMIT  105 /* degrees C */
-#define BONANZA_TPS546_INIT_OT_FAULT_LIMIT 145 /* degrees C */
-
-//OT_FAULT_RESPONSE - pg94
-//0xFF -> 1111 1111
-//11 -> Shutdown until Temperature is below OT_WARN_LIMIT, then restart according to OT_RETRY*.
-//111 -> After shutting down, wait one HICCUP period, and attempt to restart indefinitely, until commanded OFF or a successful start-up occurs.
-//111 -> Shutdown delay of 7 ms, HICCUP equal to 4 times TON_RISE
-#define BONANZA_TPS546_INIT_OT_FAULT_RESPONSE 0xFF /* wait for cooling, and retry */
-
-  /* timing */
-#define BONANZA_TPS546_INIT_TON_DELAY 0
-#define BONANZA_TPS546_INIT_TON_RISE 3
-#define BONANZA_TPS546_INIT_TON_MAX_FAULT_LIMIT 0
-#define BONANZA_TPS546_INIT_TON_MAX_FAULT_RESPONSE 0x3B
-#define BONANZA_TPS546_INIT_TOFF_DELAY 0
-#define BONANZA_TPS546_INIT_TOFF_FALL 0
-
-#define INIT_STACK_CONFIG 0x0001 //One-Slave, 2-phase
-#define INIT_SYNC_CONFIG 0x00D0 //Enable Auto Detect SYNC
-#define INIT_PIN_DETECT_OVERRIDE 0xFFFF //use pin values
-
-/*-------------------------*/
 
 /* PMBUS_ON_OFF_CONFIG initialization values */
 #define ON_OFF_CONFIG_PU        0x10 // Act on CONTROL. (01h) OPERATION command to start/stop power conversion, or both.
@@ -225,9 +89,8 @@ typedef struct BONANZA_TPS546_CONFIG
 #define BONANZA_TPS546_STATUS_MFR_BCX     0x04 //bit 2 - A BCX fault event has occurred.
 #define BONANZA_TPS546_STATUS_MFR_SYNC    0x02 //bit 1 - A SYNC fault has been detected.
 
-
 /* public functions */
-esp_err_t BONANZA_TPS546_init(BONANZA_TPS546_CONFIG config);
+esp_err_t BONANZA_TPS546_init(void);
 
 int BONANZA_TPS546_get_temperature(void);
 float BONANZA_TPS546_get_vin(void);
@@ -244,10 +107,10 @@ void BONANZA_TPS546_log_snapshot(const BONANZA_TPS546_StatusSnapshot *s);
 esp_err_t BONANZA_TPS546_snapshot_status(BONANZA_TPS546_StatusSnapshot *s);
 
 /**
- * Verify the active Bonanza/extended profile against exact PMBus readback.
+ * Read back the Bonanza power topology, feedback and hard protection settings.
  * On failure, detail identifies the first register that could not be read or
- * whose encoded value did not match. A successful verification writes GOOD.
+ * whose encoded value did not match. Success leaves detail empty.
  */
-esp_err_t BONANZA_TPS546_verify_active_config(char *detail, size_t detail_len);
+esp_err_t BONANZA_TPS546_check_protection(char *detail, size_t detail_len);
 
 #endif /* BONANZA_TPS546_H_ */

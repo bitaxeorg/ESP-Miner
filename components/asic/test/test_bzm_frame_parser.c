@@ -117,47 +117,7 @@ TEST_CASE("BZM parser preserves fragmented and interleaved TDM frames", "[asic][
 
     TEST_ASSERT_EQUAL_UINT32(4, parser.emitted_frames);
     TEST_ASSERT_EQUAL_UINT32(1, parser.discarded_bytes);
-    TEST_ASSERT_EQUAL_UINT32(0, parser.emitted_frames_at_last_discard);
-    uint8_t discarded[4] = {0};
-    TEST_ASSERT_EQUAL_UINT32(1, bzm_frame_parser_recent_discards(&parser, discarded, sizeof(discarded)));
-    TEST_ASSERT_EQUAL_HEX8(0x99, discarded[0]);
-    TEST_ASSERT_EQUAL_UINT32(0, parser.unexpected_register_headers);
     TEST_ASSERT_EQUAL_UINT32(0, bzm_frame_parser_pending_bytes(&parser));
-}
-
-TEST_CASE("BZM parser retains a bounded chronological discard trace", "[asic][bzm][frame-parser][qemu-integration]")
-{
-    uint8_t noise[BZM_FRAME_PARSER_DISCARD_TRACE_SIZE + 4U];
-    for (size_t index = 0; index < sizeof(noise); ++index) {
-        noise[index] = (uint8_t) (0x80U + index);
-    }
-    bzm_frame_parser_t parser;
-    bzm_frame_parser_init(&parser, NULL, NULL);
-    TEST_ASSERT_EQUAL_UINT32(0, bzm_frame_parser_feed(&parser, noise, sizeof(noise), 100));
-
-    uint8_t discarded[BZM_FRAME_PARSER_DISCARD_TRACE_SIZE] = {0};
-    TEST_ASSERT_EQUAL_UINT32(BZM_FRAME_PARSER_DISCARD_TRACE_SIZE,
-                             bzm_frame_parser_recent_discards(&parser, discarded, sizeof(discarded)));
-    TEST_ASSERT_EQUAL_UINT8_ARRAY(noise + 3U, discarded, BZM_FRAME_PARSER_DISCARD_TRACE_SIZE);
-    uint8_t tail[4] = {0};
-    TEST_ASSERT_EQUAL_UINT32(4, bzm_frame_parser_recent_discards(&parser, tail, sizeof(tail)));
-    TEST_ASSERT_EQUAL_UINT8_ARRAY(noise + sizeof(noise) - 5U, tail, 4);
-    TEST_ASSERT_EQUAL_UINT32(0, bzm_frame_parser_recent_discards(NULL, tail, sizeof(tail)));
-}
-
-TEST_CASE("BZM parser records the valid-frame count at the latest discard", "[asic][bzm][frame-parser][qemu-integration]")
-{
-    static const uint8_t stream[] = {
-        0x0a, 0x01, 0x83, 0x45, 0x78, 0x56, 0x34, 0x12, 0x17, 0x0d, 0x99,
-        0x14, 0x01, 0x83, 0x45, 0x78, 0x56, 0x34, 0x12, 0x17, 0x0d,
-    };
-    bzm_frame_parser_t parser;
-    bzm_frame_parser_init(&parser, NULL, NULL);
-
-    TEST_ASSERT_EQUAL_UINT32(2, bzm_frame_parser_feed(&parser, stream, sizeof(stream), 100));
-    TEST_ASSERT_EQUAL_UINT32(2, parser.emitted_frames);
-    TEST_ASSERT_EQUAL_UINT32(1, parser.discarded_bytes);
-    TEST_ASSERT_EQUAL_UINT32(1, parser.emitted_frames_at_last_discard);
 }
 
 TEST_CASE("BZM parser waits for complete frames without consuming prefixes", "[asic][bzm][frame-parser][qemu-integration]")
@@ -226,7 +186,6 @@ TEST_CASE("BZM register reply length must be reserved before parsing", "[asic][b
     TEST_ASSERT_EQUAL_UINT32(1, bzm_frame_parser_feed(&parser, stream, sizeof(stream), 300));
     TEST_ASSERT_EQUAL_UINT32(1, capture.count);
     TEST_ASSERT_EQUAL(BZM_FRAME_NOOP, capture.frames[0].type);
-    TEST_ASSERT_EQUAL_UINT32(1, parser.unexpected_register_headers);
     TEST_ASSERT_GREATER_OR_EQUAL_UINT32(4, parser.discarded_bytes);
 
     bzm_frame_parser_init(&parser, capture_frame, &capture);
@@ -698,22 +657,6 @@ TEST_CASE("BZM temperature aggregation reports the hottest fresh ASIC",
         bzm_telemetry_max_temperature(&store, 1000, 100, NULL));
 }
 
-TEST_CASE("BZM local register definitions expose stable diagnostics", "[asic][bzm][registers][qemu-integration]")
-{
-    TEST_ASSERT_EQUAL_STRING("uart_tdm_control", bzm_local_register_name(BZM_LOCAL_REG_UART_TDM_CONTROL));
-    TEST_ASSERT_EQUAL_STRING("result_status_control", bzm_local_register_name(BZM_LOCAL_REG_RESULT_STATUS_CONTROL));
-    TEST_ASSERT_EQUAL_STRING("slow_clock_divider", bzm_local_register_name(BZM_LOCAL_REG_SLOW_CLOCK_DIVIDER));
-    TEST_ASSERT_EQUAL_STRING("tdm_delay", bzm_local_register_name(BZM_LOCAL_REG_TDM_DELAY));
-    TEST_ASSERT_EQUAL_STRING("uart_tx", bzm_local_register_name(BZM_LOCAL_REG_UART_TX));
-    TEST_ASSERT_EQUAL_STRING("temperature_code_status", bzm_local_register_name(BZM_LOCAL_REG_TEMPERATURE_CODE_STATUS));
-    TEST_ASSERT_EQUAL_STRING("vsensor_ch1_ch2_status", bzm_local_register_name(BZM_LOCAL_REG_VSENSOR_CH1_CH2_STATUS));
-    TEST_ASSERT_EQUAL_STRING("io_peps_drive_strength", bzm_local_register_name(BZM_LOCAL_REG_IO_PEPS_DRIVE_STRENGTH));
-    TEST_ASSERT_EQUAL_STRING("unknown", bzm_local_register_name(0xff));
-    TEST_ASSERT_EQUAL_UINT32(BZM_CONTROL_REGISTER_WIDTH, bzm_local_register_width(BZM_LOCAL_REG_PLL0_MISC));
-    TEST_ASSERT_EQUAL_HEX32(0x0fff, BZM_TEMPERATURE_CODE_MASK);
-    TEST_ASSERT_EQUAL_HEX32(0x3fff, BZM_VOLTAGE_CODE_MASK);
-}
-
 TEST_CASE("BZM transport routes interleaved UART frames through one parser", "[asic][bzm][transport][qemu-integration]")
 {
     static const uint8_t stream[] = {
@@ -764,10 +707,9 @@ TEST_CASE("BZM transport routes interleaved UART frames through one parser", "[a
     bzm_serial_parser_stats_t stats;
     TEST_ASSERT_TRUE(bzm_serial_get_parser_stats(transport, &stats));
     TEST_ASSERT_EQUAL_UINT32(4, stats.emitted_frames);
-    TEST_ASSERT_EQUAL_UINT32(1, stats.queued_results);
-    TEST_ASSERT_EQUAL_UINT32(1, stats.unsolicited_noop_frames);
+    TEST_ASSERT_EQUAL_UINT32(1, transport->io.pending_result_length);
+    TEST_ASSERT_FALSE(transport->io.noop_ready);
     TEST_ASSERT_EQUAL_UINT32(0, stats.discarded_bytes);
-    TEST_ASSERT_EQUAL_UINT32(0, stats.telemetry_decode_failures);
 
     bzm_raw_result_t result;
     TEST_ASSERT_TRUE(bzm_serial_read_result(transport, &result, 0));
@@ -793,8 +735,7 @@ TEST_CASE("BZM transport routes interleaved UART frames through one parser", "[a
     TEST_ASSERT_NOT_NULL(stored);
     TEST_ASSERT_TRUE(stored->received);
 
-    TEST_ASSERT_TRUE(bzm_serial_get_parser_stats(transport, &stats));
-    TEST_ASSERT_EQUAL_UINT32(0, stats.queued_results);
+    TEST_ASSERT_FALSE(bzm_serial_read_result(transport, &result, 0));
     bzm_serial_transport_deinit(transport);
     free(transport);
 }
@@ -853,9 +794,7 @@ TEST_CASE("BZM transport register reservations reject ambiguity and recover fram
 
     bzm_serial_parser_stats_t stats;
     TEST_ASSERT_TRUE(bzm_serial_get_parser_stats(transport, &stats));
-    TEST_ASSERT_EQUAL_UINT32(1, stats.unexpected_register_headers);
     TEST_ASSERT_GREATER_OR_EQUAL_UINT32(4, stats.discarded_bytes);
-    TEST_ASSERT_EQUAL_UINT32(0, stats.unmatched_register_frames);
 
     TEST_ASSERT_TRUE(bzm_serial_expect_register_reply(transport, 0x28, 4));
     TEST_ASSERT_TRUE(bzm_serial_cancel_register_reply(transport, 0x28));

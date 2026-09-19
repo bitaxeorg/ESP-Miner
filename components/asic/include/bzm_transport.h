@@ -21,18 +21,8 @@ typedef struct
 {
     uint32_t emitted_frames;
     uint32_t discarded_bytes;
-    uint32_t emitted_frames_at_last_discard;
-    uint32_t unexpected_register_headers;
-    uint32_t dropped_results;
-    uint32_t rejected_result_frames;
-    uint32_t unmatched_register_frames;
-    uint32_t unsolicited_noop_frames;
     uint32_t invalid_noop_frames;
-    uint32_t telemetry_decode_failures;
     size_t buffered_bytes;
-    size_t queued_results;
-    uint8_t recent_discarded_bytes[BZM_FRAME_PARSER_DISCARD_TRACE_SIZE];
-    size_t recent_discarded_length;
 } bzm_serial_parser_stats_t;
 
 typedef struct
@@ -45,22 +35,17 @@ typedef struct
     bzm_raw_result_t pending_results[BZM_PENDING_RESULT_COUNT];
     size_t pending_result_head;
     size_t pending_result_length;
-    uint32_t dropped_results;
-    uint32_t rejected_result_frames;
 
     bool register_pending;
     bool register_ready;
     uint8_t register_asic_id;
     uint8_t register_length;
     uint8_t register_data[BZM_TDM_MAX_REGISTER_PAYLOAD_SIZE];
-    uint32_t unmatched_register_frames;
 
     bool noop_pending;
     bool noop_ready;
     uint8_t noop_asic_id;
-    uint32_t unsolicited_noop_frames;
     uint32_t invalid_noop_frames;
-    uint32_t telemetry_decode_failures;
 } bzm_serial_io_state_t;
 
 typedef struct
@@ -68,7 +53,6 @@ typedef struct
     uint8_t asic_ids[BZM_MAX_ASIC_COUNT];
     uint8_t asic_count;
     uint16_t engine_count;
-    bool enhanced_mode;
     bzm_serial_io_state_t io;
 } bzm_serial_transport_t;
 
@@ -76,14 +60,6 @@ static inline bool bzm_result_queue_capacity_covers(uint32_t result_capacity, ui
 {
     return (uint64_t) result_capacity * 1000U >= (uint64_t) results_per_second * blackout_ms;
 }
-
-typedef struct
-{
-    bool (*noop)(void * context, uint8_t asic_id);
-    bool (*write_register)(void * context, uint8_t asic_id, uint16_t engine_id, uint8_t offset, const void * data, size_t data_len);
-    bool (*read_register)(void * context, uint8_t asic_id, uint16_t engine_id, uint8_t offset, void * data, size_t data_len);
-    void (*delay_ms)(void * context, uint32_t delay_ms);
-} bzm_chain_ops_t;
 
 typedef enum
 {
@@ -101,11 +77,8 @@ size_t bzm_transport_encode_read(uint8_t asic_id, uint16_t engine_id, uint8_t of
                                  size_t encoded_capacity);
 size_t bzm_transport_encode_noop(uint8_t asic_id, uint8_t * encoded, size_t encoded_capacity);
 
-size_t bzm_discover_chain(size_t expected_count, uint8_t * asic_ids, size_t asic_ids_capacity, const bzm_chain_ops_t * ops,
-                          void * ops_context);
 bool bzm_partition_nonce_range(uint32_t starting_nonce, uint32_t end_nonce, size_t partition, size_t partition_count,
                                uint32_t * partition_start, uint32_t * partition_end);
-size_t bzm_serial_discover_chain(bzm_serial_transport_t * transport, size_t expected_count);
 
 /* A transport must not be copied after this initialization. */
 bool bzm_serial_transport_init(bzm_serial_transport_t * transport);
@@ -129,8 +102,6 @@ bool bzm_serial_get_telemetry_snapshot(bzm_serial_transport_t * transport, bzm_t
 bool bzm_serial_get_parser_stats(bzm_serial_transport_t * transport, bzm_serial_parser_stats_t * stats);
 void bzm_serial_discard_pending_results(bzm_serial_transport_t *transport);
 
-bool bzm_serial_write_register(bzm_serial_transport_t * transport, uint16_t engine_id, uint8_t offset, const void * data,
-                               size_t data_len);
 bool bzm_serial_write_register_to(bzm_serial_transport_t * transport, uint8_t asic_id, uint16_t engine_id, uint8_t offset,
                                   const void * data, size_t data_len);
 bool bzm_serial_read_register(bzm_serial_transport_t * transport, uint8_t asic_id, uint16_t engine_id, uint8_t offset, void * data,
@@ -144,12 +115,10 @@ bool bzm_transport_program_broadcast_work(
 /* Queue a deterministic, 64-leading-zero sentinel as both current and
  * pending work. It exercises the hashing datapath without opening ordinary
  * mining dispatch. */
-bool bzm_transport_program_stage6_sentinel(uint16_t engine_id, bzm_register_writer_t writer, void * writer_context);
-bool bzm_transport_program_flush(uint16_t engine_count, bool enhanced_mode, bzm_register_writer_t writer, void * writer_context);
+bool bzm_transport_program_startup_work(uint16_t engine_id, bzm_register_writer_t writer, void * writer_context);
+bool bzm_transport_program_flush(uint16_t engine_count, bzm_register_writer_t writer, void * writer_context);
 bool bzm_serial_write_work(void * context, const bzm_work_t * work);
 bool bzm_serial_flush(void * context);
 bool bzm_serial_read_result(bzm_serial_transport_t * transport, bzm_raw_result_t * result, uint16_t timeout_ms);
-
-extern const bzm_transport_ops_t BZM_SERIAL_TRANSPORT_OPS;
 
 #endif // BZM_TRANSPORT_H

@@ -18,8 +18,6 @@
  * error only. */
 #define BZM_TPS546_VOUT_READBACK_TOLERANCE_V 0.002f
 #define BZM_TPS546_VOUT_OPERATING_TOLERANCE_V 0.15f
-#define BZM_TUNING_VOLTAGE_STEP_V 0.05f
-#define BZM_TUNING_MAX_VOLTAGE_STEPS 9U
 
 typedef struct {
     uint8_t phase;
@@ -70,14 +68,8 @@ typedef struct {
 
 extern const bzm_tps546_profile_t BZM_TPS546_BIRDS_PROFILE;
 
-bool bzm_power_voltage_is_allowed(float volts);
 bool bzm_power_runtime_voltage_is_allowed(float volts);
 bool bzm_power_resolve_user_voltage(uint16_t millivolts, float *volts);
-bool bzm_power_frequency_target_voltage(float frequency_mhz,
-                                        float *voltage_v);
-bool bzm_power_tuning_next_voltage(float initial_voltage_v,
-                                   float current_voltage_v,
-                                   float *next_voltage_v);
 
 typedef struct {
     esp_err_t (*set_5v_enabled)(void *context, bool enabled);
@@ -87,8 +79,6 @@ typedef struct {
     void (*delay_ms)(void *context, uint32_t delay_ms);
 } bzm_power_ops_t;
 
-esp_err_t bzm_power_set_enabled(const bzm_power_ops_t *ops, void *context,
-                                bool enabled);
 esp_err_t bzm_power_set_rail_enabled(const bzm_power_ops_t *ops,
                                      void *context, bool enabled);
 esp_err_t bzm_power_set_runtime_voltage(const bzm_power_ops_t *ops,

@@ -6,7 +6,6 @@
 #include "bitmain_job_packet.h"
 #include "bzm_bridge.h"
 #include "bzm_reactor.h"
-#include "bzm_running_evidence.h"
 #include "bzm_transport.h"
 #include "mining.h"
 #include "unity.h"
@@ -36,76 +35,6 @@ typedef struct {
     size_t count;
     register_write_t writes[64];
 } register_capture_t;
-
-typedef struct {
-    size_t available;
-    size_t programmed;
-    size_t read_count;
-    size_t broadcast_noop_count;
-    size_t addressed_noop_count;
-    uint8_t programmed_ids[BZM_MAX_ASIC_COUNT];
-    uint8_t chain_enabled[BZM_MAX_ASIC_COUNT];
-} simulated_chain_t;
-
-static bool simulated_noop(void *context, uint8_t asic_id)
-{
-    simulated_chain_t *chain = context;
-    if (asic_id == BZM_BROADCAST_ASIC) {
-        chain->broadcast_noop_count++;
-        return chain->programmed < chain->available;
-    }
-    chain->addressed_noop_count++;
-    size_t index = 0;
-    return bzm_topology_asic_index(asic_id, &index) && index < chain->programmed;
-}
-
-static bool simulated_chain_write(void *context, uint8_t asic_id,
-                                  uint16_t engine_id, uint8_t offset,
-                                  const void *data, size_t data_len)
-{
-    simulated_chain_t *chain = context;
-    const uint8_t *bytes = data;
-    if (asic_id != BZM_BROADCAST_ASIC ||
-        engine_id != BZM_CONTROL_ENGINE_ID || offset != 0x0b ||
-        data_len != 4 || chain->programmed >= chain->available) {
-        return false;
-    }
-    chain->programmed_ids[chain->programmed] = bytes[0];
-    chain->chain_enabled[chain->programmed] = bytes[1];
-    chain->programmed++;
-    return true;
-}
-
-static bool simulated_chain_read(void *context, uint8_t asic_id,
-                                 uint16_t engine_id, uint8_t offset,
-                                 void *data, size_t data_len)
-{
-    simulated_chain_t *chain = context;
-    uint8_t *bytes = data;
-    size_t index = 0;
-    if (engine_id != BZM_CONTROL_ENGINE_ID || offset != 0x0b ||
-        data_len != 4 || !bzm_topology_asic_index(asic_id, &index) || index >= chain->programmed) {
-        return false;
-    }
-    memset(bytes, 0, data_len);
-    bytes[0] = chain->programmed_ids[index];
-    bytes[1] = chain->chain_enabled[index];
-    chain->read_count++;
-    return true;
-}
-
-static void simulated_chain_delay(void *context, uint32_t delay_ms)
-{
-    (void)context;
-    TEST_ASSERT_EQUAL_UINT32(200, delay_ms);
-}
-
-static const bzm_chain_ops_t SIMULATED_CHAIN_OPS = {
-    .noop = simulated_noop,
-    .write_register = simulated_chain_write,
-    .read_register = simulated_chain_read,
-    .delay_ms = simulated_chain_delay,
-};
 
 static bool capture_register(void *context, uint16_t engine_id,
                              uint8_t offset, const void *data,
@@ -206,7 +135,6 @@ static bzm_reactor_t *new_reactor(bzm_job_store_t *store,
         .timestamp_count = 16,
         .lead_zeros = 36,
         .nonce_offset = BZM_NONCE_GAP_1002,
-        .enhanced_mode = true,
     };
     TEST_ASSERT_TRUE(bzm_reactor_init(reactor, store, &config,
                                       &SIMULATED_OPS, transport));
@@ -224,10 +152,10 @@ TEST_CASE("BZM work builder derives four family-private midstates",
     };
     bzm_work_t work;
     TEST_ASSERT_TRUE(bzm_work_build(
-        &source, 7, 5, 16, 36, true, &work));
+        &source, 7, 5, 16, 36, &work));
     TEST_ASSERT_EQUAL_UINT16(7, work.engine_id);
     TEST_ASSERT_EQUAL_UINT8(5, work.logical_sequence);
-    TEST_ASSERT_EQUAL_UINT8(4, work.midstate_count);
+
     TEST_ASSERT_EQUAL_HEX32(0x20000004, work.versions[0]);
     TEST_ASSERT_EQUAL_HEX32(0x20002004, work.versions[1]);
     TEST_ASSERT_EQUAL_HEX32(0x20004004, work.versions[2]);
@@ -262,7 +190,7 @@ TEST_CASE("BZM keeps enhanced sequence identity when version rolling is unavaila
     for (unsigned assignment = 0; assignment < 2; ++assignment) {
         bzm_work_t work;
         TEST_ASSERT_EQUAL(BZM_ASSIGN_OK, bzm_reactor_assign(reactor, &template, &work));
-        TEST_ASSERT_EQUAL_UINT8(4, work.midstate_count);
+
         for (unsigned variant = 0; variant < 4; ++variant) {
             TEST_ASSERT_EQUAL_HEX32(template.version, work.versions[variant]);
             bzm_raw_result_t raw = {
@@ -297,28 +225,6 @@ TEST_CASE("BZM result frame decoder follows the mixed-endian wire layout",
     TEST_ASSERT_EQUAL_UINT32(999, (uint32_t)result.timestamp_us);
 }
 
-TEST_CASE("BZM TDM result decoder preserves the ASIC address",
-          "[asic][bzm][result][qemu-integration]")
-{
-    uint8_t frame[BZM_TDM_RESULT_FRAME_SIZE] = {
-        0x1e, 0x01,
-        0x83, 0x45, 0x78, 0x56, 0x34, 0x12, 0x17, 0x0d,
-    };
-    bzm_raw_result_t result;
-    TEST_ASSERT_TRUE(bzm_tdm_result_decode(frame, 999, &result));
-    TEST_ASSERT_EQUAL_HEX8(0x1e, result.asic_id);
-    TEST_ASSERT_EQUAL_UINT16(0x345, result.engine_id);
-    frame[1] = 0x03;
-    TEST_ASSERT_FALSE(bzm_tdm_result_decode(frame, 999, &result));
-}
-
-TEST_CASE("BZM temperature conversion follows the Intel 12-bit formula",
-          "[asic][bzm][temperature][qemu-integration]")
-{
-    TEST_ASSERT_FLOAT_WITHIN(0.01f, 22.02f,
-                             bzm_temperature_from_code(0x800));
-}
-
 TEST_CASE("BZM compact engine IDs skip every disabled 1002 coordinate",
           "[asic][bzm][engine-map][qemu-integration]")
 {
@@ -326,14 +232,11 @@ TEST_CASE("BZM compact engine IDs skip every disabled 1002 coordinate",
     TEST_ASSERT_EQUAL_UINT16(240, BZM_ENGINE_GRID_COUNT);
 
     for (uint16_t logical = 0; logical < BZM_ENGINES_PER_ASIC; ++logical) {
-        uint16_t physical;
         uint16_t round_trip;
         bzm_engine_location_t expected;
-        TEST_ASSERT_TRUE(bzm_topology_engine_at(logical, &expected));
-        TEST_ASSERT_TRUE(bzm_engine_physical_id(logical, &physical));
-        TEST_ASSERT_EQUAL_UINT16(expected.physical_id, physical);
-        TEST_ASSERT_TRUE(bzm_engine_logical_id(physical, &round_trip));
-        TEST_ASSERT_EQUAL_UINT16(logical, round_trip);
+        TEST_ASSERT_TRUE(bzm_topology_activation_at(logical, BZM_ENGINE_STACK_BOTTOM, &expected));
+        TEST_ASSERT_TRUE(bzm_engine_logical_id(expected.physical_id, &round_trip));
+        TEST_ASSERT_EQUAL_UINT16(expected.topology_index, round_trip);
     }
 
     static const struct {
@@ -352,15 +255,12 @@ TEST_CASE("BZM compact engine IDs skip every disabled 1002 coordinate",
         {235, 722},
     };
     for (size_t i = 0; i < sizeof(boundaries) / sizeof(boundaries[0]); ++i) {
-        uint16_t physical;
-        TEST_ASSERT_TRUE(bzm_engine_physical_id(boundaries[i].logical,
-                                                &physical));
-        TEST_ASSERT_EQUAL_UINT16(boundaries[i].physical, physical);
+        bzm_engine_location_t engine;
+        TEST_ASSERT_TRUE(bzm_topology_from_physical_id(boundaries[i].physical, &engine));
+        TEST_ASSERT_EQUAL_UINT16(boundaries[i].logical, engine.topology_index);
     }
 
     uint16_t value;
-    TEST_ASSERT_FALSE(bzm_engine_physical_id(BZM_ENGINES_PER_ASIC, &value));
-    TEST_ASSERT_FALSE(bzm_engine_physical_id(0, NULL));
     TEST_ASSERT_FALSE(bzm_engine_logical_id(0, NULL));
     TEST_ASSERT_FALSE(bzm_engine_logical_id(20, &value));
     TEST_ASSERT_FALSE(bzm_engine_logical_id(256, &value));
@@ -424,27 +324,6 @@ TEST_CASE("BZM transport encodes read and noop commands",
                                   sizeof(expected_noop));
 }
 
-TEST_CASE("BZM chain discovery reports every chain length from zero to four",
-          "[asic][bzm][discovery][qemu-integration]")
-{
-    for (size_t available = 0; available <= BZM_MAX_ASIC_COUNT;
-         ++available) {
-        uint8_t ids[BZM_MAX_ASIC_COUNT] = {0};
-        simulated_chain_t chain = {.available = available};
-        TEST_ASSERT_EQUAL_UINT32(available, bzm_discover_chain(
-            BZM_MAX_ASIC_COUNT, ids, sizeof(ids),
-            &SIMULATED_CHAIN_OPS, &chain));
-        TEST_ASSERT_EQUAL_UINT32(available, chain.read_count);
-        TEST_ASSERT_EQUAL_UINT32(0, chain.addressed_noop_count);
-        for (size_t i = 0; i < available; ++i) {
-            TEST_ASSERT_EQUAL_UINT8(bzm_asic_wire_ids[i], ids[i]);
-            TEST_ASSERT_EQUAL_UINT8(bzm_asic_wire_ids[i], chain.programmed_ids[i]);
-            TEST_ASSERT_EQUAL_UINT8(i == 0 ? 0 : 1,
-                                    chain.chain_enabled[i]);
-        }
-    }
-}
-
 TEST_CASE("BZM transport partitions an engine nonce range across ASICs",
           "[asic][bzm][transport][nonce][qemu-integration]")
 {
@@ -474,7 +353,7 @@ TEST_CASE("BZM transport programs ordered enhanced work and flush jobs",
     };
     bzm_work_t work;
     TEST_ASSERT_TRUE(bzm_work_build(
-        &source, 7, 5, 16, 36, true, &work));
+        &source, 7, 5, 16, 36, &work));
 
     register_capture_t capture = {0};
     TEST_ASSERT_TRUE(bzm_transport_program_work(
@@ -523,7 +402,7 @@ TEST_CASE("BZM transport programs ordered enhanced work and flush jobs",
 
     memset(&capture, 0, sizeof(capture));
     TEST_ASSERT_TRUE(bzm_transport_program_flush(
-        1, true, capture_register, &capture));
+        1, capture_register, &capture));
     TEST_ASSERT_EQUAL_UINT32(12, capture.count);
     TEST_ASSERT_EQUAL_HEX8(0xff, capture.writes[0].data[0]);
     for (size_t i = 1; i < 5; ++i) {
@@ -533,7 +412,7 @@ TEST_CASE("BZM transport programs ordered enhanced work and flush jobs",
     TEST_ASSERT_EQUAL_UINT8(1, capture.writes[11].data[0]);
 
     memset(&capture, 0, sizeof(capture));
-    TEST_ASSERT_TRUE(bzm_transport_program_stage6_sentinel(
+    TEST_ASSERT_TRUE(bzm_transport_program_startup_work(
         10, capture_register, &capture));
     TEST_ASSERT_EQUAL_UINT32(22, capture.count);
     TEST_ASSERT_EQUAL_UINT16(10, capture.writes[0].engine_id);
@@ -552,112 +431,11 @@ TEST_CASE("BZM transport programs ordered enhanced work and flush jobs",
 
     memset(&capture, 0, sizeof(capture));
     TEST_ASSERT_TRUE(bzm_transport_program_flush(
-        2, true, capture_register, &capture));
+        2, capture_register, &capture));
     TEST_ASSERT_EQUAL_UINT32(24, capture.count);
     TEST_ASSERT_EQUAL_UINT16(0, capture.writes[0].engine_id);
     TEST_ASSERT_EQUAL_UINT16(10, capture.writes[12].engine_id);
 
-}
-
-TEST_CASE("BZM reactor dispatches one stored generation to every engine",
-          "[asic][bzm][reactor][qemu-integration]")
-{
-    bzm_job_store_t *store = new_store();
-    simulated_transport_t *transport = new_transport();
-    bzm_reactor_t *reactor = new_reactor(store, transport, 4);
-    asic_job_t template = bzm_template("dispatch");
-
-    size_t assigned = 0;
-    TEST_ASSERT_EQUAL(BZM_ASSIGN_OK,
-                      bzm_reactor_dispatch(reactor, &template, &assigned));
-    TEST_ASSERT_EQUAL_UINT32(4, assigned);
-    TEST_ASSERT_EQUAL_UINT32(4, transport->write_count);
-    TEST_ASSERT_EQUAL_UINT32(4, transport->checkpoint_count);
-    bzm_work_handle_t shared = transport->work[0].source.handle;
-    int bottom_count = 0;
-    int top_count = 0;
-    for (size_t i = 0; i < assigned; ++i) {
-        bzm_engine_location_t expected;
-        TEST_ASSERT_TRUE(bzm_topology_activation_at(
-            i, BZM_ENGINE_STACK_BOTTOM, &expected));
-        TEST_ASSERT_EQUAL_UINT32(expected.physical_id,
-                                 transport->work[i].engine_id);
-        if (expected.stack == BZM_ENGINE_STACK_BOTTOM) {
-            ++bottom_count;
-        } else {
-            ++top_count;
-        }
-        TEST_ASSERT_LESS_OR_EQUAL_INT(1, abs(bottom_count - top_count));
-        TEST_ASSERT_EQUAL_HEX32((uint32_t)shared,
-                                (uint32_t)transport->work[i].source.handle);
-        TEST_ASSERT_EQUAL_HEX32((uint32_t)(shared >> 32),
-                                (uint32_t)(transport->work[i].source.handle >> 32));
-        TEST_ASSERT_EQUAL_HEX32(i * 0x40000000U,
-                                transport->work[i].starting_nonce);
-        TEST_ASSERT_EQUAL_HEX32(((i + 1) * 0x40000000ULL) - 1,
-                                transport->work[i].end_nonce);
-    }
-
-    asic_job_t snapshot;
-    TEST_ASSERT_TRUE(bzm_job_store_snapshot(store, shared, &snapshot));
-    TEST_ASSERT_EQUAL_STRING("dispatch", snapshot.job_id);
-
-    free(transport);
-    free(reactor);
-    delete_store(store);
-}
-
-TEST_CASE("BZM full dispatch covers 236 engines in balanced write order",
-          "[asic][bzm][reactor][topology][balance][qemu-integration]")
-{
-    bzm_job_store_t *store = new_store();
-    simulated_transport_t *transport = new_transport();
-    bzm_reactor_t *reactor = new_reactor(
-        store, transport, BZM_ENGINES_PER_ASIC);
-    asic_job_t template = bzm_template("full-topology");
-    bool seen[BZM_ENGINE_GRID_COUNT] = {false};
-
-    size_t assigned = 0;
-    TEST_ASSERT_EQUAL(BZM_ASSIGN_OK,
-                      bzm_reactor_dispatch(reactor, &template, &assigned));
-    TEST_ASSERT_EQUAL_UINT16(BZM_ENGINES_PER_ASIC, assigned);
-    TEST_ASSERT_EQUAL_UINT16(BZM_ENGINES_PER_ASIC,
-                             transport->write_count);
-    TEST_ASSERT_EQUAL_UINT16(BZM_ENGINES_PER_ASIC,
-                             transport->checkpoint_count);
-
-    int bottom_count = 0;
-    int top_count = 0;
-    for (size_t schedule_index = 0; schedule_index < assigned;
-         ++schedule_index) {
-        bzm_engine_location_t expected;
-        TEST_ASSERT_TRUE(bzm_topology_activation_at(
-            schedule_index, BZM_ENGINE_STACK_BOTTOM, &expected));
-        TEST_ASSERT_EQUAL_UINT16(expected.physical_id,
-                                 transport->work[schedule_index].engine_id);
-        TEST_ASSERT_FALSE(seen[expected.grid_id]);
-        seen[expected.grid_id] = true;
-
-        if (expected.stack == BZM_ENGINE_STACK_BOTTOM) {
-            ++bottom_count;
-        } else {
-            ++top_count;
-        }
-        TEST_ASSERT_LESS_OR_EQUAL_INT(1, abs(bottom_count - top_count));
-    }
-    TEST_ASSERT_EQUAL_INT(BZM_TOPOLOGY_STACK_ENGINE_COUNT, bottom_count);
-    TEST_ASSERT_EQUAL_INT(BZM_TOPOLOGY_STACK_ENGINE_COUNT, top_count);
-
-    // Balanced ordering limits transient skew, but does not claim an atomic
-    // pairwise commit. The separate partial-dispatch test verifies fail/flush.
-    TEST_ASSERT_FALSE(seen[4 * BZM_ENGINE_ROWS]);
-    TEST_ASSERT_FALSE(seen[5 * BZM_ENGINE_ROWS]);
-    TEST_ASSERT_FALSE(seen[5 * BZM_ENGINE_ROWS + 19]);
-    TEST_ASSERT_FALSE(seen[11 * BZM_ENGINE_ROWS + 19]);
-
-    free(transport);
-    free(reactor);
-    delete_store(store);
 }
 
 TEST_CASE("BZM incremental assignments retain compact IDs in balanced order",
@@ -672,7 +450,6 @@ TEST_CASE("BZM incremental assignments retain compact IDs in balanced order",
         .timestamp_count = 16,
         .lead_zeros = 36,
         .nonce_offset = BZM_NONCE_GAP_1002,
-        .enhanced_mode = false,
     };
     TEST_ASSERT_TRUE(bzm_reactor_init(reactor, store, &config,
                                       &SIMULATED_OPS, transport));
@@ -851,11 +628,12 @@ TEST_CASE("BZM reactor resolves microstate version and timestamp rolling",
 {
     bzm_job_store_t *store = new_store();
     simulated_transport_t *transport = new_transport();
-    bzm_reactor_t *reactor = new_reactor(store, transport, 21);
+    bzm_reactor_t *reactor = new_reactor(store, transport, BZM_ENGINES_PER_ASIC);
     asic_job_t template = bzm_template("result");
     template.version_mask = 0x1fffe000;
-    TEST_ASSERT_EQUAL(BZM_ASSIGN_OK,
-                      bzm_reactor_dispatch(reactor, &template, NULL));
+    for (size_t i = 0; i < BZM_ENGINES_PER_ASIC; ++i) {
+        TEST_ASSERT_EQUAL(BZM_ASSIGN_OK, bzm_reactor_assign(reactor, &template, NULL));
+    }
 
     bzm_raw_result_t raw = {
         .asic_id = 0x1e,
@@ -908,55 +686,7 @@ TEST_CASE("BZM reactor resolves microstate version and timestamp rolling",
     delete_store(store);
 }
 
-TEST_CASE("BZM reactor retains both enhanced sequence generations",
-          "[asic][bzm][reactor][result][pipeline][qemu-integration]")
-{
-    bzm_job_store_t *store = new_store();
-    simulated_transport_t *transport = new_transport();
-    bzm_reactor_t *reactor = new_reactor(store, transport, 2);
-    asic_job_t first = bzm_template("first");
-    asic_job_t second = bzm_template("second");
-    first.ntime = 100;
-    second.ntime = 200;
-
-    TEST_ASSERT_EQUAL(BZM_ASSIGN_OK,
-                      bzm_reactor_dispatch(reactor, &first, NULL));
-    bzm_work_handle_t first_handle = transport->work[0].source.handle;
-    TEST_ASSERT_EQUAL(BZM_ASSIGN_OK,
-                      bzm_reactor_dispatch(reactor, &second, NULL));
-    bzm_work_handle_t second_handle = transport->work[2].source.handle;
-    TEST_ASSERT_NOT_EQUAL((uint32_t) first_handle,
-                          (uint32_t) second_handle);
-
-    bzm_raw_result_t raw = {
-        .asic_id = BZM_FIRST_ASIC_ID,
-        .engine_id = transport->work[0].engine_id,
-        .status = 8,
-        .sequence_id = 0,
-        .time = 16,
-    };
-    bzm_result_t event;
-    TEST_ASSERT_TRUE(bzm_reactor_map_result(reactor, &raw, &event));
-    TEST_ASSERT_EQUAL_UINT32((uint32_t) first_handle,
-                             (uint32_t) event.work_handle);
-    TEST_ASSERT_EQUAL_HEX32(100, event.final_ntime);
-
-    raw.sequence_id = 4;
-    TEST_ASSERT_TRUE(bzm_reactor_map_result(reactor, &raw, &event));
-    TEST_ASSERT_EQUAL_UINT32((uint32_t) second_handle,
-                             (uint32_t) event.work_handle);
-    TEST_ASSERT_EQUAL_HEX32(200, event.final_ntime);
-
-    TEST_ASSERT_EQUAL(BZM_ASSIGN_FLUSH_REQUIRED,
-                      bzm_reactor_dispatch(reactor, &second, NULL));
-    TEST_ASSERT_TRUE(bzm_reactor_is_flush_pending(reactor));
-
-    free(transport);
-    free(reactor);
-    delete_store(store);
-}
-
-TEST_CASE("BZM 1002 nonce gap reproduces captured Stage 7 hardware proof",
+TEST_CASE("BZM 1002 nonce gap reproduces a captured hardware result",
           "[asic][bzm][reactor][result][hardware-vector][qemu-integration]")
 {
     asic_job_t template = {
@@ -1006,19 +736,17 @@ TEST_CASE("BZM failed flush remains a barrier until transport recovers",
     bzm_reactor_t *reactor = new_reactor(store, transport, 1);
     asic_job_t template = bzm_template("flush-error");
     TEST_ASSERT_EQUAL(BZM_ASSIGN_OK,
-                      bzm_reactor_dispatch(reactor, &template, NULL));
+                      bzm_reactor_assign(reactor, &template, NULL));
 
     transport->fail_flush = true;
-    reactor->next_sequence = 2;
-    TEST_ASSERT_EQUAL(BZM_ASSIGN_TRANSPORT_ERROR,
-                      bzm_reactor_dispatch(reactor, &template, NULL));
+    TEST_ASSERT_FALSE(bzm_reactor_begin_flush(reactor));
     TEST_ASSERT_TRUE(bzm_reactor_is_flush_pending(reactor));
     TEST_ASSERT_EQUAL_UINT32(1, transport->flush_count);
 
     bzm_reactor_finish_flush(reactor);
     TEST_ASSERT_TRUE(bzm_reactor_is_flush_pending(reactor));
     TEST_ASSERT_EQUAL(BZM_ASSIGN_FLUSH_REQUIRED,
-                      bzm_reactor_dispatch(reactor, &template, NULL));
+                      bzm_reactor_assign(reactor, &template, NULL));
 
     transport->fail_flush = false;
     TEST_ASSERT_TRUE(bzm_reactor_begin_flush(reactor));
@@ -1026,132 +754,26 @@ TEST_CASE("BZM failed flush remains a barrier until transport recovers",
     bzm_reactor_finish_flush(reactor);
     TEST_ASSERT_FALSE(bzm_reactor_is_flush_pending(reactor));
     TEST_ASSERT_EQUAL(BZM_ASSIGN_OK,
-                      bzm_reactor_dispatch(reactor, &template, NULL));
+                      bzm_reactor_assign(reactor, &template, NULL));
 
     free(transport);
     free(reactor);
     delete_store(store);
 }
 
-TEST_CASE("BZM clean-job barrier rejects stale results and invalidates handles",
-          "[asic][bzm][reactor][clean-job][qemu-integration]")
-{
-    bzm_job_store_t *store = new_store();
-    simulated_transport_t *transport = new_transport();
-    bzm_reactor_t *reactor = new_reactor(store, transport, 1);
-    asic_job_t template = bzm_template("old");
-    TEST_ASSERT_EQUAL(BZM_ASSIGN_OK,
-                      bzm_reactor_dispatch(reactor, &template, NULL));
-    bzm_work_handle_t old_handle = transport->work[0].source.handle;
-
-    bzm_raw_result_t old_result = {
-        .engine_id = 0,
-        .status = 8,
-        .sequence_id = 0,
-        .time = 16,
-    };
-    bzm_result_t event;
-    TEST_ASSERT_TRUE(bzm_reactor_clear_work(reactor));
-    TEST_ASSERT_FALSE(bzm_reactor_is_flush_pending(reactor));
-    TEST_ASSERT_TRUE(bzm_reactor_results_quarantined(reactor));
-    TEST_ASSERT_EQUAL_UINT32(1, transport->flush_count);
-    TEST_ASSERT_FALSE(bzm_reactor_map_result(reactor, &old_result, &event));
-    asic_job_t snapshot;
-    TEST_ASSERT_FALSE(bzm_job_store_snapshot(store, old_handle, &snapshot));
-
-    template = bzm_template("new");
-    TEST_ASSERT_EQUAL(BZM_ASSIGN_OK,
-                      bzm_reactor_dispatch(reactor, &template, NULL));
-    TEST_ASSERT_FALSE(bzm_reactor_results_quarantined(reactor));
-    bzm_work_handle_t new_handle =
-        transport->work[transport->write_count - 1].source.handle;
-    TEST_ASSERT_NOT_EQUAL((uint32_t)old_handle, (uint32_t)new_handle);
-    TEST_ASSERT_FALSE(bzm_job_store_snapshot(store, old_handle, &snapshot));
-
-    free(transport);
-    free(reactor);
-    delete_store(store);
-}
-
-TEST_CASE("BZM idle clean-job barrier does not disturb the hardware link",
-          "[asic][bzm][reactor][clean-job][idle][qemu-integration]")
-{
-    bzm_job_store_t *store = new_store();
-    simulated_transport_t *transport = new_transport();
-    bzm_reactor_t *reactor = new_reactor(store, transport, 1);
-    asic_job_t template = bzm_template("queued-only");
-    bzm_work_handle_t handle = BZM_WORK_HANDLE_INVALID;
-    TEST_ASSERT_TRUE(bzm_job_store_store_generated(store, &template,
-                                                     &handle));
-
-    TEST_ASSERT_TRUE(bzm_reactor_clear_work(reactor));
-    TEST_ASSERT_EQUAL_UINT32(0, transport->flush_count);
-    TEST_ASSERT_FALSE(bzm_reactor_is_flush_pending(reactor));
-    TEST_ASSERT_TRUE(bzm_reactor_results_quarantined(reactor));
-    asic_job_t snapshot;
-    TEST_ASSERT_FALSE(bzm_job_store_snapshot(store, handle, &snapshot));
-
-    free(transport);
-    free(reactor);
-    delete_store(store);
-}
-
-TEST_CASE("BZM quarantines clean-job results through the full engine rotation",
+TEST_CASE("BZM repeated clean jobs preserve engine scheduling",
           "[asic][bzm][reactor][clean-job][scheduler][qemu-integration]")
 {
-    bzm_job_store_t *store = new_store();
-    simulated_transport_t *transport = new_transport();
-    bzm_reactor_t *reactor = new_reactor(store, transport, 2);
-    asic_job_t template = bzm_template("replacement");
-
-    TEST_ASSERT_TRUE(bzm_reactor_clear_work(reactor));
-    TEST_ASSERT_TRUE(bzm_reactor_results_quarantined(reactor));
-    TEST_ASSERT_EQUAL(BZM_ASSIGN_OK,
-                      bzm_reactor_assign(reactor, &template, NULL));
-    TEST_ASSERT_TRUE(bzm_reactor_results_quarantined(reactor));
-    TEST_ASSERT_EQUAL(BZM_ASSIGN_OK,
-                      bzm_reactor_assign(reactor, &template, NULL));
-    TEST_ASSERT_FALSE(bzm_reactor_results_quarantined(reactor));
-
-    free(transport);
-    free(reactor);
-    delete_store(store);
-}
-
-TEST_CASE("BZM repeated clean refreshes preserve frequency replacement proof",
-          "[asic][bzm][reactor][clean-job][evidence][qemu-integration]")
-{
-    /* Reproduce the PR #5 HIL cadence with the corrected production policy.
-     * Each notification arrives before a 236-engine rotation can finish.
-     * Logical time models the pool's two-second refresh; transport timing and
-     * nonce validity are not emulated here. Non-clean refreshes are the control.
-     */
+    /* Notifications arriving faster than a full engine rotation must not
+     * starve engines at the end of the schedule. */
     for (unsigned repeated_clean = 0; repeated_clean <= 1; ++repeated_clean) {
         bzm_job_store_t *store = new_store();
         simulated_transport_t *transport = new_transport();
         bzm_reactor_t *reactor = new_reactor(
             store, transport, BZM_ENGINES_PER_ASIC);
-        asic_job_t template = bzm_template("refresh-proof");
-        bzm_running_stats_t baseline = {0};
-        bzm_running_stats_t current = {
-            /* Valid results can precede the first clean replacement, as in
-             * the captured run. They cannot satisfy the batch requirement. */
-            .mapped_results = 85,
-            .locally_valid_results = 85,
-        };
-        bzm_running_evidence_config_t config = {
-            .required_chip_engine_writes = 944,
-            .minimum_valid_results = 1,
-            .allow_mapping_recovery = true,
-            .maximum_mapping_rejections = 16,
-            .maximum_local_rejections = 16,
-            .proof_timeout_ms = 90000,
-            .recovery_timeout_ms = 30000,
-        };
-        bzm_running_evidence_lifecycle_t lifecycle = {.completed_once = true};
-        bzm_running_evidence_result_t evidence = bzm_running_evidence_track(
-            &lifecycle, &baseline, &current, &config, 0, 0);
-        TEST_ASSERT_EQUAL(BZM_RUNNING_EVIDENCE_GOOD, evidence.status);
+        asic_job_t template = bzm_template("refresh");
+        uint32_t dispatched = 0;
+        uint32_t rotations = 0;
 
         for (unsigned refresh = 0; refresh < 15; ++refresh) {
             if (refresh == 0 || repeated_clean)
@@ -1160,24 +782,15 @@ TEST_CASE("BZM repeated clean refreshes preserve frequency replacement proof",
             for (unsigned engine = 0; engine < 25; ++engine) {
                 TEST_ASSERT_EQUAL(BZM_ASSIGN_OK,
                                   bzm_reactor_assign(reactor, &template, NULL));
-                current.dispatched_logical_engines++;
-                current.dispatched_chip_engines += 4;
+                dispatched++;
                 if (reactor->next_engine == 0)
-                    current.dispatch_batches++;
+                    rotations++;
                 TEST_ASSERT_FALSE(bzm_reactor_results_quarantined(reactor));
             }
-            if (!bzm_reactor_results_quarantined(reactor)) {
-                current.mapped_results++;
-                current.locally_valid_results++;
-            }
-            evidence = bzm_running_evidence_track(
-                &lifecycle, &baseline, &current, &config, 0,
-                (refresh + 1) * 2000U);
         }
-        TEST_ASSERT_GREATER_THAN_UINT32(944, current.dispatched_chip_engines);
-        TEST_ASSERT_GREATER_THAN_UINT32(0, current.dispatch_batches);
+        TEST_ASSERT_EQUAL_UINT32(375, dispatched);
+        TEST_ASSERT_EQUAL_UINT32(1, rotations);
         TEST_ASSERT_FALSE(bzm_reactor_results_quarantined(reactor));
-        TEST_ASSERT_EQUAL(BZM_RUNNING_EVIDENCE_GOOD, evidence.status);
 
         free(transport);
         free(reactor);
@@ -1204,7 +817,6 @@ TEST_CASE("BZM clean jobs retire delayed results without resetting engine order"
     TEST_ASSERT_EQUAL_UINT16(1, reactor->next_engine);
     TEST_ASSERT_EQUAL_UINT32(0, transport->flush_count);
     TEST_ASSERT_FALSE(bzm_reactor_map_result(reactor, &old, &event));
-    TEST_ASSERT_TRUE(bzm_reactor_result_is_stale(reactor, &old));
     TEST_ASSERT_FALSE(bzm_job_store_contains(store, old_work.source.handle));
 
     // A second clean notification must not restart the same engine again.
@@ -1215,20 +827,17 @@ TEST_CASE("BZM clean jobs retire delayed results without resetting engine order"
     fresh.engine_id = new_work.engine_id;
     fresh.sequence_id = new_work.logical_sequence << 2;
     TEST_ASSERT_TRUE(bzm_reactor_map_result(reactor, &fresh, &event));
-    TEST_ASSERT_TRUE(bzm_reactor_result_is_stale(reactor, &old));
 
     // When the old engine is reached, its sequence advances across invalidation.
     TEST_ASSERT_EQUAL(BZM_ASSIGN_OK, bzm_reactor_assign(reactor, &template, &new_work));
     TEST_ASSERT_EQUAL_UINT16(old_work.engine_id, new_work.engine_id);
     TEST_ASSERT_NOT_EQUAL(old_work.logical_sequence, new_work.logical_sequence);
     TEST_ASSERT_FALSE(bzm_reactor_map_result(reactor, &old, &event));
-    TEST_ASSERT_TRUE(bzm_reactor_result_is_stale(reactor, &old));
     fresh = old;
     fresh.sequence_id = new_work.logical_sequence << 2;
     TEST_ASSERT_TRUE(bzm_reactor_map_result(reactor, &fresh, &event));
     fresh.sequence_id = 40 << 2; // Never issued: remains a mapping error.
     TEST_ASSERT_FALSE(bzm_reactor_map_result(reactor, &fresh, &event));
-    TEST_ASSERT_FALSE(bzm_reactor_result_is_stale(reactor, &fresh));
 
     free(transport);
     free(reactor);
@@ -1275,106 +884,31 @@ TEST_CASE("BZM incremental sequence reuse requires a hardware barrier",
     delete_store(store);
 }
 
-TEST_CASE("BZM sequence wrap forces a flush before identity reuse",
-          "[asic][bzm][reactor][wrap][qemu-integration]")
-{
-    bzm_job_store_t *store = new_store();
-    simulated_transport_t *transport = new_transport();
-    bzm_reactor_t *reactor = new_reactor(store, transport, 1);
-
-    for (size_t i = 0; i < 2; ++i) {
-        asic_job_t template = bzm_template("wrap");
-        TEST_ASSERT_EQUAL(BZM_ASSIGN_OK,
-                          bzm_reactor_dispatch(reactor, &template, NULL));
-
-    }
-    asic_job_t template = bzm_template("wrapped");
-    TEST_ASSERT_EQUAL(BZM_ASSIGN_FLUSH_REQUIRED,
-                      bzm_reactor_dispatch(reactor, &template, NULL));
-    TEST_ASSERT_TRUE(bzm_reactor_is_flush_pending(reactor));
-    TEST_ASSERT_EQUAL_UINT32(1, transport->flush_count);
-
-    bzm_raw_result_t stale = {
-        .engine_id = 0,
-        .status = 8,
-        .sequence_id = 0,
-        .time = 16,
-    };
-    bzm_result_t event;
-    TEST_ASSERT_FALSE(bzm_reactor_map_result(reactor, &stale, &event));
-    bzm_reactor_finish_flush(reactor);
-    TEST_ASSERT_EQUAL(BZM_ASSIGN_OK,
-                      bzm_reactor_dispatch(reactor, &template, NULL));
-    TEST_ASSERT_EQUAL_UINT8(0,
-        transport->work[transport->write_count - 1].logical_sequence);
-
-    free(transport);
-    free(reactor);
-    delete_store(store);
-}
-
-TEST_CASE("BZM partial dispatch is flushed and never publishes a handle",
+TEST_CASE("BZM assignment errors flush earlier work and invalidate handles",
           "[asic][bzm][reactor][error][qemu-integration]")
 {
-    bzm_job_store_t *store = new_store();
-    simulated_transport_t *transport = new_transport();
-    transport->fail_after = 1;
-    bzm_reactor_t *reactor = new_reactor(store, transport, 2);
-    asic_job_t template = bzm_template("partial");
-    size_t assigned;
-    TEST_ASSERT_EQUAL(BZM_ASSIGN_TRANSPORT_ERROR,
-                      bzm_reactor_dispatch(reactor, &template, &assigned));
-    TEST_ASSERT_EQUAL_UINT32(0, assigned);
-    TEST_ASSERT_EQUAL_UINT32(1, transport->flush_count);
-    TEST_ASSERT_FALSE(bzm_reactor_is_flush_pending(reactor));
-    asic_job_t snapshot;
-    TEST_ASSERT_FALSE(bzm_job_store_snapshot(
-        store, transport->work[0].source.handle, &snapshot));
-    free(transport);
-    free(reactor);
-
-    simulated_transport_t *first_write_failure = new_transport();
-    first_write_failure->fail_immediately = true;
-    bzm_reactor_t *first_write_reactor = new_reactor(
-        store, first_write_failure, 2);
-    assigned = 99;
-    TEST_ASSERT_EQUAL(BZM_ASSIGN_TRANSPORT_ERROR,
-                      bzm_reactor_dispatch(first_write_reactor, &template,
-                                           &assigned));
-    TEST_ASSERT_EQUAL_UINT32(0, assigned);
-    TEST_ASSERT_EQUAL_UINT32(1, first_write_failure->flush_count);
-    TEST_ASSERT_FALSE(bzm_reactor_is_flush_pending(first_write_reactor));
-    free(first_write_failure);
-    free(first_write_reactor);
-
-    simulated_transport_t *checkpoint_failure = new_transport();
-    checkpoint_failure->fail_checkpoint = true;
-    bzm_reactor_t *checkpoint_reactor = new_reactor(
-        store, checkpoint_failure, 2);
-    assigned = 99;
-    TEST_ASSERT_EQUAL(BZM_ASSIGN_TRANSPORT_ERROR,
-                      bzm_reactor_dispatch(checkpoint_reactor, &template,
-                                           &assigned));
-    TEST_ASSERT_EQUAL_UINT32(0, assigned);
-    TEST_ASSERT_EQUAL_UINT32(1, checkpoint_failure->write_count);
-    TEST_ASSERT_EQUAL_UINT32(1, checkpoint_failure->checkpoint_count);
-    TEST_ASSERT_EQUAL_UINT32(1, checkpoint_failure->flush_count);
-    TEST_ASSERT_FALSE(bzm_reactor_is_flush_pending(checkpoint_reactor));
-    free(checkpoint_failure);
-    free(checkpoint_reactor);
-
-    simulated_transport_t *transport2 = new_transport();
-    bzm_reactor_t *invalid = calloc(1, sizeof(*invalid));
-    TEST_ASSERT_NOT_NULL(invalid);
-    bzm_reactor_config_t bad = {
-        .engine_count = BZM_ENGINES_PER_ASIC + 1,
-        .timestamp_count = 16,
-        .enhanced_mode = true,
-    };
-    TEST_ASSERT_FALSE(bzm_reactor_init(invalid, store, &bad,
-                                       &SIMULATED_OPS, transport2));
-
-    free(transport2);
-    free(invalid);
-    delete_store(store);
+    for (unsigned failure = 0; failure < 3; ++failure) {
+        bzm_job_store_t *store = new_store();
+        simulated_transport_t *transport = new_transport();
+        bzm_reactor_t *reactor = new_reactor(store, transport, 2);
+        asic_job_t template = bzm_template("partial");
+        bzm_work_t assigned;
+        TEST_ASSERT_EQUAL(BZM_ASSIGN_OK, bzm_reactor_assign(reactor, &template, &assigned));
+        bzm_work_handle_t old_handle = assigned.source.handle;
+        transport->fail_immediately = failure == 0;
+        transport->fail_checkpoint = failure != 0;
+        transport->fail_flush = failure == 2;
+        TEST_ASSERT_EQUAL(BZM_ASSIGN_TRANSPORT_ERROR, bzm_reactor_assign(reactor, &template, NULL));
+        TEST_ASSERT_EQUAL_UINT32(1, transport->flush_count);
+        TEST_ASSERT_EQUAL(failure == 2, bzm_reactor_is_flush_pending(reactor));
+        asic_job_t snapshot;
+        TEST_ASSERT_FALSE(bzm_job_store_snapshot(store, old_handle, &snapshot));
+        bzm_raw_result_t raw = {.asic_id = BZM_FIRST_ASIC_ID, .engine_id = assigned.engine_id,
+                                .status = 8, .time = 16};
+        bzm_result_t result;
+        TEST_ASSERT_FALSE(bzm_reactor_map_result(reactor, &raw, &result));
+        free(transport);
+        free(reactor);
+        delete_store(store);
+    }
 }

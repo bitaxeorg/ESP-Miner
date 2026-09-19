@@ -11,8 +11,6 @@ typedef enum {
     BZM_ENGINE_IDLE = 0,
     BZM_ENGINE_ASSIGNED,
     BZM_ENGINE_FLUSHING,
-    BZM_ENGINE_RESULT_PENDING,
-    BZM_ENGINE_UNHEALTHY,
 } bzm_engine_state_t;
 
 typedef enum {
@@ -39,7 +37,6 @@ typedef struct {
     uint8_t timestamp_count;
     uint8_t lead_zeros;
     uint32_t nonce_offset;
-    bool enhanced_mode;
 } bzm_reactor_config_t;
 
 typedef struct {
@@ -54,8 +51,6 @@ typedef struct {
     uint32_t base_ntime;
     uint32_t base_version;
     uint32_t nonce_offset;
-    bool enhanced_mode;
-    uint8_t version_count;
     uint32_t versions[BZM_VERSION_VARIANTS];
 } bzm_assignment_t;
 
@@ -70,17 +65,7 @@ typedef struct {
      * instead of assuming every engine shares one batch identity. */
     bzm_assignment_t previous_assignments[BZM_MAX_ACTIVE_WORK];
     uint8_t next_engine_sequence[BZM_MAX_ACTIVE_WORK];
-    /* Retired wire identities remain recognizable after pool invalidation.
-     * They are expected stale work, not evidence of parser corruption. */
-    uint64_t retired_sequences[BZM_MAX_ACTIVE_WORK][4];
-    /* A completed full dispatch has common job/version/time metadata across
-     * all engines. Retain that compact descriptor while the next sequence is
-     * programmed so in-flight results from both hardware generations map. */
-    bzm_assignment_t previous_batch;
-    bool previous_batch_complete;
-    bool current_batch_complete;
     uint16_t next_engine;
-    uint16_t next_sequence;
     uint32_t epoch;
     bool flush_pending;
     bool flush_complete;
@@ -98,25 +83,12 @@ bzm_assign_status_t bzm_reactor_assign(bzm_reactor_t *reactor,
                                        const asic_job_t *template,
                                        bzm_work_t *assigned_work);
 
-// Distribute one stored upstream template to every configured engine. All
-// engine assignments share one generation-bearing handle.
-bzm_assign_status_t bzm_reactor_dispatch(bzm_reactor_t *reactor,
-                                         const asic_job_t *template,
-                                         size_t *assigned_count);
-
 bool bzm_reactor_begin_flush(bzm_reactor_t *reactor);
 void bzm_reactor_finish_flush(bzm_reactor_t *reactor);
 bool bzm_reactor_is_flush_pending(const bzm_reactor_t *reactor);
 bool bzm_reactor_results_quarantined(const bzm_reactor_t *reactor);
 // Retire pool ownership while preserving balanced scheduling and wire IDs.
 bool bzm_reactor_invalidate_work(bzm_reactor_t *reactor);
-// True only for a recognized, retired engine/sequence identity.
-bool bzm_reactor_result_is_stale(bzm_reactor_t *reactor,
-                                const bzm_raw_result_t *raw);
-// Complete one clean-job barrier and retire every prior assignment/handle.
-// An idle reactor invalidates the store without emitting hardware flush work.
-bool bzm_reactor_clear_work(bzm_reactor_t *reactor);
-
 bool bzm_reactor_map_result(bzm_reactor_t *reactor,
                             const bzm_raw_result_t *raw,
                             bzm_result_t *result);
