@@ -153,20 +153,7 @@ double test_nonce_value(const bm_job *job, const uint32_t nonce, const uint32_t 
 
 uint32_t increment_bitmask(const uint32_t value, const uint32_t mask)
 {
-    // if mask is zero, just return the original value
-    if (mask == 0)
-        return value;
-
-    uint32_t carry = (value & mask) + (mask & -mask);      // increment the least significant bit of the mask
-    uint32_t overflow = carry & ~mask;                     // find overflowed bits that are not in the mask
-    uint32_t new_value = (value & ~mask) | (carry & mask); // set bits according to the mask
-
-    // Handle carry propagation
-    if (overflow > 0)
-    {
-        uint32_t carry_mask = (overflow << 1);                // shift left to get the mask where carry should be propagated
-        new_value = increment_bitmask(new_value, carry_mask); // recursively handle carry propagation
-    }
-
-    return new_value;
+    // Set unmasked bits before adding so carry skips gaps in the mask.
+    // Restore them afterwards; uint32_t wrap also handles a full mask.
+    return (value & ~mask) | (((value | ~mask) + 1u) & mask);
 }

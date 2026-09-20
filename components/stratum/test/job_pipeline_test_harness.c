@@ -17,6 +17,7 @@ static size_t harness_event_index;
 static job_pipeline_harness_result_t *harness_result;
 static int harness_job_frequency_ms;
 static GlobalState harness_state;
+static bool harness_count_only;
 
 static BaseType_t fake_task_notify_wait(
     uint32_t bits_to_clear_on_entry, unsigned long bits_to_clear_on_exit,
@@ -48,6 +49,11 @@ static void spy_task_delay(TickType_t ticks)
 static void spy_asic_send_work(GlobalState *state, bm_job *job)
 {
     (void)state;
+    harness_result->submitted_job_count++;
+    if (harness_count_only) {
+        free_bm_job(job);
+        return;
+    }
     if (harness_result->job_count >= JOB_PIPELINE_HARNESS_MAX_JOBS) {
         longjmp(harness_exit, 2);
     }
@@ -122,6 +128,7 @@ void job_pipeline_harness_run(
     harness_event_index = 0;
     harness_result = result;
     harness_job_frequency_ms = config.job_frequency_ms;
+    harness_count_only = config.count_only;
     mining_allocator_fault_injector_reset(config.allocation_failure_at);
 
     int exit_reason = setjmp(harness_exit);
