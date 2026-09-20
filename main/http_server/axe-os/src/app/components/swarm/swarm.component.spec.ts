@@ -65,6 +65,52 @@ describe('SwarmComponent', () => {
     expect(component).toBeTruthy();
   });
 
+  it('rejects a Philips Hue API error response during discovery', (done) => {
+    (httpClient.get as jasmine.Spy).and.callFake((url: string) => {
+      if (url.endsWith('/api/system/info')) {
+        return of([{
+          error: {
+            type: 1,
+            address: '/info',
+            description: 'unauthorized user'
+          }
+        }]);
+      }
+      return of({});
+    });
+
+    (component as any).fetchDevice('192.0.2.10').subscribe((device: any) => {
+      expect(device).toBeNull();
+      expect(httpClient.get).not.toHaveBeenCalledWith('http://192.0.2.10/api/system/asic');
+      done();
+    });
+  });
+
+  it('keeps a valid AxeOS device during discovery', (done) => {
+    (httpClient.get as jasmine.Spy).and.callFake((url: string) => {
+      if (url.endsWith('/api/system/info')) {
+        return of({
+          ASICModel: 'BM1370',
+          hostname: 'bitaxe-test',
+          ipv4: '192.0.2.11',
+          bestDiff: 100,
+          bestSessionDiff: 50
+        });
+      }
+      if (url.endsWith('/api/system/asic')) {
+        return of({ ASICModel: 'BM1370', asicCount: 1 });
+      }
+      return of({});
+    });
+
+    (component as any).fetchDevice('192.0.2.11').subscribe((device: any) => {
+      expect(device?.ASICModel).toBe('BM1370');
+      expect(device?.hostname).toBe('bitaxe-test');
+      expect(device?.connectionAddress).toBe('192.0.2.11');
+      done();
+    });
+  });
+
   it('uses each peer\'s own presets for low and normal frequencies', () => {
     expect(component.getDeviceNotification({ frequency: 150, frequencyOptions: [100, 200] })).toBeUndefined();
     expect(component.getDeviceNotification({ frequency: 150, frequencyOptions: [200, 300] })?.msg).toBe('Frequency Low');

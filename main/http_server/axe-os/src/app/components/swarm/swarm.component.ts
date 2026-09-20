@@ -366,10 +366,14 @@ private isIpAddress(value: string): boolean {
     return this.fallbackDeviceModel(result);
   }
 
+  private hasAsicModel(data: any): boolean {
+    return typeof data?.ASICModel === 'string' && data.ASICModel.length > 0;
+  }
+
   private fetchDevice(address: string, fetchAsic: boolean = true): Observable<SwarmDevice | null> {
     return this.httpClient.get<any>(`http://${address}/api/system/info`).pipe(
       mergeMap(info => {
-        if (!info) {
+        if (!this.hasAsicModel(info)) {
           return of(null);
         }
         const asic$ = fetchAsic
@@ -380,7 +384,10 @@ private isIpAddress(value: string): boolean {
           asic: asic$,
           ipv4: this.fetchDeviceIpv4(address, info)
         }).pipe(
-          map(({ asic, ipv4 }) => this.buildSwarmDevice(address, info, asic, ipv4))
+          map(({ asic, ipv4 }) => fetchAsic && !this.hasAsicModel(asic)
+            ? null
+            : this.buildSwarmDevice(address, info, asic, ipv4)
+          )
         );
       })
     );
@@ -419,7 +426,7 @@ private isIpAddress(value: string): boolean {
           ipv4: this.fetchDeviceIpv4(address, info)
         }).pipe(
           map(({ asic, ipv4 }) => {
-            if (!info.ASICModel || !asic.ASICModel) {
+            if (!this.hasAsicModel(info) || !this.hasAsicModel(asic)) {
               return null;
             }
             return { info, asic, ipv4 };
