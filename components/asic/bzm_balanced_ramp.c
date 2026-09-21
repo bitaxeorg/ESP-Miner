@@ -1,8 +1,8 @@
-#include "bzm_balanced_ramp.h"
+#include "bzm/balanced_ramp.h"
 
 #include <math.h>
 
-#include "bzm_registers.h"
+#include "bzm/registers.h"
 
 #define BZM_BALANCED_RAMP_RESET_DELAY_MS 1U
 #define BZM_BALANCED_RAMP_BUSY_POLL_ATTEMPTS 3U

@@ -1,19 +1,21 @@
-#include "bzm_driver.h"
+#include "bzm/telemetry_internal.h"
+#include "bzm/driver.h"
+#include "bzm/board.h"
 
 #include <math.h>
 #include <pthread.h>
 #include <stdatomic.h>
 
-#include "bzm_bridge.h"
-#include "bzm_balanced_ramp.h"
-#include "bzm_bringup.h"
-#include "bzm_dispatch_gate.h"
-#include "bzm_lease_guard.h"
-#include "bzm_reactor.h"
-#include "bzm_result.h"
-#include "bzm_result_dedup.h"
-#include "bzm_registers.h"
-#include "bzm_transport.h"
+#include "bzm/bridge.h"
+#include "bzm/balanced_ramp.h"
+#include "bzm/bringup.h"
+#include "bzm/dispatch_gate.h"
+#include "bzm/lease_guard_internal.h"
+#include "bzm/reactor.h"
+#include "bzm/result.h"
+#include "bzm/result_dedup.h"
+#include "bzm/registers.h"
+#include "bzm/transport.h"
 #include "esp_heap_caps.h"
 #include "esp_psram.h"
 #include "esp_log.h"
@@ -22,7 +24,8 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "global_state.h"
-#include "bzm_serial.h"
+#include "mining.h"
+#include "bzm/serial.h"
 
 static const char * TAG = "bzm";
 

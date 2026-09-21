@@ -4,8 +4,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "bzm_job_store.h"
-#include "bzm.h"
+#include "bzm/job_store.h"
+#include "bzm/protocol.h"
 
 typedef enum {
     BZM_ENGINE_IDLE = 0,

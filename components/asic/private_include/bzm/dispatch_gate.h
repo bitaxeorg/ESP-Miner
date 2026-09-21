@@ -3,7 +3,7 @@
 
 #include <stdbool.h>
 
-typedef bool (*bzm_dispatch_authorizer_t)(void * context);
+#include "bzm/board.h"
 
 typedef struct
 {

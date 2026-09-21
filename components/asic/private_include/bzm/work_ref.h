@@ -1,7 +1,7 @@
 #ifndef BZM_WORK_REF_H
 #define BZM_WORK_REF_H
 
-#include "bzm_result.h"
+#include "bzm/result.h"
 #include "asic_job.h"
 
 typedef struct {

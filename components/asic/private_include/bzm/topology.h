@@ -5,7 +5,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#define BZM_MAX_ASIC_COUNT 4U
+#include "bzm/chain.h"
+
 #define BZM_ASIC_ID_STRIDE 10U
 #define BZM_FIRST_ASIC_ID 0x0aU
 #define BZM_LAST_ASIC_ID 0x28U

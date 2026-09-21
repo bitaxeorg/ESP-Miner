@@ -1,6 +1,6 @@
 #include <string.h>
 #include "unity.h"
-#include "bzm_result.h"
+#include "bzm/result.h"
 
 TEST_CASE("BZM result resolves rolling into an owned PR1972 snapshot", "[asic][bzm][result]")
 {

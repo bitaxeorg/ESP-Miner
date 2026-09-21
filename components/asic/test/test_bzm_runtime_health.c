@@ -1,7 +1,9 @@
+#include "bzm/bridge_protocol.h"
+#include "bzm/telemetry_internal.h"
 #include <math.h>
 #include <string.h>
 
-#include "bzm_runtime_health.h"
+#include "bzm/runtime_health.h"
 #include "unity.h"
 
 static bzm_runtime_health_input_t good_input(void)

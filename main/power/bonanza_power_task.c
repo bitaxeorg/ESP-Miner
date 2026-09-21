@@ -5,8 +5,8 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include "bzm_board_power.h"
-#include "bzm_frequency.h"
-#include "bzm_power.h"
+#include "bzm/frequency.h"
+#include "bzm/power.h"
 #include "esp_log.h"
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"

@@ -1,4 +1,6 @@
 #include "bzm_board_test_bindings.h"
+#include "bzm/bridge_protocol.h"
+#include "bzm/telemetry_internal.h"
 #include "../../../main/power/bzm_board_power.c"
 #include "unity.h"
 

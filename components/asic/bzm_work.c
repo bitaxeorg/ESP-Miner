@@ -1,5 +1,5 @@
-#include "bzm_transport.h"
-#include "bzm_work_registers.h"
+#include "bzm/transport.h"
+#include "bzm/work_registers.h"
 
 #include <string.h>
 

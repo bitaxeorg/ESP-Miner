@@ -1,4 +1,4 @@
-#include "bzm_bridge.h"
+#include "bzm/bridge_protocol.h"
 
 #include <math.h>
 #include <pthread.h>

@@ -4,8 +4,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "bzm_bridge.h"
-#include "bzm_telemetry.h"
+#include "bzm/bridge.h"
+#include "bzm/telemetry.h"
 
 #define BZM_RUNTIME_HEALTH_DETAIL_LENGTH 160U
 

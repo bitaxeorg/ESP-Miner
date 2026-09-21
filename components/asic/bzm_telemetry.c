@@ -1,4 +1,4 @@
-#include "bzm_telemetry.h"
+#include "bzm/telemetry_internal.h"
 
 #include <math.h>
 

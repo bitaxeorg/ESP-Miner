@@ -1,10 +1,7 @@
-#ifndef BZM_LEASE_GUARD_H
-#define BZM_LEASE_GUARD_H
+#ifndef BZM_LEASE_GUARD_INTERNAL_H
+#define BZM_LEASE_GUARD_INTERNAL_H
 
-#include <stdbool.h>
-#include <stdint.h>
-
-#include "bzm_bridge.h"
+#include "bzm/lease_guard.h"
 
 #define BZM_LEASE_GUARD_MAX_DELAY_CHUNK_MS 250U
 
@@ -16,9 +13,6 @@ typedef struct
     bool renewed;
     uint64_t last_renewal_ms;
 } bzm_lease_guard_schedule_t;
-
-/* Pure status predicate used by the board startup adapter. */
-bool bzm_lease_guard_status_is_controlled(const bzm_bridge_safety_status_t * status);
 
 /* Sleep in bounded chunks, renewing immediately before every chunk. */
 bool bzm_lease_guard_delay(uint32_t delay_ms, bzm_lease_guard_renew_fn renew, bzm_lease_guard_sleep_fn sleep, void * context);
@@ -36,11 +30,4 @@ bool bzm_lease_guard_service_due(bzm_lease_guard_schedule_t * schedule, uint64_t
 bool bzm_lease_guard_service_authorized(bzm_lease_guard_schedule_t * schedule, bool authorized, uint64_t now_ms,
                                         uint32_t interval_ms, bzm_lease_guard_renew_fn renew, void * context);
 
-/* A powered validation operation is allowed strictly before its absolute
- * execution deadline. Zero is always fail-closed. */
-bool bzm_lease_guard_deadline_allows(uint64_t deadline_ms, uint64_t now_ms);
-
-/* Constructs an absolute deadline without unsigned wraparound. */
-bool bzm_lease_guard_make_deadline(uint64_t now_ms, uint32_t lease_ms, uint64_t * deadline_ms);
-
-#endif // BZM_LEASE_GUARD_H
+#endif // BZM_LEASE_GUARD_INTERNAL_H

@@ -1,4 +1,4 @@
-#include "bzm_result.h"
+#include "bzm/result.h"
 #include <stddef.h>
 
 bool bzm_result_to_task(const bzm_result_t *share, task_result *result)

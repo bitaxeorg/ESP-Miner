@@ -1,9 +1,9 @@
-#include "bzm_power.h"
+#include "bzm/power.h"
 
 #include <math.h>
 #include <stddef.h>
 
-#include "bzm_frequency.h"
+#include "bzm/frequency.h"
 
 const bzm_tps546_profile_t BZM_TPS546_BIRDS_PROFILE = {
     .phase = 0xff,

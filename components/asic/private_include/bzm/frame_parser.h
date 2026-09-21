@@ -5,7 +5,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "bzm.h"
+#include "bzm/protocol.h"
 
 #define BZM_TDM_HEADER_SIZE 2U
 #define BZM_TDM_BROADCAST_ASIC_ID BZM_BROADCAST_ASIC

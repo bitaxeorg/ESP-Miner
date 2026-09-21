@@ -1,4 +1,4 @@
-#include "bzm_frame_parser.h"
+#include "bzm/frame_parser.h"
 
 #include <string.h>
 

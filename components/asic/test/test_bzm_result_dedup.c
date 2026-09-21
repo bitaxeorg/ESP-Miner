@@ -1,6 +1,6 @@
 #include <string.h>
 
-#include "bzm_result_dedup.h"
+#include "bzm/result_dedup.h"
 #include "unity.h"
 
 static bzm_result_dedup_t cache;

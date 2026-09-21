@@ -8,7 +8,7 @@
 #include "esp_log.h"
 #include "soc/uart_struct.h"
 
-#include "bzm_serial.h"
+#include "bzm/serial.h"
 #include "utils.h"
 
 #define ECHO_TEST_TXD (17)

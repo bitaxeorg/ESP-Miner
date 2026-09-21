@@ -1,6 +1,6 @@
 #include <string.h>
 
-#include "bzm_bridge.h"
+#include "bzm/bridge_protocol.h"
 #include "unity.h"
 
 static void assert_safety_status_rejected(const uint8_t *payload,

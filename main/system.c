@@ -33,7 +33,7 @@
 #include "thermal.h"
 #include "utils.h"
 #include "self_test.h"
-#include "bzm_driver.h"
+#include "bzm/driver.h"
 #include "filesystem.h"
 #include "embedded_web_ui.h"
 #include "hashrate_monitor_task.h"

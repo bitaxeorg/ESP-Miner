@@ -1,4 +1,6 @@
-#include "bzm_runtime_health.h"
+#include "bzm/bridge_protocol.h"
+#include "bzm/telemetry_internal.h"
+#include "bzm/runtime_health.h"
 
 #include <math.h>
 #include <stdarg.h>

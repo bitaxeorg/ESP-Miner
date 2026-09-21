@@ -20,7 +20,7 @@
 #include "i2c_bitaxe.h"
 #include "global_state.h"
 #include "bonanza_tps546.h"
-#include "bzm_power.h"
+#include "bzm/power.h"
 
 //#define DEBUG_TPS546_MEAS 1 //uncomment to debug TPS546 measurements
 //#define DEBUG_TPS546_STATUS 1 //uncomment to debug TPS546 status bits

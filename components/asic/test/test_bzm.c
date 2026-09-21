@@ -1,12 +1,12 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "bzm_job_store.h"
-#include "bzm.h"
+#include "bzm/job_store.h"
+#include "bzm/protocol.h"
 #include "bitmain_job_packet.h"
-#include "bzm_bridge.h"
-#include "bzm_reactor.h"
-#include "bzm_transport.h"
+#include "bzm/bridge.h"
+#include "bzm/reactor.h"
+#include "bzm/transport.h"
 #include "mining.h"
 #include "unity.h"
 #include "utils.h"

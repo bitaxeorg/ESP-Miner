@@ -1,45 +1,13 @@
 #ifndef BZM_BRINGUP_H
 #define BZM_BRINGUP_H
 
-#include <stdbool.h>
-#include <stddef.h>
-#include <stdint.h>
+#include "bzm/board.h"
+#include "bzm/telemetry_internal.h"
+#include "bzm/topology.h"
 
-#include "bzm_telemetry.h"
-#include "bzm_topology.h"
-
-#define BZM_BRINGUP_ASIC_COUNT BZM_MAX_ASIC_COUNT
 #define BZM_BRINGUP_FIRST_ASIC_ID BZM_FIRST_ASIC_ID
 #define BZM_BRINGUP_LAST_ASIC_ID BZM_LAST_ASIC_ID
 #define BZM_BRINGUP_CONTROL_ENGINE_ID 0x0fffU
-#define BZM_BRINGUP_PLL_COUNT 2U
-
-typedef enum
-{
-    BZM_BRINGUP_GOOD = 0,
-    BZM_BRINGUP_BAD,
-} bzm_bringup_outcome_t;
-
-typedef enum
-{
-    BZM_BRINGUP_REASON_NONE = 0,
-    BZM_BRINGUP_REASON_INVALID_ARGUMENT,
-    BZM_BRINGUP_REASON_PREREQUISITE,
-    BZM_BRINGUP_REASON_IO,
-    BZM_BRINGUP_REASON_CHAIN_MISSING,
-    BZM_BRINGUP_REASON_CHAIN_ID_MISMATCH,
-    BZM_BRINGUP_REASON_CHAIN_EXTRA_ASIC,
-    BZM_BRINGUP_REASON_REGISTER_READBACK,
-    BZM_BRINGUP_REASON_TELEMETRY_MISSING,
-    BZM_BRINGUP_REASON_TELEMETRY_PRECONFIG,
-    BZM_BRINGUP_REASON_TELEMETRY_STALE,
-    BZM_BRINGUP_REASON_TELEMETRY_UNSAFE,
-    BZM_BRINGUP_REASON_PLL_UNLOCKED,
-    BZM_BRINGUP_REASON_TOPOLOGY,
-    BZM_BRINGUP_REASON_BALANCED_PAIR_COMMIT,
-    BZM_BRINGUP_REASON_ACTIVATION_BARRIER,
-    BZM_BRINGUP_REASON_BALANCED_BATCH,
-} bzm_bringup_reason_t;
 
 typedef enum
 {
@@ -47,33 +15,6 @@ typedef enum
     BZM_BRINGUP_PROBE_NO_RESPONSE,
     BZM_BRINGUP_PROBE_IO_ERROR,
 } bzm_bringup_probe_result_t;
-
-typedef struct
-{
-    bzm_bringup_reason_t reason;
-    uint8_t asic_id;
-    uint8_t pll_index;
-    uint8_t register_offset;
-    uint32_t expected;
-    uint32_t actual;
-} bzm_bringup_report_t;
-
-typedef struct
-{
-    bool running;
-    float clock_mhz;
-    float domain_clock_mhz[BZM_BRINGUP_ASIC_COUNT][BZM_BRINGUP_PLL_COUNT];
-} bzm_bringup_state_t;
-
-typedef struct
-{
-    bzm_telemetry_bounds_t bounds;
-    uint64_t max_age_us;
-    /* CH2 excursions, including a voltage-fault bit in the same unchecksummed
-     * frame, require this many consecutive fresh frames. A value of one
-     * preserves immediate fail-closed behavior. */
-    uint8_t ch2_confirm_samples;
-} bzm_bringup_telemetry_policy_t;
 
 typedef struct
 {
@@ -107,8 +48,6 @@ uint32_t bzm_bringup_reference_tdm_control(void);
 bzm_bringup_outcome_t bzm_bringup_start(bzm_bringup_state_t *state, const bzm_bringup_ops_t *ops,
                                        void *context, const bzm_bringup_telemetry_policy_t *policy,
                                        bzm_bringup_report_t *report);
-
-const char * bzm_bringup_reason_name(bzm_bringup_reason_t reason);
 
 /*
  * Apply one live tuning transaction across the eight ASIC/PLL

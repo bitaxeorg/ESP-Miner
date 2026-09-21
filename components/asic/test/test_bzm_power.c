@@ -1,7 +1,7 @@
 #include <math.h>
 #include <string.h>
 
-#include "bzm_power.h"
+#include "bzm/power.h"
 #include "unity.h"
 
 typedef enum {

@@ -2,7 +2,7 @@
 
 #include <math.h>
 
-#include "bzm_frequency.h"
+#include "bzm/frequency.h"
 
 TEST_CASE("BZM frequency targets use the fixed BIRDS PLL math",
           "[asic][bzm][frequency]")

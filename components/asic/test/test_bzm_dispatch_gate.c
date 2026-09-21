@@ -1,6 +1,6 @@
 #include "unity.h"
 
-#include "bzm_dispatch_gate.h"
+#include "bzm/dispatch_gate.h"
 
 static bool authorize_from_flag(void * context)
 {

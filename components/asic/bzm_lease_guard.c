@@ -1,4 +1,4 @@
-#include "bzm_lease_guard.h"
+#include "bzm/lease_guard_internal.h"
 
 #include <stddef.h>
 #include <stdint.h>

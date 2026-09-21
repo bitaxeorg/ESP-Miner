@@ -1,6 +1,6 @@
 #include "thermal.h"
-#include "bzm_bridge.h"
-#include "bzm_driver.h"
+#include "bzm/bridge.h"
+#include "bzm/driver.h"
 #include "bonanza_power_task.h"
 #include <math.h>
 #include "device_config.h"

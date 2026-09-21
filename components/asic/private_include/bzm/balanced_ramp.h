@@ -4,8 +4,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "bzm_bringup.h"
-#include "bzm_transport.h"
+#include "bzm/bringup.h"
+#include "bzm/transport.h"
 
 #define BZM_BALANCED_RAMP_ENGINE_CONFIG 0x04U
 #define BZM_BALANCED_RAMP_ENGINE_BUSY_MASK 0x01U

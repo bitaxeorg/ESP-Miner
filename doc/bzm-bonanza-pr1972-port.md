@@ -226,3 +226,22 @@ logs, samples and summary are under
 `.cache/review/hardware-validation/96e3a5d8/`.
 SV2, pool fallback, explicit self-test, arbitrary tuning targets and a long
 soak were not exercised in this hardware run.
+
+## Public and private headers
+
+BZM's public headers are under `components/asic/include/bzm/`. `driver.h`
+contains the shared mining interface; `board.h` contains the controls and
+snapshots needed by Bonanza power management. Public headers do not expose the
+parser, transport, work store or startup operation callbacks.
+
+Implementation headers are under `components/asic/private_include/bzm/`.
+Only the ASIC component and its unit tests add that directory to their private
+include paths. Tests still exercise the production implementations with the
+same hardware fakes. Separate compile checks include each of the nine public
+headers without private headers or test stubs.
+
+This change preserves the C implementations and all 119 BZM header constants.
+ESP-IDF 6.0.2 application and test builds pass; all 334 QEMU tests pass with no
+failures or ignored tests. Build and interface-check evidence is under
+`.cache/review/header-interfaces/`. No new hardware deployment was needed for
+this header-only change.

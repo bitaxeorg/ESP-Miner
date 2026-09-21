@@ -1,4 +1,4 @@
-#include "bzm.h"
+#include "bzm/protocol.h"
 
 #include <string.h>
 

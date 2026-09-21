@@ -1,12 +1,13 @@
-#include "bzm_transport.h"
-#include "bzm_work_registers.h"
+#include "bzm/telemetry_internal.h"
+#include "bzm/transport.h"
+#include "bzm/work_registers.h"
 
 #include <string.h>
 
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "bzm_serial.h"
+#include "bzm/serial.h"
 
 enum { BZM_REGISTER_REPLY_TIMEOUT_US = 1000000 };
 

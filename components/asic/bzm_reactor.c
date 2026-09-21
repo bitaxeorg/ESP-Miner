@@ -1,8 +1,8 @@
-#include "bzm_reactor.h"
+#include "bzm/reactor.h"
 
 #include <string.h>
 
-#include "bzm_topology.h"
+#include "bzm/topology.h"
 
 static bool scheduled_engine_at(uint16_t schedule_index,
                                 bzm_engine_location_t *engine)

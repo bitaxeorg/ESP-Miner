@@ -1,6 +1,6 @@
 #include "unity.h"
 
-#include "bzm_lease_guard.h"
+#include "bzm/lease_guard_internal.h"
 
 typedef struct
 {

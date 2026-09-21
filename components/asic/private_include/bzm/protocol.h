@@ -5,9 +5,9 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "bzm_result.h"
-#include "bzm_work_ref.h"
-#include "bzm_topology.h"
+#include "bzm/result.h"
+#include "bzm/work_ref.h"
+#include "bzm/topology.h"
 
 #define BZM_CHIP_ID 0xB0A0U
 #define BZM_BAUD_RATE 2000000

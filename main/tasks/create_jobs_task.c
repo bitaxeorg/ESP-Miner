@@ -12,7 +12,7 @@
 #include "esp_timer.h"
 
 #include "asic.h"
-#include "bzm_driver.h"
+#include "bzm/driver.h"
 #include "system.h"
 #include "esp_heap_caps.h"
 #include "utils.h"

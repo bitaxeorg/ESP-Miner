@@ -9,11 +9,12 @@
 #include <string.h>
 
 #include "bonanza_tps546.h"
-#include "bzm_driver.h"
-#include "bzm_frequency.h"
-#include "bzm_lease_guard.h"
-#include "bzm_power.h"
-#include "bzm_runtime_health.h"
+#include "bzm/driver.h"
+#include "bzm/board.h"
+#include "bzm/frequency.h"
+#include "bzm/lease_guard.h"
+#include "bzm/power.h"
+#include "bzm/runtime_health.h"
 #include "driver/gpio.h"
 #include "esp_heap_caps.h"
 #include "esp_log.h"

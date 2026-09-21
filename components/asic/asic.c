@@ -5,7 +5,7 @@
 #include <esp_log.h>
 
 #include "bm1397.h"
-#include "bzm_driver.h"
+#include "bzm/driver.h"
 #include "hashrate_monitor_task.h"
 #include "esp_timer.h"
 #include "bm1366.h"

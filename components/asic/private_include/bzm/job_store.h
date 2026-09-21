@@ -5,7 +5,7 @@
 #include <pthread.h>
 #include <stdint.h>
 
-#include "bzm_result.h"
+#include "bzm/result.h"
 #include "asic_job.h"
 
 /* BZM keeps one independently generated job active for each of its 236

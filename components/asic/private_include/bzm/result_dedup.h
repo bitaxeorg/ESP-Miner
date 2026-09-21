@@ -6,7 +6,7 @@
 #include <stdint.h>
 
 #include "asic_job.h"
-#include "bzm_result.h"
+#include "bzm/result.h"
 
 #define BZM_RESULT_DEDUP_CAPACITY 256U
 

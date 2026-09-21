@@ -1,3 +1,4 @@
+#include "bzm/telemetry_internal.h"
 #include "unity.h"
 
 #include <string.h>
@@ -10,8 +11,8 @@
 #define bzm_bringup_reason_name test_bringup_reason_name
 #define bzm_bringup_live_frequency_domains_step test_bringup_frequency_step
 #include "../bzm_bringup.c"
-#include "bzm_frequency.h"
-#include "bzm_registers.h"
+#include "bzm/frequency.h"
+#include "bzm/registers.h"
 
 typedef struct
 {

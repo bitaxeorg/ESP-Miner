@@ -1,4 +1,4 @@
-#include "bzm_dispatch_gate.h"
+#include "bzm/dispatch_gate.h"
 
 #include <stddef.h>
 

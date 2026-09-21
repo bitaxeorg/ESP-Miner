@@ -1,7 +1,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "bzm_topology.h"
+#include "bzm/topology.h"
 #include "unity.h"
 
 static size_t coordinate_slot(uint8_t row, uint8_t column)

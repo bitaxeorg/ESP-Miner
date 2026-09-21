@@ -1,4 +1,4 @@
-#include "bzm_frequency.h"
+#include "bzm/frequency.h"
 
 #include <math.h>
 #include <stddef.h>

@@ -1,11 +1,12 @@
-#include "bzm_bringup.h"
+#include "bzm/telemetry_internal.h"
+#include "bzm/bringup.h"
 
 #include <math.h>
 #include <stddef.h>
 
-#include "bzm.h"
-#include "bzm_frequency.h"
-#include "bzm_registers.h"
+#include "bzm/protocol.h"
+#include "bzm/frequency.h"
+#include "bzm/registers.h"
 
 enum
 {

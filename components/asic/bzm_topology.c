@@ -1,4 +1,4 @@
-#include "bzm_topology.h"
+#include "bzm/topology.h"
 
 #include <stddef.h>
 

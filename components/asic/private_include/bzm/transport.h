@@ -6,10 +6,10 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "bzm.h"
-#include "bzm_frame_parser.h"
-#include "bzm_reactor.h"
-#include "bzm_telemetry.h"
+#include "bzm/protocol.h"
+#include "bzm/frame_parser.h"
+#include "bzm/reactor.h"
+#include "bzm/telemetry.h"
 
 #define BZM_PENDING_RESULT_COUNT 256U
 #define BZM_RESULT_DESIGN_RATE_PER_SECOND 200U

@@ -1,7 +1,7 @@
 #include <string.h>
 
-#include "bzm_balanced_ramp.h"
-#include "bzm_registers.h"
+#include "bzm/balanced_ramp.h"
+#include "bzm/registers.h"
 #include "unity.h"
 
 typedef struct

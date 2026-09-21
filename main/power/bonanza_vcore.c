@@ -5,8 +5,8 @@
 #include "driver/gpio.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "bzm_bridge.h"
-#include "bzm_power.h"
+#include "bzm/bridge.h"
+#include "bzm/power.h"
 #include "global_state.h"
 #define GPIO_ASIC_ENABLE CONFIG_GPIO_ASIC_ENABLE
 #define GPIO_TPS546_PGOOD 11

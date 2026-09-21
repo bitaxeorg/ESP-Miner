@@ -2,11 +2,11 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "bzm_frame_parser.h"
-#include "bzm_registers.h"
-#include "bzm_telemetry.h"
-#include "bzm_transport.h"
-#include "bzm_serial.h"
+#include "bzm/frame_parser.h"
+#include "bzm/registers.h"
+#include "bzm/telemetry_internal.h"
+#include "bzm/transport.h"
+#include "bzm/serial.h"
 #include "unity.h"
 
 #define CAPTURED_FRAME_COUNT 8

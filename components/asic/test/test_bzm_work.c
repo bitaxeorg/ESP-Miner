@@ -1,6 +1,6 @@
 #include <string.h>
 
-#include "bzm.h"
+#include "bzm/protocol.h"
 #include "unity.h"
 
 TEST_CASE("BZM consecutive midstate groups do not repeat a header", "[asic][bzm][work]")
