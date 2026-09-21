@@ -65,48 +65,47 @@ describe('SwarmComponent', () => {
     expect(component).toBeTruthy();
   });
 
-  it('rejects a Philips Hue API error response during discovery', (done) => {
+  it('rejects HTTP 200 JSON without an ASIC model during discovery', (done) => {
+    const address = 'non-miner.test';
+
     (httpClient.get as jasmine.Spy).and.callFake((url: string) => {
       if (url.endsWith('/api/system/info')) {
-        return of([{
-          error: {
-            type: 1,
-            address: '/info',
-            description: 'unauthorized user'
-          }
-        }]);
+        return of({ status: 'ok' });
       }
       return of({});
     });
 
-    (component as any).fetchDevice('192.0.2.10').subscribe((device: any) => {
+    (component as any).fetchDevice(address).subscribe((device: any) => {
       expect(device).toBeNull();
-      expect(httpClient.get).not.toHaveBeenCalledWith('http://192.0.2.10/api/system/asic');
+      expect(httpClient.get).not.toHaveBeenCalledWith(`http://${address}/api/system/asic`);
       done();
     });
   });
 
-  it('keeps a valid AxeOS device during discovery', (done) => {
+  it('keeps an AxeOS device with any non-empty ASIC model during discovery', (done) => {
+    const address = 'miner.test';
+    const asicModel = 'test-asic';
+
     (httpClient.get as jasmine.Spy).and.callFake((url: string) => {
       if (url.endsWith('/api/system/info')) {
         return of({
-          ASICModel: 'BM1370',
+          ASICModel: asicModel,
           hostname: 'bitaxe-test',
-          ipv4: '192.0.2.11',
+          ipv4: address,
           bestDiff: 100,
           bestSessionDiff: 50
         });
       }
       if (url.endsWith('/api/system/asic')) {
-        return of({ ASICModel: 'BM1370', asicCount: 1 });
+        return of({ ASICModel: asicModel, asicCount: 1 });
       }
       return of({});
     });
 
-    (component as any).fetchDevice('192.0.2.11').subscribe((device: any) => {
-      expect(device?.ASICModel).toBe('BM1370');
+    (component as any).fetchDevice(address).subscribe((device: any) => {
+      expect(device?.ASICModel).toBe(asicModel);
       expect(device?.hostname).toBe('bitaxe-test');
-      expect(device?.connectionAddress).toBe('192.0.2.11');
+      expect(device?.connectionAddress).toBe(address);
       done();
     });
   });
