@@ -2,7 +2,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { HttpClient, provideHttpClient } from '@angular/common/http';
 import { provideToastr } from 'ngx-toastr';
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
 
 import { FormControl } from '@angular/forms';
 import { addressValidator, SwarmComponent } from './swarm.component';
@@ -106,6 +106,61 @@ describe('SwarmComponent', () => {
       expect(device?.ASICModel).toBe(asicModel);
       expect(device?.hostname).toBe('bitaxe-test');
       expect(device?.connectionAddress).toBe(address);
+      done();
+    });
+  });
+
+  it('keeps a legacy AxeOS device when the optional ASIC endpoint is unavailable', (done) => {
+    const address = 'legacy-miner.test';
+    const asicModel = 'legacy-asic';
+
+    (httpClient.get as jasmine.Spy).and.callFake((url: string) => {
+      if (url.endsWith('/api/system/info')) {
+        return of({
+          ASICModel: asicModel,
+          hostname: 'legacy-miner',
+          ipv4: address,
+          bestDiff: 100,
+          bestSessionDiff: 50
+        });
+      }
+      if (url.endsWith('/api/system/asic')) {
+        return throwError(() => ({ status: 404 }));
+      }
+      return of({});
+    });
+
+    (component as any).fetchDevice(address).subscribe((device: any) => {
+      expect(device?.ASICModel).toBe(asicModel);
+      expect(device?.hostname).toBe('legacy-miner');
+      done();
+    });
+  });
+
+  it('ignores malformed optional ASIC enrichment for an identified AxeOS device', (done) => {
+    const address = 'miner-with-invalid-enrichment.test';
+    const asicModel = 'test-asic';
+
+    (httpClient.get as jasmine.Spy).and.callFake((url: string) => {
+      if (url.endsWith('/api/system/info')) {
+        return of({
+          ASICModel: asicModel,
+          hostname: 'identified-miner',
+          ipv4: address,
+          bestDiff: 100,
+          bestSessionDiff: 50
+        });
+      }
+      if (url.endsWith('/api/system/asic')) {
+        return of({ status: 'not-supported' });
+      }
+      return of({});
+    });
+
+    (component as any).fetchDevice(address).subscribe((device: any) => {
+      expect(device?.ASICModel).toBe(asicModel);
+      expect(device?.hostname).toBe('identified-miner');
+      expect(device?.status).toBeUndefined();
       done();
     });
   });

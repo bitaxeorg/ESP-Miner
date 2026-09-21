@@ -367,7 +367,11 @@ private isIpAddress(value: string): boolean {
   }
 
   private hasAsicModel(data: any): boolean {
-    return typeof data?.ASICModel === 'string' && data.ASICModel.length > 0;
+    return typeof data?.ASICModel === 'string' && data.ASICModel.trim().length > 0;
+  }
+
+  private getAsicEnrichment(data: any): any {
+    return this.hasAsicModel(data) ? data : {};
   }
 
   private fetchDevice(address: string, fetchAsic: boolean = true): Observable<SwarmDevice | null> {
@@ -384,10 +388,7 @@ private isIpAddress(value: string): boolean {
           asic: asic$,
           ipv4: this.fetchDeviceIpv4(address, info)
         }).pipe(
-          map(({ asic, ipv4 }) => fetchAsic && !this.hasAsicModel(asic)
-            ? null
-            : this.buildSwarmDevice(address, info, asic, ipv4)
-          )
+          map(({ asic, ipv4 }) => this.buildSwarmDevice(address, info, this.getAsicEnrichment(asic), ipv4))
         );
       })
     );
@@ -421,16 +422,14 @@ private isIpAddress(value: string): boolean {
         if (!info || (info as any)._corsError === 401) {
           return of(null); // Already showed warning or timed out
         }
+        if (!this.hasAsicModel(info)) {
+          return of(null);
+        }
         return forkJoin({
           asic: this.httpClient.get<any>(`http://${address}/api/system/asic`).pipe(timeout(1000), catchError(() => of({}))),
           ipv4: this.fetchDeviceIpv4(address, info)
         }).pipe(
-          map(({ asic, ipv4 }) => {
-            if (!this.hasAsicModel(info) || !this.hasAsicModel(asic)) {
-              return null;
-            }
-            return { info, asic, ipv4 };
-          })
+          map(({ asic, ipv4 }) => ({ info, asic: this.getAsicEnrichment(asic), ipv4 }))
         );
       })
     ).subscribe(result => {
