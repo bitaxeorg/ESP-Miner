@@ -428,7 +428,7 @@
               </div>
 
               <div appTooltip="{{ activePoolUser }}" tooltipPosition="top" sensitive-data>
-                <span class="font-mono font-bold text-base">{{ activePoolUserAddressPart | address }}</span>{{ activePoolUserSuffixPart }}
+                <span class="font-mono font-bold text-base">{{ activePoolUserAddress | address }}</span>{{ activePoolUserSuffix }}
               </div>
             </div>
 
@@ -558,7 +558,7 @@
                 @for (output of info.coinbaseOutputs; track output; let i = $index) {
                   <div class="flex justify-between">
                     @if (output.value > 0) {
-                      @if (output.address === activePoolUserAddressPart) {
+                      @if (isOurPayout(output.address)) {
                         <span><span class="font-mono text-sm font-bold" appTooltip="Your payout address" tooltipPosition="top" sensitive-data>{{ output.address | address }}</span>&nbsp;<i class="pi pi-star-fill text-xs"></i></span>
                       } @else {
                         <span class="font-mono text-sm" appTooltip="{{ output.address }}" tooltipPosition="top">{{ output.address | address }}</span>

@@ -185,8 +185,8 @@ export class HomeComponent implements OnInit, OnDestroy {
   public efficiency: number = 0;
   public efficiencyAverage: number = 0;
   public expectedEfficiency: number = 0;
-  public activePoolUserAddressPart: string = '';
-  public activePoolUserSuffixPart: string = '';
+  public activePoolUserAddress: string = '';
+  public activePoolUserSuffix: string = '';
   public sortedRejectionReasons: Array<{ message: string; count: number; percentage: number }> = [];
   public networkDifficultyPercentage: string = '0';
   public payoutPercentage: number = -1;
@@ -976,8 +976,9 @@ export class HomeComponent implements OnInit, OnDestroy {
         }
         this.responseTime = info.responseTime;
 
-        this.activePoolUserAddressPart = this.getAddressPart(this.activePoolUser);
-        this.activePoolUserSuffixPart = this.getSuffixPart(this.activePoolUser);
+        const { address, worker } = this.parseAddressAndWorker(this.activePoolUser);
+        this.activePoolUserAddress = address;
+        this.activePoolUserSuffix = worker;
 
         const totalShares = info.sharesAccepted + info.sharesRejected;
         this.sortedRejectionReasons = [...(info.sharesRejectedReasons ?? [])]
@@ -1204,6 +1205,12 @@ export class HomeComponent implements OnInit, OnDestroy {
     return index;
   }
 
+  public isOurPayout(address: string): boolean {
+    if (address === this.activePoolUserAddress) {
+      return true
+    }
+    return false
+  }
   getPayoutPercentage(info: ISystemInfo) {
     if (info.coinbaseValueTotalSatoshis) {
       return (info.coinbaseValueUserSatoshis ?? 0) / info.coinbaseValueTotalSatoshis * 100;
@@ -1530,13 +1537,55 @@ export class HomeComponent implements OnInit, OnDestroy {
     }
   }
 
-  getAddressPart(user: string): string {
-    const dotIndex = user.lastIndexOf('.');
-    return dotIndex !== -1 ? user.substring(0, dotIndex) : user;
-  }
+  parseAddressAndWorker(user: string): ({ address: string, worker: string }) {
+    // sri ident dsl
+    // reference: https://github.com/stratum-mining/sv2-apps/blob/37be0fb65c12a790c17c97a303d3b1507e654d1d/pool-apps/pool/README.md#user-identity-patterns
+    if (user.startsWith("sri/")) {
+      let entries = user.split('/');
+      if (entries.length < 2) {
+        return {
+          address: '',
+          worker: ''
+        };
+      }
+      // solo mode (sri/solo/addr[/worker_name])
+      if (entries[1] == 'solo') {
+        return {
+          address: entries[2],
+          worker: entries.length == 4 ? entries[3] : ''
+        };
+      }
+      // donation mode
+      if (entries[1] == 'donate') {
+        // full donation to pool (sri/donate[/worker_name])
+        if (entries.length <= 3) {
+          return {
+            address: '',
+            worker: entries.length == 3 ? entries[2] : ''
+          };
+        }
+        // partial donation (sri/donate/pct/addr[/worker_name])
+        // MAYBE: validate donation %?
+        if (entries.length <= 5) {
+          return {
+            address: entries[3],
+            worker: entries.length == 5 ? entries[4] : ''
+          };
+        }
+      }
+    }
 
-  getSuffixPart(user: string): string {
+    // default addr.worker
     const dotIndex = user.lastIndexOf('.');
-    return dotIndex !== -1 ? '.' + user.substring(dotIndex + 1) : '';
+    if (dotIndex !== -1) {
+      return {
+        address: user.substring(0, dotIndex),
+        worker: user.substring(dotIndex + 1)
+      };
+    }
+    return {
+      address: user,
+      worker: ''
+    };
   }
 }
