@@ -1207,13 +1207,18 @@ export class HomeComponent implements OnInit, OnDestroy {
 
   public isOurPayout(address: string): boolean {
     if (address === this.activePoolUserAddress) {
-      return true
+      return true;
     }
-    return false
+    return false;
   }
   getPayoutPercentage(info: ISystemInfo) {
     if (info.coinbaseValueTotalSatoshis) {
-      return (info.coinbaseValueUserSatoshis ?? 0) / info.coinbaseValueTotalSatoshis * 100;
+      // find our payout
+      const ourPayout = info.coinbaseOutputs?.find(out => out.address === this.activePoolUserAddress);
+      if (ourPayout === undefined) {
+        return -1;
+      };
+      return ourPayout.value / info.coinbaseValueTotalSatoshis * 100;
     }
     return -1;
   }
@@ -1552,7 +1557,7 @@ export class HomeComponent implements OnInit, OnDestroy {
       if (entries[1] == 'solo') {
         return {
           address: entries[2],
-          worker: entries.length == 4 ? entries[3] : ''
+          worker: entries.length == 4 ? '/'+entries[3] : ''
         };
       }
       // donation mode
@@ -1561,7 +1566,7 @@ export class HomeComponent implements OnInit, OnDestroy {
         if (entries.length <= 3) {
           return {
             address: '',
-            worker: entries.length == 3 ? entries[2] : ''
+            worker: entries.length == 3 ? '/'+entries[2] : ''
           };
         }
         // partial donation (sri/donate/pct/addr[/worker_name])
@@ -1569,7 +1574,7 @@ export class HomeComponent implements OnInit, OnDestroy {
         if (entries.length <= 5) {
           return {
             address: entries[3],
-            worker: entries.length == 5 ? entries[4] : ''
+            worker: entries.length == 5 ? '/'+entries[4] : ''
           };
         }
       }
@@ -1580,7 +1585,7 @@ export class HomeComponent implements OnInit, OnDestroy {
     if (dotIndex !== -1) {
       return {
         address: user.substring(0, dotIndex),
-        worker: user.substring(dotIndex + 1)
+        worker: user.substring(dotIndex)
       };
     }
     return {
