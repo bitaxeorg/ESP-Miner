@@ -19,11 +19,11 @@ typedef struct {
     uint32_t nonce;
     uint32_t version_bits;
     char nvs_entry[128];
+    int nvs_slot;
 } ScoreboardEntry;
 
 typedef struct {
     ScoreboardEntry entries[MAX_SCOREBOARD];
-    int count;
     SemaphoreHandle_t mutex;
 } Scoreboard;
 
