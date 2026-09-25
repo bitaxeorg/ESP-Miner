@@ -2,6 +2,8 @@
 #include "stratum_api.h"
 #include <string.h>
 #include <sys/param.h>
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 
 static StratumApiV1Message stratum_api_v1_message;
 static StratumApiV1Message stratum_api_v1_message2;
@@ -540,6 +542,11 @@ typedef struct {
     size_t length;
     size_t offset;
     size_t max_chunk;
+    unsigned zero_reads;
+    unsigned read_calls;
+    unsigned stop_after;
+    unsigned delay_ms;
+    int largest_timeout_ms;
 } mock_transport_data_t;
 
 static int mock_transport_read(esp_transport_handle_t transport, char *buffer,
@@ -547,6 +554,21 @@ static int mock_transport_read(esp_transport_handle_t transport, char *buffer,
 {
     mock_transport_data_t *mock =
         (mock_transport_data_t *)esp_transport_get_context_data(transport);
+    if (mock != NULL) {
+        mock->read_calls++;
+        mock->largest_timeout_ms = MAX(mock->largest_timeout_ms, timeout_ms);
+        // Bound a broken receiver so regression failures cannot hang QEMU.
+        if (mock->stop_after && mock->read_calls >= mock->stop_after) {
+            return ERR_TCP_TRANSPORT_CONNECTION_FAILED;
+        }
+        if (mock->delay_ms) {
+            vTaskDelay(MAX(1, pdMS_TO_TICKS(mock->delay_ms)));
+        }
+        if (mock->zero_reads) {
+            mock->zero_reads--;
+            return 0;
+        }
+    }
     if (mock == NULL || mock->offset >= mock->length) {
         return 0;
     }
@@ -587,7 +609,7 @@ TEST_CASE("Receive fragmented JSON-RPC line", "[stratum][security]")
     TEST_ASSERT_NOT_NULL(transport);
 
     TEST_ASSERT_TRUE(STRATUM_V1_initialize_buffer());
-    char *line = STRATUM_V1_receive_jsonrpc_line(transport);
+    char *line = STRATUM_V1_receive_jsonrpc_line(transport, 1000);
     TEST_ASSERT_NOT_NULL(line);
     TEST_ASSERT_EQUAL_STRING("{\"id\":1,\"result\":true,\"error\":null}", line);
 
@@ -609,8 +631,8 @@ TEST_CASE("Receive preserves consecutive JSON-RPC lines", "[stratum][security]")
     TEST_ASSERT_NOT_NULL(transport);
 
     TEST_ASSERT_TRUE(STRATUM_V1_initialize_buffer());
-    char *first = STRATUM_V1_receive_jsonrpc_line(transport);
-    char *second = STRATUM_V1_receive_jsonrpc_line(transport);
+    char *first = STRATUM_V1_receive_jsonrpc_line(transport, 1000);
+    char *second = STRATUM_V1_receive_jsonrpc_line(transport, 1000);
     TEST_ASSERT_NOT_NULL(first);
     TEST_ASSERT_NOT_NULL(second);
     TEST_ASSERT_EQUAL_STRING("{\"id\":1,\"result\":true}", first);
@@ -638,7 +660,7 @@ TEST_CASE("Receive rejects oversized JSON-RPC line", "[stratum][security]")
     TEST_ASSERT_NOT_NULL(transport);
 
     TEST_ASSERT_TRUE(STRATUM_V1_initialize_buffer());
-    TEST_ASSERT_NULL(STRATUM_V1_receive_jsonrpc_line(transport));
+    TEST_ASSERT_NULL(STRATUM_V1_receive_jsonrpc_line(transport, 1000));
 
     esp_transport_destroy(transport);
     free(json);
@@ -663,8 +685,8 @@ TEST_CASE("Receive accepts maximum line and preserves the next line", "[stratum]
     TEST_ASSERT_NOT_NULL(transport);
 
     TEST_ASSERT_TRUE(STRATUM_V1_initialize_buffer());
-    char *maximum_line = STRATUM_V1_receive_jsonrpc_line(transport);
-    char *second_line = STRATUM_V1_receive_jsonrpc_line(transport);
+    char *maximum_line = STRATUM_V1_receive_jsonrpc_line(transport, 1000);
+    char *second_line = STRATUM_V1_receive_jsonrpc_line(transport, 1000);
     TEST_ASSERT_NOT_NULL(maximum_line);
     TEST_ASSERT_EQUAL_size_t(STRATUM_V1_MAX_JSON_LINE_SIZE, strlen(maximum_line));
     TEST_ASSERT_EQUAL_STRING("{}", second_line);
@@ -687,9 +709,105 @@ TEST_CASE("Receive rejects embedded NUL", "[stratum][security]")
     TEST_ASSERT_NOT_NULL(transport);
 
     TEST_ASSERT_TRUE(STRATUM_V1_initialize_buffer());
-    TEST_ASSERT_NULL(STRATUM_V1_receive_jsonrpc_line(transport));
+    TEST_ASSERT_NULL(STRATUM_V1_receive_jsonrpc_line(transport, 1000));
 
     esp_transport_destroy(transport);
+}
+
+TEST_CASE("Receive bounds repeated empty timeout reads", "[stratum][timeout]")
+{
+    mock_transport_data_t mock = {.zero_reads = 100, .delay_ms = 10, .stop_after = 64};
+    esp_transport_handle_t transport = create_mock_transport(&mock);
+    TEST_ASSERT_NOT_NULL(transport);
+    TEST_ASSERT_TRUE(STRATUM_V1_initialize_buffer());
+    char *line = STRATUM_V1_receive_jsonrpc_line(transport, 50);
+    bool timed_out = line == NULL;
+    free(line);
+    esp_transport_destroy(transport);
+
+    TEST_ASSERT_TRUE(timed_out);
+    TEST_ASSERT_GREATER_THAN(0, mock.read_calls);
+    TEST_ASSERT_LESS_THAN(mock.stop_after, mock.read_calls);
+    TEST_ASSERT_LESS_OR_EQUAL(50, mock.largest_timeout_ms);
+}
+
+TEST_CASE("Receive permits short timeout gaps before a complete line", "[stratum][timeout]")
+{
+    mock_transport_data_t mock = {
+        .data = "{}\n", .length = 3, .zero_reads = 2, .delay_ms = 10, .stop_after = 64,
+    };
+    esp_transport_handle_t transport = create_mock_transport(&mock);
+    TEST_ASSERT_NOT_NULL(transport);
+    TEST_ASSERT_TRUE(STRATUM_V1_initialize_buffer());
+    char *line = STRATUM_V1_receive_jsonrpc_line(transport, 500);
+    bool received = line != NULL && strcmp(line, "{}") == 0;
+    free(line);
+    esp_transport_destroy(transport);
+
+    TEST_ASSERT_TRUE(received);
+    TEST_ASSERT_EQUAL(3, mock.read_calls);
+}
+
+TEST_CASE("Receive timeout clears partial data before the next connection", "[stratum][timeout]")
+{
+    mock_transport_data_t mock = {
+        .data = "{", .length = 1, .delay_ms = 10, .stop_after = 64,
+    };
+    esp_transport_handle_t transport = create_mock_transport(&mock);
+    TEST_ASSERT_NOT_NULL(transport);
+    TEST_ASSERT_TRUE(STRATUM_V1_initialize_buffer());
+    char *line = STRATUM_V1_receive_jsonrpc_line(transport, 50);
+    bool timed_out = line == NULL;
+    unsigned reads_before_timeout = mock.read_calls;
+    free(line);
+
+    mock = (mock_transport_data_t){.data = "{}\n", .length = 3, .stop_after = 64};
+    line = STRATUM_V1_receive_jsonrpc_line(transport, 500);
+    bool clean_line = line != NULL && strcmp(line, "{}") == 0;
+    free(line);
+    esp_transport_destroy(transport);
+
+    TEST_ASSERT_TRUE(timed_out);
+    TEST_ASSERT_LESS_THAN(64, reads_before_timeout);
+    TEST_ASSERT_TRUE(clean_line);
+}
+
+TEST_CASE("Receive deadline also bounds slowly arriving incomplete frames", "[stratum][timeout]")
+{
+    char data[128];
+    memset(data, ' ', sizeof(data));
+    mock_transport_data_t mock = {
+        .data = data, .length = sizeof(data), .max_chunk = 1,
+        .delay_ms = 10, .stop_after = 64,
+    };
+    esp_transport_handle_t transport = create_mock_transport(&mock);
+    TEST_ASSERT_NOT_NULL(transport);
+    TEST_ASSERT_TRUE(STRATUM_V1_initialize_buffer());
+    char *line = STRATUM_V1_receive_jsonrpc_line(transport, 50);
+    bool timed_out = line == NULL;
+    free(line);
+    esp_transport_destroy(transport);
+
+    TEST_ASSERT_TRUE(timed_out);
+    TEST_ASSERT_GREATER_THAN(0, mock.offset);
+    TEST_ASSERT_LESS_THAN(mock.stop_after, mock.read_calls);
+}
+
+TEST_CASE("Receive rejects nonpositive time budgets without reading", "[stratum][timeout]")
+{
+    mock_transport_data_t mock = {.data = "{}\n{}\n", .length = 6, .stop_after = 64};
+    esp_transport_handle_t transport = create_mock_transport(&mock);
+    TEST_ASSERT_NOT_NULL(transport);
+    TEST_ASSERT_TRUE(STRATUM_V1_initialize_buffer());
+    char *zero = STRATUM_V1_receive_jsonrpc_line(transport, 0);
+    char *negative = STRATUM_V1_receive_jsonrpc_line(transport, -1);
+    bool rejected = zero == NULL && negative == NULL;
+    free(zero);
+    free(negative);
+    esp_transport_destroy(transport);
+
+    TEST_ASSERT_TRUE(rejected);
+    TEST_ASSERT_EQUAL(0, mock.read_calls);
 }
 
 TEST_CASE("Reject invalid numeric and trailing JSON-RPC values", "[stratum][security]")

@@ -97,7 +97,8 @@ esp_transport_handle_t STRATUM_V1_transport_init(tls_mode tls, const char * cert
 
 bool STRATUM_V1_initialize_buffer(void);
 
-char *STRATUM_V1_receive_jsonrpc_line(esp_transport_handle_t transport);
+// A complete line must arrive within timeout_ms; timeout/error discards partial data.
+char *STRATUM_V1_receive_jsonrpc_line(esp_transport_handle_t transport, int timeout_ms);
 
 int STRATUM_V1_subscribe(esp_transport_handle_t transport, int send_uid, const char * model);
 
