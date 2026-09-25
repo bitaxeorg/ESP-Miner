@@ -14,6 +14,7 @@
 #include "display.h"
 #include "scoreboard.h"
 #include "esp_transport.h"
+#include "stratum_protocol.h"
 #include "system.h"
 
 typedef struct bm_job bm_job;

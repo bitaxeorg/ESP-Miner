@@ -12,6 +12,12 @@ job-task code with controlled inputs and recorded outputs.
 
 ## How the modules fit together
 
+The job pipeline and SV1 transport tests use the ESP-IDF task/transport
+harnesses and carry `[qemu-integration]` tags. Run them with
+`bash tools/run_qemu_tests.sh`. The portable unit tests, including job building
+with allocator fault injection, share their sources between host and QEMU.
+See the [test-layer guide](../../../doc/unit_testing.md) for registration rules.
+
 1. A test case creates a miner job or a list of task events.
 2. The job pipeline harness runs the real job task with that input.
 3. The mining test instance builds the real mining code with private test
@@ -34,6 +40,7 @@ job-task code with controlled inputs and recorded outputs.
 | File | Production components and behavior |
 | --- | --- |
 | `test_mining_pipeline.c` | Runs the SV1 and SV2 job models, mining conversion, and create-jobs task together. It checks exact ASIC job data, task events, metadata limits, job ownership, allocation recovery, extranonce data, and large coinbase data. |
+| `test_sv1_transport.c` | Exercises ESP transport line buffering, fragmented and consecutive messages, size limits, and embedded NUL rejection. |
 
 ## Unit tests
 
@@ -45,7 +52,8 @@ job-task code with controlled inputs and recorded outputs.
 | `test_job_building.c` | Coinbase hashing at stack and heap limits, allocation failure recovery, ASIC job defaults, copied metadata, and software midstates. |
 | `test_miner_job.c` | Miner-job pool slots, buffer ownership, index wraparound, and rollable-job checks. |
 | `test_mining.c` | Coinbase hashes, Merkle roots, midstates, version-mask changes, and nonce difficulty. |
-| `test_stratum_json.c` | SV1 JSON-RPC parsing, job fields, server messages, malformed input, line buffering, and size limits. |
+| `test_stratum_json.c` | SV1 JSON-RPC parsing, job fields, server messages, malformed input, and size limits. |
+| `test_sv1_protocol_encode.c` | Portable SV1 message encoding, JSON escaping, and buffer bounds. |
 | `test_utils.c` | Hashing, hex conversion, URL decoding, byte order, network difficulty, and difficulty conversion safety. |
 
 ## Test double names

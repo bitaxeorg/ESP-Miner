@@ -210,7 +210,7 @@ static void run_result_case(result_case_t test_case)
 }
 
 TEST_CASE("result task keeps owned snapshots through submission for every protocol",
-          "[asic][result][ownership][characterization]")
+          "[asic][result][ownership][characterization][qemu-integration]")
 {
     for (int type = JOB_TYPE_V1; type <= JOB_TYPE_SV2_EXTENDED; ++type) {
         run_result_case((result_case_t) {
@@ -232,7 +232,7 @@ TEST_CASE("result task keeps owned snapshots through submission for every protoc
 }
 
 TEST_CASE("result task separates registers and rejects unavailable job slots",
-          "[asic][result][job-store][characterization]")
+          "[asic][result][job-store][characterization][qemu-integration]")
 {
     run_result_case((result_case_t) {.invalid = true});
     TEST_ASSERT_EQUAL_UINT32(
@@ -246,7 +246,7 @@ TEST_CASE("result task separates registers and rejects unavailable job slots",
 }
 
 TEST_CASE("result task preserves thresholds self test and repeated delivery",
-          "[asic][result][characterization]")
+          "[asic][result][characterization][qemu-integration]")
 {
     run_result_case((result_case_t) {.self_test = true});
     TEST_ASSERT_EQUAL_UINT32(1, fixture_self_tests);

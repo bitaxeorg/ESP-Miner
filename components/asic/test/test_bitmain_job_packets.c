@@ -46,7 +46,7 @@ static void queue_bm1397_job_response(uint8_t job_id, uint8_t midstate_index,
 }
 
 TEST_CASE("BM13xx work packets preserve complete header fields byte exact",
-          "[asic][job-packet][characterization]")
+          "[asic][job-packet][characterization][qemu-integration]")
 {
     static const uint8_t expected_template[] = {
         0x55, 0xaa, 0x21, 0x56, 0x00, 0x01,
@@ -98,7 +98,7 @@ TEST_CASE("BM13xx work packets preserve complete header fields byte exact",
 }
 
 TEST_CASE("BM1397 work packet and returned midstate preserve version mapping",
-          "[asic][job-packet][version-rolling][characterization]")
+          "[asic][job-packet][version-rolling][characterization][qemu-integration]")
 {
     static const uint8_t expected_packet[] = {
         0x55, 0xaa, 0x21, 0x96, 0x04, 0x04,
@@ -153,7 +153,7 @@ TEST_CASE("BM1397 work packet and returned midstate preserve version mapping",
 }
 
 TEST_CASE("Bitmain occupied work slots transfer ownership to replacements",
-          "[asic][job-store][characterization]")
+          "[asic][job-store][characterization][qemu-integration]")
 {
     static const uint8_t job_id_steps[] = {8, 24, 24, 24};
 
@@ -196,7 +196,7 @@ TEST_CASE("Bitmain occupied work slots transfer ownership to replacements",
 }
 
 TEST_CASE("BM1397 register results preserve type address value and reset job fields",
-          "[asic][result][register][characterization]")
+          "[asic][result][register][characterization][qemu-integration]")
 {
     GlobalState *state = bm1397_harness_begin();
     TEST_ASSERT_EQUAL_UINT8(2, bm1397_harness_driver.init(state));
@@ -225,7 +225,7 @@ TEST_CASE("BM1397 register results preserve type address value and reset job fie
 }
 
 TEST_CASE("BM1397 rejects inactive job results and repeated nonces",
-          "[asic][result][job-store][characterization]")
+          "[asic][result][job-store][characterization][qemu-integration]")
 {
     GlobalState *state = bm1397_harness_begin();
     TEST_ASSERT_EQUAL_UINT8(2, bm1397_harness_driver.init(state));

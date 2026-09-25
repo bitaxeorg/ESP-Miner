@@ -2,7 +2,7 @@
 
 #include "job_pipeline_test_harness.h"
 #include "mining.h"
-#include "stratum_api.h"
+#include "sv1_protocol.h"
 #include "sv2_protocol.h"
 #include "utils.h"
 
@@ -91,7 +91,7 @@ static void parse_sv2_frame(const uint8_t *frame, size_t frame_size,
 }
 
 TEST_CASE("SV1 notify reaches the ASIC job boundary byte exact",
-          "[stratum][mining][characterization]")
+          "[stratum][mining][characterization][qemu-integration]")
 {
     miner_job_pool_init();
     miner_job_t *miner_job = miner_job_get_slot(0);
@@ -164,7 +164,7 @@ TEST_CASE("SV1 notify reaches the ASIC job boundary byte exact",
 }
 
 TEST_CASE("SV2 standard messages reach the ASIC job boundary byte exact",
-          "[sv2][mining][characterization]")
+          "[sv2][mining][characterization][qemu-integration]")
 {
     uint8_t new_job_frame[SV2_FRAME_HEADER_SIZE + 45] = {
         0x00, 0x80, SV2_MSG_NEW_MINING_JOB, 45, 0x00, 0x00,
@@ -333,7 +333,7 @@ TEST_CASE("SV2 standard messages reach the ASIC job boundary byte exact",
 }
 
 TEST_CASE("SV2 extended messages roll extranonce into the ASIC job byte exact",
-          "[sv2][mining][characterization]")
+          "[sv2][mining][characterization][qemu-integration]")
 {
     uint8_t new_job_frame[SV2_FRAME_HEADER_SIZE + 23] = {
         0x00, 0x80, SV2_MSG_NEW_EXTENDED_MINING_JOB, 23, 0x00, 0x00,
@@ -447,7 +447,7 @@ TEST_CASE("SV2 extended messages roll extranonce into the ASIC job byte exact",
 }
 
 TEST_CASE("job task harness preserves idle and staged work behavior",
-          "[mining][characterization][job-task]")
+          "[mining][characterization][job-task][qemu-integration]")
 {
     miner_job_pool_init();
     miner_job_t *job = miner_job_get_slot(5);
@@ -498,7 +498,7 @@ TEST_CASE("job task harness preserves idle and staged work behavior",
 }
 
 TEST_CASE("job task harness rejects oversized extranonce work",
-          "[mining][characterization][job-task]")
+          "[mining][characterization][job-task][qemu-integration]")
 {
     miner_job_pool_init();
     miner_job_t *job = miner_job_get_slot(6);
@@ -549,7 +549,7 @@ static miner_job_t *prepare_followup_job(uint8_t extranonce_len, bool large_coin
 }
 
 TEST_CASE("job task preserves maximum accepted metadata and detached ownership",
-          "[mining][job-building][job-task]")
+          "[mining][job-building][job-task][qemu-integration]")
 {
     miner_job_t *job = prepare_followup_job(32, false);
     const char *job_id = "0123456789012345678901234567890";
@@ -587,7 +587,7 @@ TEST_CASE("job task preserves maximum accepted metadata and detached ownership",
 }
 
 TEST_CASE("job allocation failure skips a send and permits the next cycle",
-          "[mining][job-building][job-task]")
+          "[mining][job-building][job-task][qemu-integration]")
 {
     (void)prepare_followup_job(1, false);
     const job_pipeline_harness_event_t events[] = {
@@ -615,7 +615,7 @@ TEST_CASE("job allocation failure skips a send and permits the next cycle",
 }
 
 TEST_CASE("zero-length extranonce waits for new work and preserves owned metadata",
-          "[mining][job-building][job-task]")
+          "[mining][job-building][job-task][qemu-integration]")
 {
     miner_job_t *job = prepare_followup_job(0, false);
     const job_pipeline_harness_event_t events[] = {
@@ -649,7 +649,7 @@ TEST_CASE("zero-length extranonce waits for new work and preserves owned metadat
 }
 
 TEST_CASE("large coinbase job uses heap hashing and retains extranonce order",
-          "[mining][job-building][job-task]")
+          "[mining][job-building][job-task][qemu-integration]")
 {
     (void)prepare_followup_job(1, true);
     const job_pipeline_harness_event_t events[] = {

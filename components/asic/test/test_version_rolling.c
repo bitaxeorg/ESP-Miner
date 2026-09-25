@@ -1,7 +1,7 @@
 #include "unity.h"
 
 #include "bm13xx_test_harness.h"
-#include "stratum_api.h"
+#include "sv1_client.h"
 #include "sv2_protocol.h"
 #include "utils.h"
 
@@ -66,7 +66,7 @@ static void queue_job_response(const bm13xx_harness_driver_t *driver,
 }
 
 TEST_CASE("BM13xx version mask register command remains byte exact",
-          "[asic][version-rolling][characterization]")
+          "[asic][version-rolling][characterization][qemu-integration]")
 {
     static const struct {
         uint32_t mask;
@@ -95,7 +95,7 @@ TEST_CASE("BM13xx version mask register command remains byte exact",
 }
 
 TEST_CASE("BM13xx initialization enables the full version rolling mask",
-          "[asic][version-rolling][characterization]")
+          "[asic][version-rolling][characterization][qemu-integration]")
 {
     for (size_t d = 0; d < BM13XX_HARNESS_DRIVER_COUNT; d++) {
         const bm13xx_harness_driver_t *driver = &bm13xx_harness_drivers[d];
@@ -115,7 +115,7 @@ TEST_CASE("BM13xx initialization enables the full version rolling mask",
 }
 
 TEST_CASE("BM13xx response version bits reconstruct rolled block versions",
-          "[asic][version-rolling][characterization]")
+          "[asic][version-rolling][characterization][qemu-integration]")
 {
     static const struct {
         uint32_t base_version;
@@ -158,7 +158,7 @@ TEST_CASE("BM13xx response version bits reconstruct rolled block versions",
 }
 
 TEST_CASE("BM13xx missing jobs and register replies do not produce rolled shares",
-          "[asic][version-rolling][characterization]")
+          "[asic][version-rolling][characterization][qemu-integration]")
 {
     for (size_t d = 0; d < BM13XX_HARNESS_DRIVER_COUNT; d++) {
         const bm13xx_harness_driver_t *driver = &bm13xx_harness_drivers[d];
@@ -195,7 +195,7 @@ TEST_CASE("BM13xx missing jobs and register replies do not produce rolled shares
 }
 
 TEST_CASE("BM1373 version mask writes retry without changing command bytes",
-          "[asic][version-rolling][characterization]")
+          "[asic][version-rolling][characterization][qemu-integration]")
 {
     const bm13xx_harness_driver_t *driver = &bm13xx_harness_drivers[3];
     bm13xx_harness_begin();
@@ -214,7 +214,7 @@ TEST_CASE("BM1373 version mask writes retry without changing command bytes",
 }
 
 TEST_CASE("BM13xx rolled version reaches SV1 and SV2 share messages byte exact",
-          "[asic][version-rolling][stratum][characterization]")
+          "[asic][version-rolling][stratum][characterization][qemu-integration]")
 {
     TEST_ASSERT_TRUE(STRATUM_V1_initialize_buffer());
     for (size_t d = 0; d < BM13XX_HARNESS_DRIVER_COUNT; d++) {
