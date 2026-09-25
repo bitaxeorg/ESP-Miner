@@ -199,7 +199,10 @@ float BM1370_send_hash_frequency(float target_freq)
     uint8_t fb_divider, refdiv, postdiv1, postdiv2;
     float frequency;
 
-    pll_get_parameters(target_freq, 160, 239, &fb_divider, &refdiv, &postdiv1, &postdiv2, &frequency);
+    if (!pll_get_parameters(target_freq, 160, 239, &fb_divider, &refdiv, &postdiv1, &postdiv2, &frequency)) {
+        ESP_LOGE(TAG, "No valid PLL parameters for %g MHz", target_freq);
+        return 0.0f;
+    }
     
     uint8_t vdo_scale = (fb_divider * FREQ_MULT / refdiv >= 2400) ? 0x50 : 0x40;
     uint8_t postdiv = (((postdiv1 - 1) & 0xf) << 4) | ((postdiv2 - 1) & 0xf);
@@ -316,7 +319,7 @@ uint8_t BM1370_init(GlobalState * GLOBAL_STATE)
     //ramp up the hash frequency
     do_frequency_transition(GLOBAL_STATE, BM1370_send_hash_frequency);
 
-    float frequency = GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value;
+    float frequency = GLOBAL_STATE->POWER_MANAGEMENT_MODULE.actual_frequency;
     int cores = GLOBAL_STATE->DEVICE_CONFIG.family.asic.core_count;
 
     BM1370_set_nonce_space(1.0, frequency, asic_count, cores);
