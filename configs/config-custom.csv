@@ -95,4 +95,27 @@ selftest_warm,data,u16,55
 # Self-test Max Temperature
 selftest_max,data,u16,70
 selftest_fan,data,u16,1000
+# Display overrides
+# Display model: NONE, SSD1306 (128x32), SSD1309 (128x64), SH1107 (64x128), SH1107 (128x128), ST7789 (320x170)
+#display,data,string,SSD1306 (128x32)
+# Invert screen colors (0,1)
+#invertscreen,data,u16,0
+# Screen timeout in seconds (-1 to disable)
+#displayTimeout,data,i32,-1
+# SH1107 OLED Display Row Offset override (0-127, e.g. 0, 32, 96)
+#displayOffset,data,u16,0
+# Fan & Thermal Target overrides
+# Minimum fan speed percentage (0-99)
+#minfanspeed,data,u16,25
+# Target temperature in Celsius (35-66)
+#temptarget,data,u16,60
+# System & Feature overrides
+# NTP time synchronization (0,1)
+#usentp,data,u16,0
+# Overclock enabled (0,1)
+#oc_enabled,data,u16,0
+# Telemetry stats frequency in seconds (0 to disable)
+#statsFrequency,data,u16,0
+# Custom Web UI hosted on SD/SPIFFS (0,1)
+#use_custom_www,data,u16,0
 
