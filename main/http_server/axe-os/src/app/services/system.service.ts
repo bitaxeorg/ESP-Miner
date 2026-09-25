@@ -214,9 +214,10 @@ export class SystemApiService {
         },
         blockFound: 1,
         showNewBlock: true,
-        coinbaseOutputs: [{value: 50, address: "payoutaddress"}],
+        coinbaseOutputs: [{value: 50, address: "payoutaddress", isUserOutput: 1}],
         coinbaseValueTotalSatoshis: 50,
         coinbaseValueUserSatoshis: 50,
+        coinbaseHasUserAddress: 1,
         miningPaused: false,
         workReceived: 42,
       }

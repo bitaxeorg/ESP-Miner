@@ -43,6 +43,7 @@ const mockSystemInfo: ISystemInfo = {
   autofanspeed: 1,
   blockSignals: [],
   coinbaseValueUserSatoshis: 0,
+  coinbaseHasUserAddress: 0,
   display: 'SSD1306',
   displayTimeout: 0,
   errorPercentage: 0,
@@ -331,6 +332,29 @@ describe('HomeComponent', () => {
 
       await expectSelectedPool('Primary');
       expect(component.activePoolURL).toBe(mockSystemInfo.stratumURL);
+    });
+
+    it('should format bitcoin addresses and display account usernames naturally', () => {
+      // 1. Account username (not an address)
+      emitPoolInfo({ stratumUser: 'satoshi.worker1', coinbaseHasUserAddress: 0 });
+      expect(component.isUserAddress).toBeFalse();
+      expect(component.activePoolUserAddressPart).toBe('satoshi');
+      expect(component.activePoolUserSuffixPart).toBe('.worker1');
+      expect(component.formattedUserAddressPart).toBe('satoshi');
+
+      // 2. Bitcoin address (single)
+      emitPoolInfo({ stratumUser: 'bc1q42aueh0wluqpzg3ng32kvaugnx4thnxa7y625x.worker1', coinbaseHasUserAddress: 1 });
+      expect(component.isUserAddress).toBeTrue();
+      expect(component.formattedUserAddressPart).toContain('bc1q');
+      expect(component.formattedUserAddressPart).toContain('...');
+
+      // 3. Bitcoin address (multiple addresses)
+      emitPoolInfo({
+        stratumUser: 'bc1q42aueh0wluqpzg3ng32kvaugnx4thnxa7y625x, 1DYwPTnC4NgEmoqbLbcRqoSzVeH3ehmGbV.worker1',
+        coinbaseHasUserAddress: 1
+      });
+      expect(component.isUserAddress).toBeTrue();
+      expect(component.formattedUserAddressPart).toContain(',');
     });
 
     for (const target of ['Primary', 'Fallback'] as const) {

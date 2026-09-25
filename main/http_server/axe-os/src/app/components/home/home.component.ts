@@ -9,6 +9,7 @@ import { DateAgoPipe } from 'src/app/pipes/date-ago.pipe';
 import { HashSuffixPipe } from 'src/app/pipes/hash-suffix.pipe';
 import { ByteSuffixPipe } from 'src/app/pipes/byte-suffix.pipe';
 import { DiffSuffixPipe } from 'src/app/pipes/diff-suffix.pipe';
+import { AddressPipe } from 'src/app/pipes/address.pipe';
 import { QuicklinkService } from 'src/app/services/quicklink.service';
 import { ShareRejectionExplanationService } from 'src/app/services/share-rejection-explanation.service';
 import { LoadingService } from 'src/app/services/loading.service';
@@ -187,6 +188,8 @@ export class HomeComponent implements OnInit, OnDestroy {
   public expectedEfficiency: number = 0;
   public activePoolUserAddressPart: string = '';
   public activePoolUserSuffixPart: string = '';
+  public isUserAddress: boolean = false;
+  public formattedUserAddressPart: string = '';
   public sortedRejectionReasons: Array<{ message: string; count: number; percentage: number }> = [];
   public networkDifficultyPercentage: string = '0';
   public payoutPercentage: number = -1;
@@ -978,6 +981,10 @@ export class HomeComponent implements OnInit, OnDestroy {
 
         this.activePoolUserAddressPart = this.getAddressPart(this.activePoolUser);
         this.activePoolUserSuffixPart = this.getSuffixPart(this.activePoolUser);
+        this.isUserAddress = info.coinbaseHasUserAddress === 1 || this.checkIsAddress(this.activePoolUserAddressPart);
+        this.formattedUserAddressPart = this.isUserAddress
+          ? this.getFormattedUserAddressPart(this.activePoolUserAddressPart)
+          : this.activePoolUserAddressPart;
 
         const totalShares = info.sharesAccepted + info.sharesRejected;
         this.sortedRejectionReasons = [...(info.sharesRejectedReasons ?? [])]
@@ -1205,7 +1212,7 @@ export class HomeComponent implements OnInit, OnDestroy {
   }
 
   getPayoutPercentage(info: ISystemInfo) {
-    if (info.coinbaseValueTotalSatoshis) {
+    if (info.coinbaseHasUserAddress === 1 && info.coinbaseValueTotalSatoshis) {
       return (info.coinbaseValueUserSatoshis ?? 0) / info.coinbaseValueTotalSatoshis * 100;
     }
     return -1;
@@ -1246,7 +1253,7 @@ export class HomeComponent implements OnInit, OnDestroy {
     if (info.coinbaseOutputs && info.coinbaseOutputs.length > 0) {
       let percentage = this.getPayoutPercentage(info);
       updateMessage(percentage > 0 && percentage < 95, 'NOT_SOLO_MINING', 'warn', `Your share of the mining reward is only ${percentage.toFixed(1)}%`);
-      updateMessage(percentage === 0, 'NO_MINING_REWARD', 'warn', `You don't have a share in the mining reward`);
+      updateMessage(info.coinbaseHasUserAddress === 1 && percentage === 0, 'NO_MINING_REWARD', 'warn', `You don't have a share in the mining reward`);
     }
   }
 
@@ -1538,5 +1545,25 @@ export class HomeComponent implements OnInit, OnDestroy {
   getSuffixPart(user: string): string {
     const dotIndex = user.lastIndexOf('.');
     return dotIndex !== -1 ? '.' + user.substring(dotIndex + 1) : '';
+  }
+
+  checkIsAddress(addressPart: string): boolean {
+    if (!addressPart) return false;
+    const firstToken = addressPart.split(/[,;]/)[0].trim();
+    return /^(bc1|tb1|bcrt1|[13mn2])[a-zA-HJ-NP-Z0-9]{25,90}$/i.test(firstToken) ||
+           (/^[0-9a-fA-F]{44,80}$/.test(firstToken));
+  }
+
+  getFormattedUserAddressPart(addressPart: string): string {
+    if (!addressPart) return '';
+    if (addressPart.includes(',') || addressPart.includes(';')) {
+      return addressPart
+        .split(/[,;]/)
+        .map(addr => addr.trim())
+        .filter(addr => addr.length > 0)
+        .map(addr => AddressPipe.transform(addr))
+        .join(', ');
+    }
+    return AddressPipe.transform(addressPart);
   }
 }
