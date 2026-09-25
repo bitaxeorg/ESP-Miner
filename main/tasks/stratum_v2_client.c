@@ -447,7 +447,7 @@ esp_err_t stratum_v2_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
         return ESP_ERR_NO_MEM;
     }
 
-    ESP_LOGI(TAG, "Connecting to stratum+sv2://%s:%d", stratum_url, port);
+    ESP_LOGI(TAG, "Connecting to stratum2+tcp://%s:%d", stratum_url, port);
 
     esp_transport_handle_t transport = esp_transport_tcp_init();
     if (!transport) {
