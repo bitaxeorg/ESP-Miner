@@ -533,10 +533,26 @@ export class HomeComponent implements OnInit, OnDestroy {
     const unit = this.form?.get(formControlName)?.value;
     const labels = ChartUnitGroups.find(g => g.value === unit)?.labels || [];
 
-    return labels.filter(label => this.isSensorSupported(label, this.latestInfo)).map((labelKey, index) => {
-      const label = chartLabelValue(labelKey) || labelKey;
-      const borderColor = index === 0 
-        ? baseColor 
+    const entries = labels
+      .filter(label => this.isSensorSupported(label, this.latestInfo))
+      .map((labelKey, index) => {
+        const label = chartLabelValue(labelKey) || labelKey;
+        return {
+          labelKey,
+          label,
+          index,
+          hidden: this.chartHiddenSensors[label] ?? DEFAULT_HIDDEN_SENSORS.has(labelKey)
+        };
+      });
+
+    // Fill one series, not every series in the group: overlapping translucent
+    // fills stack into a solid block. Pick the first *visible* one, so hiding a
+    // series from the legend moves the fill on rather than removing it.
+    const fillIndex = fill ? entries.findIndex(entry => !entry.hidden) : -1;
+
+    return entries.map(({ labelKey, label, index, hidden }) => {
+      const borderColor = index === 0
+        ? baseColor
         : `color-mix(in srgb, ${baseColor} ${100 - index * 15}%, ${mixColor} ${index * 15}%)`;
       const backgroundColor = `color-mix(in srgb, ${borderColor}, transparent 81%)`;
 
@@ -544,7 +560,7 @@ export class HomeComponent implements OnInit, OnDestroy {
         type: 'line',
         label,
         data: this.chartDatasets[labelKey] || (this.chartDatasets[labelKey] = []),
-        fill,
+        fill: index === fillIndex,
         backgroundColor,
         borderColor,
         tension: 0,
@@ -552,8 +568,21 @@ export class HomeComponent implements OnInit, OnDestroy {
         pointHoverRadius: 5,
         borderWidth: 1,
         yAxisID,
-        hidden: this.chartHiddenSensors[label] ?? DEFAULT_HIDDEN_SENSORS.has(labelKey)
+        hidden
       };
+    });
+  }
+
+  /**
+   * Move the fill to the first visible series on the filled axis. The legend
+   * toggles `hidden` in place without rebuilding the datasets, so the choice
+   * made at build time has to be revisited here.
+   */
+  private refreshChartFill(): void {
+    const onFilledAxis = (this.chartData?.datasets ?? []).filter((dataset: any) => dataset.yAxisID === 'y');
+    const target = onFilledAxis.find((dataset: any) => !dataset.hidden);
+    onFilledAxis.forEach((dataset: any) => {
+      dataset.fill = dataset === target;
     });
   }
 
@@ -562,10 +591,12 @@ export class HomeComponent implements OnInit, OnDestroy {
     const primaryColor = documentStyle.getPropertyValue('--color-primary').trim() || '#F80421';
     const textColor = documentStyle.getPropertyValue('--color-text-main').trim() || '#ffffff';
     const textColorSecondary = documentStyle.getPropertyValue('--color-text-secondary').trim() || '#808080';
+    const axis2Color = documentStyle.getPropertyValue('--chart-axis2-color').trim() || textColorSecondary;
 
     const datasets = [
       ...this.createChartDatasets('chartY1Unit', primaryColor, textColor, true, 'y'),
-      ...this.createChartDatasets('chartY2Unit', textColorSecondary, 'black', false, 'y2')
+      // 'black' as the mix colour darkened the series into the dark background.
+      ...this.createChartDatasets('chartY2Unit', axis2Color, textColor, false, 'y2')
     ];
 
     if (this.chartData) {
@@ -582,6 +613,7 @@ export class HomeComponent implements OnInit, OnDestroy {
     const textColorSecondary = documentStyle.getPropertyValue('--color-text-secondary').trim();
     const surfaceBorder = documentStyle.getPropertyValue('--color-border-content').trim();
     const primaryColor = documentStyle.getPropertyValue('--color-primary').trim();
+    const axis2Color = documentStyle.getPropertyValue('--chart-axis2-color').trim() || textColorSecondary;
     this.primaryColorRgb = this.hexToRgb(primaryColor);
 
     this.rebuildChartDatasets();
@@ -592,7 +624,8 @@ export class HomeComponent implements OnInit, OnDestroy {
       this.chartOptions.scales.x.grid.color = surfaceBorder;
       this.chartOptions.scales.y.ticks.color = primaryColor;
       this.chartOptions.scales.y.grid.color = surfaceBorder;
-      this.chartOptions.scales.y2.ticks.color = textColorSecondary;
+      // Match each axis to the colour of the series it scales.
+      this.chartOptions.scales.y2.ticks.color = axis2Color;
       this.chartOptions.scales.y2.grid.color = surfaceBorder;
     }
 
@@ -671,6 +704,8 @@ export class HomeComponent implements OnInit, OnDestroy {
                 this.chartHiddenSensors[label] = !!legendItem.hidden;
                 this.storageService.setItem(HOME_CHART_HIDDEN_SENSORS, JSON.stringify(this.chartHiddenSensors));
               }
+              this.refreshChartFill();
+              ci.update();
             }
           }
         },
