@@ -2,7 +2,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { HttpClient, provideHttpClient } from '@angular/common/http';
 import { provideToastr } from 'ngx-toastr';
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
 
 import { FormControl } from '@angular/forms';
 import { addressValidator, SwarmComponent } from './swarm.component';
@@ -63,6 +63,106 @@ describe('SwarmComponent', () => {
 
   it('should create', () => {
     expect(component).toBeTruthy();
+  });
+
+  it('rejects HTTP 200 JSON without an ASIC model during discovery', (done) => {
+    const address = 'non-miner.test';
+
+    (httpClient.get as jasmine.Spy).and.callFake((url: string) => {
+      if (url.endsWith('/api/system/info')) {
+        return of({ status: 'ok' });
+      }
+      return of({});
+    });
+
+    (component as any).fetchDevice(address).subscribe((device: any) => {
+      expect(device).toBeNull();
+      expect(httpClient.get).not.toHaveBeenCalledWith(`http://${address}/api/system/asic`);
+      done();
+    });
+  });
+
+  it('keeps an AxeOS device with any non-empty ASIC model during discovery', (done) => {
+    const address = 'miner.test';
+    const asicModel = 'test-asic';
+
+    (httpClient.get as jasmine.Spy).and.callFake((url: string) => {
+      if (url.endsWith('/api/system/info')) {
+        return of({
+          ASICModel: asicModel,
+          hostname: 'bitaxe-test',
+          ipv4: address,
+          bestDiff: 100,
+          bestSessionDiff: 50
+        });
+      }
+      if (url.endsWith('/api/system/asic')) {
+        return of({ ASICModel: asicModel, asicCount: 1 });
+      }
+      return of({});
+    });
+
+    (component as any).fetchDevice(address).subscribe((device: any) => {
+      expect(device?.ASICModel).toBe(asicModel);
+      expect(device?.hostname).toBe('bitaxe-test');
+      expect(device?.connectionAddress).toBe(address);
+      done();
+    });
+  });
+
+  it('keeps a legacy AxeOS device when the optional ASIC endpoint is unavailable', (done) => {
+    const address = 'legacy-miner.test';
+    const asicModel = 'legacy-asic';
+
+    (httpClient.get as jasmine.Spy).and.callFake((url: string) => {
+      if (url.endsWith('/api/system/info')) {
+        return of({
+          ASICModel: asicModel,
+          hostname: 'legacy-miner',
+          ipv4: address,
+          bestDiff: 100,
+          bestSessionDiff: 50
+        });
+      }
+      if (url.endsWith('/api/system/asic')) {
+        return throwError(() => ({ status: 404 }));
+      }
+      return of({});
+    });
+
+    (component as any).fetchDevice(address).subscribe((device: any) => {
+      expect(device?.ASICModel).toBe(asicModel);
+      expect(device?.hostname).toBe('legacy-miner');
+      done();
+    });
+  });
+
+  it('ignores malformed optional ASIC enrichment for an identified AxeOS device', (done) => {
+    const address = 'miner-with-invalid-enrichment.test';
+    const asicModel = 'test-asic';
+
+    (httpClient.get as jasmine.Spy).and.callFake((url: string) => {
+      if (url.endsWith('/api/system/info')) {
+        return of({
+          ASICModel: asicModel,
+          hostname: 'identified-miner',
+          ipv4: address,
+          bestDiff: 100,
+          bestSessionDiff: 50
+        });
+      }
+      if (url.endsWith('/api/system/asic')) {
+        return of({ status: 'not-supported' });
+      }
+      return of({});
+    });
+
+    (component as any).fetchDevice(address).subscribe((device: any) => {
+      expect(device?.ASICModel).toBe(asicModel);
+      expect(device?.hostname).toBe('identified-miner');
+      expect(device?.status).toBeUndefined();
+      done();
+    });
   });
 
   it('uses each peer\'s own presets for low and normal frequencies', () => {
