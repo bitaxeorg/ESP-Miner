@@ -85,6 +85,7 @@ static void system_api_add_telemetry(cJSON *root, GlobalState *g) {
     cJSON_AddNumberToObject(root, "networkDifficulty", g->network_nonce_diff);
     cJSON_AddNumberToObject(root, "coinbaseValueTotalSatoshis", g->coinbase_value_total_satoshis);
     cJSON_AddNumberToObject(root, "coinbaseValueUserSatoshis", g->coinbase_value_user_satoshis);
+    cJSON_AddNumberToObject(root, "coinbaseHasUserAddress", g->coinbase_has_user_address ? 1 : 0);
 
     // Dynamic System Stats
     cJSON_AddNumberToObject(root, "freeHeap", esp_get_free_heap_size());
@@ -300,6 +301,7 @@ static void system_api_add_block_info(cJSON *root, GlobalState *g) {
             if (obj) {
                 cJSON_AddNumberToObject(obj, "value", g->coinbase_outputs[i].value_satoshis);
                 cJSON_AddStringToObject(obj, "address", g->coinbase_outputs[i].address);
+                cJSON_AddNumberToObject(obj, "isUserOutput", g->coinbase_outputs[i].is_user_output ? 1 : 0);
                 cJSON_AddItemToArray(outputs, obj);
             }
         }

@@ -428,7 +428,11 @@
               </div>
 
               <div appTooltip="{{ activePoolUser }}" tooltipPosition="top" sensitive-data>
-                <span class="font-mono font-bold text-base">{{ activePoolUserAddressPart | address }}</span>{{ activePoolUserSuffixPart }}
+                @if (isUserAddress) {
+                  <span class="font-mono font-bold text-base">{{ formattedUserAddressPart }}</span>{{ activePoolUserSuffixPart }}
+                } @else {
+                  <span class="font-bold text-base">{{ activePoolUserAddressPart }}</span>{{ activePoolUserSuffixPart }}
+                }
               </div>
             </div>
 
@@ -448,7 +452,7 @@
                 --
               }
             </div>
-            @if ((info.coinbaseOutputs?.length ?? 0) > 0) {
+            @if (info.coinbaseHasUserAddress === 1 && (info.coinbaseOutputs?.length ?? 0) > 0) {
               <div class="flex flex-nowrap">
                 @let percentage = payoutPercentage;
                 @if (percentage >= 95) {
@@ -558,7 +562,7 @@
                 @for (output of info.coinbaseOutputs; track output; let i = $index) {
                   <div class="flex justify-between">
                     @if (output.value > 0) {
-                      @if (output.address === activePoolUserAddressPart) {
+                      @if (output.isUserOutput === 1 || output.address === activePoolUserAddressPart) {
                         <span><span class="font-mono text-sm font-bold" appTooltip="Your payout address" tooltipPosition="top" sensitive-data>{{ output.address | address }}</span>&nbsp;<i class="pi pi-star-fill text-xs"></i></span>
                       } @else {
                         <span class="font-mono text-sm" appTooltip="{{ output.address }}" tooltipPosition="top">{{ output.address | address }}</span>
