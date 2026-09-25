@@ -30,7 +30,14 @@
 
     /* Dynamic Theme variables calculated from --color-primary */
     --focus-ring: 0 0 0 0.2rem oklch(from var(--color-primary) l c h / 0.2);
-    --slider-bg: #dee2e6;
+    /* Track behind progress bars and sliders. */
+    --slider-bg: rgba(255, 255, 255, 0.10);
+
+    /* Meter status colours. Okabe-Ito orange and vermillion: they stay
+       distinguishable from each other, and from --color-primary, under
+       deuteranopia, protanopia and tritanopia. */
+    --color-status-warn: #e69f00;
+    --color-status-critical: #d55e00;
 
     /* Custom Message severity styles */
     --color-message-warn-bg: #ffecb3;
@@ -75,4 +82,8 @@
     --color-overlay-select-bg: #f1f5f9;
     --color-overlay-select-border: #e2e8f0;
     --color-bg-hover: rgba(0, 0, 0, 0.04);
+    --slider-bg: rgba(15, 23, 42, 0.10);
+    /* Darkened for contrast against the light card. */
+    --color-status-warn: #a86800;
+    --color-status-critical: #9c4300;
 }
