@@ -7,6 +7,7 @@
 #include "system.h"
 #include "asic_common.h"
 #include "asic.h"
+#include "bm_hashrate.h"
 #include "utils.h"
 
 #define EPSILON 0.0001f
@@ -80,7 +81,7 @@ void update_hash_counter(measurement_t * measurement, uint32_t value, uint64_t t
             return;
         }
         uint32_t counter = value - measurement->value; // Compute counter difference, handling uint32_t wraparound
-        measurement->hashrate = hashCounterToGhs(duration_us, counter);
+        measurement->hashrate = bm_hash_counter_to_ghs(duration_us, counter);
     }
 
     measurement->value = value;

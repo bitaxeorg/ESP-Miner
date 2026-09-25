@@ -1,3 +1,4 @@
+#include "bonanza_power_task.h"
 #include "setup_ble.h"
 
 #include <stdbool.h>
@@ -319,6 +320,13 @@ static void setup_ble_restart_task(void *param)
 {
     (void)param;
     vTaskDelay(pdMS_TO_TICKS(500));
+    if (setup_ble_global_state != NULL &&
+        setup_ble_global_state->DEVICE_CONFIG.family.id == BONANZA &&
+        !BONANZA_POWER_MANAGEMENT_prepare_restart()) {
+        ESP_LOGE(TAG, "Bonanza safe shutdown failed; restart cancelled");
+        vTaskDelete(NULL);
+        return;
+    }
     esp_restart();
 }
 

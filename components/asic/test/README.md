@@ -32,23 +32,34 @@ logic under test is unchanged.
 | `bm1397_test_harness.*` | Creates BM1397 state, provides scripted ASIC responses, and records serial packets. |
 | `bm1397_test_bindings.h` | Gives the BM1397 driver private test names and connects its external calls to test doubles. |
 | `bm1397_test_instance.c` | Builds an isolated instance of the real BM1397 driver. |
+| `asic_submit_test_instance.c` | Builds the real common-job submission path with private symbols; records owned common jobs through the job pipeline harness. |
+| `bitmain_job_test_bindings.h`, `bitmain_job_allocator_fault_injector.*` | Inject isolated adapter allocation failures without affecting unrelated tasks. |
 | `result_task_test_bindings.h` | Gives the result task a private test name. It connects ASIC results, share submission, scoring, self-test, and register calls to test doubles. |
 | `result_task_test_instance.c` | Builds an isolated instance of the real ASIC result task. |
+| `job_pipeline_test_harness.*`, `stubs/` | Run the real create-jobs task and common-job submission with scripted events and application state. |
 
 ## Component tests
 
 | File | Production components and behavior |
 | --- | --- |
-| `test_bitmain_job_packets.c` | Runs the BM13xx and BM1397 drivers with the active-job store. It checks work packets, slot replacement, share and register responses, inactive jobs, and repeated nonces. |
+| `test_mining_pipeline.c` | Runs SV1/SV2 job creation through common submission and the packet builders; preserves golden packet fields, version rolling, ownership, and allocation recovery. |
+| `test_bitmain_job_packets.c` | Runs the BM13xx and BM1397 drivers with the active-job store. It checks exact work packets built from common jobs, BM1397 sparse-mask wrap and disabled rolling, slot replacement, share and register responses, inactive jobs, and repeated nonces. |
 | `test_version_rolling.c` | Runs the BM13xx drivers, active-job store, and SV1 and SV2 share encoders. It checks version-mask commands, driver setup, response decoding, write retries, and submitted version fields. |
-| `test_asic_result_task.c` | Runs the ASIC result task with the active-job store and mining checks. It checks owned job snapshots, all job protocols, register routing, unavailable slots, share thresholds, self-test results, and repeated results. |
+| `test_asic_result_job.c` | Runs all five drivers and checks that each nonce result carries its matched common job through slot replacement, including maximum metadata for all job protocols. It also checks out-of-range response job IDs. |
+| `test_asic_result_task.c` | Runs the ASIC result task with embedded job snapshots and mining checks, without an active-job store. It checks all job protocols, register routing, empty responses, share thresholds, self-test results, and repeated results. |
 
 ## Unit tests
 
 | File | Unit behavior |
 | --- | --- |
+| `test_bitmain_job_packet_building.c` | Golden software midstate, midstate-count limits, zeroed unused entries, and guarded unaligned packet outputs. |
+| `test_asic_submit.c` | Common-job ownership, invalid metadata, and submission allocation recovery. |
 | `test_pll.c` | PLL divider selection and the calculated ASIC frequency. |
 | `test_timeout.c` | ASIC timeout calculation for different chips, chain sizes, version spaces, and the zero-chip default. |
+
+The BM1397 packet and sparse-mask fixtures use independent OpenSSL SHA-256
+states; their frame CRC uses CRC-16/CCITT-FALSE. The BM13xx packet fixtures
+retain the original literal bytes for all four drivers.
 
 ## Disabled example
 

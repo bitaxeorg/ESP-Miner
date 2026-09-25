@@ -1,0 +1,4 @@
+# The Bonanza bridge owns GPIO43/44, the ESP32-S3 default UART console pins.
+# Select the existing ESP-IDF USB console; no USB connection is needed to mine.
+CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y
+CONFIG_ESP_CONSOLE_SECONDARY_NONE=y

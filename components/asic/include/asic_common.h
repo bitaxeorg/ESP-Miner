@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include "asic_job.h"
 #include "esp_err.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -32,7 +33,8 @@ typedef enum
 typedef struct task_result
 {
     // -- job result response
-    uint8_t job_id;
+    // Snapshot matched while decoding the response; survives active-slot reuse.
+    asic_job_t job;
     uint32_t nonce;
     uint32_t rolled_version;
     // ---- register response

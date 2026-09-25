@@ -146,7 +146,7 @@ static void stratum_v2_track_submit(GlobalState *GLOBAL_STATE, uint32_t sequence
     stratum_v2_update_pending_shares(GLOBAL_STATE);
 }
 
-int stratum_v2_submit_share(GlobalState *GLOBAL_STATE, const bm_job *active_job,
+int stratum_v2_submit_share(GlobalState *GLOBAL_STATE, const asic_job_t *active_job,
                             uint32_t nonce, uint32_t rolled_version, uint64_t *sent_time_us)
 {
     if (!GLOBAL_STATE || !active_job) {
@@ -156,7 +156,7 @@ int stratum_v2_submit_share(GlobalState *GLOBAL_STATE, const bm_job *active_job,
     uint8_t extranonce_2[32];
     uint8_t en2_len = 0;
 
-    if (active_job->job_type == JOB_TYPE_SV2_EXTENDED && active_job->extranonce2) {
+    if (active_job->source_type == JOB_TYPE_SV2_EXTENDED) {
         en2_len = (uint8_t)(strlen(active_job->extranonce2) / 2);
         if (en2_len > sizeof(extranonce_2)) en2_len = sizeof(extranonce_2);
         hex2bin(active_job->extranonce2, extranonce_2, en2_len);
@@ -174,7 +174,7 @@ int stratum_v2_submit_share(GlobalState *GLOBAL_STATE, const bm_job *active_job,
     uint32_t sequence_number = conn->sequence_number++;
     uint8_t buf[SV2_SUBMIT_SHARES_MAX_FRAME_SIZE];
 
-    uint32_t sv2_job_id = (uint32_t)strtoul(active_job->jobid, NULL, 10);
+    uint32_t sv2_job_id = (uint32_t)strtoul(active_job->job_id, NULL, 10);
     int len = sv2_build_submit_shares(buf, sizeof(buf),
                                       conn->channel_id,
                                       sequence_number,

@@ -1,6 +1,7 @@
 #include "unity.h"
 #include "utils.h"
 #include "mining.h"
+#include <math.h>
 #include <string.h>
 
 TEST_CASE("Test double_sha256_bin", "[utils]")
@@ -98,13 +99,7 @@ TEST_CASE("Test bin2hex", "[utils]")
 
 TEST_CASE("reverse_32bit_words", "[utils]")
 {
-    uint8_t input[32];
-    for (int i = 0; i < 32; i++) input[i] = i;
-
-    uint8_t actual[32];
-    reverse_32bit_words(input, actual);
-
-    uint8_t expected[32] = {28, 29, 30, 31,
+    const uint8_t expected[32] = {28, 29, 30, 31,
                             24, 25, 26, 27,
                             20, 21, 22, 23,
                             16, 17, 18, 19,
@@ -112,17 +107,55 @@ TEST_CASE("reverse_32bit_words", "[utils]")
                              8,  9, 10, 11,
                              4,  5,  6,  7,
                              0,  1,  2,  3};
-    TEST_ASSERT_EQUAL_UINT8_ARRAY(expected, actual, 32);
+    for (size_t source_offset = 8; source_offset < 16; source_offset++) {
+        for (size_t destination_offset = 8; destination_offset < 16; destination_offset++) {
+            _Alignas(8) uint8_t source[48], destination[48];
+            uint8_t original_source[sizeof(source)];
+            uint8_t expected_destination[sizeof(destination)];
+            memset(source, 0xa5, sizeof(source));
+            memset(destination, 0xa5, sizeof(destination));
+            memset(expected_destination, 0xa5, sizeof(expected_destination));
+            for (size_t i = 0; i < 32; i++) source[source_offset + i] = (uint8_t)i;
+            memcpy(original_source, source, sizeof(source));
+            memcpy(expected_destination + destination_offset, expected, sizeof(expected));
+
+            reverse_32bit_words(source + source_offset, destination + destination_offset);
+
+            /* Compare the whole buffers, including the surrounding guard bytes. */
+            TEST_ASSERT_EQUAL_HEX8_ARRAY(expected_destination, destination, sizeof(destination));
+            TEST_ASSERT_EQUAL_HEX8_ARRAY(original_source, source, sizeof(source));
+        }
+    }
+}
+
+TEST_CASE("word reversal supports overlapping buffers", "[utils]")
+{
+    const uint8_t expected_words[32] = {
+        28, 29, 30, 31, 24, 25, 26, 27, 20, 21, 22, 23, 16, 17, 18, 19,
+        12, 13, 14, 15,  8,  9, 10, 11,  4,  5,  6,  7,  0,  1,  2,  3
+    };
+    const size_t offsets[][2] = {
+        {0, 0}, {0, 4}, {4, 0}, {1, 1}, {1, 5}, {5, 1}, {0, 1}, {1, 0}
+    };
+
+    for (size_t i = 0; i < sizeof(offsets) / sizeof(offsets[0]); i++) {
+        _Alignas(uint32_t) uint8_t storage[48];
+        uint8_t expected[sizeof(storage)];
+        memset(storage, 0xa5, sizeof(storage));
+        uint8_t *source = storage + 4 + offsets[i][0];
+        uint8_t *destination = storage + 4 + offsets[i][1];
+        for (int byte = 0; byte < 32; byte++) source[byte] = byte;
+        memcpy(expected, storage, sizeof(expected));
+        memcpy(expected + 4 + offsets[i][1], expected_words, sizeof(expected_words));
+
+        reverse_32bit_words(source, destination);
+        TEST_ASSERT_EQUAL_UINT8_ARRAY(expected, storage, sizeof(storage));
+    }
 }
 
 TEST_CASE("reverse_endianness_per_word", "[utils]")
 {
-    uint8_t data[32];
-    for (int i = 0; i < 32; i++) data[i] = i;
-
-    reverse_endianness_per_word(data);
-
-    uint8_t expected[32] = { 3,  2,  1,  0,
+    const uint8_t expected[32] = { 3,  2,  1,  0,
                              7,  6,  5,  4,
                             11, 10,  9,  8,
                             15, 14, 13, 12,
@@ -130,7 +163,63 @@ TEST_CASE("reverse_endianness_per_word", "[utils]")
                             23, 22, 21, 20,
                             27, 26, 25, 24,
                             31, 30, 29, 28};
-    TEST_ASSERT_EQUAL_UINT8_ARRAY(expected, data, 32);
+    for (size_t offset = 8; offset < 16; offset++) {
+        _Alignas(8) uint8_t storage[48];
+        uint8_t original[sizeof(storage)], expected_storage[sizeof(storage)];
+        memset(storage, 0xa5, sizeof(storage));
+        memset(expected_storage, 0xa5, sizeof(expected_storage));
+        for (size_t i = 0; i < 32; i++) storage[offset + i] = (uint8_t)i;
+        memcpy(original, storage, sizeof(storage));
+        memcpy(expected_storage + offset, expected, sizeof(expected));
+
+        reverse_endianness_per_word(storage + offset);
+        TEST_ASSERT_EQUAL_HEX8_ARRAY(expected_storage, storage, sizeof(storage));
+
+        reverse_endianness_per_word(storage + offset);
+        TEST_ASSERT_EQUAL_HEX8_ARRAY(original, storage, sizeof(storage));
+    }
+}
+
+static void assert_target_conversion(const uint8_t storage[48], size_t offset, double expected)
+{
+    uint8_t original[48];
+    memcpy(original, storage, sizeof(original));
+    /* These expected doubles are exact; a tolerance could hide lost low bits. */
+    TEST_ASSERT_DOUBLE_WITHIN(0.0, expected, le256todouble(storage + offset));
+    TEST_ASSERT_EQUAL_HEX8_ARRAY(original, storage, sizeof(original));
+}
+
+TEST_CASE("le256todouble converts every target bit at every alignment", "[utils]")
+{
+    for (size_t offset = 8; offset < 16; offset++) {
+        _Alignas(8) uint8_t storage[48];
+        memset(storage, 0xa5, sizeof(storage));
+        for (unsigned bit = 0; bit < 256; bit++) {
+            memset(storage + offset, 0, 32);
+            storage[offset + bit / 8] = (uint8_t)(1u << (bit % 8));
+            assert_target_conversion(storage, offset, ldexp(1.0, bit));
+        }
+    }
+}
+
+TEST_CASE("le256todouble preserves target edge values at every alignment", "[utils]")
+{
+    for (size_t offset = 8; offset < 16; offset++) {
+        _Alignas(8) uint8_t storage[48];
+        memset(storage, 0xa5, sizeof(storage));
+        memset(storage + offset, 0, 32);
+        assert_target_conversion(storage, offset, 0.0);
+
+        /* The maximum 256-bit integer rounds to 2^256 as a double. */
+        memset(storage + offset, 0xff, 32);
+        assert_target_conversion(storage, offset, 0x1p256);
+
+        /* Exactly representable 2^80 + 2^28 spans two 64-bit limbs. */
+        memset(storage + offset, 0, 32);
+        storage[offset + 10] = 1;
+        storage[offset + 3] = 0x10;
+        assert_target_conversion(storage, offset, 0x1.0000000000001p80);
+    }
 }
 
 TEST_CASE("networkDifficulty", "[utils]")

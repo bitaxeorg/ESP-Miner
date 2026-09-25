@@ -1,3 +1,4 @@
+#include "bonanza_power_task.h"
 #include <pthread.h>
 #include <fcntl.h>
 #include <string.h>
@@ -1233,6 +1234,11 @@ static esp_err_t POST_restart(httpd_req_t * req)
 
     ESP_LOGI(TAG, "Restarting System because of API Request");
 
+    if (GLOBAL_STATE->DEVICE_CONFIG.family.id == BONANZA &&
+        !BONANZA_POWER_MANAGEMENT_prepare_restart()) {
+        return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR,
+                                   "Bonanza safe shutdown failed");
+    }
     httpd_resp_set_type(req, "application/json");
 
     cJSON * root = cJSON_CreateObject();
@@ -1404,6 +1410,11 @@ static esp_err_t POST_mining_pause(httpd_req_t * req)
         return ESP_OK;
     }
 
+    if (GLOBAL_STATE->DEVICE_CONFIG.family.id == BONANZA &&
+        !BONANZA_POWER_MANAGEMENT_pause()) {
+        return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR,
+                                   "Bonanza pause did not complete safely");
+    }
     GLOBAL_STATE->SYSTEM_MODULE.mining_paused = true;
     ESP_LOGI(TAG, "Mining paused by API request");
 
@@ -1430,6 +1441,11 @@ static esp_err_t POST_mining_resume(httpd_req_t * req)
         return ESP_OK;
     }
 
+    if (GLOBAL_STATE->DEVICE_CONFIG.family.id == BONANZA &&
+        !BONANZA_POWER_MANAGEMENT_resume()) {
+        return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR,
+                                   "Bonanza resume did not complete safely");
+    }
     GLOBAL_STATE->SYSTEM_MODULE.mining_paused = false;
     ESP_LOGI(TAG, "Mining resumed by API request");
 
@@ -1540,6 +1556,12 @@ static esp_err_t POST_system_boot(httpd_req_t *req)
         return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "No valid firmware found on partition");
     }
 
+    if (GLOBAL_STATE->DEVICE_CONFIG.family.id == BONANZA &&
+        !BONANZA_POWER_MANAGEMENT_prepare_restart()) {
+        cJSON_Delete(root);
+        return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR,
+                                   "Bonanza safe shutdown failed");
+    }
     esp_err_t err = esp_ota_set_boot_partition(p);
     cJSON_Delete(root);
 
@@ -1795,6 +1817,11 @@ esp_err_t POST_WWW_update(httpd_req_t * req)
             vTaskDelay(10 / portTICK_PERIOD_MS);
         }
     }
+    if (GLOBAL_STATE->DEVICE_CONFIG.family.id == BONANZA &&
+        !BONANZA_POWER_MANAGEMENT_prepare_restart()) {
+        return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR,
+                                   "Bonanza safe shutdown failed");
+    }
     httpd_resp_set_type(req, "text/plain");
     httpd_resp_sendstr(req, "WWW update complete, rebooting now!\n");
     nvs_config_set_bool(NVS_CONFIG_USE_CUSTOM_WWW, true);
@@ -1824,6 +1851,9 @@ esp_err_t POST_OTA_update(httpd_req_t * req)
         return ESP_OK;
     }
     
+    bool bonanza = GLOBAL_STATE->DEVICE_CONFIG.family.id == BONANZA;
+    if (bonanza && !BONANZA_POWER_MANAGEMENT_acquire_maintenance(BONANZA_POWER_OWNER_OTA))
+        return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Bonanza safe shutdown failed");
     GLOBAL_STATE->SYSTEM_MODULE.is_firmware_update = true;
     snprintf(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_filename, 20, "esp-miner.bin");
     snprintf(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_status, 20, "Starting...");
@@ -1833,7 +1863,11 @@ esp_err_t POST_OTA_update(httpd_req_t * req)
     int remaining = req->content_len;
 
     const esp_partition_t * ota_partition = esp_ota_get_next_update_partition(NULL);
-    ESP_ERROR_CHECK(esp_ota_begin(ota_partition, OTA_SIZE_UNKNOWN, &ota_handle));
+    if (esp_ota_begin(ota_partition, OTA_SIZE_UNKNOWN, &ota_handle) != ESP_OK) {
+        if (bonanza) (void)BONANZA_POWER_MANAGEMENT_release_maintenance(BONANZA_POWER_OWNER_OTA);
+        GLOBAL_STATE->SYSTEM_MODULE.is_firmware_update = false;
+        return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "OTA initialization failed");
+    }
 
     int chunks = 0;
     while (remaining > 0) {
@@ -1845,8 +1879,11 @@ esp_err_t POST_OTA_update(httpd_req_t * req)
 
             // Serious Error: Abort OTA
         } else if (recv_len <= 0) {
+            esp_ota_abort(ota_handle);
             snprintf(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_status, 20, "Protocol Error");
             HTTP_send_json_error(req, "500 Internal Server Error", "Protocol Error");
+            if (bonanza) (void)BONANZA_POWER_MANAGEMENT_release_maintenance(BONANZA_POWER_OWNER_OTA);
+            GLOBAL_STATE->SYSTEM_MODULE.is_firmware_update = false;
             return ESP_FAIL;
         }
 
@@ -1855,6 +1892,8 @@ esp_err_t POST_OTA_update(httpd_req_t * req)
             esp_ota_abort(ota_handle);
             snprintf(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_status, 20, "Write Error");
             HTTP_send_json_error(req, "500 Internal Server Error", "Write Error");
+            if (bonanza) (void)BONANZA_POWER_MANAGEMENT_release_maintenance(BONANZA_POWER_OWNER_OTA);
+            GLOBAL_STATE->SYSTEM_MODULE.is_firmware_update = false;
             return ESP_FAIL;
         }
 
@@ -1873,6 +1912,8 @@ esp_err_t POST_OTA_update(httpd_req_t * req)
     // Validate and switch to new OTA image and reboot
     if (esp_ota_end(ota_handle) != ESP_OK || esp_ota_set_boot_partition(ota_partition) != ESP_OK) {
         snprintf(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_status, 20, "Validation Error");
+        if (bonanza) (void)BONANZA_POWER_MANAGEMENT_release_maintenance(BONANZA_POWER_OWNER_OTA);
+        GLOBAL_STATE->SYSTEM_MODULE.is_firmware_update = false;
         HTTP_send_json_error(req, "500 Internal Server Error", "Validation / Activation Error");
         return ESP_OK;
     }
