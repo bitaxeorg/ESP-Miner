@@ -277,6 +277,7 @@ components:
         - useFallbackStratum
         - pools
         - poolConnectionInfo
+        - primaryPoolError
         - poolDifficulty
         - power
         - resetReason
@@ -517,6 +518,9 @@ components:
         poolConnectionInfo:
           type: string
           description: Current pool address family
+        primaryPoolError:
+          type: string
+          description: Last error encountered by primary pool causing failover
         poolDifficulty:
           type: number
           description: Current pool difficulty

@@ -1259,7 +1259,21 @@ export class HomeComponent implements OnInit, OnDestroy {
     updateMessage(!!info.power_fault, 'POWER_FAULT', 'error', `${info.power_fault} Check your Power Supply.`);
     updateMessage(!!info.hardware_fault, 'HARDWARE_FAULT', 'error', `${info.hardware_fault}`);
     updateMessage(isFrequencyLow(info.frequency, frequencyOptions), 'FREQUENCY_LOW', 'warn', 'Device frequency is set low - See settings');
-    updateMessage(info.isUsingFallbackStratum === 1 && info.useFallbackStratum === 0, 'FALLBACK_STRATUM', 'warn', 'Primary pool unreachable - operating on fallback pool.');
+    if (info.useFallbackStratum === 0) {
+      if (info.isUsingFallbackStratum === 0) {
+        updateMessage(false, 'FALLBACK_STRATUM', 'info', '');
+      } else {
+        const reason = info.primaryPoolError || 'Primary pool unreachable';
+        const text = `${reason} - operating on fallback pool.`;
+        updateMessage(true, 'FALLBACK_STRATUM', 'warn', text);
+      }
+    } else {
+      if (info.isUsingFallbackStratum === 0) {
+        updateMessage(true, 'FALLBACK_STRATUM', 'warn', 'Fallback pool unreachable - operating on primary pool.');
+      } else {
+        updateMessage(true, 'FALLBACK_STRATUM', 'info', 'Operating on fallback pool by user preference.');
+      }
+    }
     if (info.coinbaseOutputs && info.coinbaseOutputs.length > 0) {
       let percentage = this.getPayoutPercentage(info);
       const warn = this.activePoolShareWarning;

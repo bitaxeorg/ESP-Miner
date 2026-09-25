@@ -109,6 +109,7 @@ const mockSystemInfo: ISystemInfo = {
   coreVoltage: 0,
   maxPower: 20,
   poolConnectionInfo: 'Connected',
+  primaryPoolError: '',
   responseTime: 45,
   responseShareBatch: 1,
   poolDifficulty: 1000,
@@ -502,6 +503,81 @@ describe('HomeComponent', () => {
       expect(clearTimeout).toHaveBeenCalledWith(component['shareAcceptedTimeout']);
       expect(clearTimeout).toHaveBeenCalledWith(component['shareRejectedTimeout']);
       expect(clearTimeout).toHaveBeenCalledWith(component['workReceivedTimeout']);
+    });
+
+    describe('FALLBACK_STRATUM messages', () => {
+      const error = { duration: 0, startTime: null };
+
+      it('should show info banner when operating on fallback pool by user preference', () => {
+        component.handleSystemMessages({
+          ...mockSystemInfo,
+          isUsingFallbackStratum: 1,
+          useFallbackStratum: 1,
+        }, error);
+
+        const msg = component.messages.find(m => m.type === 'FALLBACK_STRATUM');
+        expect(msg).toBeDefined();
+        expect(msg?.severity).toBe('info');
+        expect(msg?.text).toBe('Operating on fallback pool by user preference.');
+      });
+
+      it('should show warn banner with primaryPoolError when primary fails over to fallback', () => {
+        component.handleSystemMessages({
+          ...mockSystemInfo,
+          isUsingFallbackStratum: 1,
+          useFallbackStratum: 0,
+          primaryPoolError: 'SV1: Pool unreachable',
+        }, error);
+
+        const msg = component.messages.find(m => m.type === 'FALLBACK_STRATUM');
+        expect(msg).toBeDefined();
+        expect(msg?.severity).toBe('warn');
+        expect(msg?.text).toBe('SV1: Pool unreachable - operating on fallback pool.');
+      });
+
+      it('should show default warn banner when failover occurs without primaryPoolError', () => {
+        component.handleSystemMessages({
+          ...mockSystemInfo,
+          isUsingFallbackStratum: 1,
+          useFallbackStratum: 0,
+          primaryPoolError: '',
+        }, error);
+
+        const msg = component.messages.find(m => m.type === 'FALLBACK_STRATUM');
+        expect(msg).toBeDefined();
+        expect(msg?.severity).toBe('warn');
+        expect(msg?.text).toBe('Primary pool unreachable - operating on fallback pool.');
+      });
+
+      it('should show warn banner when user requested fallback but operating on primary', () => {
+        component.handleSystemMessages({
+          ...mockSystemInfo,
+          isUsingFallbackStratum: 0,
+          useFallbackStratum: 1,
+        }, error);
+
+        const msg = component.messages.find(m => m.type === 'FALLBACK_STRATUM');
+        expect(msg).toBeDefined();
+        expect(msg?.severity).toBe('warn');
+        expect(msg?.text).toBe('Fallback pool unreachable - operating on primary pool.');
+      });
+
+      it('should dismiss banner when operating normally on primary pool', () => {
+        component.messages = [{
+          type: 'FALLBACK_STRATUM',
+          severity: 'warn',
+          text: 'Primary pool unreachable - operating on fallback pool.',
+        }];
+
+        component.handleSystemMessages({
+          ...mockSystemInfo,
+          isUsingFallbackStratum: 0,
+          useFallbackStratum: 0,
+        }, error);
+
+        const msg = component.messages.find(m => m.type === 'FALLBACK_STRATUM');
+        expect(msg).toBeUndefined();
+      });
     });
   });
 });

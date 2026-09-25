@@ -222,7 +222,8 @@ esp_err_t stratum_v1_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
     STRATUM_V1_configure_version_rolling(transport, stratum_get_next_uid(GLOBAL_STATE), &s_v1_conn->version_mask);
 
     // mining.subscribe - ID: 2
-    STRATUM_V1_subscribe(transport, stratum_get_next_uid(GLOBAL_STATE), GLOBAL_STATE->DEVICE_CONFIG.family.asic.name);
+    int subscribe_message_id = stratum_get_next_uid(GLOBAL_STATE);
+    STRATUM_V1_subscribe(transport, subscribe_message_id, GLOBAL_STATE->DEVICE_CONFIG.family.asic.name);
 
     int authorize_message_id = stratum_get_next_uid(GLOBAL_STATE);
 
@@ -264,6 +265,8 @@ esp_err_t stratum_v1_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
                 run_result = ESP_OK;
             } else {
                 ESP_LOGE(TAG, "Failed to receive JSON-RPC line, reconnecting...");
+                snprintf(GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info,
+                         sizeof(GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info), "SV1: Connection lost");
                 run_result = ESP_FAIL;
             }
             break;
@@ -367,6 +370,8 @@ esp_err_t stratum_v1_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
 
             case CLIENT_RECONNECT:
                 ESP_LOGW(TAG, "Pool requested client reconnect, pausing 1s before reconnecting...");
+                snprintf(GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info,
+                         sizeof(GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info), "SV1: Pool requested reconnect");
                 vTaskDelay(pdMS_TO_TICKS(1000));
                 reconnect_requested = true;
                 break;
@@ -409,6 +414,12 @@ esp_err_t stratum_v1_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
                         if (s_v1_msg->message_id == authorize_message_id) {
                             snprintf(GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info,
                                      sizeof(GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info), "SV1: Auth rejected");
+                        } else if (s_v1_msg->message_id == subscribe_message_id) {
+                            snprintf(GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info,
+                                     sizeof(GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info), "SV1: Subscribe rejected");
+                        } else {
+                            snprintf(GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info,
+                                     sizeof(GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info), "SV1: Setup rejected");
                         }
                     }
                 }
