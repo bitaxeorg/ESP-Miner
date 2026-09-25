@@ -17,6 +17,8 @@
 #include <esp_heap_caps.h>
 #include "esp_transport_ssl.h"
 #include "freertos/task.h"
+#include "asic_common.h"
+#include "difficulty_controller.h"
 
 #define MAX_EXTRANONCE_2_LEN 32
 #define TRANSPORT_TIMEOUT_MS 5000
@@ -168,7 +170,7 @@ esp_err_t stratum_v1_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
     }
     s_v1_conn->send_uid = 1;
     strlcpy(s_v1_conn->user, username, sizeof(s_v1_conn->user));
-    s_v1_conn->pool_difficulty = (double)GLOBAL_STATE->DEVICE_CONFIG.family.asic.difficulty;
+    s_v1_conn->pool_difficulty = (difficulty > 0) ? (double)difficulty : (double)CONFIG_STRATUM_DIFFICULTY;
     s_v1_conn->version_mask = 0;
 
     stratum_connection_info_t conn_info;
@@ -319,11 +321,13 @@ esp_err_t stratum_v1_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
 
             case MINING_SET_DIFFICULTY: {
                 double requested_diff = s_v1_msg->new_difficulty;
-                double asic_diff = GLOBAL_STATE->DEVICE_CONFIG.family.asic.difficulty;
-                s_v1_conn->pool_difficulty = (requested_diff < asic_diff) ? asic_diff : requested_diff;
-                ESP_LOGI(TAG, "Set effective pool difficulty: %.2f (requested: %.2f)",
+                s_v1_conn->pool_difficulty = (requested_diff < MIN_ASIC_DIFFICULTY) ? MIN_ASIC_DIFFICULTY : requested_diff;
+                ESP_LOGI(TAG, "Set pool difficulty: %.2f (requested: %.2f)",
                          s_v1_conn->pool_difficulty, requested_diff);
                 GLOBAL_STATE->SYSTEM_MODULE.pool_difficulty = s_v1_conn->pool_difficulty;
+                if (GLOBAL_STATE->ASIC_initalized) {
+                    difficulty_controller_update(GLOBAL_STATE);
+                }
                 break;
             }
 

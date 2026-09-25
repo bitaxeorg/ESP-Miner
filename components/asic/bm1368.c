@@ -223,12 +223,6 @@ uint8_t BM1368_init(GlobalState * GLOBAL_STATE)
         vTaskDelay(pdMS_TO_TICKS(500));
     }
 
-    uint16_t difficulty = GLOBAL_STATE->DEVICE_CONFIG.family.asic.difficulty;
-
-    uint8_t difficulty_mask[6];
-    get_difficulty_mask(difficulty, difficulty_mask);
-    _send_BM1368((TYPE_CMD | GROUP_ALL | CMD_WRITE), difficulty_mask, 6, BM1368_SERIALTX_DEBUG);    
-
     do_frequency_transition(GLOBAL_STATE, BM1368_send_hash_frequency);
 
     float frequency = GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value;
@@ -350,4 +344,11 @@ void BM1368_read_registers(GlobalState * GLOBAL_STATE)
             }
         }
     }
+}
+
+void BM1368_set_difficulty(double difficulty)
+{
+    uint8_t difficulty_mask[6];
+    get_difficulty_mask(difficulty, difficulty_mask);
+    _send_BM1368((TYPE_CMD | GROUP_ALL | CMD_WRITE), difficulty_mask, 6, BM1368_SERIALTX_DEBUG);
 }

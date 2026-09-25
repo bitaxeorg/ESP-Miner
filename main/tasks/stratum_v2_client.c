@@ -16,6 +16,7 @@
 #include "libbase58.h"
 #include "device_config.h"
 #include "esp_heap_caps.h"
+#include "difficulty_controller.h"
 
 #include <string.h>
 #include <stdlib.h>
@@ -392,6 +393,9 @@ static void stratum_v2_handle_set_target(GlobalState *GLOBAL_STATE, sv2_conn_t *
 
     memcpy(conn->target, max_target, 32);
     GLOBAL_STATE->SYSTEM_MODULE.pool_difficulty = pdiff;
+    if (GLOBAL_STATE->ASIC_initalized) {
+        difficulty_controller_update(GLOBAL_STATE);
+    }
 
     ESP_LOGI(TAG, "Set pool difficulty: %g", pdiff);
 }
@@ -726,6 +730,9 @@ esp_err_t stratum_v2_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
 
         double pdiff = hash_to_pdiff(target);
         GLOBAL_STATE->SYSTEM_MODULE.pool_difficulty = pdiff;
+        if (GLOBAL_STATE->ASIC_initalized) {
+            difficulty_controller_update(GLOBAL_STATE);
+        }
 
         ESP_LOGI(TAG, "Mining channel opened: channel_id=%lu, group=%lu, type=%s",
                  channel_id, group_channel_id,
