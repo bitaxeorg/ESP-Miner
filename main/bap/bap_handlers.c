@@ -232,11 +232,19 @@ void BAP_send_request(bap_parameter_t param, GlobalState *state) {
             BAP_send_message(BAP_CMD_RES, "deviceModel", state->DEVICE_CONFIG.family.name);
             BAP_send_message(BAP_CMD_RES, "asicModel", state->DEVICE_CONFIG.family.asic.name);
             char port_str[6];
+            char auto_fan_str[2];
+            char manual_fan_speed_str[6];
             uint16_t prim_idx = state->SYSTEM_MODULE.primary_pool_index;
             snprintf(port_str, sizeof(port_str),"%u", state->SYSTEM_MODULE.pools[prim_idx].port);
+            snprintf(auto_fan_str, sizeof(auto_fan_str), "%d",
+                     nvs_config_get_bool(NVS_CONFIG_AUTO_FAN_SPEED) ? 1 : 0);
+            snprintf(manual_fan_speed_str, sizeof(manual_fan_speed_str), "%u",
+                     nvs_config_get_u16(NVS_CONFIG_MANUAL_FAN_SPEED));
             BAP_send_message(BAP_CMD_RES, "pool", state->SYSTEM_MODULE.pools[prim_idx].url);
             BAP_send_message(BAP_CMD_RES, "poolPort", port_str);
             BAP_send_message(BAP_CMD_RES, "poolUser", state->SYSTEM_MODULE.pools[prim_idx].user);
+            BAP_send_message(BAP_CMD_RES, "auto_fan", auto_fan_str);
+            BAP_send_message(BAP_CMD_RES, "manual_fan_speed", manual_fan_speed_str);
             break;
         case BAP_PARAM_SHARES:
             {
