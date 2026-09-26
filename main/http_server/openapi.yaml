@@ -219,6 +219,27 @@ components:
           nullable: true
           description: Partition space usage percentage (0-100)
 
+    FirmwareChecksum:
+      type: object
+      required:
+        - partition
+        - version
+        - size
+        - sha256
+      properties:
+        partition:
+          type: string
+          description: Label of the running partition (e.g., ota_0, ota_1, factory)
+        version:
+          type: string
+          description: Firmware version of the running image
+        size:
+          type: integer
+          description: Size of the running image in bytes
+        sha256:
+          type: string
+          description: Lowercase hex SHA-256 of the running image, comparable to the release esp-miner.bin checksum
+
     SystemInfo:
       type: object
       required:
@@ -1246,6 +1267,25 @@ paths:
                 $ref: '#/components/schemas/GenericResponse'
         '400':
           description: Invalid partition label
+        '401':
+          description: Unauthorized - Client not in allowed network range
+        '500':
+          description: Internal server error
+
+  /api/system/firmware/checksum:
+    get:
+      summary: Get running firmware checksum
+      description: Returns the SHA-256 of the running firmware image, matching sha256sum of the flashed esp-miner.bin
+      operationId: getFirmwareChecksum
+      tags:
+        - system
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FirmwareChecksum'
         '401':
           description: Unauthorized - Client not in allowed network range
         '500':

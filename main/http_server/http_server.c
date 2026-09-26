@@ -19,6 +19,7 @@
 
 #include "dns_server.h"
 #include "esp_ota_ops.h"
+#include "esp_app_desc.h"
 #include "esp_wifi.h"
 #include "lwip/inet.h"
 #include <arpa/inet.h>
@@ -30,6 +31,7 @@
 #include "global_state.h"
 #include "nvs_config.h"
 #include "system.h"
+#include "firmware_checksum.h"
 #include "connect.h"
 #include "statistics_task.h"
 #include "theme_api.h"
@@ -1565,6 +1567,41 @@ static esp_err_t POST_system_boot(httpd_req_t *req)
     return send_res;
 }
 
+static esp_err_t GET_system_firmware_checksum(httpd_req_t *req)
+{
+    if (is_network_allowed(req) != ESP_OK) {
+        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+    }
+
+    httpd_resp_set_type(req, "application/json");
+
+    // Set CORS headers
+    if (set_cors_headers(req) != ESP_OK) {
+        httpd_resp_send_500(req);
+        return ESP_OK;
+    }
+
+    const esp_partition_t *running = esp_ota_get_running_partition();
+    const char *sha256_hex = NULL;
+    uint32_t image_len = 0;
+    if (running == NULL || firmware_checksum_get_running(&sha256_hex, &image_len) != ESP_OK) {
+        return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to compute firmware checksum");
+    }
+
+    const esp_app_desc_t *app_desc = esp_app_get_description();
+
+    cJSON *root = cJSON_CreateObject();
+    cJSON_AddStringToObject(root, "partition", running->label);
+    cJSON_AddStringToObject(root, "version", app_desc->version);
+    cJSON_AddNumberToObject(root, "size", image_len);
+    cJSON_AddStringToObject(root, "sha256", sha256_hex);
+
+    esp_err_t res = HTTP_send_json(req, root, &api_common_prebuffer_len);
+    cJSON_Delete(root);
+
+    return res;
+}
+
 static esp_err_t GET_system_statistics(httpd_req_t * req)
 {
     if (is_network_allowed(req) != ESP_OK) {
@@ -1921,7 +1958,7 @@ esp_err_t start_rest_server(GlobalState * global_state)
     config.uri_match_fn = httpd_uri_match_wildcard;
     config.stack_size = 8192;
     config.max_open_sockets = 20;
-    config.max_uri_handlers = 25;
+    config.max_uri_handlers = 26;
     config.close_fn = websocket_close_fn;
     config.lru_purge_enable = true;
     config.keep_alive_enable = true;
@@ -1968,6 +2005,15 @@ esp_err_t start_rest_server(GlobalState * global_state)
         .user_ctx = rest_context
     };
     httpd_register_uri_handler(server, &system_boot_post_uri);
+
+    /* URI handler for fetching the running firmware checksum */
+    httpd_uri_t system_firmware_checksum_get_uri = {
+        .uri = "/api/system/firmware/checksum",
+        .method = HTTP_GET,
+        .handler = GET_system_firmware_checksum,
+        .user_ctx = rest_context
+    };
+    httpd_register_uri_handler(server, &system_firmware_checksum_get_uri);
 
     /* URI handler for fetching system asic values */
     httpd_uri_t system_asic_get_uri = {
