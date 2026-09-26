@@ -1,5 +1,5 @@
 import { Component, ViewChild, ElementRef } from '@angular/core';
-import { Observable, map } from 'rxjs';
+import { Observable, map, switchMap, catchError, of } from 'rxjs';
 import { HttpErrorResponse, HttpEventType } from '@angular/common/http';
 import { getHttpErrorMessage } from 'src/app/utils/error-handler';
 import { ToastrService } from 'ngx-toastr';
@@ -8,9 +8,11 @@ import { SystemApiService } from 'src/app/services/system.service';
 import { LiveDataService } from 'src/app/services/live-data.service';
 import { LocalStorageService } from 'src/app/local-storage.service';
 import { ModalComponent } from '../modal/modal.component';
-import { SystemInfo } from 'src/app/generated/models';
+import { FirmwareChecksum, SystemInfo } from 'src/app/generated/models';
 
 const IGNORE_RELEASE_CHECK_WARNING = 'IGNORE_RELEASE_CHECK_WARNING';
+
+export type FirmwareVerifyStatus = 'idle' | 'checking' | 'match' | 'mismatch' | 'no-release' | 'no-digest' | 'error';
 
 @Component({
     selector: 'app-update',
@@ -39,7 +41,13 @@ export class UpdateComponent {
   public updateStatus: 'progress' | 'success' | 'error' = 'progress';
   public updateMessage: string = '';
 
+  public verifyStatus: FirmwareVerifyStatus = 'idle';
+  public deviceChecksum: FirmwareChecksum | null = null;
+  public releaseChecksum: string | null = null;
+  public verifyReleaseUrl: string | null = null;
+
   private currentVersion: string | undefined = undefined;
+  private pendingGithubAction: (() => void) | null = null;
 
   constructor(
     private systemService: SystemApiService,
@@ -198,9 +206,18 @@ export class UpdateComponent {
   }
 
   public handleReleaseCheck(): void {
+    this.requestGithubAccess(() => this.checkLatestRelease = true);
+  }
+
+  public handleFirmwareVerify(): void {
+    this.requestGithubAccess(() => this.verifyFirmware());
+  }
+
+  private requestGithubAccess(action: () => void): void {
     if (this.localStorageService.getBool(IGNORE_RELEASE_CHECK_WARNING)) {
-      this.checkLatestRelease = true;
+      action();
     } else {
+      this.pendingGithubAction = action;
       if (this.privacyModal) {
         this.privacyModal.isVisible = true;
       }
@@ -208,7 +225,8 @@ export class UpdateComponent {
   }
 
   public continueReleaseCheck(skipWarning: boolean): void {
-    this.checkLatestRelease = true;
+    this.pendingGithubAction?.();
+    this.pendingGithubAction = null;
     if (this.privacyModal) {
       this.privacyModal.isVisible = false;
     }
@@ -218,6 +236,48 @@ export class UpdateComponent {
     }
 
     this.localStorageService.setBool(IGNORE_RELEASE_CHECK_WARNING, true);
+  }
+
+  public verifyFirmware(): void {
+    this.verifyStatus = 'checking';
+    this.deviceChecksum = null;
+    this.releaseChecksum = null;
+    this.verifyReleaseUrl = null;
+
+    this.systemService.getFirmwareChecksum().pipe(
+      switchMap(checksum => {
+        this.deviceChecksum = checksum;
+        return this.githubUpdateService.getReleaseByTag(checksum.version).pipe(
+          catchError((err: HttpErrorResponse) => {
+            if (err.status === 404) {
+              return of(null);
+            }
+            throw err;
+          })
+        );
+      })
+    ).subscribe({
+      next: release => {
+        if (!release) {
+          this.verifyStatus = 'no-release';
+          return;
+        }
+
+        this.verifyReleaseUrl = release.html_url;
+        const digest = release.assets?.find(asset => asset.name === 'esp-miner.bin')?.digest;
+        if (!digest?.startsWith('sha256:')) {
+          this.verifyStatus = 'no-digest';
+          return;
+        }
+
+        this.releaseChecksum = digest.substring('sha256:'.length).toLowerCase();
+        this.verifyStatus = this.releaseChecksum === this.deviceChecksum?.sha256.toLowerCase() ? 'match' : 'mismatch';
+      },
+      error: err => {
+        this.verifyStatus = 'error';
+        this.toastrService.error(`Firmware verification failed. ${getHttpErrorMessage(err)}`);
+      }
+    });
   }
 
   public switchPartition(label: string): void {

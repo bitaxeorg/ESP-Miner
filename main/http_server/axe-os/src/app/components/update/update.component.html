@@ -8,22 +8,6 @@
 
         @if (checkLatestRelease == false) {
           <h3>Latest Release: <button class="btn text-sm ml-2" (click)="handleReleaseCheck()">Check</button></h3>
-          <app-modal #privacyModal [headline]="'Privacy Warning'">
-            <p>
-              Please note, this will connect to <strong>github.com</strong> to check for the latest release.
-            </p>
-            <p class="flex items-center gap-2">
-              <app-checkbox
-                [binary]="true"
-                inputId="ignoreWarning"
-                #ignoreWarning></app-checkbox>
-              <label for="ignoreWarning" class="cursor-pointer">Don't show again</label>
-            </p>
-            <div class="flex gap-3 mt-5">
-              <button class="btn" (click)="continueReleaseCheck(ignoreWarning.model)">Continue</button>
-              <button class="btn btn-secondary" (click)="privacyModal.isVisible = false">Cancel</button>
-            </div>
-          </app-modal>
         } @else {
           @if (latestRelease$ | async; as latestRelease) {
             <h3>Latest Release:
@@ -49,6 +33,53 @@
           }
         }
 
+        <div class="mt-4 pt-3 border-t border-white/10">
+          <h5 class="mb-2">Firmware Integrity: <button class="btn text-sm ml-2" [disabled]="verifyStatus === 'checking'" (click)="handleFirmwareVerify()">Verify</button></h5>
+          <small class="text-secondary block">Compares the SHA-256 of the running firmware with the official esp-miner.bin of the same release.</small>
+
+          @switch (verifyStatus) {
+            @case ('checking') {
+              <div class="mt-2">Computing checksum...</div>
+            }
+            @case ('match') {
+              <div class="mt-2 text-green-500 flex items-center gap-2"><i class="pi pi-check-circle"></i>Matches the official <a class="underline" target="_blank" [href]="verifyReleaseUrl">{{ deviceChecksum?.version }}</a> release</div>
+            }
+            @case ('mismatch') {
+              <div class="mt-2 text-red-500 flex items-center gap-2"><i class="pi pi-times-circle"></i>Does not match the official <a class="underline" target="_blank" [href]="verifyReleaseUrl">{{ deviceChecksum?.version }}</a> release</div>
+            }
+            @case ('no-release') {
+              <div class="mt-2 text-orange-500">No official release found for {{ deviceChecksum?.version }}. This is likely a development or custom build.</div>
+            }
+            @case ('no-digest') {
+              <div class="mt-2 text-orange-500">The {{ deviceChecksum?.version }} release does not provide a checksum for esp-miner.bin.</div>
+            }
+          }
+
+          @if (deviceChecksum) {
+            <div class="mt-2 text-xs font-mono break-all">
+              <div><span class="text-secondary">Device ({{ deviceChecksum.partition }}):</span> {{ deviceChecksum.sha256 }}</div>
+              @if (releaseChecksum) {
+                <div><span class="text-secondary">Release:</span> {{ releaseChecksum }}</div>
+              }
+            </div>
+          }
+        </div>
+        <app-modal #privacyModal [headline]="'Privacy Warning'">
+          <p>
+            Please note, this will connect to <strong>github.com</strong> to look up official releases.
+          </p>
+          <p class="flex items-center gap-2">
+            <app-checkbox
+              [binary]="true"
+              inputId="ignoreWarning"
+              #ignoreWarning></app-checkbox>
+            <label for="ignoreWarning" class="cursor-pointer">Don't show again</label>
+          </p>
+          <div class="flex gap-3 mt-5">
+            <button class="btn" (click)="continueReleaseCheck(ignoreWarning.model)">Continue</button>
+            <button class="btn btn-secondary" (click)="privacyModal.isVisible = false">Cancel</button>
+          </div>
+        </app-modal>
       </div>
     </div>
     <div class="w-full lg:w-1/2 xl:w-1/3 px-2 mb-4 lg:mb-0">

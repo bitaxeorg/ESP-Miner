@@ -8,6 +8,9 @@ import { ProgressbarComponent } from '../progressbar/progressbar.component';
 import { provideHttpClient, HttpErrorResponse } from '@angular/common/http';
 import { provideToastr } from 'ngx-toastr';
 import { getHttpErrorMessage } from 'src/app/utils/error-handler';
+import { of, throwError } from 'rxjs';
+import { SystemApiService } from 'src/app/services/system.service';
+import { GithubRelease, GithubUpdateService } from 'src/app/services/github-update.service';
 
 describe('UpdateComponent', () => {
   let component: UpdateComponent;
@@ -77,6 +80,57 @@ describe('UpdateComponent', () => {
       expect(msg).toBe('Write Error (Device: 192.168.1.10)');
     });
   });
+
+  describe('verifyFirmware', () => {
+    const sha = 'ab'.repeat(32);
+    let githubService: GithubUpdateService;
+
+    const release = (digest?: string | null): GithubRelease => ({
+      id: 1,
+      tag_name: 'v2.13.0',
+      name: 'v2.13.0',
+      html_url: 'https://github.com/bitaxeorg/esp-miner/releases/tag/v2.13.0',
+      prerelease: false,
+      assets: [{ name: 'esp-miner.bin', browser_download_url: '', digest }]
+    });
+
+    beforeEach(() => {
+      spyOn(TestBed.inject(SystemApiService), 'getFirmwareChecksum').and.returnValue(
+        of({ partition: 'ota_0', version: 'v2.13.0', size: 1024, sha256: sha })
+      );
+      githubService = TestBed.inject(GithubUpdateService);
+    });
+
+    it('should report a match when the release digest equals the device checksum', () => {
+      const spy = spyOn(githubService, 'getReleaseByTag').and.returnValue(of(release(`sha256:${sha.toUpperCase()}`)));
+      component.verifyFirmware();
+      expect(spy).toHaveBeenCalledWith('v2.13.0');
+      expect(component.verifyStatus).toBe('match');
+      expect(component.releaseChecksum).toBe(sha);
+    });
+
+    it('should report a mismatch when the digests differ', () => {
+      spyOn(githubService, 'getReleaseByTag').and.returnValue(of(release(`sha256:${'cd'.repeat(32)}`)));
+      component.verifyFirmware();
+      expect(component.verifyStatus).toBe('mismatch');
+    });
+
+    it('should report no-digest when the release asset has no digest', () => {
+      spyOn(githubService, 'getReleaseByTag').and.returnValue(of(release(null)));
+      component.verifyFirmware();
+      expect(component.verifyStatus).toBe('no-digest');
+    });
+
+    it('should report no-release when the tag does not exist', () => {
+      spyOn(githubService, 'getReleaseByTag').and.returnValue(throwError(() => new HttpErrorResponse({ status: 404 })));
+      component.verifyFirmware();
+      expect(component.verifyStatus).toBe('no-release');
+    });
+
+    it('should report an error for other failures', () => {
+      spyOn(githubService, 'getReleaseByTag').and.returnValue(throwError(() => new HttpErrorResponse({ status: 500 })));
+      component.verifyFirmware();
+      expect(component.verifyStatus).toBe('error');
+    });
+  });
 });
-
-
