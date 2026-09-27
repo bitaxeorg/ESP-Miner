@@ -22,9 +22,6 @@
 #include "nvs_config.h"
 #include "esp_app_desc.h"
 
-// Maximum number of access points to scan
-#define MAX_AP_COUNT 20
-
 #if CONFIG_ESP_WPA3_SAE_PWE_HUNT_AND_PECK
 #define ESP_WIFI_SAE_MODE WPA3_SAE_PWE_HUNT_AND_PECK
 #define EXAMPLE_H2E_IDENTIFIER ""
@@ -62,7 +59,7 @@ static TimerHandle_t ip_acquire_timer = NULL;
 
 static bool is_scanning = false;
 static uint16_t ap_number = 0;
-static wifi_ap_record_t ap_info[MAX_AP_COUNT];
+static wifi_ap_record_t ap_info[WIFI_SCAN_MAX_AP_COUNT];
 static int s_retry_num = 0;
 static int clients_connected_to_ap = 0;
 static bool mdns_initialized = false;
@@ -316,8 +313,14 @@ esp_err_t get_wifi_current_rssi(int8_t *rssi)
 }
 
 // Function to scan for available WiFi networks
-esp_err_t wifi_scan(wifi_ap_record_simple_t *ap_records, uint16_t *ap_count)
+esp_err_t wifi_scan(wifi_ap_record_simple_t *ap_records, size_t records_capacity, uint16_t *ap_count)
 {
+    if (ap_records == NULL || ap_count == NULL || records_capacity == 0) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    *ap_count = 0;
+
     if (is_scanning) {
         ESP_LOGW(TAG, "Scan already in progress");
         return ESP_ERR_INVALID_STATE;
@@ -325,6 +328,7 @@ esp_err_t wifi_scan(wifi_ap_record_simple_t *ap_records, uint16_t *ap_count)
 
     ESP_LOGI(TAG, "Starting Wi-Fi scan!");
     is_scanning = true;
+    ap_number = 0;
 
     wifi_ap_record_t current_ap_info;
     if (esp_wifi_sta_get_ap_info(&current_ap_info) != ESP_OK) {
@@ -352,6 +356,7 @@ esp_err_t wifi_scan(wifi_ap_record_simple_t *ap_records, uint16_t *ap_count)
         retries_remaining--;
         if (retries_remaining == 0) {
             is_scanning = false;
+            ap_number = 0;
             return ESP_FAIL;
         }
         vTaskDelay(1000 / portTICK_PERIOD_MS);
@@ -362,10 +367,16 @@ esp_err_t wifi_scan(wifi_ap_record_simple_t *ap_records, uint16_t *ap_count)
         ESP_LOGW(TAG, "No Wi-Fi networks found");
     }
 
-    *ap_count = ap_number;
-    memset(ap_records, 0, (*ap_count) * sizeof(wifi_ap_record_simple_t));
-    for (int i = 0; i < ap_number; i++) {
+    size_t records_to_copy = ap_number;
+    if (records_to_copy > records_capacity) {
+        records_to_copy = records_capacity;
+    }
+
+    *ap_count = (uint16_t)records_to_copy;
+    memset(ap_records, 0, records_to_copy * sizeof(*ap_records));
+    for (size_t i = 0; i < records_to_copy; i++) {
         memcpy(ap_records[i].ssid, ap_info[i].ssid, sizeof(ap_records[i].ssid));
+        ap_records[i].ssid[sizeof(ap_records[i].ssid) - 1U] = '\0';
         ap_records[i].rssi = ap_info[i].rssi;
         ap_records[i].authmode = ap_info[i].authmode;
     }
@@ -391,10 +402,21 @@ static void event_handler(void * arg, esp_event_base_t event_base, int32_t event
     if (event_base == WIFI_EVENT)
     {
         if (event_id == WIFI_EVENT_SCAN_DONE) {
-            esp_wifi_scan_get_ap_num(&ap_number);
-            ESP_LOGI(TAG, "Wi-Fi Scan Done");
-            if (esp_wifi_scan_get_ap_records(&ap_number, ap_info) != ESP_OK) {
-                ESP_LOGI(TAG, "Failed esp_wifi_scan_get_ap_records");
+            esp_err_t scan_err = esp_wifi_scan_get_ap_num(&ap_number);
+            if (scan_err != ESP_OK) {
+                ESP_LOGW(TAG, "Failed to get Wi-Fi scan count: %s", esp_err_to_name(scan_err));
+                ap_number = 0;
+            } else {
+                ESP_LOGI(TAG, "Wi-Fi Scan Done: %u network(s) found", ap_number);
+                if (ap_number > WIFI_SCAN_MAX_AP_COUNT) {
+                    ap_number = WIFI_SCAN_MAX_AP_COUNT;
+                }
+
+                scan_err = esp_wifi_scan_get_ap_records(&ap_number, ap_info);
+                if (scan_err != ESP_OK) {
+                    ESP_LOGW(TAG, "Failed to get Wi-Fi scan records: %s", esp_err_to_name(scan_err));
+                    ap_number = 0;
+                }
             }
             is_scanning = false;
         }
