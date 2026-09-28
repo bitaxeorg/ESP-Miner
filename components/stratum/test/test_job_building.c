@@ -70,12 +70,14 @@ TEST_CASE("Bitmain job defaults and explicit values preserve metadata precedence
         .type = JOB_TYPE_SV2_STANDARD,
     };
     diff_to_target(17.0, source.pool_target);
+    nbits_to_target(source.nbits, source.network_target);
     uint8_t merkle[32] = {0};
     bm_job result = {0};
     construct_bm_job_from_miner_job(&source, 0, merkle, 0x0000e000, 0, &result);
     TEST_ASSERT_EQUAL_HEX32(source.version, result.version);
     TEST_ASSERT_EQUAL_HEX32(0x0000e000, result.version_mask);
     TEST_ASSERT_FLOAT_WITHIN(1e-4, 17.0, target_to_diff(result.pool_target));
+    TEST_ASSERT_EQUAL_HEX8_ARRAY(source.network_target, result.network_target, 32);
     TEST_ASSERT_EQUAL_UINT8(0, result.num_midstates);
     TEST_ASSERT_EQUAL_HEX32(source.nbits, result.target);
     TEST_ASSERT_EQUAL_HEX32(source.ntime, result.ntime);

@@ -63,10 +63,6 @@ void construct_bm_job_from_miner_job(const miner_job_t *job, const uint32_t vers
     new_job->starting_nonce = 0;
     memcpy(new_job->pool_target, job->pool_target, 32);
     memcpy(new_job->network_target, job->network_target, 32);
-    static const uint8_t zero_target[32] = {0};
-    if (memcmp(new_job->network_target, zero_target, 32) == 0 && new_job->target != 0) {
-        nbits_to_target(new_job->target, new_job->network_target);
-    }
     new_job->pool_id = job->pool_id;
     new_job->job_type = job->type;
     uint32_t effective_mask = (job->version_mask != 0) ? job->version_mask : version_mask;
