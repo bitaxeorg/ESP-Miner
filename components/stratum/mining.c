@@ -121,16 +121,6 @@ void calculate_merkle_root_hash(const uint8_t coinbase_tx_hash[32], const uint8_
     memcpy(dest, both_merkles, 32);
 }
 
-double hash_to_pdiff(const uint8_t hash[32])
-{
-    if (!hash) return (double)UINT32_MAX;
-    double s64 = le256todouble(hash);
-    if (s64 <= 0.0 || isnan(s64) || isinf(s64)) return (double)UINT32_MAX;
-    double diff = TRUEDIFFONE / s64;
-    if (isnan(diff) || isinf(diff) || diff <= 0.0) return (double)UINT32_MAX;
-    return diff;
-}
-
 void test_nonce_hash(const bm_job *job, const uint32_t nonce, const uint32_t rolled_version, uint8_t hash_result[32])
 {
     uint8_t header[80];
@@ -152,7 +142,7 @@ double test_nonce_value(const bm_job *job, const uint32_t nonce, const uint32_t 
 {
     uint8_t hash_result[32];
     test_nonce_hash(job, nonce, rolled_version, hash_result);
-    return hash_to_pdiff(hash_result);
+    return target_to_diff(hash_result);
 }
 
 uint32_t increment_bitmask(const uint32_t value, const uint32_t mask)

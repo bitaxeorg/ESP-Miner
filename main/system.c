@@ -508,9 +508,14 @@ void SYSTEM_decode_and_apply_coinbase(GlobalState * GLOBAL_STATE, const miner_jo
 {
     if (!GLOBAL_STATE || !job) return;
 
-    // Update network difficulty from nbits (available on all job types, including SV2 Standard)
-    if (job->nbits != 0) {
-        double net_diff = networkDifficulty(job->nbits);
+    // Update network difficulty from network_target or nbits (available on all job types, including SV2 Standard)
+    double net_diff = target_to_diff(job->network_target);
+    if ((net_diff <= 0.0 || net_diff == (double)UINT32_MAX) && job->nbits != 0) {
+        uint8_t t[32];
+        nbits_to_target(job->nbits, t);
+        net_diff = target_to_diff(t);
+    }
+    if (net_diff > 0.0 && net_diff != (double)UINT32_MAX) {
         GLOBAL_STATE->network_nonce_diff = (uint64_t) net_diff;
         suffixString(net_diff, GLOBAL_STATE->network_diff_string, DIFF_STRING_SIZE, 0);
     }

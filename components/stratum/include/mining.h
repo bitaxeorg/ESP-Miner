@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <stddef.h>
 #include "miner_job.h"
+#include "utils.h"
 
 #define BM_JOB_MAX_MIDSTATES 4
 
@@ -39,11 +40,6 @@ void calculate_coinbase_tx_hash_bin(const uint8_t *prefix, size_t prefix_len,
 void calculate_merkle_root_hash(const uint8_t coinbase_tx_hash[32], const uint8_t merkle_branches[][32], const int num_merkle_branches, uint8_t dest[32]);
 
 void construct_bm_job_from_miner_job(const miner_job_t *job, const uint32_t version, const uint8_t merkle_root[32], const uint32_t version_mask, const double difficulty, const uint8_t software_midstates, bm_job *new_job);
-
-// Convert a 256-bit value (block hash or pool target, little-endian) to
-// difficulty (pdiff = truediffone / value). Shared by SV1 (test_nonce_value)
-// and SV2 (target). Returns a double to preserve fractional difficulty.
-double hash_to_pdiff(const uint8_t hash[32]);
 
 void test_nonce_hash(const bm_job *job, const uint32_t nonce, const uint32_t rolled_version, uint8_t hash_result[32]);
 

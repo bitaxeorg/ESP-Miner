@@ -54,8 +54,6 @@ double le256todouble(const void *target);
 
 void prettyHex(unsigned char *buf, int len);
 
-double networkDifficulty(uint32_t nBits);
-
 void suffixString(uint64_t val, char * buf, size_t bufsiz, int sigdigits);
 
 float hashCounterToGhs(uint64_t duration_us, uint32_t counter);
@@ -83,6 +81,14 @@ void nbits_to_target(uint32_t nbits, uint8_t target[32]);
  * @param target 32-byte output buffer (little-endian).
  */
 void diff_to_target(double diff, uint8_t target[32]);
+
+/**
+ * @brief Converts a 256-bit target (or hash) into a floating-point difficulty.
+ * diff = truediffone / target
+ * @param target 32-byte target or hash buffer (little-endian).
+ * @return Difficulty value, or UINT32_MAX on invalid/zero target.
+ */
+double target_to_diff(const uint8_t target[32]);
 
 /**
  * @brief Compares two 256-bit little-endian integers.

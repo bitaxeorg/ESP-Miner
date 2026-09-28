@@ -89,7 +89,7 @@ void ASIC_result_task(void *pvParameters)
         }
 
         // 3. Telemetry & Display (deferred after submission)
-        double nonce_diff = hash_to_pdiff(hash_result);
+        double nonce_diff = target_to_diff(hash_result);
 
         SYSTEM_notify_found_nonce(GLOBAL_STATE, nonce_diff, is_block);
 
@@ -98,7 +98,7 @@ void ASIC_result_task(void *pvParameters)
 
         double pool_diff = (active_job->pool_diff > 0.0)
                          ? active_job->pool_diff
-                         : hash_to_pdiff(active_job->pool_target);
+                         : target_to_diff(active_job->pool_target);
 
         // Log the ASIC response
         ESP_LOGI(TAG, "ID: %s, ASIC nr: %d, Core: %d/%d, ver: %08" PRIX32 " Nonce %08" PRIX32 " diff %.1f of %g.",

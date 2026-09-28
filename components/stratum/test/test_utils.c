@@ -133,31 +133,20 @@ TEST_CASE("reverse_endianness_per_word", "[utils]")
     TEST_ASSERT_EQUAL_UINT8_ARRAY(expected, data, 32);
 }
 
-TEST_CASE("networkDifficulty", "[utils]")
-{
-    uint32_t nBits = 0x1701cdfb;
-
-    double actual = networkDifficulty(nBits);
-
-    double expected = 155973032196071.9;
-
-    TEST_ASSERT_EQUAL_DOUBLE(expected, actual);
-}
-
-TEST_CASE("hash_to_pdiff safety", "[mining]")
+TEST_CASE("target_to_diff safety", "[utils]")
 {
     // 1. NULL pointer
-    TEST_ASSERT_EQUAL_DOUBLE((double)UINT32_MAX, hash_to_pdiff(NULL));
+    TEST_ASSERT_EQUAL_DOUBLE((double)UINT32_MAX, target_to_diff(NULL));
 
     // 2. All zero target (division by zero guard)
     uint8_t zero_target[32] = {0};
-    TEST_ASSERT_EQUAL_DOUBLE((double)UINT32_MAX, hash_to_pdiff(zero_target));
+    TEST_ASSERT_EQUAL_DOUBLE((double)UINT32_MAX, target_to_diff(zero_target));
 
     // 3. Max difficulty 1 target (0x00000000ffff0000...00)
     uint8_t diff1_target[32] = {0};
     diff1_target[26] = 0xff;
     diff1_target[27] = 0xff;
-    double d1 = hash_to_pdiff(diff1_target);
+    double d1 = target_to_diff(diff1_target);
     TEST_ASSERT_TRUE(d1 >= 0.99 && d1 <= 1.01);
 }
 
@@ -172,14 +161,14 @@ TEST_CASE("nbits_to_target", "[utils]")
     expected_genesis[27] = 0xff;
     TEST_ASSERT_EQUAL_UINT8_ARRAY(expected_genesis, target, 32);
 
-    // Test conversion back to difficulty via hash_to_pdiff
-    double diff = hash_to_pdiff(target);
+    // Test conversion back to difficulty via target_to_diff
+    double diff = target_to_diff(target);
     TEST_ASSERT_TRUE(diff >= 0.9999 && diff <= 1.0001);
 
     // Mainnet block nBits (0x1701cdfb)
     nbits_to_target(0x1701cdfb, target);
-    double actual_diff = hash_to_pdiff(target);
-    double expected_diff = networkDifficulty(0x1701cdfb);
+    double actual_diff = target_to_diff(target);
+    double expected_diff = 155973032196071.9;
     TEST_ASSERT_FLOAT_WITHIN(expected_diff * 0.0001, expected_diff, actual_diff);
 
     // Negative / overflow nBits (bit 23 set)
@@ -198,15 +187,15 @@ TEST_CASE("diff_to_target", "[utils]")
     expected_diff1[26] = 0xff;
     expected_diff1[27] = 0xff;
     TEST_ASSERT_EQUAL_UINT8_ARRAY(expected_diff1, target, 32);
-    TEST_ASSERT_FLOAT_WITHIN(1e-4, 1.0, hash_to_pdiff(target));
+    TEST_ASSERT_FLOAT_WITHIN(1e-4, 1.0, target_to_diff(target));
 
     // diff 1000.0 round-trip
     diff_to_target(1000.0, target);
-    TEST_ASSERT_FLOAT_WITHIN(0.1, 1000.0, hash_to_pdiff(target));
+    TEST_ASSERT_FLOAT_WITHIN(0.1, 1000.0, target_to_diff(target));
 
     // diff 0.5 round-trip
     diff_to_target(0.5, target);
-    TEST_ASSERT_FLOAT_WITHIN(1e-4, 0.5, hash_to_pdiff(target));
+    TEST_ASSERT_FLOAT_WITHIN(1e-4, 0.5, target_to_diff(target));
 
     // diff <= 0.0 returns all-zero target
     diff_to_target(0.0, target);

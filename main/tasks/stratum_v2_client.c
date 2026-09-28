@@ -226,7 +226,7 @@ static void stratum_v2_handle_new_extended_mining_job(GlobalState *GLOBAL_STATE,
     }
 
     job->pool_id = conn->pool_idx;
-    job->pool_diff = hash_to_pdiff(conn->target);
+    job->pool_diff = target_to_diff(conn->target);
     memcpy(job->pool_target, conn->target, 32);
     job->version_mask = version_rolling_allowed ? conn->version_mask : 0;
     job->extranonce1_len = conn->extranonce_prefix_len;
@@ -289,7 +289,7 @@ static void stratum_v2_handle_new_mining_job(GlobalState *GLOBAL_STATE, sv2_conn
     job->version = version;
     memcpy(job->merkle_root, merkle_root, 32);
     job->pool_id = conn->pool_idx;
-    job->pool_diff = hash_to_pdiff(conn->target);
+    job->pool_diff = target_to_diff(conn->target);
     memcpy(job->pool_target, conn->target, 32);
     job->version_mask = conn->version_mask;
     conn->pending_jobs_valid |= (1U << slot);
@@ -350,7 +350,7 @@ static void stratum_v2_handle_set_new_prev_hash(GlobalState *GLOBAL_STATE, sv2_c
         nbits_to_target(job->nbits, job->network_target);
         job->clean_jobs = true;
         job->pool_id = conn->pool_idx;
-        job->pool_diff = hash_to_pdiff(conn->target);
+        job->pool_diff = target_to_diff(conn->target);
         memcpy(job->pool_target, conn->target, 32);
         if (job->type == JOB_TYPE_SV2_STANDARD) {
             job->version_mask = conn->version_mask;
@@ -390,7 +390,7 @@ static void stratum_v2_handle_set_target(GlobalState *GLOBAL_STATE, sv2_conn_t *
         return;
     }
 
-    double pdiff = hash_to_pdiff(max_target);
+    double pdiff = target_to_diff(max_target);
     if (isnan(pdiff) || isinf(pdiff) || pdiff < 0.0001 || pdiff > 4294967295.0) {
         ESP_LOGW(TAG, "Ignoring out-of-range SV2 target pdiff: %g", pdiff);
         return;
@@ -730,7 +730,7 @@ esp_err_t stratum_v2_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
         conn->channel_opened = true;
         memcpy(conn->target, target, 32);
 
-        double pdiff = hash_to_pdiff(target);
+        double pdiff = target_to_diff(target);
         GLOBAL_STATE->SYSTEM_MODULE.pool_difficulty = pdiff;
 
         ESP_LOGI(TAG, "Mining channel opened: channel_id=%lu, group=%lu, type=%s",

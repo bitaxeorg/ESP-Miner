@@ -298,6 +298,16 @@ void diff_to_target(double diff, uint8_t target[32])
     for (int i = 0; i < 8; i++) target[i] = (uint8_t)(h64 >> (i * 8));
 }
 
+double target_to_diff(const uint8_t target[32])
+{
+    if (!target) return (double)UINT32_MAX;
+    double s64 = le256todouble(target);
+    if (s64 <= 0.0 || isnan(s64) || isinf(s64)) return (double)UINT32_MAX;
+    double diff = TRUEDIFFONE / s64;
+    if (isnan(diff) || isinf(diff) || diff <= 0.0) return (double)UINT32_MAX;
+    return diff;
+}
+
 void prettyHex(unsigned char *buf, int len)
 {
     int i;
@@ -307,19 +317,6 @@ void prettyHex(unsigned char *buf, int len)
         printf("%02X ", buf[i]);
     }
     printf("%02X]", buf[len - 1]);
-}
-
-/* Calculate the network difficulty from nBits */
-double networkDifficulty(uint32_t nBits)
-{
-    uint32_t mantissa = nBits & 0x007fffff;  // Extract the mantissa from nBits
-    uint8_t exponent = (nBits >> 24) & 0xff; // Extract the exponent from nBits
-
-    double target = (double) mantissa * pow(256, (exponent - 3)); // Calculate the target value
-
-    double difficulty = TRUEDIFFONE / target; // Calculate the difficulty
-
-    return difficulty;
 }
 
 /* Convert a uint64_t value into a truncated string for displaying with its
