@@ -19,7 +19,6 @@
 
 #include <string.h>
 #include <stdlib.h>
-#include <math.h>
 
 #define TRANSPORT_TIMEOUT_MS 5000
 #define SV2_MAX_FRAME_SIZE 8192
@@ -388,7 +387,7 @@ static void stratum_v2_handle_set_target(GlobalState *GLOBAL_STATE, sv2_conn_t *
     }
 
     double pdiff = target_to_diff(max_target);
-    if (isnan(pdiff) || isinf(pdiff) || pdiff < 0.0001 || pdiff > 4294967295.0) {
+    if (pdiff < 0.0001 || pdiff >= (double)UINT32_MAX) {
         ESP_LOGW(TAG, "Ignoring out-of-range SV2 target pdiff: %g", pdiff);
         return;
     }
