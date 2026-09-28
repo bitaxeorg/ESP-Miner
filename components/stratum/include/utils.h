@@ -5,6 +5,19 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+/* Bitcoin Difficulty 1 target: 0x00000000ffff0000...0000 (0xffff * 2^208) */
+#define TRUEDIFFONE 0xffff.0p208
+
+/* Scale factors (2^64, 2^128, 2^192) for 64-bit limbs of 128/256-bit integers */
+#define BITS64  0x1.0p64
+#define BITS128 0x1.0p128
+#define BITS192 0x1.0p192
+
+// BIP320 16-bit version rolling mask (bits 13..28: 0x1fffe000).
+// BM13xx ASICs program version rolling as a 16-bit field shifted by 13 (version_mask >> 13).
+// This is a strict hardware-compatible subset of the BIP323 mask.
+#define BIP320_VERSION_ROLLING_MASK 0x1fffe000U
+
 extern const int8_t hex_val_table[256];
 
 /**
@@ -42,14 +55,6 @@ void reverse_32bit_words(const uint8_t src[32], uint8_t dest[32]);
 
 void reverse_endianness_per_word(uint8_t data[32]);
 
-/* Bitcoin Difficulty 1 target: 0x00000000ffff0000...0000 (0xffff * 2^208) */
-#define TRUEDIFFONE 0xffff.0p208
-
-/* Scale factors (2^64, 2^128, 2^192) for 64-bit limbs of 128/256-bit integers */
-#define BITS64  0x1.0p64
-#define BITS128 0x1.0p128
-#define BITS192 0x1.0p192
-
 double le256todouble(const void *target);
 
 void prettyHex(unsigned char *buf, int len);
@@ -61,11 +66,6 @@ float hashCounterToGhs(uint64_t duration_us, uint32_t counter);
 void url_decode(char *dst, const char *src);
 
 char *strdup_psram(const char *str);
-
-// BIP320 16-bit version rolling mask (bits 13..28: 0x1fffe000).
-// BM13xx ASICs program version rolling as a 16-bit field shifted by 13 (version_mask >> 13).
-// This is a strict hardware-compatible subset of the BIP323 mask.
-#define BIP320_VERSION_ROLLING_MASK 0x1fffe000U
 
 /**
  * @brief Expands Bitcoin compact nBits (32-bit) into a 256-bit target (little-endian byte array).
