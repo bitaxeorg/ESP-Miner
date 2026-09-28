@@ -75,7 +75,12 @@ void ASIC_result_task(void *pvParameters)
 
         // 1. Bit-exact PoW checks
         bool is_share = uint256_lte(hash_result, active_job->pool_target);
-        bool is_block = uint256_lte(hash_result, active_job->network_target);
+        bool is_block = false;
+        if (active_job->target != 0) {
+            uint8_t network_target[32] __attribute__((aligned(4)));
+            nbits_to_target(active_job->target, network_target);
+            is_block = uint256_lte(hash_result, network_target);
+        }
 
         // 2. Submit if it meets share or block target IMMEDIATELY
         if (is_share || is_block) {

@@ -304,7 +304,6 @@ esp_err_t stratum_v1_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
                     
                     target_job->pool_id = (uint8_t)pool_idx;
                     memcpy(target_job->pool_target, s_v1_conn->pool_target, 32);
-                    nbits_to_target(target_job->nbits, target_job->network_target);
                     target_job->version_mask = s_v1_conn->version_mask;
                     target_job->extranonce1_len = s_v1_conn->extranonce1_len;
                     if (s_v1_conn->extranonce1_len > 0) {

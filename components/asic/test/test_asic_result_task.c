@@ -162,7 +162,6 @@ static void run_result_case(result_case_t test_case)
     fixture_slots[8]->ntime = 123;
     fixture_slots[8]->target = 0x1705dd01;
     diff_to_target(fixture_case.pool_diff, fixture_slots[8]->pool_target);
-    nbits_to_target(fixture_slots[8]->target, fixture_slots[8]->network_target);
     fixture_slots[8]->job_type = fixture_case.protocol;
     fixture_slots[8]->jobid = strdup("42");
     fixture_slots[8]->extranonce2 = strdup("aabb");

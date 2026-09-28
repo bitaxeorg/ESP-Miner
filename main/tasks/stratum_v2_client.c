@@ -243,7 +243,6 @@ static void stratum_v2_handle_new_extended_mining_job(GlobalState *GLOBAL_STATE,
         }
         memcpy(job->prev_hash, conn->prev_hash, 32);
         job->nbits = conn->prev_hash_nbits;
-        nbits_to_target(job->nbits, job->network_target);
         job->clean_jobs = false;
 
         GLOBAL_STATE->SYSTEM_MODULE.work_received++;
@@ -299,7 +298,6 @@ static void stratum_v2_handle_new_mining_job(GlobalState *GLOBAL_STATE, sv2_conn
         memcpy(job->prev_hash, conn->prev_hash, 32);
         job->ntime = min_ntime;
         job->nbits = conn->prev_hash_nbits;
-        nbits_to_target(job->nbits, job->network_target);
         job->clean_jobs = false;
 
         GLOBAL_STATE->SYSTEM_MODULE.work_received++;
@@ -344,7 +342,6 @@ static void stratum_v2_handle_set_new_prev_hash(GlobalState *GLOBAL_STATE, sv2_c
         memcpy(job->prev_hash, prev_hash, 32);
         job->ntime = min_ntime;
         job->nbits = nbits;
-        nbits_to_target(job->nbits, job->network_target);
         job->clean_jobs = true;
         job->pool_id = conn->pool_idx;
         memcpy(job->pool_target, conn->target, 32);

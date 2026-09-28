@@ -21,7 +21,6 @@ typedef struct bm_job
     uint8_t num_midstates;
     uint8_t midstates[BM_JOB_MAX_MIDSTATES][32];
     uint8_t pool_target[32];
-    uint8_t network_target[32];
     uint8_t pool_id;
     miner_job_type_t job_type;
     char *jobid;

@@ -235,7 +235,6 @@ TEST_CASE("SV2 standard messages reach the ASIC job boundary byte exact",
     miner_job->version = version;
     miner_job->ntime = min_ntime;
     miner_job->nbits = nbits;
-    nbits_to_target(miner_job->nbits, miner_job->network_target);
     miner_job->clean_jobs = true;
     diff_to_target(2048.0, miner_job->pool_target);
     miner_job->version_mask = BIP320_VERSION_ROLLING_MASK;
@@ -396,7 +395,6 @@ TEST_CASE("SV2 extended messages roll extranonce into the ASIC job byte exact",
                miner_job->prev_hash, &miner_job->ntime, &miner_job->nbits));
     TEST_ASSERT_EQUAL_HEX32(channel_id, prev_channel_id);
     TEST_ASSERT_EQUAL_UINT32(43, prev_job_id);
-    nbits_to_target(miner_job->nbits, miner_job->network_target);
 
     miner_job->clean_jobs = true;
     diff_to_target(1024.0, miner_job->pool_target);
@@ -463,7 +461,6 @@ TEST_CASE("job task harness preserves idle and staged work behavior",
     job->version = 0x20000004;
     job->ntime = 0x64658bd8;
     job->nbits = 0x1705dd01;
-    nbits_to_target(job->nbits, job->network_target);
     job->clean_jobs = false;
     diff_to_target(512.0, job->pool_target);
     job->pool_id = 2;
@@ -542,7 +539,6 @@ static miner_job_t *prepare_followup_job(uint8_t extranonce_len, bool large_coin
     job->clean_jobs = true;
     job->ntime = 0x64658bd8;
     job->nbits = 0x1705dd01;
-    nbits_to_target(job->nbits, job->network_target);
     diff_to_target(256.0, job->pool_target);
     job->extranonce2_len = extranonce_len;
     job->coinbase_prefix_len = large_coinbase ? 1024 : 1;

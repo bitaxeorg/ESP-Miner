@@ -114,7 +114,6 @@ TEST_CASE("Validate midstate generation", "[mining]")
     reverse_endianness_per_word(mjob.prev_hash);
     mjob.version = 0x20000004;
     mjob.nbits = 0x1705dd01;
-    nbits_to_target(mjob.nbits, mjob.network_target);
     mjob.ntime = 0x64658bd8;
     diff_to_target(1000, mjob.pool_target);
 
@@ -154,7 +153,6 @@ TEST_CASE("Test nonce diff checking", "[mining test_nonce][not-on-qemu]")
     hex2bin("d02b10fc0d4711eae1a805af50a8a83312a2215e00017f2b0000000000000000", mjob.prev_hash, 32);
     mjob.version = 0x20000004;
     mjob.nbits = 0x1705ae3a;
-    nbits_to_target(mjob.nbits, mjob.network_target);
     mjob.ntime = 0x646ff1a9;
     diff_to_target(1000, mjob.pool_target);
 
@@ -179,7 +177,6 @@ TEST_CASE("Test nonce diff checking 2", "[mining test_nonce][not-on-qemu]")
     hex2bin("0c859545a3498373a57452fac22eb7113df2a465000543520000000000000000", mjob.prev_hash, 32);
     mjob.version = 0x20000004;
     mjob.nbits = 0x1705ae3a;
-    nbits_to_target(mjob.nbits, mjob.network_target);
     mjob.ntime = 0x647025b5;
     diff_to_target(1000, mjob.pool_target);
 

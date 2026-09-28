@@ -436,7 +436,6 @@ static bool parse_mining_notify(cJSON *json, miner_job_t *job)
 
     job->version = strtoul(version_item->valuestring, NULL, 16);
     job->nbits = strtoul(nbits_item->valuestring, NULL, 16);
-    nbits_to_target(job->nbits, job->network_target);
     job->ntime = strtoul(ntime_item->valuestring, NULL, 16);
     job->clean_jobs = cJSON_IsTrue(cJSON_GetArrayItem(params, params_count - 1));
 
