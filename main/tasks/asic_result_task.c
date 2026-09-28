@@ -64,7 +64,7 @@ void ASIC_result_task(void *pvParameters)
         bm_job *active_job = &active_job_snapshot;
 
         uint8_t hash_result[32] __attribute__((aligned(4)));
-        test_nonce_hash(active_job, asic_result->nonce, asic_result->rolled_version, hash_result);
+        calculate_header_hash(active_job, asic_result->nonce, asic_result->rolled_version, hash_result);
 
         if (GLOBAL_STATE->SELF_TEST_MODULE.is_active) {
             self_test_record_nonce(GLOBAL_STATE, hash_result);

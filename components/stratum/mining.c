@@ -121,7 +121,7 @@ void calculate_merkle_root_hash(const uint8_t coinbase_tx_hash[32], const uint8_
     memcpy(dest, both_merkles, 32);
 }
 
-void test_nonce_hash(const bm_job *job, const uint32_t nonce, const uint32_t rolled_version, uint8_t hash_result[32])
+void calculate_header_hash(const bm_job *job, const uint32_t nonce, const uint32_t rolled_version, uint8_t hash_result[32])
 {
     uint8_t header[80];
 
@@ -134,15 +134,6 @@ void test_nonce_hash(const bm_job *job, const uint32_t nonce, const uint32_t rol
     memcpy(header + 76, &nonce, 4);
 
     double_sha256_bin(header, 80, hash_result);
-}
-
-///////cgminer nonce testing
-/* testing a nonce and return the diff - 0 means invalid */
-double test_nonce_value(const bm_job *job, const uint32_t nonce, const uint32_t rolled_version)
-{
-    uint8_t hash_result[32];
-    test_nonce_hash(job, nonce, rolled_version, hash_result);
-    return target_to_diff(hash_result);
 }
 
 uint32_t increment_bitmask(const uint32_t value, const uint32_t mask)

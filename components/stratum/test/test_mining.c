@@ -164,7 +164,9 @@ TEST_CASE("Test nonce diff checking", "[mining test_nonce][not-on-qemu]")
     uint32_t nonce = 0x276E8947;
     uint32_t version_bits = 0;
     uint32_t rolled_version = job.version | version_bits;
-    double diff = test_nonce_value(&job, nonce, rolled_version);
+    uint8_t hash_result[32];
+    calculate_header_hash(&job, nonce, rolled_version, hash_result);
+    double diff = target_to_diff(hash_result);
     TEST_ASSERT_EQUAL_INT(18, (int)diff);
 }
 
@@ -220,6 +222,8 @@ TEST_CASE("Test nonce diff checking 2", "[mining test_nonce][not-on-qemu]")
     uint32_t nonce = 0x0a029ed1;
     uint32_t version_bits = 0;
     uint32_t rolled_version = job.version | version_bits;
-    double diff = test_nonce_value(&job, nonce, rolled_version);
+    uint8_t hash_result[32];
+    calculate_header_hash(&job, nonce, rolled_version, hash_result);
+    double diff = target_to_diff(hash_result);
     TEST_ASSERT_EQUAL_INT(683, (int)diff);
 }

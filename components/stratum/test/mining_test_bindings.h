@@ -10,8 +10,7 @@
 #define calculate_coinbase_tx_hash_bin mining_test_calculate_coinbase_tx_hash_bin
 #define calculate_merkle_root_hash mining_test_calculate_merkle_root_hash
 #define construct_bm_job_from_miner_job mining_test_construct_bm_job_from_miner_job
-#define test_nonce_hash mining_test_test_nonce_hash
-#define test_nonce_value mining_test_nonce_value
+#define calculate_header_hash mining_test_calculate_header_hash
 #define increment_bitmask mining_test_increment_bitmask
 
 #define malloc(size) mining_allocator_fault_injector_malloc(size)
