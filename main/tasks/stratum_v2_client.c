@@ -227,6 +227,7 @@ static void stratum_v2_handle_new_extended_mining_job(GlobalState *GLOBAL_STATE,
 
     job->pool_id = conn->pool_idx;
     job->pool_diff = hash_to_pdiff(conn->target);
+    memcpy(job->pool_target, conn->target, 32);
     job->version_mask = version_rolling_allowed ? conn->version_mask : 0;
     job->extranonce1_len = conn->extranonce_prefix_len;
     if (job->extranonce1_len > sizeof(job->extranonce1)) job->extranonce1_len = sizeof(job->extranonce1);
@@ -244,6 +245,7 @@ static void stratum_v2_handle_new_extended_mining_job(GlobalState *GLOBAL_STATE,
         }
         memcpy(job->prev_hash, conn->prev_hash, 32);
         job->nbits = conn->prev_hash_nbits;
+        nbits_to_target(job->nbits, job->network_target);
         job->clean_jobs = false;
 
         GLOBAL_STATE->SYSTEM_MODULE.work_received++;
@@ -288,6 +290,7 @@ static void stratum_v2_handle_new_mining_job(GlobalState *GLOBAL_STATE, sv2_conn
     memcpy(job->merkle_root, merkle_root, 32);
     job->pool_id = conn->pool_idx;
     job->pool_diff = hash_to_pdiff(conn->target);
+    memcpy(job->pool_target, conn->target, 32);
     job->version_mask = conn->version_mask;
     conn->pending_jobs_valid |= (1U << slot);
 
@@ -299,6 +302,7 @@ static void stratum_v2_handle_new_mining_job(GlobalState *GLOBAL_STATE, sv2_conn
         memcpy(job->prev_hash, conn->prev_hash, 32);
         job->ntime = min_ntime;
         job->nbits = conn->prev_hash_nbits;
+        nbits_to_target(job->nbits, job->network_target);
         job->clean_jobs = false;
 
         GLOBAL_STATE->SYSTEM_MODULE.work_received++;
@@ -343,9 +347,11 @@ static void stratum_v2_handle_set_new_prev_hash(GlobalState *GLOBAL_STATE, sv2_c
         memcpy(job->prev_hash, prev_hash, 32);
         job->ntime = min_ntime;
         job->nbits = nbits;
+        nbits_to_target(job->nbits, job->network_target);
         job->clean_jobs = true;
         job->pool_id = conn->pool_idx;
         job->pool_diff = hash_to_pdiff(conn->target);
+        memcpy(job->pool_target, conn->target, 32);
         if (job->type == JOB_TYPE_SV2_STANDARD) {
             job->version_mask = conn->version_mask;
         } else if (job->type == JOB_TYPE_SV2_EXTENDED) {

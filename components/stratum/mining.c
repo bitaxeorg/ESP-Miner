@@ -62,6 +62,15 @@ void construct_bm_job_from_miner_job(const miner_job_t *job, const uint32_t vers
     new_job->ntime = job->ntime;
     new_job->starting_nonce = 0;
     new_job->pool_diff = (job->pool_diff > 0) ? job->pool_diff : difficulty;
+    memcpy(new_job->pool_target, job->pool_target, 32);
+    memcpy(new_job->network_target, job->network_target, 32);
+    static const uint8_t zero_target[32] = {0};
+    if (memcmp(new_job->pool_target, zero_target, 32) == 0 && new_job->pool_diff > 0) {
+        diff_to_target(new_job->pool_diff, new_job->pool_target);
+    }
+    if (memcmp(new_job->network_target, zero_target, 32) == 0 && new_job->target != 0) {
+        nbits_to_target(new_job->target, new_job->network_target);
+    }
     new_job->pool_id = job->pool_id;
     new_job->job_type = job->type;
     uint32_t effective_mask = (job->version_mask != 0) ? job->version_mask : version_mask;
@@ -125,17 +134,9 @@ double hash_to_pdiff(const uint8_t hash[32])
     return diff;
 }
 
-///////cgminer nonce testing
-/* testing a nonce and return the diff - 0 means invalid */
-double test_nonce_value(const bm_job *job, const uint32_t nonce, const uint32_t rolled_version)
+void test_nonce_hash(const bm_job *job, const uint32_t nonce, const uint32_t rolled_version, uint8_t hash_result[32])
 {
     uint8_t header[80];
-
-    // // TODO: use the midstate hash instead of hashing the whole header
-    // uint32_t rolled_version = job->version;
-    // for (int i = 0; i < midstate_index; i++) {
-    //     rolled_version = increment_bitmask(rolled_version, job->version_mask);
-    // }
 
     // copy data from job to header
     memcpy(header, &rolled_version, 4);
@@ -145,9 +146,15 @@ double test_nonce_value(const bm_job *job, const uint32_t nonce, const uint32_t 
     memcpy(header + 72, &job->target, 4);
     memcpy(header + 76, &nonce, 4);
 
-    uint8_t hash_result[32];
     double_sha256_bin(header, 80, hash_result);
+}
 
+///////cgminer nonce testing
+/* testing a nonce and return the diff - 0 means invalid */
+double test_nonce_value(const bm_job *job, const uint32_t nonce, const uint32_t rolled_version)
+{
+    uint8_t hash_result[32];
+    test_nonce_hash(job, nonce, rolled_version, hash_result);
     return hash_to_pdiff(hash_result);
 }
 

@@ -3,6 +3,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <stdbool.h>
 
 extern const int8_t hex_val_table[256];
 
@@ -61,5 +62,38 @@ char *strdup_psram(const char *str);
 // BM13xx ASICs program version rolling as a 16-bit field shifted by 13 (version_mask >> 13).
 // This is a strict hardware-compatible subset of the BIP323 mask.
 #define BIP320_VERSION_ROLLING_MASK 0x1fffe000U
+
+/**
+ * @brief Expands Bitcoin compact nBits (32-bit) into a 256-bit target (little-endian byte array).
+ * @param nbits 32-bit compact target from block header (exponent in high byte, 24-bit mantissa).
+ * @param target 32-byte output buffer (little-endian: byte 0 is LSB, byte 31 is MSB).
+ */
+void nbits_to_target(uint32_t nbits, uint8_t target[32]);
+
+/**
+ * @brief Converts a floating-point difficulty into a 256-bit share target.
+ * target = truediffone / diff
+ * @param diff Difficulty value (> 0.0).
+ * @param target 32-byte output buffer (little-endian).
+ */
+void diff_to_target(double diff, uint8_t target[32]);
+
+/**
+ * @brief Compares two 256-bit little-endian integers.
+ * Evaluates whether hash <= target.
+ * @param hash 32-byte hash buffer (little-endian).
+ * @param target 32-byte target buffer (little-endian).
+ * @return true if hash <= target (PoW valid), false otherwise.
+ */
+static inline bool uint256_lte(const void *hash, const void *target)
+{
+    const uint32_t *h = (const uint32_t *)hash;
+    const uint32_t *t = (const uint32_t *)target;
+    for (int i = 7; i >= 0; i--) {
+        if (h[i] < t[i]) return true;
+        if (h[i] > t[i]) return false;
+    }
+    return true; // Exactly equal
+}
 
 #endif // STRATUM_UTILS_H

@@ -9,6 +9,7 @@
 #include "self_test.h"
 #include "stratum_task.h"
 #include "system.h"
+#include "utils.h"
 #include "unity.h"
 
 #include <float.h>
@@ -96,19 +97,19 @@ int result_task_fake_submit_share(GlobalState *state, const bm_job *job,
     return fixture_case.submit_result;
 }
 
-void result_task_spy_record_nonce(GlobalState *state, double difficulty)
+void result_task_spy_record_nonce(GlobalState *state, const uint8_t hash[32])
 {
     TEST_ASSERT_EQUAL_PTR(&fixture_state, state);
-    TEST_ASSERT_TRUE(difficulty > 0);
+    TEST_ASSERT_NOT_NULL(hash);
     fixture_self_tests++;
 }
 
 void result_task_spy_notify_found_nonce(GlobalState *state, double difficulty,
-                                        uint32_t target)
+                                        bool is_block)
 {
     TEST_ASSERT_EQUAL_PTR(&fixture_state, state);
     TEST_ASSERT_TRUE(difficulty > 0);
-    TEST_ASSERT_EQUAL_HEX32(0x1705dd01, target);
+    TEST_ASSERT_FALSE(is_block);
     fixture_notifications++;
 }
 
@@ -161,6 +162,8 @@ static void run_result_case(result_case_t test_case)
     fixture_slots[8]->ntime = 123;
     fixture_slots[8]->target = 0x1705dd01;
     fixture_slots[8]->pool_diff = fixture_case.pool_diff;
+    diff_to_target(fixture_slots[8]->pool_diff, fixture_slots[8]->pool_target);
+    nbits_to_target(fixture_slots[8]->target, fixture_slots[8]->network_target);
     fixture_slots[8]->job_type = fixture_case.protocol;
     fixture_slots[8]->jobid = strdup("42");
     fixture_slots[8]->extranonce2 = strdup("aabb");

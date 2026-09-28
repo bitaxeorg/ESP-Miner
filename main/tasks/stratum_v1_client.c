@@ -169,6 +169,7 @@ esp_err_t stratum_v1_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
     s_v1_conn->send_uid = 1;
     strlcpy(s_v1_conn->user, username, sizeof(s_v1_conn->user));
     s_v1_conn->pool_difficulty = (double)GLOBAL_STATE->DEVICE_CONFIG.family.asic.difficulty;
+    diff_to_target(s_v1_conn->pool_difficulty, s_v1_conn->pool_target);
     s_v1_conn->version_mask = 0;
 
     stratum_connection_info_t conn_info;
@@ -303,6 +304,8 @@ esp_err_t stratum_v1_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
                     
                     target_job->pool_id = (uint8_t)pool_idx;
                     target_job->pool_diff = s_v1_conn->pool_difficulty;
+                    memcpy(target_job->pool_target, s_v1_conn->pool_target, 32);
+                    nbits_to_target(target_job->nbits, target_job->network_target);
                     target_job->version_mask = s_v1_conn->version_mask;
                     target_job->extranonce1_len = s_v1_conn->extranonce1_len;
                     if (s_v1_conn->extranonce1_len > 0) {
@@ -321,6 +324,7 @@ esp_err_t stratum_v1_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
                 double requested_diff = s_v1_msg->new_difficulty;
                 double asic_diff = GLOBAL_STATE->DEVICE_CONFIG.family.asic.difficulty;
                 s_v1_conn->pool_difficulty = (requested_diff < asic_diff) ? asic_diff : requested_diff;
+                diff_to_target(s_v1_conn->pool_difficulty, s_v1_conn->pool_target);
                 ESP_LOGI(TAG, "Set effective pool difficulty: %.2f (requested: %.2f)",
                          s_v1_conn->pool_difficulty, requested_diff);
                 GLOBAL_STATE->SYSTEM_MODULE.pool_difficulty = s_v1_conn->pool_difficulty;

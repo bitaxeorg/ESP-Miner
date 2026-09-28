@@ -254,6 +254,52 @@ double le256todouble(const void *target)
     return dcut64;
 }
 
+void nbits_to_target(uint32_t nbits, uint8_t target[32])
+{
+    memset(target, 0, 32);
+    if (nbits & 0x00800000) {
+        return;
+    }
+    uint32_t mantissa = nbits & 0x007fffff;
+    uint8_t exponent = (nbits >> 24) & 0xff;
+
+    if (exponent <= 3) {
+        mantissa >>= 8 * (3 - exponent);
+        memcpy(target, &mantissa, 4);
+    } else {
+        size_t offset = exponent - 3;
+        if (offset <= 28) {
+            memcpy(target + offset, &mantissa, 4);
+        } else if (offset < 32) {
+            size_t copy_len = 32 - offset;
+            memcpy(target + offset, &mantissa, copy_len);
+        }
+    }
+}
+
+void diff_to_target(double diff, uint8_t target[32])
+{
+    memset(target, 0, 32);
+    if (diff <= 0.0 || isnan(diff)) {
+        return;
+    }
+    double target_double = truediffone / diff;
+    if (isinf(target_double) || target_double >= pow(2.0, 256.0)) {
+        memset(target, 0xFF, 32);
+        return;
+    }
+    if (target_double <= 0.0) {
+        return;
+    }
+    double rem = target_double;
+    for (int i = 3; i >= 0; i--) {
+        double base = pow(2.0, i * 64);
+        uint64_t part = (uint64_t)(rem / base);
+        memcpy(target + (i * 8), &part, 8);
+        rem -= (double)part * base;
+    }
+}
+
 void prettyHex(unsigned char *buf, int len)
 {
     int i;
