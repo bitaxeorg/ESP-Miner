@@ -59,11 +59,15 @@ static void generate_work_from_miner_job(GlobalState *GLOBAL_STATE, const miner_
         }
 
         uint8_t coinbase_tx_hash[32];
-        calculate_coinbase_tx_hash_bin(job->coinbase_prefix, job->coinbase_prefix_len,
-                                       job->extranonce1, job->extranonce1_len,
-                                       extranonce_2_bin, e2_len,
-                                       job->coinbase_suffix, job->coinbase_suffix_len,
-                                       coinbase_tx_hash);
+        if (!calculate_coinbase_tx_hash_bin(job->coinbase_prefix, job->coinbase_prefix_len,
+                                            job->extranonce1, job->extranonce1_len,
+                                            extranonce_2_bin, e2_len,
+                                            job->coinbase_suffix, job->coinbase_suffix_len,
+                                            coinbase_tx_hash)) {
+            ESP_LOGE(TAG, "Failed to calculate coinbase tx hash");
+            free(next_job);
+            return;
+        }
 
         calculate_merkle_root_hash(coinbase_tx_hash,
                                    (const uint8_t (*)[32])job->merkle_path,

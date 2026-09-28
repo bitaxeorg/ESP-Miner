@@ -28,7 +28,7 @@ typedef struct bm_job
 
 void free_bm_job(bm_job *job);
 
-void calculate_coinbase_tx_hash_bin(const uint8_t *prefix, size_t prefix_len,
+bool calculate_coinbase_tx_hash_bin(const uint8_t *prefix, size_t prefix_len,
                                     const uint8_t *extranonce_prefix, size_t ep_len,
                                     const uint8_t *extranonce_2, size_t e2_len,
                                     const uint8_t *suffix, size_t suffix_len,

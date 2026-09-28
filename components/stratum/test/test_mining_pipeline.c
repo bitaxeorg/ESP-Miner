@@ -648,7 +648,7 @@ TEST_CASE("zero-length extranonce waits for new work and preserves owned metadat
     job_pipeline_harness_result_free(&result);
 }
 
-TEST_CASE("large coinbase job uses heap hashing and retains extranonce order",
+TEST_CASE("large coinbase job streams hashing without heap allocation and retains extranonce order",
           "[mining][job-building][job-task]")
 {
     (void)prepare_followup_job(1, true);
@@ -665,7 +665,7 @@ TEST_CASE("large coinbase job uses heap hashing and retains extranonce order",
         }, events, sizeof(events) / sizeof(events[0]), &result);
 
     TEST_ASSERT_EQUAL_UINT32(2, result.job_count);
-    TEST_ASSERT_EQUAL_UINT32(4, result.allocation_count);
+    TEST_ASSERT_EQUAL_UINT32(2, result.allocation_count);
     TEST_ASSERT_EQUAL_UINT32(1, result.coinbase_decode_count);
     TEST_ASSERT_EQUAL_STRING("00", result.jobs[0]->extranonce2);
     TEST_ASSERT_EQUAL_STRING("01", result.jobs[1]->extranonce2);
