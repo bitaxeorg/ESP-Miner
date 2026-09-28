@@ -228,27 +228,6 @@ void reverse_endianness_per_word(uint8_t data[32])
     d[7] = __builtin_bswap32(d[7]);
 }
 
-/* Converts a little endian 256 bit value to a double */
-double le256todouble(const void *target)
-{
-    uint64_t *data64;
-    double dcut64;
-
-    data64 = (uint64_t *)(target + 24);
-    dcut64 = *data64 * BITS192;
-
-    data64 = (uint64_t *)(target + 16);
-    dcut64 += *data64 * BITS128;
-
-    data64 = (uint64_t *)(target + 8);
-    dcut64 += *data64 * BITS64;
-
-    data64 = (uint64_t *)(target);
-    dcut64 += *data64;
-
-    return dcut64;
-}
-
 void nbits_to_target(uint32_t nbits, uint8_t target[32])
 {
     memset(target, 0, 32);
@@ -301,11 +280,17 @@ void diff_to_target(double diff, uint8_t target[32])
 double target_to_diff(const uint8_t target[32])
 {
     if (!target) return (double)UINT32_MAX;
-    double s64 = le256todouble(target);
-    if (s64 <= 0.0 || isnan(s64) || isinf(s64)) return (double)UINT32_MAX;
-    double diff = TRUEDIFFONE / s64;
-    if (isnan(diff) || isinf(diff) || diff <= 0.0) return (double)UINT32_MAX;
-    return diff;
+
+    uint64_t w0, w1, w2, w3;
+    memcpy(&w0, target,      8);
+    memcpy(&w1, target + 8,  8);
+    memcpy(&w2, target + 16, 8);
+    memcpy(&w3, target + 24, 8);
+
+    if ((w0 | w1 | w2 | w3) == 0) return (double)UINT32_MAX;
+
+    double s64 = (double)w3 * BITS192 + (double)w2 * BITS128 + (double)w1 * BITS64 + (double)w0;
+    return TRUEDIFFONE / s64;
 }
 
 void prettyHex(unsigned char *buf, int len)

@@ -63,7 +63,7 @@ void ASIC_result_task(void *pvParameters)
         pthread_mutex_unlock(&GLOBAL_STATE->ASIC_TASK_MODULE.valid_jobs_lock);
         bm_job *active_job = &active_job_snapshot;
 
-        uint8_t hash_result[32] __attribute__((aligned(4)));
+        uint8_t hash_result[32];
         calculate_header_hash(active_job, asic_result->nonce, asic_result->rolled_version, hash_result);
 
         if (GLOBAL_STATE->SELF_TEST_MODULE.is_active) {
@@ -75,7 +75,7 @@ void ASIC_result_task(void *pvParameters)
 
         // 1. Bit-exact PoW checks
         bool is_share = uint256_lte(hash_result, active_job->pool_target);
-        uint8_t network_target[32] __attribute__((aligned(4)));
+        uint8_t network_target[32];
         nbits_to_target(active_job->target, network_target);
         bool is_block = uint256_lte(hash_result, network_target);
 

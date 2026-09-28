@@ -55,8 +55,6 @@ void reverse_32bit_words(const uint8_t src[32], uint8_t dest[32]);
 
 void reverse_endianness_per_word(uint8_t data[32]);
 
-double le256todouble(const void *target);
-
 void prettyHex(unsigned char *buf, int len);
 
 void suffixString(uint64_t val, char * buf, size_t bufsiz, int sigdigits);
@@ -93,17 +91,15 @@ double target_to_diff(const uint8_t target[32]);
 /**
  * @brief Compares two 256-bit little-endian integers.
  * Evaluates whether hash <= target.
- * @param hash 32-byte hash buffer (little-endian).
- * @param target 32-byte target buffer (little-endian).
+ * @param hash 32-byte hash buffer (little-endian: byte 31 is MSB).
+ * @param target 32-byte target buffer (little-endian: byte 31 is MSB).
  * @return true if hash <= target (PoW valid), false otherwise.
  */
-static inline bool uint256_lte(const void *hash, const void *target)
+static inline bool uint256_lte(const uint8_t hash[32], const uint8_t target[32])
 {
-    const uint32_t *h = (const uint32_t *)hash;
-    const uint32_t *t = (const uint32_t *)target;
-    for (int i = 7; i >= 0; i--) {
-        if (h[i] < t[i]) return true;
-        if (h[i] > t[i]) return false;
+    for (int i = 31; i >= 0; i--) {
+        if (hash[i] < target[i]) return true;
+        if (hash[i] > target[i]) return false;
     }
     return true; // Exactly equal
 }
