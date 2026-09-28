@@ -320,6 +320,11 @@ static void stratum_v2_handle_set_new_prev_hash(GlobalState *GLOBAL_STATE, sv2_c
         return;
     }
 
+    if (nbits == 0) {
+        ESP_LOGW(TAG, "Rejecting SetNewPrevHash with zero nbits");
+        return;
+    }
+
     if (!sv2_channel_or_group_matches(channel_id, conn->channel_id, conn->group_channel_id)) {
         ESP_LOGW(TAG, "Dropping SetNewPrevHash for unexpected channel %lu (expected %lu or group %lu)",
                  (unsigned long)channel_id, (unsigned long)conn->channel_id, (unsigned long)conn->group_channel_id);
