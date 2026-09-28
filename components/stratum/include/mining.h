@@ -20,7 +20,6 @@ typedef struct bm_job
 
     uint8_t num_midstates;
     uint8_t midstates[BM_JOB_MAX_MIDSTATES][32];
-    double pool_diff;
     uint8_t pool_target[32];
     uint8_t network_target[32];
     uint8_t pool_id;
@@ -39,7 +38,7 @@ void calculate_coinbase_tx_hash_bin(const uint8_t *prefix, size_t prefix_len,
 
 void calculate_merkle_root_hash(const uint8_t coinbase_tx_hash[32], const uint8_t merkle_branches[][32], const int num_merkle_branches, uint8_t dest[32]);
 
-void construct_bm_job_from_miner_job(const miner_job_t *job, const uint32_t version, const uint8_t merkle_root[32], const uint32_t version_mask, const double difficulty, const uint8_t software_midstates, bm_job *new_job);
+void construct_bm_job_from_miner_job(const miner_job_t *job, const uint32_t version, const uint8_t merkle_root[32], const uint32_t version_mask, const uint8_t software_midstates, bm_job *new_job);
 
 void calculate_header_hash(const bm_job *job, const uint32_t nonce, const uint32_t rolled_version, uint8_t hash_result[32]);
 

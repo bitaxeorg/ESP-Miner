@@ -64,18 +64,18 @@ TEST_CASE("Bitmain job defaults and explicit values preserve metadata precedence
     miner_job_t source = {
         .version = 0x20000000,
         .version_mask = 0,
-        .pool_diff = 0,
         .nbits = 0x1705dd01,
         .ntime = 0x64658bd8,
         .pool_id = 3,
         .type = JOB_TYPE_SV2_STANDARD,
     };
+    diff_to_target(17.0, source.pool_target);
     uint8_t merkle[32] = {0};
     bm_job result = {0};
-    construct_bm_job_from_miner_job(&source, 0, merkle, 0x0000e000, 17.0, 0, &result);
+    construct_bm_job_from_miner_job(&source, 0, merkle, 0x0000e000, 0, &result);
     TEST_ASSERT_EQUAL_HEX32(source.version, result.version);
     TEST_ASSERT_EQUAL_HEX32(0x0000e000, result.version_mask);
-    TEST_ASSERT_EQUAL_DOUBLE(17.0, result.pool_diff);
+    TEST_ASSERT_FLOAT_WITHIN(1e-4, 17.0, target_to_diff(result.pool_target));
     TEST_ASSERT_EQUAL_UINT8(0, result.num_midstates);
     TEST_ASSERT_EQUAL_HEX32(source.nbits, result.target);
     TEST_ASSERT_EQUAL_HEX32(source.ntime, result.ntime);
@@ -84,11 +84,11 @@ TEST_CASE("Bitmain job defaults and explicit values preserve metadata precedence
     TEST_ASSERT_EQUAL_UINT32(0, result.starting_nonce);
 
     source.version_mask = 0x1fffe000;
-    source.pool_diff = 512.0;
-    construct_bm_job_from_miner_job(&source, 0x20002000, merkle, 0x0000e000, 17.0, 0, &result);
+    diff_to_target(512.0, source.pool_target);
+    construct_bm_job_from_miner_job(&source, 0x20002000, merkle, 0x0000e000, 0, &result);
     TEST_ASSERT_EQUAL_HEX32(0x20002000, result.version);
     TEST_ASSERT_EQUAL_HEX32(source.version_mask, result.version_mask);
-    TEST_ASSERT_EQUAL_DOUBLE(source.pool_diff, result.pool_diff);
+    TEST_ASSERT_FLOAT_WITHIN(1e-4, 512.0, target_to_diff(result.pool_target));
 }
 
 TEST_CASE("Bitmain software midstate count honors zero mask and the buffer limit",
@@ -98,11 +98,11 @@ TEST_CASE("Bitmain software midstate count honors zero mask and the buffer limit
     uint8_t merkle[32] = {0};
     bm_job first = {0}, limited = {0};
 
-    construct_bm_job_from_miner_job(&source, 0, merkle, 0, 1.0, 4, &first);
+    construct_bm_job_from_miner_job(&source, 0, merkle, 0, 4, &first);
     TEST_ASSERT_EQUAL_UINT8(1, first.num_midstates);
-    construct_bm_job_from_miner_job(&source, 0, merkle, 0x1fffe000, 1.0,
+    construct_bm_job_from_miner_job(&source, 0, merkle, 0x1fffe000,
                                    BM_JOB_MAX_MIDSTATES, &first);
-    construct_bm_job_from_miner_job(&source, 0, merkle, 0x1fffe000, 1.0, UINT8_MAX, &limited);
+    construct_bm_job_from_miner_job(&source, 0, merkle, 0x1fffe000, UINT8_MAX, &limited);
     TEST_ASSERT_EQUAL_UINT8(BM_JOB_MAX_MIDSTATES, first.num_midstates);
     TEST_ASSERT_EQUAL_UINT8(BM_JOB_MAX_MIDSTATES, limited.num_midstates);
     TEST_ASSERT_EQUAL_HEX8_ARRAY(first.midstates, limited.midstates, sizeof(first.midstates));

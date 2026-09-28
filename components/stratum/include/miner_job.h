@@ -28,7 +28,6 @@ typedef struct {
     bool             clean_jobs;
 
     // Multi-pool difficulty and version rolling configuration
-    double           pool_diff;
     uint8_t          pool_target[32];       // Authoritative 256-bit share target (LE)
     uint8_t          network_target[32];    // Authoritative 256-bit network block target (LE)
     uint32_t         version_mask;

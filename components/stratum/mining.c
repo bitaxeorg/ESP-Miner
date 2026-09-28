@@ -55,19 +55,15 @@ void calculate_coinbase_tx_hash_bin(const uint8_t *prefix, size_t prefix_len,
     }
 }
 
-void construct_bm_job_from_miner_job(const miner_job_t *job, const uint32_t version, const uint8_t merkle_root[32], const uint32_t version_mask, const double difficulty, const uint8_t software_midstates, bm_job *new_job)
+void construct_bm_job_from_miner_job(const miner_job_t *job, const uint32_t version, const uint8_t merkle_root[32], const uint32_t version_mask, const uint8_t software_midstates, bm_job *new_job)
 {
     new_job->version = (version != 0) ? version : job->version;
     new_job->target = job->nbits;
     new_job->ntime = job->ntime;
     new_job->starting_nonce = 0;
-    new_job->pool_diff = (job->pool_diff > 0) ? job->pool_diff : difficulty;
     memcpy(new_job->pool_target, job->pool_target, 32);
     memcpy(new_job->network_target, job->network_target, 32);
     static const uint8_t zero_target[32] = {0};
-    if (memcmp(new_job->pool_target, zero_target, 32) == 0 && new_job->pool_diff > 0) {
-        diff_to_target(new_job->pool_diff, new_job->pool_target);
-    }
     if (memcmp(new_job->network_target, zero_target, 32) == 0 && new_job->target != 0) {
         nbits_to_target(new_job->target, new_job->network_target);
     }

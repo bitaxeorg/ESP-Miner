@@ -31,7 +31,6 @@ static void generate_work_from_miner_job(GlobalState *GLOBAL_STATE, const miner_
     }
 
     uint32_t version_mask = job->version_mask;
-    double job_diff = job->pool_diff;
 
     uint8_t merkle_root[32];
     char extranonce_2_str[MAX_EXTRANONCE2_STR] = "";
@@ -70,7 +69,7 @@ static void generate_work_from_miner_job(GlobalState *GLOBAL_STATE, const miner_
                                    job->merkle_path_count, merkle_root);
     }
 
-    construct_bm_job_from_miner_job(job, effective_version, merkle_root, version_mask, job_diff, GLOBAL_STATE->DEVICE_CONFIG.family.asic.software_midstates, next_job);
+    construct_bm_job_from_miner_job(job, effective_version, merkle_root, version_mask, GLOBAL_STATE->DEVICE_CONFIG.family.asic.software_midstates, next_job);
     next_job->jobid = strdup(job->job_id);
     next_job->extranonce2 = strdup(extranonce_2_str);
 

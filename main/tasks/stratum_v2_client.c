@@ -226,7 +226,6 @@ static void stratum_v2_handle_new_extended_mining_job(GlobalState *GLOBAL_STATE,
     }
 
     job->pool_id = conn->pool_idx;
-    job->pool_diff = target_to_diff(conn->target);
     memcpy(job->pool_target, conn->target, 32);
     job->version_mask = version_rolling_allowed ? conn->version_mask : 0;
     job->extranonce1_len = conn->extranonce_prefix_len;
@@ -289,7 +288,6 @@ static void stratum_v2_handle_new_mining_job(GlobalState *GLOBAL_STATE, sv2_conn
     job->version = version;
     memcpy(job->merkle_root, merkle_root, 32);
     job->pool_id = conn->pool_idx;
-    job->pool_diff = target_to_diff(conn->target);
     memcpy(job->pool_target, conn->target, 32);
     job->version_mask = conn->version_mask;
     conn->pending_jobs_valid |= (1U << slot);
@@ -350,7 +348,6 @@ static void stratum_v2_handle_set_new_prev_hash(GlobalState *GLOBAL_STATE, sv2_c
         nbits_to_target(job->nbits, job->network_target);
         job->clean_jobs = true;
         job->pool_id = conn->pool_idx;
-        job->pool_diff = target_to_diff(conn->target);
         memcpy(job->pool_target, conn->target, 32);
         if (job->type == JOB_TYPE_SV2_STANDARD) {
             job->version_mask = conn->version_mask;

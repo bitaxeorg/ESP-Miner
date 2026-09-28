@@ -555,7 +555,7 @@ void self_test_task(void * pvParameters)
     if (msg.method == MINING_NOTIFY) {
         ESP_LOGI(TAG, "Activating mock work for self-test");
         job->pool_id = 0;
-        job->pool_diff = mock_diff;
+        diff_to_target(mock_diff, job->pool_target);
         job->version_mask = mock_version_mask;
         job->extranonce1_len = (uint8_t)e1_len;
         if (e1_len > 0) {

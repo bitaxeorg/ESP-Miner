@@ -96,9 +96,7 @@ void ASIC_result_task(void *pvParameters)
         uint32_t version_bits = asic_result->rolled_version ^ active_job->version;
         scoreboard_add(&GLOBAL_STATE->SYSTEM_MODULE.scoreboard, nonce_diff, active_job->jobid, active_job->extranonce2, active_job->ntime, asic_result->nonce, version_bits);
 
-        double pool_diff = (active_job->pool_diff > 0.0)
-                         ? active_job->pool_diff
-                         : target_to_diff(active_job->pool_target);
+        double pool_diff = target_to_diff(active_job->pool_target);
 
         // Log the ASIC response
         ESP_LOGI(TAG, "ID: %s, ASIC nr: %d, Core: %d/%d, ver: %08" PRIX32 " Nonce %08" PRIX32 " diff %.1f of %g.",
