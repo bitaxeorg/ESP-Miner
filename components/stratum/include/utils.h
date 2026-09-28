@@ -42,7 +42,13 @@ void reverse_32bit_words(const uint8_t src[32], uint8_t dest[32]);
 
 void reverse_endianness_per_word(uint8_t data[32]);
 
-extern const double truediffone;
+/* Bitcoin Difficulty 1 target: 0x00000000ffff0000...0000 (0xffff * 2^208) */
+#define TRUEDIFFONE 0xffff.0p208
+
+/* Scale factors (2^64, 2^128, 2^192) for 64-bit limbs of 128/256-bit integers */
+#define BITS64  0x1.0p64
+#define BITS128 0x1.0p128
+#define BITS192 0x1.0p192
 
 double le256todouble(const void *target);
 

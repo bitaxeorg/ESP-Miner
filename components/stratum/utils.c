@@ -228,11 +228,6 @@ void reverse_endianness_per_word(uint8_t data[32])
     d[7] = __builtin_bswap32(d[7]);
 }
 
-const double truediffone = 26959535291011309493156476344723991336010898738574164086137773096960.0;
-static const double bits192 = 6277101735386680763835789423207666416102355444464034512896.0;
-static const double bits128 = 340282366920938463463374607431768211456.0;
-static const double bits64 = 18446744073709551616.0;
-
 /* Converts a little endian 256 bit value to a double */
 double le256todouble(const void *target)
 {
@@ -240,13 +235,13 @@ double le256todouble(const void *target)
     double dcut64;
 
     data64 = (uint64_t *)(target + 24);
-    dcut64 = *data64 * bits192;
+    dcut64 = *data64 * BITS192;
 
     data64 = (uint64_t *)(target + 16);
-    dcut64 += *data64 * bits128;
+    dcut64 += *data64 * BITS128;
 
     data64 = (uint64_t *)(target + 8);
-    dcut64 += *data64 * bits64;
+    dcut64 += *data64 * BITS64;
 
     data64 = (uint64_t *)(target);
     dcut64 += *data64;
@@ -280,24 +275,27 @@ void nbits_to_target(uint32_t nbits, uint8_t target[32])
 void diff_to_target(double diff, uint8_t target[32])
 {
     memset(target, 0, 32);
-    if (diff <= 0.0 || isnan(diff)) {
-        return;
-    }
-    double target_double = truediffone / diff;
-    if (isinf(target_double) || target_double >= pow(2.0, 256.0)) {
-        memset(target, 0xFF, 32);
-        return;
-    }
-    if (target_double <= 0.0) {
-        return;
-    }
-    double rem = target_double;
-    for (int i = 3; i >= 0; i--) {
-        double base = pow(2.0, i * 64);
-        uint64_t part = (uint64_t)(rem / base);
-        memcpy(target + (i * 8), &part, 8);
-        rem -= (double)part * base;
-    }
+    if (diff <= 0.0 || isnan(diff)) return;
+
+    double d64 = TRUEDIFFONE / diff;
+
+    double dcut64 = d64 / BITS192;
+    uint64_t h64 = (uint64_t)dcut64;
+    for (int i = 0; i < 8; i++) target[24 + i] = (uint8_t)(h64 >> (i * 8));
+    d64 -= ((double)h64) * BITS192;
+
+    dcut64 = d64 / BITS128;
+    h64 = (uint64_t)dcut64;
+    for (int i = 0; i < 8; i++) target[16 + i] = (uint8_t)(h64 >> (i * 8));
+    d64 -= ((double)h64) * BITS128;
+
+    dcut64 = d64 / BITS64;
+    h64 = (uint64_t)dcut64;
+    for (int i = 0; i < 8; i++) target[8 + i] = (uint8_t)(h64 >> (i * 8));
+    d64 -= ((double)h64) * BITS64;
+
+    h64 = (uint64_t)d64;
+    for (int i = 0; i < 8; i++) target[i] = (uint8_t)(h64 >> (i * 8));
 }
 
 void prettyHex(unsigned char *buf, int len)
@@ -319,7 +317,7 @@ double networkDifficulty(uint32_t nBits)
 
     double target = (double) mantissa * pow(256, (exponent - 3)); // Calculate the target value
 
-    double difficulty = (pow(2, 208) * 65535) / target; // Calculate the difficulty
+    double difficulty = TRUEDIFFONE / target; // Calculate the difficulty
 
     return difficulty;
 }

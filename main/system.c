@@ -696,7 +696,7 @@ uint64_t SYSTEM_noinit_get_total_uptime_seconds()
 // Convert 128-bit to double: high * 2^64 + low. Loses precision for very large values, but sufficient for display
 double SYSTEM_noinit_get_total_hashes()
 {
-    return (double)noinit_state.cumulative_hashes_high * 18446744073709551616.0 + (double)noinit_state.cumulative_hashes_low;
+    return (double)noinit_state.cumulative_hashes_high * BITS64 + (double)noinit_state.cumulative_hashes_low;
 }
 
 double SYSTEM_noinit_get_total_log2_work()
@@ -714,7 +714,7 @@ double SYSTEM_noinit_get_total_log2_work()
     // log2(high * 2^64 + low) ≈ 64 + log2(high) for large values
     // More precise: 64 + log2(high + low/2^64)
     double high_plus_fraction = (double)noinit_state.cumulative_hashes_high + 
-                                (double)noinit_state.cumulative_hashes_low / 18446744073709551616.0;
+                                (double)noinit_state.cumulative_hashes_low / BITS64;
     return 64.0 + log2(high_plus_fraction);
 }
 

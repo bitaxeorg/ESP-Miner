@@ -3,7 +3,7 @@
 #include <limits.h>
 #include "esp_log.h"
 #include "mining.h"
-#include "stratum_api.h"
+#include <math.h>
 #include "utils.h"
 
 static const char *TAG = "mining";
@@ -121,15 +121,12 @@ void calculate_merkle_root_hash(const uint8_t coinbase_tx_hash[32], const uint8_
     memcpy(dest, both_merkles, 32);
 }
 
-
-#include <math.h>
-
 double hash_to_pdiff(const uint8_t hash[32])
 {
     if (!hash) return (double)UINT32_MAX;
     double s64 = le256todouble(hash);
     if (s64 <= 0.0 || isnan(s64) || isinf(s64)) return (double)UINT32_MAX;
-    double diff = truediffone / s64;
+    double diff = TRUEDIFFONE / s64;
     if (isnan(diff) || isinf(diff) || diff <= 0.0) return (double)UINT32_MAX;
     return diff;
 }
