@@ -234,8 +234,7 @@ esp_err_t stratum_v1_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
         }
         if (!s_v1_msg) {
             ESP_LOGE(TAG, "Failed to allocate StratumApiV1Message");
-            esp_transport_close(transport);
-            esp_transport_destroy(transport);
+            stratum_v1_close_connection(GLOBAL_STATE);
             return ESP_ERR_NO_MEM;
         }
     }
