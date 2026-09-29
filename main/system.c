@@ -517,7 +517,6 @@ void SYSTEM_reset_pool_session(GlobalState * GLOBAL_STATE)
     module->shares_accepted = 0;
     module->shares_rejected = 0;
     module->shares_pending = 0;
-    module->work_received = 0;
     module->response_time = 0.0f;
     module->response_share_batch = 0;
     module->pool_difficulty = 0.0;

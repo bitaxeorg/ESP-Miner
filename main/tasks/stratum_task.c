@@ -186,6 +186,7 @@ void stratum_task(void *pvParameters)
                 GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback = (first_idx == sec_idx);
                 consecutive_pool_failures = 0;
                 retry_attempts = 0;
+                GLOBAL_STATE->SYSTEM_MODULE.work_received = 0;
                 SYSTEM_reset_pool_session(GLOBAL_STATE);
             } else if (has_fallback && stratum_probe_pool(GLOBAL_STATE, second_idx)) {
                 ESP_LOGI(TAG, "Pool %u reachable, resuming mining", second_idx);
@@ -193,6 +194,7 @@ void stratum_task(void *pvParameters)
                 GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback = (second_idx == sec_idx);
                 consecutive_pool_failures = 0;
                 retry_attempts = 0;
+                GLOBAL_STATE->SYSTEM_MODULE.work_received = 0;
                 SYSTEM_reset_pool_session(GLOBAL_STATE);
             }
             continue;
@@ -216,6 +218,7 @@ void stratum_task(void *pvParameters)
             consecutive_pool_failures = 0;
             retry_attempts = 0;
             GLOBAL_STATE->SYSTEM_MODULE.pools_unavailable = false;
+            GLOBAL_STATE->SYSTEM_MODULE.work_received = 0;
             SYSTEM_reset_pool_session(GLOBAL_STATE);
             s_should_reconnect = false;
         } else {
@@ -233,6 +236,7 @@ void stratum_task(void *pvParameters)
                     ESP_LOGI(TAG, "Switching to %s pool (%s)",
                              GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback ? "fallback" : "primary",
                              GLOBAL_STATE->SYSTEM_MODULE.pools[GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback ? sec_idx : prim_idx].url);
+                    GLOBAL_STATE->SYSTEM_MODULE.work_received = 0;
                     SYSTEM_reset_pool_session(GLOBAL_STATE);
                 }
             }
