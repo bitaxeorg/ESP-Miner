@@ -171,8 +171,6 @@ void stratum_task(void *pvParameters)
         // Paused state when all configured pools have exhausted retries
         if (consecutive_pool_failures >= threshold) {
             GLOBAL_STATE->SYSTEM_MODULE.pools_unavailable = true;
-            snprintf(GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info,
-                     sizeof(GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info), "All pools unreachable");
             ESP_LOGW(TAG, "All configured pools unreachable, pausing mining to conserve power.");
             vTaskDelay(pdMS_TO_TICKS(RECOVERY_PROBE_INTERVAL_MS));
 

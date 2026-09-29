@@ -251,8 +251,6 @@ esp_err_t stratum_v1_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
 
         if (GLOBAL_STATE->SYSTEM_MODULE.mining_paused || GLOBAL_STATE->SYSTEM_MODULE.hardware_fault) {
             ESP_LOGI(TAG, "Mining paused, disconnecting from pool");
-            snprintf(GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info,
-                     sizeof(GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info), "Not Connected");
             run_result = ESP_OK;
             break;
         }
@@ -264,8 +262,6 @@ esp_err_t stratum_v1_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
                 run_result = ESP_OK;
             } else {
                 ESP_LOGE(TAG, "Failed to receive JSON-RPC line, reconnecting...");
-                snprintf(GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info,
-                         sizeof(GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info), "SV1: Connection lost");
                 run_result = ESP_FAIL;
             }
             break;
