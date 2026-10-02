@@ -1059,6 +1059,7 @@ bool check_settings_and_update(const cJSON * const root, char **redirect_url)
                                       (cJSON_GetObjectItem(root, "secondaryPoolIndex") != NULL) ||
                                       (use_fallback_item != NULL);
         if (pools_item != NULL || pool_selection_changed) {
+            GLOBAL_STATE->SYSTEM_MODULE.primary_pool_error[0] = '\0';
             SYSTEM_reload_pool_config(GLOBAL_STATE);
 
             if (use_fallback_item) {

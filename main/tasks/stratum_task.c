@@ -110,6 +110,7 @@ void stratum_notify_pool_modified(GlobalState *gs, uint16_t pool_idx)
 {
     if (!gs) return;
 
+    gs->SYSTEM_MODULE.primary_pool_error[0] = '\0';
     uint16_t prim_idx = gs->SYSTEM_MODULE.primary_pool_index;
 
     if (pool_idx == s_running_pool_idx) {
@@ -123,6 +124,7 @@ void stratum_notify_pool_selection_changed(GlobalState *gs)
 {
     if (!gs) return;
 
+    gs->SYSTEM_MODULE.primary_pool_error[0] = '\0';
     uint16_t prim_idx = gs->SYSTEM_MODULE.primary_pool_index;
     uint16_t sec_idx = gs->SYSTEM_MODULE.secondary_pool_index;
     uint16_t target_idx = gs->SYSTEM_MODULE.is_using_fallback ? sec_idx : prim_idx;
@@ -228,6 +230,9 @@ void stratum_task(void *pvParameters)
             consecutive_pool_failures = 0;
             retry_attempts = 0;
             GLOBAL_STATE->SYSTEM_MODULE.pools_unavailable = false;
+            if (!GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback) {
+                GLOBAL_STATE->SYSTEM_MODULE.primary_pool_error[0] = '\0';
+            }
             reset_share_stats(GLOBAL_STATE);
             s_should_reconnect = false;
         } else {
@@ -241,6 +246,11 @@ void stratum_task(void *pvParameters)
                 retry_attempts = 0;
 
                 if (has_fallback) {
+                    if (!GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback) {
+                        strlcpy(GLOBAL_STATE->SYSTEM_MODULE.primary_pool_error,
+                                GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info,
+                                sizeof(GLOBAL_STATE->SYSTEM_MODULE.primary_pool_error));
+                    }
                     GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback = !GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback;
                     ESP_LOGI(TAG, "Switching to %s pool (%s)",
                              GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback ? "fallback" : "primary",

@@ -254,6 +254,7 @@ void SYSTEM_init_system(GlobalState * GLOBAL_STATE)
 
     // Initialize pool connection info
     strcpy(module->pool_connection_info, "Not Connected");
+    module->primary_pool_error[0] = '\0';
 
     // Initialize overheat_mode
     module->overheat_mode = nvs_config_get_bool(NVS_CONFIG_OVERHEAT_MODE);
