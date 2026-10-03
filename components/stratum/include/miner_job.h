@@ -60,4 +60,21 @@ static inline bool miner_job_is_rollable(const miner_job_t *job)
     return (job != NULL) && (job->extranonce2_len > 0) && (job->coinbase_prefix_len > 0);
 }
 
+// Advance only within the extranonce bytes actually serialized by the miner.
+// A false result leaves the last valid counter intact; wait for a new job.
+static inline bool miner_job_advance_extranonce2(const miner_job_t *job, uint64_t *counter)
+{
+    if (!miner_job_is_rollable(job) || counter == NULL || *counter == UINT64_MAX) {
+        return false;
+    }
+    if (job->extranonce2_len < sizeof(*counter)) {
+        uint64_t limit = UINT64_C(1) << (8 * job->extranonce2_len);
+        if (*counter >= limit - 1) {
+            return false;
+        }
+    }
+    ++*counter;
+    return true;
+}
+
 #endif /* MINER_JOB_H_ */

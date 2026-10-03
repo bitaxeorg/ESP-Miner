@@ -13,9 +13,10 @@ typedef struct {
     bool asic_initialized;
     int job_frequency_ms;
     size_t allocation_failure_at;
+    bool count_only; // Free sent jobs after counting instead of retaining them.
 } job_pipeline_harness_config_t;
 
-#define JOB_PIPELINE_HARNESS_MAX_EVENTS 8
+#define JOB_PIPELINE_HARNESS_MAX_EVENTS 260
 #define JOB_PIPELINE_HARNESS_MAX_JOBS 8
 
 typedef enum {
@@ -31,6 +32,7 @@ typedef struct {
 typedef struct {
     bm_job *jobs[JOB_PIPELINE_HARNESS_MAX_JOBS];
     size_t job_count;
+    size_t submitted_job_count;
     uint32_t version_masks[JOB_PIPELINE_HARNESS_MAX_JOBS];
     size_t version_mask_count;
     size_t coinbase_decode_count;

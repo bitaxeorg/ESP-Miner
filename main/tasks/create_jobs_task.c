@@ -103,6 +103,7 @@ void create_jobs_task(void *pvParameters)
     uint32_t current_version_mask = 0;
     miner_job_t *current_work = NULL;
     bool current_work_sent = false;
+    bool current_work_exhausted = false;
     uint64_t extranonce_2 = 0;
     uint32_t current_version = 0;
     int timeout_ms = ASIC_get_asic_job_frequency_ms(GLOBAL_STATE);
@@ -123,6 +124,7 @@ void create_jobs_task(void *pvParameters)
             current_work = new_work;
             GLOBAL_STATE->active_job_slot_idx = (uint8_t)(slot_notify % MINER_JOB_POOL_SIZE);
             current_work_sent = false;
+            current_work_exhausted = false;
             current_version = new_work->version;
 
             if (new_work->version_mask != current_version_mask && GLOBAL_STATE->ASIC_initalized) {
@@ -142,7 +144,8 @@ void create_jobs_task(void *pvParameters)
                 vTaskDelay(100 / portTICK_PERIOD_MS);
                 continue;
             }
-            if (!miner_job_is_rollable(current_work) && current_work_sent && GLOBAL_STATE->DEVICE_CONFIG.family.asic.hardware_version_rolling) {
+            if (current_work_exhausted ||
+                (!miner_job_is_rollable(current_work) && current_work_sent && GLOBAL_STATE->DEVICE_CONFIG.family.asic.hardware_version_rolling)) {
                 timeout_ms = ASIC_get_asic_job_frequency_ms(GLOBAL_STATE);
                 continue;
             }
@@ -155,7 +158,10 @@ void create_jobs_task(void *pvParameters)
         current_work_sent = true;
 
         if (miner_job_is_rollable(current_work)) {
-            extranonce_2++;
+            current_work_exhausted = !miner_job_advance_extranonce2(current_work, &extranonce_2);
+            if (current_work_exhausted) {
+                ESP_LOGW(TAG, "Extranonce space exhausted for job %s; waiting for new work", current_work->job_id);
+            }
         } else if (!GLOBAL_STATE->DEVICE_CONFIG.family.asic.hardware_version_rolling) {
             // Software version rolling for ASICs without hardware version rolling (e.g. BM1397) on SV2 Standard Channel
             uint32_t mask = (current_work->version_mask != 0) ? current_work->version_mask : BIP320_VERSION_ROLLING_MASK;
