@@ -190,11 +190,13 @@ void hashrate_monitor_task(void *pvParameters)
 
             SYSTEM_MODULE->current_hashrate = current_hashrate;
             SYSTEM_MODULE->error_percentage = current_hashrate > 0 ? error_hashrate / current_hashrate * 100.f : 0;
-
-            if (current_hashrate > 0.0f) update_hashrate_averages(SYSTEM_MODULE);
         } else {
             SYSTEM_MODULE->current_hashrate = 0;
+            SYSTEM_MODULE->error_percentage = 0;
         }
+
+        // Each poll represents elapsed time, including zero-rate and stopped ASICs.
+        update_hashrate_averages(SYSTEM_MODULE);
 
         SYSTEM_noinit_update(SYSTEM_MODULE);
 

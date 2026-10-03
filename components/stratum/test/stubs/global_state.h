@@ -8,6 +8,17 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "scoreboard.h"
+#include "hashrate_monitor_task.h"
+
+typedef struct {
+    float process_time;
+    Scoreboard scoreboard;
+    float current_hashrate;
+    float error_percentage;
+    float hashrate_1m;
+    float hashrate_10m;
+    float hashrate_1h;
+} SystemModule;
 
 /*
  * Shared test view for the real job task and isolated BM13xx driver copies.
@@ -25,6 +36,7 @@ typedef struct GlobalState {
                 uint8_t software_midstates;
                 uint16_t difficulty;
                 uint16_t core_count;
+                uint8_t hash_domains;
             } asic;
         } family;
     } DEVICE_CONFIG;
@@ -38,10 +50,8 @@ typedef struct GlobalState {
         float actual_frequency;
     } POWER_MANAGEMENT_MODULE;
     bool ASIC_initalized;
-    struct {
-        float process_time;
-        Scoreboard scoreboard;
-    } SYSTEM_MODULE;
+    SystemModule SYSTEM_MODULE;
+    HashrateMonitorModule HASHRATE_MONITOR_MODULE;
     struct {
         bool is_active;
     } SELF_TEST_MODULE;
