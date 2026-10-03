@@ -10,10 +10,16 @@
 
 static const char * TAG = "pll";
 
-void pll_get_parameters(float target_freq, uint16_t fb_divider_min, uint16_t fb_divider_max, 
+bool pll_get_parameters(float target_freq, uint16_t fb_divider_min, uint16_t fb_divider_max,
                         uint8_t *fb_divider, uint8_t *refdiv, uint8_t *postdiv1, uint8_t *postdiv2,
                         float *actual_freq) 
 {
+    if (!isfinite(target_freq) || target_freq <= 0 ||
+        fb_divider_min == 0 || fb_divider_min > fb_divider_max || fb_divider_max > UINT8_MAX ||
+        !fb_divider || !refdiv || !postdiv1 || !postdiv2 || !actual_freq) {
+        return false;
+    }
+
     float best_freq = 0;
     uint8_t best_refdiv = 0, best_fb_divider = 0, best_postdiv1 = 0, best_postdiv2 = 0;
     float min_diff = FLT_MAX;
@@ -24,9 +30,12 @@ void pll_get_parameters(float target_freq, uint16_t fb_divider_min, uint16_t fb_
         for (uint8_t postdiv1 = 7; postdiv1 > 0; postdiv1--) {
             for (uint8_t postdiv2 = 7; postdiv2 > 0; postdiv2--) {
                 uint16_t divider = refdiv * postdiv1 * postdiv2;
-                uint16_t fb_divider = round(target_freq / FREQ_MULT * divider);
+                // Check the rounded value before narrowing: very large targets
+                // must not overflow an integer conversion and appear valid.
+                double rounded_fb_divider = round(target_freq / FREQ_MULT * divider);
                 if (postdiv1 > postdiv2 &&
-                    fb_divider >= fb_divider_min && fb_divider <= fb_divider_max) {
+                    rounded_fb_divider >= fb_divider_min && rounded_fb_divider <= fb_divider_max) {
+                    uint8_t fb_divider = (uint8_t)rounded_fb_divider;
                     float new_freq = FREQ_MULT * fb_divider / divider;
                     float curr_diff = fabs(target_freq - new_freq);
                     float vco_freq = FREQ_MULT * fb_divider / refdiv;
@@ -51,6 +60,10 @@ void pll_get_parameters(float target_freq, uint16_t fb_divider_min, uint16_t fb_
         }
     }
 
+    if (best_refdiv == 0) {
+        return false;
+    }
+
     ESP_LOGI(TAG, "Frequency: %g MHz (fb_divider: %d, refdiv: %d, postdiv1: %d, postdiv2: %d)", best_freq, best_fb_divider, best_refdiv, best_postdiv1, best_postdiv2);
 
     *actual_freq = best_freq;
@@ -58,4 +71,5 @@ void pll_get_parameters(float target_freq, uint16_t fb_divider_min, uint16_t fb_
     *refdiv = best_refdiv;
     *postdiv1 = best_postdiv1;
     *postdiv2 = best_postdiv2;
+    return true;
 }

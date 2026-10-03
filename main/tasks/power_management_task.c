@@ -1,3 +1,5 @@
+#include <stdio.h>
+#include "frequency_limits.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -35,7 +37,7 @@ static void mining_stop(GlobalState * GLOBAL_STATE)
     // Wind frequency down to 50 MHz before cutting power. This also updates
     // the transition tracker so the ramp starts from 50 MHz on next start,
     // rather than the stale pre-reset frequency.
-    GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value = 50;
+    GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value = ASIC_MIN_FREQUENCY_MHZ;
     GLOBAL_STATE->POWER_MANAGEMENT_MODULE.expected_hashrate = 0;
 
     ASIC_set_frequency(GLOBAL_STATE);
@@ -97,7 +99,7 @@ void POWER_MANAGEMENT_init_frequency(GlobalState * GLOBAL_STATE)
     float frequency = nvs_config_get_float(NVS_CONFIG_ASIC_FREQUENCY);
 
     GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value = frequency;
-    GLOBAL_STATE->POWER_MANAGEMENT_MODULE.actual_frequency = 50.0;
+    GLOBAL_STATE->POWER_MANAGEMENT_MODULE.actual_frequency = ASIC_MIN_FREQUENCY_MHZ;
     GLOBAL_STATE->POWER_MANAGEMENT_MODULE.expected_hashrate = expected_hashrate(GLOBAL_STATE);
     
     char expected_hashrate_str[16] = {0};
@@ -208,7 +210,17 @@ void POWER_MANAGEMENT_task(void * pvParameters)
             ESP_LOGI(TAG, "Temperature normalized after %d cooling cycles. Reinitializing ASIC...", cooling_cycles);
             
             uint16_t reduced_voltage = last_known_asic_voltage > ASIC_REDUCTION ? last_known_asic_voltage - ASIC_REDUCTION : 1000;
-            float reduced_asic_frequency = last_known_asic_frequency > ASIC_REDUCTION ? last_known_asic_frequency - ASIC_REDUCTION : 400.0;
+            float reduced_asic_frequency;
+            if (!asic_recovery_frequency(last_known_asic_frequency, ASIC_REDUCTION, &reduced_asic_frequency)) {
+                // mining_stop() has already cut power. Do not increase the
+                // clock or restart a device that overheated at the floor.
+                sys_module->hardware_fault = true;
+                snprintf(sys_module->hardware_fault_msg, sizeof(sys_module->hardware_fault_msg),
+                         "Overheat at minimum ASIC frequency; check cooling");
+                is_paused = true;
+                ESP_LOGE(TAG, "%s", sys_module->hardware_fault_msg);
+                continue;
+            }
 
             // Never drop below the regulator's minimum core voltage. TPS546_set_vout()
             // rejects anything lower (out of range), which leaves the VR stuck in a
