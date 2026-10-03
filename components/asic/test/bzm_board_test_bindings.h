@@ -1,0 +1,41 @@
+#ifndef BZM_BOARD_TEST_BINDINGS_H
+#define BZM_BOARD_TEST_BINDINGS_H
+
+#include "bzm_test_state.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+
+/* Only hardware I/O and timing are replaced in the production board code. */
+#ifdef vTaskDelay
+#undef vTaskDelay
+#endif
+#define vTaskDelay board_test_delay
+void board_test_delay(TickType_t ticks);
+#define esp_timer_get_time board_test_time
+#define BONANZA_POWER_MANAGEMENT_stop_requested board_test_stop_requested
+#define BONANZA_TPS546_check_protection board_test_check_protection
+#define BONANZA_VCORE_bzm_snapshot board_test_power_snapshot
+#define BONANZA_VCORE_bzm_set_rail_enabled board_test_rail
+#define BONANZA_VCORE_bzm_set_runtime_voltage board_test_voltage
+#define Thermal_set_fan_percent board_test_fan
+#define nvs_config_get_float board_test_saved_float
+#define nvs_config_get_u16 board_test_saved_u16
+#define BZM_bridge_get_info board_test_bridge_info
+#define BZM_bridge_get_safety_status board_test_bridge_status
+#define BZM_bridge_arm_safety board_test_arm
+#define BZM_bridge_disarm_safety board_test_disarm
+#define BZM_bridge_clear_safety_fault board_test_clear_fault
+#define BZM_bridge_safety_heartbeat board_test_heartbeat
+#define BZM_bridge_get_fan_rpm board_test_rpm
+#define BZM_bridge_set_5v_enabled board_test_five_volt
+#define BZM_bridge_set_asic_reset board_test_reset
+#define BZM_start board_test_start
+#define BZM_hold_reset board_test_hold_reset
+#define BZM_has_io_fault board_test_io_fault
+#define BZM_set_dispatch_authorizer board_test_dispatch_authorizer
+#define BZM_get_telemetry_snapshot board_test_telemetry
+#define BZM_work_replacement_snapshot board_test_replacement
+#define BZM_get_state board_test_driver_state
+#define BZM_step_frequency_domains board_test_frequency
+
+#endif

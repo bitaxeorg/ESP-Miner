@@ -13,6 +13,7 @@
 #include "global_state.h"
 #include "device_config.h"
 #include "vcore.h"
+#include "bonanza_vcore.h"
 
 #define GPIO_ASIC_ENABLE CONFIG_GPIO_ASIC_ENABLE
 #define GPIO_PLUG_SENSE CONFIG_GPIO_PLUG_SENSE
@@ -135,6 +136,11 @@ esp_err_t VCORE_init(GlobalState * GLOBAL_STATE)
     vcore_initialized = false;
     ESP_RETURN_ON_FALSE(GLOBAL_STATE->DEVICE_CONFIG.family.voltage_domains != 0, ESP_FAIL, TAG, "voltage_domains not defined");
 
+    if (GLOBAL_STATE->DEVICE_CONFIG.family.id == BONANZA) {
+        esp_err_t err = BONANZA_VCORE_init(GLOBAL_STATE);
+        vcore_initialized = err == ESP_OK;
+        return err;
+    }
     configure_asic_power_enable(GLOBAL_STATE);
 
     if (GLOBAL_STATE->DEVICE_CONFIG.DS4432U) {
@@ -159,6 +165,12 @@ bool VCORE_is_initialized(void)
 
 esp_err_t VCORE_set_voltage(GlobalState * GLOBAL_STATE, float core_voltage)
 {
+    if (GLOBAL_STATE->DEVICE_CONFIG.family.id == BONANZA) {
+        return core_voltage == 0.0f
+            ? BONANZA_VCORE_bzm_force_regulator_off(GLOBAL_STATE)
+            : ESP_ERR_INVALID_STATE;
+    }
+
     ESP_LOGI(TAG, "Set ASIC voltage = %.3fV", core_voltage);
 
     // Enable/disable the ASIC power enable GPIO before touching the regulator
@@ -187,6 +199,10 @@ esp_err_t VCORE_set_voltage(GlobalState * GLOBAL_STATE, float core_voltage)
 
 int16_t VCORE_get_voltage_mv(GlobalState * GLOBAL_STATE)
 {
+    if (GLOBAL_STATE->DEVICE_CONFIG.family.id == BONANZA) {
+        return BONANZA_TPS546_get_vout() * 1000;
+    }
+
     if (GLOBAL_STATE->DEVICE_CONFIG.TPS546) {
         return TPS546_get_vout() / GLOBAL_STATE->DEVICE_CONFIG.family.voltage_domains * 1000;
     }
@@ -197,6 +213,10 @@ int16_t VCORE_get_voltage_mv(GlobalState * GLOBAL_STATE)
 // anything below VOUT_MIN as out of range, so callers must not command below this.
 int16_t VCORE_get_voltage_min_mv(GlobalState * GLOBAL_STATE)
 {
+    if (GLOBAL_STATE->DEVICE_CONFIG.family.id == BONANZA) {
+        return 2100;
+    }
+
     if (GLOBAL_STATE->DEVICE_CONFIG.TPS546) {
         TPS546_CONFIG config = get_tps546_config(&GLOBAL_STATE->DEVICE_CONFIG.family);
         uint16_t domains = GLOBAL_STATE->DEVICE_CONFIG.family.voltage_domains;
@@ -209,6 +229,10 @@ int16_t VCORE_get_voltage_min_mv(GlobalState * GLOBAL_STATE)
 
 esp_err_t VCORE_check_fault(GlobalState * GLOBAL_STATE)
 {
+    if (GLOBAL_STATE->DEVICE_CONFIG.family.id == BONANZA) {
+        return BONANZA_TPS546_check_status(GLOBAL_STATE);
+    }
+
     if (GLOBAL_STATE->DEVICE_CONFIG.TPS546) {
         ESP_RETURN_ON_ERROR(TPS546_check_status(GLOBAL_STATE), TAG, "TPS546 check status failed!");
     }
@@ -217,6 +241,10 @@ esp_err_t VCORE_check_fault(GlobalState * GLOBAL_STATE)
 
 const char * VCORE_get_fault_string(GlobalState * GLOBAL_STATE)
 {
+    if (GLOBAL_STATE->DEVICE_CONFIG.family.id == BONANZA) {
+        return BONANZA_TPS546_get_error_message();
+    }
+
     if (GLOBAL_STATE->DEVICE_CONFIG.TPS546) {
         return TPS546_get_error_message();
     }
@@ -225,6 +253,10 @@ const char * VCORE_get_fault_string(GlobalState * GLOBAL_STATE)
 
 uint8_t VCORE_get_phase_count(GlobalState * GLOBAL_STATE)
 {
+    if (GLOBAL_STATE->DEVICE_CONFIG.family.id == BONANZA) {
+        return BONANZA_TPS546_get_phase_count();
+    }
+
     if (GLOBAL_STATE->DEVICE_CONFIG.TPS546) {
         return TPS546_get_phase_count();
     }

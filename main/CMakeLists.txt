@@ -1,5 +1,11 @@
 idf_component_register(
 SRCS
+    "power/bzm_board_power.c"
+    "power/bonanza_power_policy.c"
+    "power/bonanza_power_task.c"
+    "power/bonanza_tps546.c"
+    "power/bonanza_vcore.c"
+
     "adc.c"
     "i2c_bitaxe.c"
     "main.c"

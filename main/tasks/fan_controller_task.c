@@ -7,6 +7,7 @@
 #include "fan_controller_task.h"
 #include "nvs_config.h"
 #include "thermal.h"
+#include "bonanza_power_task.h"
 #include "PID.h"
 
 #define EPSILON 0.0001f
@@ -68,6 +69,11 @@ void FAN_CONTROLLER_task(void * pvParameters)
     TickType_t taskWakeTime = xTaskGetTickCount();
 
     while (1) {
+        bool bonanza = GLOBAL_STATE->DEVICE_CONFIG.family.id == BONANZA;
+        if (bonanza && !BONANZA_POWER_MANAGEMENT_board_io_begin()) {
+            vTaskDelayUntil(&taskWakeTime, POLL_TIME_MS / portTICK_PERIOD_MS);
+            continue;
+        }
         if (nvs_config_get_bool(NVS_CONFIG_OVERHEAT_MODE)) {
             update_fan_speed(GLOBAL_STATE, 100.0f, "Overheat");
         } else if (GLOBAL_STATE->SYSTEM_MODULE.mining_paused) {
@@ -131,9 +137,15 @@ void FAN_CONTROLLER_task(void * pvParameters)
             }
         }
 
-        power_management->fan_rpm = Thermal_get_fan_speed(&GLOBAL_STATE->DEVICE_CONFIG);
-        power_management->fan2_rpm = Thermal_get_fan2_speed(&GLOBAL_STATE->DEVICE_CONFIG);
+        /* Bonanza's board monitor publishes RPM from its safety sample.
+         * Another tach request occupies the bridge for 500 ms and delays
+         * mining lease renewals and engine replacement. */
+        if (!bonanza) {
+            power_management->fan_rpm = Thermal_get_fan_speed(&GLOBAL_STATE->DEVICE_CONFIG);
+            power_management->fan2_rpm = Thermal_get_fan2_speed(&GLOBAL_STATE->DEVICE_CONFIG);
+        }
 
+        if (bonanza) BONANZA_POWER_MANAGEMENT_board_io_end();
         vTaskDelayUntil(&taskWakeTime, POLL_TIME_MS / portTICK_PERIOD_MS);
     }
 }

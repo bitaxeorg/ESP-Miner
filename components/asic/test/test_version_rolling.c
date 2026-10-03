@@ -143,7 +143,7 @@ TEST_CASE("BM13xx response version bits reconstruct rolled block versions",
             const task_result *result = driver->process_work(state);
             TEST_ASSERT_NOT_NULL(result);
             TEST_ASSERT_EQUAL_HEX32(cases[c].expected_version, result->rolled_version);
-            TEST_ASSERT_EQUAL_HEX8(0x10, result->job_id);
+            TEST_ASSERT_EQUAL_HEX32(cases[c].base_version, result->job.version);
             TEST_ASSERT_EQUAL_HEX32(0x0a4c049b, result->nonce);
             TEST_ASSERT_EQUAL_UINT8(1, result->asic_nr);
             TEST_ASSERT_EQUAL_UINT8(77, result->core_id);
@@ -174,7 +174,7 @@ TEST_CASE("BM13xx missing jobs and register replies do not produce rolled shares
         queue_job_response(driver, 0, 1);
         TEST_ASSERT_NOT_NULL(driver->process_work(state));
 
-        /* A register result must clear the previous job's version and nonce. */
+        /* A register result must clear the previous job snapshot and nonce. */
         const uint8_t register_response[] = {
             0xaa, 0x55, 0x12, 0x34, 0x56, 0x78, 0, 0x4c, 0, 0, 0,
         };
@@ -185,6 +185,8 @@ TEST_CASE("BM13xx missing jobs and register replies do not produce rolled shares
         TEST_ASSERT_EQUAL_HEX32(0x12345678, result->value);
         TEST_ASSERT_EQUAL_HEX32(0, result->rolled_version);
         TEST_ASSERT_EQUAL_HEX32(0, result->nonce);
+        const uint8_t empty_job[sizeof(asic_job_t)] = {0};
+        TEST_ASSERT_EQUAL_HEX8_ARRAY(empty_job, &result->job, sizeof(empty_job));
         const uint8_t unknown_register[] = {
             0xaa, 0x55, 0, 0, 0, 0, 0, 1, 0, 0, 0,
         };
