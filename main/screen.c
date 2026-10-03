@@ -841,8 +841,8 @@ static void screen_update_cb(lv_timer_t * timer)
             current_block_height = GLOBAL_STATE->block_height;
         }
 
-        if (strcmp(lv_label_get_text(mining_scriptsig_label), GLOBAL_STATE->scriptsig) != 0) {
-            lv_label_set_text(mining_scriptsig_label, GLOBAL_STATE->scriptsig);
+        if (strcmp(lv_label_get_text(mining_scriptsig_label), GLOBAL_STATE->coinbase.scriptsig) != 0) {
+            lv_label_set_text(mining_scriptsig_label, GLOBAL_STATE->coinbase.scriptsig);
         }
     }
 

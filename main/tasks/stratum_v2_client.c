@@ -121,7 +121,7 @@ void stratum_v2_close_connection(GlobalState *GLOBAL_STATE)
 
     GLOBAL_STATE->SYSTEM_MODULE.shares_pending = 0;
     SYSTEM_clean_jobs_queue(GLOBAL_STATE);
-    SYSTEM_reset_coinbase_ui_state(GLOBAL_STATE, "");
+    SYSTEM_reset_coinbase_ui_state(GLOBAL_STATE);
 }
 
 #define SV2_SUBMIT_TIMING_SLOTS 32
@@ -424,10 +424,7 @@ esp_err_t stratum_v2_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
         sv2_conn_free(&s_v2_conn);
     }
 
-    sv2_conn_t *conn = heap_caps_calloc(1, sizeof(sv2_conn_t), MALLOC_CAP_SPIRAM);
-    if (!conn) {
-        conn = calloc(1, sizeof(sv2_conn_t));
-    }
+    sv2_conn_t *conn = calloc(1, sizeof(sv2_conn_t));
     if (!conn) {
         ESP_LOGE(TAG, "Failed to allocate sv2_conn");
         return ESP_ERR_NO_MEM;

@@ -196,7 +196,7 @@ static void coinbase_store_output(mining_notification_result_t *result, const ch
         result->output_count++;
     }
 
-    strncpy(result->outputs[idx].address, address, MAX_ADDRESS_STRING_LEN);
+    snprintf(result->outputs[idx].address, sizeof(result->outputs[idx].address), "%s", address);
     result->outputs[idx].value_satoshis = value_satoshis;
     result->outputs[idx].is_user_output = is_user_output;
 }
@@ -266,7 +266,14 @@ static esp_err_t parse_coinbase_suffix(const miner_job_t *job,
             char output_address[MAX_ADDRESS_STRING_LEN];
             coinbase_decode_address_from_scriptpubkey(coinbase_2_bin + offset, script_len, output_address, MAX_ADDRESS_STRING_LEN, bech32_hrp, is_testnet);
 
-            bool is_user_address = value_satoshis > 0 && user_address && strncmp(user_address, output_address, strlen(output_address)) == 0;
+            bool is_user_address = false;
+            if (value_satoshis > 0 && user_address) {
+                size_t addr_len = strlen(output_address);
+                if (strncmp(user_address, output_address, addr_len) == 0 &&
+                    (user_address[addr_len] == '\0' || user_address[addr_len] == '.' || user_address[addr_len] == '_')) {
+                    is_user_address = true;
+                }
+            }
 
             if (is_user_address) result->user_value_satoshis += value_satoshis;
 
@@ -296,7 +303,7 @@ esp_err_t coinbase_process_miner_job(const miner_job_t *job,
                                      const char *user_address,
                                      bool decode_coinbase_tx,
                                      mining_notification_result_t *result) {
-    if (!job || !result) return ESP_ERR_INVALID_ARG;
+    if (!job || !result || !job->coinbase_prefix || !job->coinbase_suffix) return ESP_ERR_INVALID_ARG;
 
     // Initialize result
     result->total_value_satoshis = 0;
@@ -352,38 +359,40 @@ esp_err_t coinbase_process_miner_job(const miner_job_t *job,
         scriptsig_length -= (extranonce1_len + extranonce2_len);
     }
     
+    result->scriptsig[0] = '\0';
+
     // Extract miner tag if present
     if (scriptsig_length > 0) {
-        char *tag = malloc(scriptsig_length + 1);
-        if (tag) {
-            int coinbase_1_tag_len = coinbase_1_len - coinbase_1_offset;
-            if (coinbase_1_tag_len > scriptsig_length) {
-                coinbase_1_tag_len = scriptsig_length;
+        if (scriptsig_length >= (int)sizeof(result->scriptsig)) {
+            scriptsig_length = (int)sizeof(result->scriptsig) - 1;
+        }
+
+        int coinbase_1_tag_len = coinbase_1_len - coinbase_1_offset;
+        if (coinbase_1_tag_len > scriptsig_length) {
+            coinbase_1_tag_len = scriptsig_length;
+        }
+
+        if (coinbase_1_tag_len > 0) {
+            memcpy(result->scriptsig, job->coinbase_prefix + coinbase_1_offset, coinbase_1_tag_len);
+        }
+
+        int coinbase_2_tag_len = scriptsig_length - coinbase_1_tag_len;
+        int coinbase_2_len = job->coinbase_suffix_len;
+
+        if (coinbase_2_len >= coinbase_2_tag_len) {
+            if (coinbase_2_tag_len > 0) {
+                memcpy(result->scriptsig + coinbase_1_tag_len, job->coinbase_suffix, coinbase_2_tag_len);
             }
 
-            if (coinbase_1_tag_len > 0) {
-                memcpy(tag, job->coinbase_prefix + coinbase_1_offset, coinbase_1_tag_len);
-            }
-
-            int coinbase_2_tag_len = scriptsig_length - coinbase_1_tag_len;
-            int coinbase_2_len = job->coinbase_suffix_len;
-            
-            if (coinbase_2_len >= coinbase_2_tag_len) {
-                if (coinbase_2_tag_len > 0) {
-                    memcpy(tag + coinbase_1_tag_len, job->coinbase_suffix, coinbase_2_tag_len);
+            // Filter non-printable characters
+            for (int i = 0; i < scriptsig_length; i++) {
+                if (!isprint((unsigned char)result->scriptsig[i])) {
+                    result->scriptsig[i] = '.';
                 }
-                
-                // Filter non-printable characters
-                for (int i = 0; i < scriptsig_length; i++) {
-                    if (!isprint((unsigned char)tag[i])) {
-                        tag[i] = '.';
-                    }
-                }
-                tag[scriptsig_length] = '\0';
-                result->scriptsig = tag;
-            } else {
-                free(tag);
             }
+            result->scriptsig[scriptsig_length] = '\0';
+        } else {
+            result->scriptsig[0] = '\0';
         }
     }
 
@@ -400,10 +409,7 @@ esp_err_t coinbase_process_miner_job(const miner_job_t *job,
     // 4. Parse Coinbase Suffix (nSequence, outputs, nLockTime)
     esp_err_t err = parse_coinbase_suffix(job, coinbase_2_offset, user_address, bech32_hrp, is_testnet, decode_coinbase_tx, result);
     if (err != ESP_OK) {
-        if (result->scriptsig) {
-            free(result->scriptsig);
-            result->scriptsig = NULL;
-        }
+        result->scriptsig[0] = '\0';
         return err;
     }
 

@@ -174,13 +174,8 @@ typedef struct GlobalState
     bool filesystem_is_available;
 
     int block_height;
-    char scriptsig[128];
-    coinbase_output_t coinbase_outputs[MAX_COINBASE_TX_OUTPUTS];
-    int coinbase_output_count;
-    int coinbase_others_count;
-    uint64_t coinbase_others_value_satoshis;
-    uint64_t coinbase_value_total_satoshis;
-    uint64_t coinbase_value_user_satoshis;
+    mining_notification_result_t coinbase;
+    mining_notification_result_t coinbase_staging;
     uint64_t network_nonce_diff;
     char network_diff_string[DIFF_STRING_SIZE];
     char block_signals[MAX_BLOCK_SIGNALS][MAX_BLOCK_SIGNAL_LEN];

@@ -9,6 +9,7 @@
 
 #define MAX_ADDRESS_STRING_LEN 128
 #define MAX_COINBASE_TX_OUTPUTS 6
+#define MAX_SCRIPTSIG_STRING_LEN 100
 
 // Bitcoin Script Opcodes
 #define OP_0            0x00
@@ -63,7 +64,7 @@ typedef struct {
  */
 typedef struct {
     uint32_t block_height;
-    char *scriptsig; // Allocated, must be freed by caller
+    char scriptsig[MAX_SCRIPTSIG_STRING_LEN];
     coinbase_output_t outputs[MAX_COINBASE_TX_OUTPUTS];
     int output_count;
     int others_count;               // outputs that did not fit in `outputs[]`

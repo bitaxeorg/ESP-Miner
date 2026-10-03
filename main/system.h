@@ -28,7 +28,7 @@ void SYSTEM_notify_new_ntime(GlobalState * GLOBAL_STATE, uint32_t ntime);
 // Reset decoded coinbase UI fields (scriptsig, coinbase values, outputs, block signals).
 // Note: block_height is intentionally NOT reset here; it is preserved as the "last known good"
 // network height so the UI, screen, and BAP do not flicker or lose context on transient disconnects.
-void SYSTEM_reset_coinbase_ui_state(GlobalState * GLOBAL_STATE, const char *scriptsig_msg);
+void SYSTEM_reset_coinbase_ui_state(GlobalState * GLOBAL_STATE);
 void SYSTEM_decode_and_apply_coinbase(GlobalState * GLOBAL_STATE, const miner_job_t * job);
 
 void SYSTEM_noinit_update(SystemModule * SYSTEM_MODULE);

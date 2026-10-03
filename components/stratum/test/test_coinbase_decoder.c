@@ -274,7 +274,7 @@ TEST_CASE("BIP-110 signaling not detected", "[coinbase_decoder]")
     TEST_ASSERT_EQUAL(ESP_OK, err);
     TEST_ASSERT_EQUAL_INT(3, result.output_count);
     TEST_ASSERT_FALSE(result.bip110_signaling);
-    if (result.scriptsig) free(result.scriptsig);
+    TEST_ASSERT_NOT_NULL(strstr(result.scriptsig, "/slush/"));
 }
 
 TEST_CASE("BIP-110 signaling detected", "[coinbase_decoder]")
@@ -288,7 +288,7 @@ TEST_CASE("BIP-110 signaling detected", "[coinbase_decoder]")
     TEST_ASSERT_EQUAL(ESP_OK, err);
     TEST_ASSERT_EQUAL_INT(3, result.output_count);
     TEST_ASSERT_TRUE(result.bip110_signaling);
-    if (result.scriptsig) free(result.scriptsig);
+    TEST_ASSERT_NOT_NULL(strstr(result.scriptsig, "/slush/"));
 }
 
 TEST_CASE("BIP-110 signaling last block", "[coinbase_decoder]")
@@ -303,7 +303,7 @@ TEST_CASE("BIP-110 signaling last block", "[coinbase_decoder]")
     TEST_ASSERT_EQUAL_INT(3, result.output_count);
     TEST_ASSERT_EQUAL(965663, result.block_height);
     TEST_ASSERT_TRUE(result.bip110_signaling);
-    if (result.scriptsig) free(result.scriptsig);
+    TEST_ASSERT_NOT_NULL(strstr(result.scriptsig, "/slush/"));
 }
 
 TEST_CASE("BIP-110 signaling expired", "[coinbase_decoder]")
@@ -318,7 +318,7 @@ TEST_CASE("BIP-110 signaling expired", "[coinbase_decoder]")
     TEST_ASSERT_EQUAL_INT(3, result.output_count);
     TEST_ASSERT_EQUAL(965664, result.block_height);
     TEST_ASSERT_FALSE(result.bip110_signaling);
-    if (result.scriptsig) free(result.scriptsig);
+    TEST_ASSERT_NOT_NULL(strstr(result.scriptsig, "/slush/"));
 }
 
 TEST_CASE("Decode via miner_job_t directly", "[coinbase_decoder]")
@@ -346,7 +346,7 @@ TEST_CASE("Decode via miner_job_t directly", "[coinbase_decoder]")
     TEST_ASSERT_EQUAL(ESP_OK, err);
     TEST_ASSERT_EQUAL_INT(3, result.output_count);
     TEST_ASSERT_EQUAL(965663, result.block_height);
-    if (result.scriptsig) free(result.scriptsig);
+    TEST_ASSERT_NOT_NULL(strstr(result.scriptsig, "/slush/"));
 
     // Test NULL user_address handling (PR hardening)
     mining_notification_result_t null_user_result = { 0 };
@@ -354,7 +354,7 @@ TEST_CASE("Decode via miner_job_t directly", "[coinbase_decoder]")
     TEST_ASSERT_EQUAL(ESP_OK, err_null);
     TEST_ASSERT_EQUAL_INT(3, null_user_result.output_count);
     TEST_ASSERT_EQUAL(965663, null_user_result.block_height);
-    if (null_user_result.scriptsig) free(null_user_result.scriptsig);
+    TEST_ASSERT_NOT_NULL(strstr(null_user_result.scriptsig, "/slush/"));
 }
 
 TEST_CASE("Coinbase decoder requires exactly one locktime", "[coinbase_decoder][security]")
@@ -381,19 +381,19 @@ TEST_CASE("Coinbase decoder requires exactly one locktime", "[coinbase_decoder][
     // Valid job succeeds
     TEST_ASSERT_EQUAL(ESP_OK, coinbase_process_miner_job(&job, "", true, &result));
     TEST_ASSERT_EQUAL_INT(3, result.output_count);
-    if (result.scriptsig) free(result.scriptsig);
+    TEST_ASSERT_NOT_NULL(strstr(result.scriptsig, "/slush/"));
 
     // Missing locktime bytes (truncate suffix by 4 bytes)
     job.coinbase_suffix_len -= 4;
     memset(&result, 0, sizeof(result));
     TEST_ASSERT_EQUAL(ESP_ERR_INVALID_ARG, coinbase_process_miner_job(&job, "", true, &result));
-    TEST_ASSERT_NULL(result.scriptsig);
+    TEST_ASSERT_EQUAL_STRING("", result.scriptsig);
 
     // Extra trailing bytes after locktime
     job.coinbase_suffix_len = strlen(c2) / 2 + 1; // original + 1 byte
     memset(&result, 0, sizeof(result));
     TEST_ASSERT_EQUAL(ESP_ERR_INVALID_ARG, coinbase_process_miner_job(&job, "", true, &result));
-    TEST_ASSERT_NULL(result.scriptsig);
+    TEST_ASSERT_EQUAL_STRING("", result.scriptsig);
 }
 
 // Coinbase with a scriptsig that ends inside coinbase_1, so the outputs start at the
@@ -415,7 +415,7 @@ TEST_CASE("Coinbase outputs below capacity are not aggregated", "[coinbase_decod
     TEST_ASSERT_TRUE(0 == result.others_value_satoshis);
     TEST_ASSERT_TRUE(3100 == result.total_value_satoshis);
     TEST_ASSERT_TRUE(100 == result.user_value_satoshis);
-    if (result.scriptsig) free(result.scriptsig);
+    TEST_ASSERT_EQUAL_STRING("/test/", result.scriptsig);
 }
 
 TEST_CASE("Coinbase outputs beyond capacity are aggregated", "[coinbase_decoder]")
@@ -447,5 +447,5 @@ TEST_CASE("Coinbase outputs beyond capacity are aggregated", "[coinbase_decoder]
         }
     }
     TEST_ASSERT_TRUE(user_output_kept);
-    if (result.scriptsig) free(result.scriptsig);
+    TEST_ASSERT_EQUAL_STRING("/test/", result.scriptsig);
 }
