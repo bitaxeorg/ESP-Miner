@@ -62,18 +62,9 @@ npm run start
 ### Internal C Components (Unity & QEMU)
 Backend firmware unit tests use the Unity test framework and run under QEMU emulation (`esp32s3` machine target) in CI.
 
-**Run locally using the helper script:**
+**Execution:**
 ```bash
 bash tools/run_qemu_tests.sh
-```
-
-**Manual Execution / Under the Hood:**
-```bash
-cd test-ci
-idf.py build
-cd build
-esptool --chip esp32s3 merge-bin --pad-to-size 16MB -o flash_image.bin @flash_args
-qemu-system-xtensa -machine esp32s3 -monitor none -nographic -no-reboot -watchdog-action shutdown -drive file=flash_image.bin,if=mtd,format=raw -m 4 -serial stdio
 ```
 *Note: Test cases tagged with `[not-on-qemu]` (such as hardware-specific ASIC nonce tests) are automatically skipped in QEMU emulation.*
 
