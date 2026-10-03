@@ -11,6 +11,8 @@
 #include "esp_timer.h"
 
 #include "asic.h"
+#include "asic_common.h"
+#include "difficulty_controller.h"
 #include "system.h"
 #include "esp_heap_caps.h"
 #include "utils.h"
@@ -132,6 +134,10 @@ void create_jobs_task(void *pvParameters)
             }
 
             extranonce_2 = 0;
+
+            if (GLOBAL_STATE->ASIC_initalized) {
+                difficulty_controller_update(GLOBAL_STATE);
+            }
 
             if (!current_work->clean_jobs) {
                 // Staged job for next cycle, let current ASIC cycle finish

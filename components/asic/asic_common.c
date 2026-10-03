@@ -225,6 +225,29 @@ void get_difficulty_mask(double difficulty, uint8_t *job_difficulty_mask)
     job_difficulty_mask[5] = _reverse_bits( mask        & 0xFF);
 }
 
+double calculate_effective_asic_difficulty(double expected_ghs, double interval_s, double pool_difficulty)
+{
+    if (interval_s <= 0.0) {
+        interval_s = DEFAULT_SHARE_INTERVAL_S;
+    }
+
+    double target_diff = MIN_ASIC_DIFFICULTY;
+    if (expected_ghs > 0.0) {
+        double raw_diff = expected_ghs * 1e9 * interval_s / NONCE_SPACE;
+        if (raw_diff > MIN_ASIC_DIFFICULTY) {
+            int lower = _largest_power_of_two((int)raw_diff);
+            int upper = _next_power_of_two((int)raw_diff);
+            target_diff = ((raw_diff - lower) > (upper - raw_diff)) ? (double)upper : (double)lower;
+        }
+    }
+
+    if (pool_difficulty > 0.0 && pool_difficulty < target_diff) {
+        target_diff = fmax(pool_difficulty, MIN_ASIC_DIFFICULTY);
+    }
+
+    return (double)_largest_power_of_two((int)target_diff);
+}
+
 double calculate_bm_timeout_ms(float frequency_mhz, size_t asic_count, size_t small_cores, size_t cores, size_t version_size, float timeout_percent, double default_time_ms)
 {
     if (asic_count <= 0)

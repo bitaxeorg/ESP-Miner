@@ -31,5 +31,6 @@ int BM1397_set_max_baud(void);
 float BM1397_send_hash_frequency(float frequency);
 task_result * BM1397_process_work(GlobalState * GLOBAL_STATE);
 void BM1397_read_registers(GlobalState * GLOBAL_STATE);
+void BM1397_set_difficulty(double difficulty);
 
 #endif /* BM1397_H_ */

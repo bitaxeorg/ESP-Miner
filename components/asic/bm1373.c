@@ -338,12 +338,7 @@ uint8_t BM1373_init(GlobalState * GLOBAL_STATE)
         return 0;
     }
 
-    uint8_t difficulty_mask[6];
-    get_difficulty_mask(GLOBAL_STATE->DEVICE_CONFIG.family.asic.difficulty, difficulty_mask);
-    if (!_send_BM1373(TYPE_CMD | GROUP_ALL | CMD_WRITE, difficulty_mask,
-                      sizeof(difficulty_mask), BM1373_SERIALTX_DEBUG)) {
-        return 0;
-    }
+    // TODO: Verify sending ticket mask later
 
     if (!_write_broadcast(BM1372_REGISTER_IO_DRIVER_STRENGTH,
                           BM1372_IO_DRIVER_STRENGTH_DEFAULT)) {
@@ -549,4 +544,12 @@ void BM1373_read_registers(void)
             vTaskDelay(pdMS_TO_TICKS(1));
         }
     }
+}
+
+void BM1373_set_difficulty(double difficulty)
+{
+    uint8_t difficulty_mask[6];
+    get_difficulty_mask(difficulty, difficulty_mask);
+    _send_BM1373(TYPE_CMD | GROUP_ALL | CMD_WRITE, difficulty_mask,
+                 sizeof(difficulty_mask), BM1373_SERIALTX_DEBUG);
 }
