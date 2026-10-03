@@ -337,6 +337,26 @@ describe('HomeComponent', () => {
       expect(component.activePoolURL).toBe(mockSystemInfo.stratumURL);
     });
 
+    it('should reflect reset pool fields (responseTime, poolDifficulty, coinbaseOutputs) on failover', async () => {
+      await expectSelectedPool('Primary');
+
+      emitPoolInfo({
+        useFallbackStratum: 0,
+        isUsingFallbackStratum: 1,
+        responseTime: 0,
+        responseShareBatch: 0,
+        poolDifficulty: 0,
+        coinbaseOutputs: [],
+        coinbaseValueTotalSatoshis: 0,
+        coinbaseValueUserSatoshis: 0
+      });
+
+      await expectSelectedPool('Fallback');
+      expect(component.responseTime).toBe(0);
+      expect(component.payoutPercentage).toBe(-1);
+      expect(component.orderedCoinbaseOutputs).toEqual([]);
+    });
+
     for (const target of ['Primary', 'Fallback'] as const) {
       it(`should preserve a pending manual switch to ${target} until the preference is acknowledged`, async () => {
         const targetFallback = Number(target === 'Fallback');

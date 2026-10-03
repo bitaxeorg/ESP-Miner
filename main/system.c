@@ -274,7 +274,7 @@ void SYSTEM_init_system(GlobalState * GLOBAL_STATE)
     pthread_mutex_init(&GLOBAL_STATE->transport_mutex, NULL);
 
     // Allocate the job tracking tables here rather than in create_jobs_task().
-    // The stratum tasks touch valid_jobs (SYSTEM_clean_jobs_queue) as soon as they
+    // The stratum tasks touch valid_jobs (via SYSTEM_reset_pool_session) as soon as they
     // connect, so tying the allocation to create_jobs_task actually starting is a
     // NULL dereference waiting to happen if that task ever fails to spawn.
     GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs = heap_caps_calloc(MAX_ASIC_JOBS, sizeof(bm_job *), MALLOC_CAP_SPIRAM);
@@ -410,7 +410,7 @@ esp_err_t SYSTEM_init_peripherals(GlobalState * GLOBAL_STATE) {
     return ESP_OK;
 }
 
-void SYSTEM_clean_jobs_queue(GlobalState * GLOBAL_STATE)
+static void clean_jobs_queue(GlobalState * GLOBAL_STATE)
 {
     ESP_LOGI(TAG, "Clean Jobs: invalidating active jobs");
 
@@ -488,7 +488,7 @@ void SYSTEM_notify_new_ntime(GlobalState * GLOBAL_STATE, uint32_t ntime)
 // Reset decoded coinbase UI fields (scriptsig, coinbase values, outputs, block signals).
 // Note: block_height is intentionally NOT reset here; it is preserved as the "last known good"
 // network height so the UI, screen, and BAP do not flicker or lose context on transient disconnects.
-void SYSTEM_reset_coinbase_ui_state(GlobalState * GLOBAL_STATE, const char *scriptsig_msg)
+static void reset_coinbase_ui_state(GlobalState * GLOBAL_STATE, const char *scriptsig_msg)
 {
     GLOBAL_STATE->coinbase_output_count = 0;
     GLOBAL_STATE->coinbase_others_count = 0;
@@ -502,6 +502,27 @@ void SYSTEM_reset_coinbase_ui_state(GlobalState * GLOBAL_STATE, const char *scri
         GLOBAL_STATE->scriptsig[0] = '\0';
     }
     GLOBAL_STATE->block_signals_count = 0;
+}
+
+void SYSTEM_reset_pool_session(GlobalState * GLOBAL_STATE)
+{
+    if (!GLOBAL_STATE) return;
+
+    SystemModule *module = &GLOBAL_STATE->SYSTEM_MODULE;
+    for (int i = 0; i < module->rejected_reason_stats_count; i++) {
+        module->rejected_reason_stats[i].count = 0;
+        module->rejected_reason_stats[i].message[0] = '\0';
+    }
+    module->rejected_reason_stats_count = 0;
+    module->shares_accepted = 0;
+    module->shares_rejected = 0;
+    module->shares_pending = 0;
+    module->response_time = 0.0f;
+    module->response_share_batch = 0;
+    module->pool_difficulty = 0.0;
+
+    clean_jobs_queue(GLOBAL_STATE);
+    reset_coinbase_ui_state(GLOBAL_STATE, "");
 }
 
 void SYSTEM_decode_and_apply_coinbase(GlobalState * GLOBAL_STATE, const miner_job_t * job)
@@ -518,14 +539,14 @@ void SYSTEM_decode_and_apply_coinbase(GlobalState * GLOBAL_STATE, const miner_jo
     // Direct Merkle Root jobs (e.g. SV2 Standard) don't carry coinbase parts
     if (job->type == JOB_TYPE_SV2_STANDARD) {
         GLOBAL_STATE->block_height = 0;
-        SYSTEM_reset_coinbase_ui_state(GLOBAL_STATE, NULL);
+        reset_coinbase_ui_state(GLOBAL_STATE, NULL);
         return;
     }
 
     mining_notification_result_t *result = heap_caps_malloc(sizeof(mining_notification_result_t), MALLOC_CAP_SPIRAM);
     if (!result) {
         ESP_LOGE(TAG, "Failed to allocate coinbase decode result in PSRAM");
-        SYSTEM_reset_coinbase_ui_state(GLOBAL_STATE, "[decode error]");
+        reset_coinbase_ui_state(GLOBAL_STATE, "[decode error]");
         return;
     }
     memset(result, 0, sizeof(mining_notification_result_t));
@@ -537,7 +558,7 @@ void SYSTEM_decode_and_apply_coinbase(GlobalState * GLOBAL_STATE, const miner_jo
     if (coinbase_process_miner_job(job, user, decode_coinbase_tx, result) != ESP_OK) {
         ESP_LOGW(TAG, "Failed to decode coinbase for job %s", job->job_id);
         free(result);
-        SYSTEM_reset_coinbase_ui_state(GLOBAL_STATE, "[decode error]");
+        reset_coinbase_ui_state(GLOBAL_STATE, "[decode error]");
         return;
     }
 
