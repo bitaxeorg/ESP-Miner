@@ -208,7 +208,7 @@ static void uart_send_task(void *pvParameters) {
 }
 
 esp_err_t BAP_start_uart_receive_task(void) {
-    xTaskCreateWithCaps(
+    BaseType_t task_result = xTaskCreateWithCaps(
         uart_receive_task,
         "uart_receive_ta",
         8192,
@@ -218,7 +218,25 @@ esp_err_t BAP_start_uart_receive_task(void) {
         MALLOC_CAP_SPIRAM
     );
 
-    //ESP_LOGI(TAG, "UART receive task started");
+    if (task_result != pdPASS) {
+        ESP_LOGW(TAG, "Failed to create UART receive task in PSRAM; retrying in internal RAM");
+        task_result = xTaskCreate(
+            uart_receive_task,
+            "uart_receive_ta",
+            8192,
+            NULL,
+            5,
+            &uart_receive_task_handle
+        );
+    }
+
+    if (task_result != pdPASS) {
+        uart_receive_task_handle = NULL;
+        ESP_LOGE(TAG, "Failed to create UART receive task");
+        return ESP_ERR_NO_MEM;
+    }
+
+    ESP_LOGI(TAG, "UART receive task started");
     return ESP_OK;
 }
 
