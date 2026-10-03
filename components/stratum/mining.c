@@ -1,12 +1,9 @@
 #include <string.h>
 #include <stdio.h>
 #include <limits.h>
-#include "esp_log.h"
 #include "mining.h"
-#include "stratum_api.h"
 #include "utils.h"
-
-static const char *TAG = "mining";
+#include "psa/crypto.h"
 
 void free_bm_job(bm_job *job)
 {
@@ -16,43 +13,48 @@ void free_bm_job(bm_job *job)
 }
 
 
-void calculate_coinbase_tx_hash_bin(const uint8_t *prefix, size_t prefix_len,
+bool calculate_coinbase_tx_hash_bin(const uint8_t *prefix, size_t prefix_len,
                                     const uint8_t *extranonce_prefix, size_t ep_len,
                                     const uint8_t *extranonce_2, size_t e2_len,
                                     const uint8_t *suffix, size_t suffix_len,
                                     uint8_t dest[32])
 {
-    size_t total_len = prefix_len + ep_len + e2_len + suffix_len;
-    uint8_t stack_buf[1024];
-    uint8_t *buf = (total_len <= sizeof(stack_buf)) ? stack_buf : malloc(total_len);
-    if (!buf) {
-        ESP_LOGE(TAG, "Failed to allocate memory for coinbase tx (%zu bytes)", total_len);
-        if (dest) memset(dest, 0, 32);
-        return;
+    if (!dest) {
+        return false;
     }
 
-    size_t offset = 0;
+    psa_hash_operation_t op = PSA_HASH_OPERATION_INIT;
+    if (psa_hash_setup(&op, PSA_ALG_SHA_256) != PSA_SUCCESS) {
+        memset(dest, 0, 32);
+        return false;
+    }
     if (prefix && prefix_len > 0) {
-        memcpy(buf + offset, prefix, prefix_len);
-        offset += prefix_len;
+        psa_hash_update(&op, prefix, prefix_len);
     }
     if (extranonce_prefix && ep_len > 0) {
-        memcpy(buf + offset, extranonce_prefix, ep_len);
-        offset += ep_len;
+        psa_hash_update(&op, extranonce_prefix, ep_len);
     }
     if (extranonce_2 && e2_len > 0) {
-        memcpy(buf + offset, extranonce_2, e2_len);
-        offset += e2_len;
+        psa_hash_update(&op, extranonce_2, e2_len);
     }
     if (suffix && suffix_len > 0) {
-        memcpy(buf + offset, suffix, suffix_len);
-        offset += suffix_len;
+        psa_hash_update(&op, suffix, suffix_len);
     }
-
-    double_sha256_bin(buf, total_len, dest);
-    if (buf != stack_buf) {
-        free(buf);
+    uint8_t first_hash[32];
+    size_t out_len = 0;
+    if (psa_hash_finish(&op, first_hash, sizeof(first_hash), &out_len) != PSA_SUCCESS ||
+        out_len != sizeof(first_hash)) {
+        psa_hash_abort(&op);
+        memset(dest, 0, 32);
+        return false;
     }
+    // Pass 2: single 32-byte SHA-256
+    if (psa_hash_compute(PSA_ALG_SHA_256, first_hash, sizeof(first_hash),
+                         dest, 32, &out_len) != PSA_SUCCESS || out_len != 32) {
+        memset(dest, 0, 32);
+        return false;
+    }
+    return true;
 }
 
 void construct_bm_job_from_miner_job(const miner_job_t *job, const uint32_t version, const uint8_t merkle_root[32], const uint32_t version_mask, const double difficulty, const uint8_t software_midstates, bm_job *new_job)
