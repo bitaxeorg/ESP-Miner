@@ -4,7 +4,8 @@
 #include <lwip/tcpip.h>
 #include "stratum_v1_client.h"
 #include "stratum_task.h"
-#include "stratum_api.h"
+#include "sv1_client.h"
+#include "sv1_protocol.h"
 #include "stratum_socket.h"
 #include "connect.h"
 #include <esp_sntp.h>
@@ -219,7 +220,7 @@ esp_err_t stratum_v1_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
     SYSTEM_clean_jobs_queue(GLOBAL_STATE);
 
     // mining.configure - ID: 1
-    STRATUM_V1_configure_version_rolling(transport, stratum_get_next_uid(GLOBAL_STATE), &s_v1_conn->version_mask);
+    STRATUM_V1_configure_version_rolling(transport, stratum_get_next_uid(GLOBAL_STATE));
 
     // mining.subscribe - ID: 2
     STRATUM_V1_subscribe(transport, stratum_get_next_uid(GLOBAL_STATE), GLOBAL_STATE->DEVICE_CONFIG.family.asic.name);

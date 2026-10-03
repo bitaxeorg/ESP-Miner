@@ -3,7 +3,6 @@
 
 #include "esp_err.h"
 #include "miner_job.h"
-#include "stratum_api.h"
 
 typedef struct GlobalState GlobalState;
 typedef struct SystemModule SystemModule;
