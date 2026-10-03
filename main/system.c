@@ -495,6 +495,7 @@ void SYSTEM_reset_coinbase_ui_state(GlobalState * GLOBAL_STATE, const char *scri
     GLOBAL_STATE->coinbase_others_value_satoshis = 0;
     GLOBAL_STATE->coinbase_value_total_satoshis = 0;
     GLOBAL_STATE->coinbase_value_user_satoshis = 0;
+    coinbase_clear_user_cache();
     if (scriptsig_msg) {
         strncpy(GLOBAL_STATE->scriptsig, scriptsig_msg, sizeof(GLOBAL_STATE->scriptsig) - 1);
         GLOBAL_STATE->scriptsig[sizeof(GLOBAL_STATE->scriptsig) - 1] = '\0';
@@ -578,6 +579,7 @@ void SYSTEM_decode_and_apply_coinbase(GlobalState * GLOBAL_STATE, const miner_jo
     }
 
     GLOBAL_STATE->coinbase_value_total_satoshis = result->total_value_satoshis;
+    GLOBAL_STATE->coinbase_value_user_satoshis = result->user_value_satoshis;
     ESP_LOGI(TAG, "Coinbase outputs: %d, total value: %llu%s",
              result->output_count, result->total_value_satoshis,
              result->decode_coinbase_tx ? " sats" : "");
