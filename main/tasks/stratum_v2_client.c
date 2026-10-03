@@ -16,6 +16,7 @@
 #include "libbase58.h"
 #include "device_config.h"
 #include "esp_heap_caps.h"
+#include "stratum_timing.h"
 
 #include <string.h>
 #include <stdlib.h>
@@ -27,6 +28,7 @@
 static const char *TAG = "stratum_v2";
 
 static sv2_conn_t *s_v2_conn = NULL;
+static stratum_timing_tracker_t s_v2_timing = {0};
 
 static bool add_active_job_id(uint32_t *active_job_ids, int *count, uint32_t job_id)
 {
@@ -120,12 +122,10 @@ void stratum_v2_close_connection(GlobalState *GLOBAL_STATE)
     pthread_mutex_unlock(&GLOBAL_STATE->transport_mutex);
 
     GLOBAL_STATE->SYSTEM_MODULE.shares_pending = 0;
+    stratum_timing_reset(&s_v2_timing);
     SYSTEM_clean_jobs_queue(GLOBAL_STATE);
     SYSTEM_reset_coinbase_ui_state(GLOBAL_STATE, "");
 }
-
-#define SV2_SUBMIT_TIMING_SLOTS 32
-static int64_t stratum_v2_submit_time_us[SV2_SUBMIT_TIMING_SLOTS] = {0};
 
 static void stratum_v2_update_pending_shares(GlobalState *GLOBAL_STATE)
 {
@@ -142,7 +142,7 @@ static void stratum_v2_update_pending_shares(GlobalState *GLOBAL_STATE)
 
 static void stratum_v2_track_submit(GlobalState *GLOBAL_STATE, uint32_t sequence_number)
 {
-    stratum_v2_submit_time_us[sequence_number % SV2_SUBMIT_TIMING_SLOTS] = esp_timer_get_time();
+    stratum_timing_record(&s_v2_timing, sequence_number, esp_timer_get_time());
     stratum_v2_update_pending_shares(GLOBAL_STATE);
 }
 
@@ -812,14 +812,11 @@ esp_err_t stratum_v2_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
                                  (unsigned long)accepted_count, (unsigned long)pending);
                         accepted_count = pending;
                     }
-                    int slot = last_sequence_number % SV2_SUBMIT_TIMING_SLOTS;
-                    int64_t submit_time_us = stratum_v2_submit_time_us[slot];
-                    if (submit_time_us > 0) {
-                        float response_time_ms = (float)(esp_timer_get_time() - submit_time_us) / 1000.0f;
+                    float response_time_ms = stratum_timing_calculate_ms(&s_v2_timing, last_sequence_number, esp_timer_get_time());
+                    if (response_time_ms >= 0) {
                         ESP_LOGI(TAG, "Shares accepted: %lu (%.1f ms)", accepted_count, response_time_ms);
                         GLOBAL_STATE->SYSTEM_MODULE.response_time = response_time_ms;
                         GLOBAL_STATE->SYSTEM_MODULE.response_share_batch = (uint16_t)accepted_count;
-                        stratum_v2_submit_time_us[slot] = 0;
                     } else {
                         ESP_LOGI(TAG, "Shares accepted: %lu", accepted_count);
                     }

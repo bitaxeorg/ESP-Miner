@@ -17,6 +17,7 @@
 #include <esp_heap_caps.h>
 #include "esp_transport_ssl.h"
 #include "freertos/task.h"
+#include "stratum_timing.h"
 
 #define MAX_EXTRANONCE_2_LEN 32
 #define TRANSPORT_TIMEOUT_MS 5000
@@ -27,6 +28,7 @@ static const char *TAG = "stratum_v1";
 
 static StratumApiV1Message *s_v1_msg = NULL;
 static sv1_conn_t *s_v1_conn = NULL;
+static stratum_timing_tracker_t s_v1_timing = {0};
 
 static bool add_active_job_id(char active_job_ids[][MAX_JOB_ID_LEN], int *count, const char *job_id)
 {
@@ -81,6 +83,7 @@ int stratum_v1_submit_share(GlobalState *GLOBAL_STATE, const bm_job *active_job,
     }
 
     int uid = s_v1_conn->send_uid++;
+    uint64_t now = 0;
     int ret = STRATUM_V1_submit_share(
         transport,
         uid,
@@ -90,9 +93,13 @@ int stratum_v1_submit_share(GlobalState *GLOBAL_STATE, const bm_job *active_job,
         active_job->ntime,
         nonce,
         version_bits,
-        sent_time_us);
+        &now);
 
     if (ret >= 0) {
+        stratum_timing_record(&s_v1_timing, (uint32_t)uid, now);
+        if (sent_time_us) {
+            *sent_time_us = now;
+        }
         if (GLOBAL_STATE->SYSTEM_MODULE.shares_pending < UINT16_MAX) {
             GLOBAL_STATE->SYSTEM_MODULE.shares_pending++;
         }
@@ -120,6 +127,7 @@ void stratum_v1_close_connection(GlobalState *GLOBAL_STATE)
     pthread_mutex_unlock(&GLOBAL_STATE->transport_mutex);
 
     GLOBAL_STATE->SYSTEM_MODULE.shares_pending = 0;
+    stratum_timing_reset(&s_v1_timing);
     SYSTEM_clean_jobs_queue(GLOBAL_STATE);
     SYSTEM_reset_coinbase_ui_state(GLOBAL_STATE, "");
 }
@@ -379,7 +387,7 @@ esp_err_t stratum_v1_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
                 break;
 
             case STRATUM_RESULT: {
-                float response_time_ms = STRATUM_V1_get_response_time_ms(s_v1_msg->message_id, receive_time_us);
+                float response_time_ms = stratum_timing_calculate_ms(&s_v1_timing, (uint32_t)s_v1_msg->message_id, (uint64_t)receive_time_us);
                 if (response_time_ms >= 0) {
                     if (GLOBAL_STATE->SYSTEM_MODULE.shares_pending > 0) {
                         GLOBAL_STATE->SYSTEM_MODULE.shares_pending--;

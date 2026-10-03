@@ -38,28 +38,6 @@ static char * json_rpc_buffer = NULL;
 static size_t json_rpc_buffer_size = 0;
 static size_t json_rpc_buffer_len = 0;
 
-static RequestTiming *request_timings = NULL;
-
-static RequestTiming* get_request_timing(int request_id) {
-    if (request_id < 0) return NULL;
-    int index = request_id % MAX_REQUEST_IDS;
-    return &request_timings[index];
-}
-
-float STRATUM_V1_get_response_time_ms(int request_id, int64_t receive_time_us)
-{
-    if (request_id < 0) return -1.0;
-    
-    RequestTiming *timing = get_request_timing(request_id);
-    if (!timing || !timing->tracking) {
-        return -1.0;
-    }
-    
-    float response_time = (receive_time_us - timing->timestamp_us) / 1000.0f;
-    timing->tracking = false;
-    return response_time;
-}
-
 esp_transport_handle_t STRATUM_V1_transport_init(tls_mode tls, const char * cert)
 {
     esp_transport_handle_t transport;
@@ -115,25 +93,6 @@ bool STRATUM_V1_initialize_buffer(void)
     }
     json_rpc_buffer_size = BUFFER_SIZE;
     json_rpc_buffer[0] = '\0';
-
-    if (request_timings == NULL) {
-        request_timings = heap_caps_malloc(sizeof(RequestTiming) * MAX_REQUEST_IDS, MALLOC_CAP_SPIRAM);
-        if (request_timings == NULL) {
-            request_timings = malloc(sizeof(RequestTiming) * MAX_REQUEST_IDS);
-        }
-        if (request_timings == NULL) {
-            ESP_LOGE(TAG, "Failed to allocate memory for request_timings");
-            free(json_rpc_buffer);
-            json_rpc_buffer = NULL;
-            json_rpc_buffer_size = 0;
-            return false;
-        }
-    }
-
-    for (int i = 0; i < MAX_REQUEST_IDS; i++) {
-        request_timings[i].timestamp_us = 0;
-        request_timings[i].tracking = false;
-    }
 
     return true;
 }
@@ -773,19 +732,6 @@ bool STRATUM_V1_parse(StratumApiV1Message *message, const char *stratum_json, mi
     return result;
 }
 
-
-
-static void stamp_tx(int request_id, uint64_t timestamp_us)
-{
-    if (request_id >= 1) {
-        RequestTiming *timing = get_request_timing(request_id);
-        if (timing) {
-            timing->timestamp_us = timestamp_us;
-            timing->tracking = true;
-        }
-    }
-}
-
 static void debug_stratum_tx(const char * msg)
 {
     char *newline = strchr(msg, '\n');
@@ -887,14 +833,9 @@ int STRATUM_V1_submit_share(esp_transport_handle_t transport, int send_uid, cons
 
     int ret = esp_transport_write(transport, submit_msg, strlen(submit_msg), TRANSPORT_TIMEOUT_MS);
 
-    uint64_t now = esp_timer_get_time();
-    if (out_sent_time_us) {
-        *out_sent_time_us = now;
-    }
+    if (out_sent_time_us) *out_sent_time_us = esp_timer_get_time();
 
     debug_stratum_tx(submit_msg);
-    
-    stamp_tx(send_uid, now);
 
     return ret;
 }
