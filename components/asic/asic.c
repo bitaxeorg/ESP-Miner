@@ -1,4 +1,6 @@
+#include "asic_internal.h"
 #include <string.h>
+#include <stdlib.h>
 
 #include <esp_log.h>
 
@@ -71,7 +73,7 @@ int ASIC_set_max_baud(GlobalState * GLOBAL_STATE)
     return 0;
 }
 
-void ASIC_send_work(GlobalState * GLOBAL_STATE, bm_job * next_job)
+void ASIC_send_work(GlobalState * GLOBAL_STATE, asic_job_t * next_job)
 {
     switch (GLOBAL_STATE->DEVICE_CONFIG.family.asic.id) {
         case BM1397:
@@ -91,6 +93,7 @@ void ASIC_send_work(GlobalState * GLOBAL_STATE, bm_job * next_job)
             break;
         default:
             ESP_LOGE(TAG, "Unknown ASIC id %d — cannot send work", GLOBAL_STATE->DEVICE_CONFIG.family.asic.id);
+            free(next_job);
             break;
     }
 }

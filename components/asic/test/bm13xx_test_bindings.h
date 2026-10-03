@@ -30,7 +30,6 @@ void bm13xx_spy_delay(TickType_t ticks);
 #define BM1366_read_registers bm1366_test_read_registers
 #define BM1366_set_nonce_space bm1366_test_set_nonce_space
 #define BM1366_set_hash_counting_number bm1366_test_set_hash_counting_number
-/* This existing driver function has no declaration in its public header. */
 void BM1366_set_hash_counting_number(uint32_t hcn);
 
 #define BM1368_init bm1368_test_init
@@ -42,7 +41,6 @@ void BM1366_set_hash_counting_number(uint32_t hcn);
 #define BM1368_read_registers bm1368_test_read_registers
 #define BM1368_set_nonce_space bm1368_test_set_nonce_space
 #define BM1368_set_hash_counting_number bm1368_test_set_hash_counting_number
-/* This existing driver function has no declaration in its public header. */
 void BM1368_set_hash_counting_number(uint32_t hcn);
 
 #define BM1370_init bm1370_test_init
@@ -54,7 +52,6 @@ void BM1368_set_hash_counting_number(uint32_t hcn);
 #define BM1370_read_registers bm1370_test_read_registers
 #define BM1370_set_nonce_space bm1370_test_set_nonce_space
 #define BM1370_set_hash_counting_number bm1370_test_set_hash_counting_number
-/* This existing driver function has no declaration in its public header. */
 void BM1370_set_hash_counting_number(uint32_t hcn);
 
 #define BM1373_init bm1373_test_init
@@ -66,7 +63,6 @@ void BM1370_set_hash_counting_number(uint32_t hcn);
 #define BM1373_read_registers bm1373_test_read_registers
 #define BM1373_set_nonce_space bm1373_test_set_nonce_space
 #define BM1373_set_hash_counting_number bm1373_test_set_hash_counting_number
-/* This existing driver function has no declaration in its public header. */
 void BM1373_set_hash_counting_number(uint32_t hcn);
 
 #endif

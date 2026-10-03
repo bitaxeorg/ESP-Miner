@@ -1,3 +1,4 @@
+#include "asic_internal.h"
 #include "mining_test_bindings.h"
 #include "job_pipeline_test_harness.h"
 
@@ -45,7 +46,7 @@ static void spy_task_delay(TickType_t ticks)
     harness_result->delay_count++;
 }
 
-static void spy_asic_send_work(GlobalState *state, bm_job *job)
+void spy_asic_send_work(GlobalState *state, asic_job_t *job)
 {
     (void)state;
     if (harness_result->job_count >= JOB_PIPELINE_HARNESS_MAX_JOBS) {
@@ -76,8 +77,6 @@ static void spy_decode_coinbase(GlobalState *state, const miner_job_t *job)
     harness_result->coinbase_decode_count++;
 }
 
-/* Test components cannot attach compile definitions to one source, so compile
- * the task into this test-only translation unit and interpose its boundaries. */
 #ifdef xTaskNotifyWait
 #undef xTaskNotifyWait
 #endif
@@ -87,6 +86,7 @@ static void spy_decode_coinbase(GlobalState *state, const miner_job_t *job)
 #define xTaskNotifyWait fake_task_notify_wait
 #define vTaskDelay spy_task_delay
 #define ASIC_send_work spy_asic_send_work
+#define ASIC_send_job test_asic_send_job
 #define ASIC_set_version_mask spy_asic_set_version_mask
 #define ASIC_get_asic_job_frequency_ms stub_asic_get_job_frequency
 #define SYSTEM_decode_and_apply_coinbase spy_decode_coinbase
@@ -95,6 +95,7 @@ static void spy_decode_coinbase(GlobalState *state, const miner_job_t *job)
 #undef ASIC_get_asic_job_frequency_ms
 #undef ASIC_set_version_mask
 #undef ASIC_send_work
+#undef ASIC_send_job
 #undef vTaskDelay
 #undef xTaskNotifyWait
 
@@ -142,8 +143,17 @@ void job_pipeline_harness_result_free(job_pipeline_harness_result_t *result)
 {
     if (result == NULL) return;
     for (size_t index = 0; index < result->job_count; ++index) {
-        free_bm_job(result->jobs[index]);
+        free(result->jobs[index]);
         result->jobs[index] = NULL;
     }
     result->job_count = 0;
+}
+
+void job_pipeline_harness_send_job(const asic_job_t *job, job_pipeline_harness_result_t *result)
+{
+    memset(result, 0, sizeof(*result));
+    harness_state = (GlobalState) {0};
+    harness_result = result;
+    test_asic_send_job(&harness_state, job);
+    harness_result = NULL;
 }

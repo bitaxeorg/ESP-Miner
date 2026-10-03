@@ -5,17 +5,15 @@
 #include <stdbool.h>
 #include <stddef.h>
 
-typedef enum {
-    JOB_TYPE_V1 = 0,
-    JOB_TYPE_SV2_STANDARD,
-    JOB_TYPE_SV2_EXTENDED,
-} miner_job_type_t;
+#include "asic_job.h"
+
+typedef mining_job_source_t miner_job_type_t;
 
 #define MAX_COINBASE_PREFIX_LEN 1024
 #define MAX_COINBASE_SUFFIX_LEN 64512
 #define MAX_COINBASE_BIN_LEN    MAX_COINBASE_SUFFIX_LEN
 #define MAX_MERKLE_BRANCHES 32
-#define MAX_JOB_ID_LEN 32
+#define MAX_JOB_ID_LEN ASIC_JOB_ID_LEN
 #define MINER_JOB_POOL_SIZE 8
 
 typedef struct {
