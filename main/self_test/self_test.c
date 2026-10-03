@@ -232,6 +232,7 @@ static void self_test_start_nonce_measurement(GlobalState * GLOBAL_STATE)
     measurement->accepted_count = 0;
     measurement->rejected_count = 0;
     measurement->hashes = 0.0;
+    diff_to_target(GLOBAL_STATE->DEVICE_CONFIG.family.asic.difficulty, measurement->target);
     measurement->is_active = true;
     pthread_mutex_unlock(&measurement->lock);
 }
@@ -272,14 +273,14 @@ static float self_test_get_nonce_hashrate(GlobalState * GLOBAL_STATE, uint64_t e
     return (float)(hashes / seconds / 1000000000.0);
 }
 
-void self_test_record_nonce(GlobalState * GLOBAL_STATE, double nonce_diff)
+void self_test_record_nonce(GlobalState * GLOBAL_STATE, const uint8_t hash[32])
 {
     SelfTestNonceMeasurement * measurement = &GLOBAL_STATE->SELF_TEST_MODULE.nonce_measurement;
     double ticket_diff = GLOBAL_STATE->DEVICE_CONFIG.family.asic.difficulty;
 
     pthread_mutex_lock(&measurement->lock);
     if (measurement->is_active) {
-        if (nonce_diff >= ticket_diff) {
+        if (uint256_lte(hash, measurement->target)) {
             measurement->accepted_count++;
             measurement->hashes += ticket_diff * NONCE_SPACE;
         } else {
@@ -554,7 +555,7 @@ void self_test_task(void * pvParameters)
     if (msg.method == MINING_NOTIFY) {
         ESP_LOGI(TAG, "Activating mock work for self-test");
         job->pool_id = 0;
-        job->pool_diff = mock_diff;
+        diff_to_target(mock_diff, job->pool_target);
         job->version_mask = mock_version_mask;
         job->extranonce1_len = (uint8_t)e1_len;
         if (e1_len > 0) {

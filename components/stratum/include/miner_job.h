@@ -28,7 +28,7 @@ typedef struct {
     bool             clean_jobs;
 
     // Multi-pool difficulty and version rolling configuration
-    double           pool_diff;
+    uint8_t          pool_target[32];
     uint32_t         version_mask;
 
     // Extranonce configuration for this job / channel / pool

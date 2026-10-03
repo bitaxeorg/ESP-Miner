@@ -19,7 +19,6 @@
 
 #include <string.h>
 #include <stdlib.h>
-#include <math.h>
 
 #define TRANSPORT_TIMEOUT_MS 5000
 #define SV2_MAX_FRAME_SIZE 8192
@@ -226,7 +225,7 @@ static void stratum_v2_handle_new_extended_mining_job(GlobalState *GLOBAL_STATE,
     }
 
     job->pool_id = conn->pool_idx;
-    job->pool_diff = hash_to_pdiff(conn->target);
+    memcpy(job->pool_target, conn->target, 32);
     job->version_mask = version_rolling_allowed ? conn->version_mask : 0;
     job->extranonce1_len = conn->extranonce_prefix_len;
     if (job->extranonce1_len > sizeof(job->extranonce1)) job->extranonce1_len = sizeof(job->extranonce1);
@@ -287,7 +286,7 @@ static void stratum_v2_handle_new_mining_job(GlobalState *GLOBAL_STATE, sv2_conn
     job->version = version;
     memcpy(job->merkle_root, merkle_root, 32);
     job->pool_id = conn->pool_idx;
-    job->pool_diff = hash_to_pdiff(conn->target);
+    memcpy(job->pool_target, conn->target, 32);
     job->version_mask = conn->version_mask;
     conn->pending_jobs_valid |= (1U << slot);
 
@@ -321,6 +320,11 @@ static void stratum_v2_handle_set_new_prev_hash(GlobalState *GLOBAL_STATE, sv2_c
         return;
     }
 
+    if (nbits == 0) {
+        ESP_LOGW(TAG, "Rejecting SetNewPrevHash with zero nbits");
+        return;
+    }
+
     if (!sv2_channel_or_group_matches(channel_id, conn->channel_id, conn->group_channel_id)) {
         ESP_LOGW(TAG, "Dropping SetNewPrevHash for unexpected channel %lu (expected %lu or group %lu)",
                  (unsigned long)channel_id, (unsigned long)conn->channel_id, (unsigned long)conn->group_channel_id);
@@ -345,7 +349,7 @@ static void stratum_v2_handle_set_new_prev_hash(GlobalState *GLOBAL_STATE, sv2_c
         job->nbits = nbits;
         job->clean_jobs = true;
         job->pool_id = conn->pool_idx;
-        job->pool_diff = hash_to_pdiff(conn->target);
+        memcpy(job->pool_target, conn->target, 32);
         if (job->type == JOB_TYPE_SV2_STANDARD) {
             job->version_mask = conn->version_mask;
         } else if (job->type == JOB_TYPE_SV2_EXTENDED) {
@@ -384,8 +388,8 @@ static void stratum_v2_handle_set_target(GlobalState *GLOBAL_STATE, sv2_conn_t *
         return;
     }
 
-    double pdiff = hash_to_pdiff(max_target);
-    if (isnan(pdiff) || isinf(pdiff) || pdiff < 0.0001 || pdiff > 4294967295.0) {
+    double pdiff = target_to_diff(max_target);
+    if (pdiff < 0.0001 || pdiff >= (double)UINT32_MAX) {
         ESP_LOGW(TAG, "Ignoring out-of-range SV2 target pdiff: %g", pdiff);
         return;
     }
@@ -724,7 +728,7 @@ esp_err_t stratum_v2_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
         conn->channel_opened = true;
         memcpy(conn->target, target, 32);
 
-        double pdiff = hash_to_pdiff(target);
+        double pdiff = target_to_diff(target);
         GLOBAL_STATE->SYSTEM_MODULE.pool_difficulty = pdiff;
 
         ESP_LOGI(TAG, "Mining channel opened: channel_id=%lu, group=%lu, type=%s",

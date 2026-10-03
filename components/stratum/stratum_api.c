@@ -439,6 +439,11 @@ static bool parse_mining_notify(cJSON *json, miner_job_t *job)
     job->ntime = strtoul(ntime_item->valuestring, NULL, 16);
     job->clean_jobs = cJSON_IsTrue(cJSON_GetArrayItem(params, params_count - 1));
 
+    if (job->nbits == 0) {
+        ESP_LOGW(TAG, "Rejecting notify with zero nbits");
+        return false;
+    }
+
     if (job->ntime < BITCOIN_GENESIS_NTIME) {
         ESP_LOGW(TAG, "Rejecting notify with pre-genesis ntime: %" PRIu32, job->ntime);
         return false;

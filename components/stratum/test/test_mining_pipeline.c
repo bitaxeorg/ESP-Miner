@@ -67,7 +67,7 @@ static void assert_common_asic_job(const bm_job *job, uint32_t expected_version,
     TEST_ASSERT_EQUAL_UINT32(0, job->starting_nonce);
     TEST_ASSERT_EQUAL_UINT8(pool_id, job->pool_id);
     TEST_ASSERT_EQUAL_INT(type, job->job_type);
-    TEST_ASSERT_EQUAL_DOUBLE(pool_diff, job->pool_diff);
+    TEST_ASSERT_FLOAT_WITHIN(1e-4, pool_diff, target_to_diff(job->pool_target));
     assert_hex32(
         "000000000000000049070000a804d248b472b528c6e5607d837bdc1335fd44bf",
         job->prev_block_hash);
@@ -111,7 +111,7 @@ TEST_CASE("SV1 notify reaches the ASIC job boundary byte exact",
     TEST_ASSERT_EQUAL_UINT8(7, miner_job->extranonce1_len);
     miner_job->extranonce2_len = 8;
     miner_job->pool_id = 3;
-    miner_job->pool_diff = 2048.0;
+    diff_to_target(2048.0, miner_job->pool_target);
     miner_job->version_mask = BIP320_VERSION_ROLLING_MASK;
 
     assert_hex32(
@@ -236,7 +236,7 @@ TEST_CASE("SV2 standard messages reach the ASIC job boundary byte exact",
     miner_job->ntime = min_ntime;
     miner_job->nbits = nbits;
     miner_job->clean_jobs = true;
-    miner_job->pool_diff = 2048.0;
+    diff_to_target(2048.0, miner_job->pool_target);
     miner_job->version_mask = BIP320_VERSION_ROLLING_MASK;
     miner_job->pool_id = 3;
     (void)snprintf(miner_job->job_id, sizeof(miner_job->job_id), "%lu",
@@ -397,7 +397,7 @@ TEST_CASE("SV2 extended messages roll extranonce into the ASIC job byte exact",
     TEST_ASSERT_EQUAL_UINT32(43, prev_job_id);
 
     miner_job->clean_jobs = true;
-    miner_job->pool_diff = 1024.0;
+    diff_to_target(1024.0, miner_job->pool_target);
     miner_job->version_mask = BIP320_VERSION_ROLLING_MASK;
     miner_job->pool_id = 4;
     miner_job->extranonce1[0] = 0xaa;
@@ -462,7 +462,7 @@ TEST_CASE("job task harness preserves idle and staged work behavior",
     job->ntime = 0x64658bd8;
     job->nbits = 0x1705dd01;
     job->clean_jobs = false;
-    job->pool_diff = 512.0;
+    diff_to_target(512.0, job->pool_target);
     job->pool_id = 2;
     TEST_ASSERT_EQUAL_UINT32(
         32, hex2bin(
@@ -539,7 +539,7 @@ static miner_job_t *prepare_followup_job(uint8_t extranonce_len, bool large_coin
     job->clean_jobs = true;
     job->ntime = 0x64658bd8;
     job->nbits = 0x1705dd01;
-    job->pool_diff = 256.0;
+    diff_to_target(256.0, job->pool_target);
     job->extranonce2_len = extranonce_len;
     job->coinbase_prefix_len = large_coinbase ? 1024 : 1;
     memset(job->coinbase_prefix, large_coinbase ? 0xa5 : 0x01, job->coinbase_prefix_len);
@@ -555,7 +555,7 @@ TEST_CASE("job task preserves maximum accepted metadata and detached ownership",
     const char *job_id = "0123456789012345678901234567890";
     memcpy(job->job_id, job_id, 32);
     job->pool_id = UINT8_MAX;
-    job->pool_diff = 256.125;
+    diff_to_target(256.125, job->pool_target);
     const job_pipeline_harness_event_t events[] = {
         { .type = JOB_PIPELINE_HARNESS_NOTIFY, .slot = 0 },
         { .type = JOB_PIPELINE_HARNESS_TIMEOUT },
@@ -580,7 +580,7 @@ TEST_CASE("job task preserves maximum accepted metadata and detached ownership",
         "0100000000000000000000000000000000000000000000000000000000000000",
         result.jobs[1]->extranonce2);
     TEST_ASSERT_EQUAL_UINT8(UINT8_MAX, result.jobs[0]->pool_id);
-    TEST_ASSERT_EQUAL_DOUBLE(256.125, result.jobs[0]->pool_diff);
+    TEST_ASSERT_FLOAT_WITHIN(1e-4, 256.125, target_to_diff(result.jobs[0]->pool_target));
     assert_hex32("e7154b58fec3d73f1e4b8a80535df7bd7e4e0a98228be8375762ed1f77eb40de",
                  result.jobs[0]->merkle_root);
     job_pipeline_harness_result_free(&result);

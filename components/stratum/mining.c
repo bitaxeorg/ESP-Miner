@@ -3,7 +3,6 @@
 #include <limits.h>
 #include "esp_log.h"
 #include "mining.h"
-#include "stratum_api.h"
 #include "utils.h"
 
 static const char *TAG = "mining";
@@ -55,13 +54,13 @@ void calculate_coinbase_tx_hash_bin(const uint8_t *prefix, size_t prefix_len,
     }
 }
 
-void construct_bm_job_from_miner_job(const miner_job_t *job, const uint32_t version, const uint8_t merkle_root[32], const uint32_t version_mask, const double difficulty, const uint8_t software_midstates, bm_job *new_job)
+void construct_bm_job_from_miner_job(const miner_job_t *job, const uint32_t version, const uint8_t merkle_root[32], const uint32_t version_mask, const uint8_t software_midstates, bm_job *new_job)
 {
     new_job->version = (version != 0) ? version : job->version;
     new_job->target = job->nbits;
     new_job->ntime = job->ntime;
     new_job->starting_nonce = 0;
-    new_job->pool_diff = (job->pool_diff > 0) ? job->pool_diff : difficulty;
+    memcpy(new_job->pool_target, job->pool_target, 32);
     new_job->pool_id = job->pool_id;
     new_job->job_type = job->type;
     uint32_t effective_mask = (job->version_mask != 0) ? job->version_mask : version_mask;
@@ -112,30 +111,9 @@ void calculate_merkle_root_hash(const uint8_t coinbase_tx_hash[32], const uint8_
     memcpy(dest, both_merkles, 32);
 }
 
-
-#include <math.h>
-
-double hash_to_pdiff(const uint8_t hash[32])
-{
-    if (!hash) return (double)UINT32_MAX;
-    double s64 = le256todouble(hash);
-    if (s64 <= 0.0 || isnan(s64) || isinf(s64)) return (double)UINT32_MAX;
-    double diff = truediffone / s64;
-    if (isnan(diff) || isinf(diff) || diff <= 0.0) return (double)UINT32_MAX;
-    return diff;
-}
-
-///////cgminer nonce testing
-/* testing a nonce and return the diff - 0 means invalid */
-double test_nonce_value(const bm_job *job, const uint32_t nonce, const uint32_t rolled_version)
+void calculate_header_hash(const bm_job *job, const uint32_t nonce, const uint32_t rolled_version, uint8_t hash_result[32])
 {
     uint8_t header[80];
-
-    // // TODO: use the midstate hash instead of hashing the whole header
-    // uint32_t rolled_version = job->version;
-    // for (int i = 0; i < midstate_index; i++) {
-    //     rolled_version = increment_bitmask(rolled_version, job->version_mask);
-    // }
 
     // copy data from job to header
     memcpy(header, &rolled_version, 4);
@@ -145,10 +123,7 @@ double test_nonce_value(const bm_job *job, const uint32_t nonce, const uint32_t 
     memcpy(header + 72, &job->target, 4);
     memcpy(header + 76, &nonce, 4);
 
-    uint8_t hash_result[32];
     double_sha256_bin(header, 80, hash_result);
-
-    return hash_to_pdiff(hash_result);
 }
 
 uint32_t increment_bitmask(const uint32_t value, const uint32_t mask)

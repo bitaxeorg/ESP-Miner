@@ -395,6 +395,11 @@ TEST_CASE("Parse stratum mining.notify hardening", "[mining.notify]")
     const char *json_empty_job = "{\"id\":null,\"method\":\"mining.notify\",\"params\":"
                                  "[\"\",\"0000000000000000000000000000000000000000000000000000000000000000\",\"0100\",\"0200\",[],\"20000000\",\"1705ae3a\",\"647025b5\",true]}";
     TEST_ASSERT_FALSE(STRATUM_V1_parse(&msg, json_empty_job));
+
+    // Zero nbits
+    const char *json_zero_nbits = "{\"id\":null,\"method\":\"mining.notify\",\"params\":"
+                                  "[\"1\",\"0000000000000000000000000000000000000000000000000000000000000000\",\"0100\",\"0200\",[],\"20000000\",\"00000000\",\"647025b5\",true]}";
+    TEST_ASSERT_FALSE(STRATUM_V1_parse(&msg, json_zero_nbits));
 }
 
 TEST_CASE("Parse stratum notify type confusion", "[mining.notify]")
