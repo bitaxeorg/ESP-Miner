@@ -45,7 +45,6 @@ typedef struct AsicConfig {
     bool hardware_version_rolling;
     uint8_t software_midstates;
     uint8_t init_retry_attempts;
-    float domain_hashrate_scale;
     // test values
     float hashrate_test_percentage_target;
 } AsicConfig;
@@ -123,7 +122,7 @@ static const AsicConfig ASIC_BM1368 = { .id = BM1368, .name = "BM1368", .chip_id
 static const AsicConfig ASIC_BM1370 = { .id = BM1370, .name = "BM1370", .chip_id = 1370, .default_frequency_mhz = 525, .frequency_options = BM1370_FREQUENCY_OPTIONS, .default_voltage_mv = 1150, .voltage_options = BM1370_VOLTAGE_OPTIONS, .difficulty = 256, .core_count = 128, .small_core_count = 2040, .hash_domains = 4, .default_asic_timeout = 500, .hardware_version_rolling = true, .software_midstates = 0, .hashrate_test_percentage_target = 0.85};
 static const AsicConfig ASIC_BM1370XP = { .id = BM1370, .name = "BM1370", .chip_id = 1370, .default_frequency_mhz = 400, .frequency_options = BM1370_FRQUENCY_XP_OPTIONS, .default_voltage_mv = 1150, .voltage_options = BM1370_VOLTAGE_OPTIONS, .difficulty = 256, .core_count = 128, .small_core_count = 2040, .hash_domains = 4, .default_asic_timeout = 500, .hardware_version_rolling = true, .software_midstates = 0, .hashrate_test_percentage_target = 0.85};
 static const AsicConfig ASIC_BM1370_HEX = { .id = BM1370, .name = "BM1370", .chip_id = 1370, .default_frequency_mhz = 690, .frequency_options = BM1370_FREQUENCY_OPTIONS, .default_voltage_mv = 1200, .voltage_options = BM1370_VOLTAGE_OPTIONS, .difficulty = 256, .core_count = 128, .small_core_count = 2040, .hash_domains = 4, .default_asic_timeout = 500, .hardware_version_rolling = true, .software_midstates = 0, .hashrate_test_percentage_target = 0.85};
-static const AsicConfig ASIC_BM1373 = { .id = BM1373, .name = "BM1372/BM1373", .chip_id = 1372, .default_frequency_mhz = 327, .frequency_options = BM1373_FREQUENCY_OPTIONS, .default_voltage_mv = 1000, .voltage_options = BM1373_VOLTAGE_OPTIONS, .difficulty = 256, .core_count = 128, .small_core_count = 6725, .hash_domains = 4, .default_asic_timeout = 500, .hardware_version_rolling = true, .software_midstates = 0, .init_retry_attempts = 3, .domain_hashrate_scale = 2.0f, .hashrate_test_percentage_target = 0.85};
+static const AsicConfig ASIC_BM1373 = { .id = BM1373, .name = "BM1372/BM1373", .chip_id = 1372, .default_frequency_mhz = 327, .frequency_options = BM1373_FREQUENCY_OPTIONS, .default_voltage_mv = 1000, .voltage_options = BM1373_VOLTAGE_OPTIONS, .difficulty = 256, .core_count = 128, .small_core_count = 6725, .hash_domains = 8, .default_asic_timeout = 500, .hardware_version_rolling = true, .software_midstates = 0, .init_retry_attempts = 3, .hashrate_test_percentage_target = 0.85};
 
 static const AsicConfig default_asic_configs[] = {
     ASIC_BM1397,

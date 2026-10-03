@@ -182,6 +182,8 @@ export class HomeComponent implements OnInit, OnDestroy {
   private isHardwareConfigInitialized = false;
   public asicsAmount: number = 0;
   public asicDomainsAmount: number = 0;
+  public domainUnit: string = 'GH/s';
+  public domainPower: number = 3;
   public efficiency: number = 0;
   public efficiencyAverage: number = 0;
   public expectedEfficiency: number = 0;
@@ -947,6 +949,8 @@ export class HomeComponent implements OnInit, OnDestroy {
           this.asicDomainsAmount = info.hashrateMonitor.asics[0]?.domains?.length ?? 0;
         }
 
+        this.updateDomainUnit(info);
+
         this.updateChartDataSources(info);
 
         this.efficiency = this.calculateEfficiency(info, 'hashRate');
@@ -1294,6 +1298,17 @@ export class HomeComponent implements OnInit, OnDestroy {
     const lightness = 0.5 + amount;
 
     return lightness.toFixed(3);
+  }
+
+  private updateDomainUnit(info: ISystemInfo) {
+    const totalDomains = this.asicsAmount * this.asicDomainsAmount;
+    if (totalDomains <= 0) return;
+
+    const totalHashrate = info.expectedHashrate || info.hashRate || 0;
+    if (totalHashrate <= 0) return;
+
+    this.domainPower = HashSuffixPipe.getPower(totalHashrate / totalDomains);
+    this.domainUnit = HashSuffixPipe.getSuffix(this.domainPower);
   }
 
   private updateChartUnitGroups() {
