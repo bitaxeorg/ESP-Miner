@@ -20,6 +20,7 @@
 
 #define MAX_EXTRANONCE_2_LEN 32
 #define TRANSPORT_TIMEOUT_MS 5000
+#define RECEIVE_TIMEOUT_MS (3 * 60 * 1000)
 #define BUFFER_SIZE 1024
 #define PROBE_RECV_BUFFER_SIZE 2048
 
@@ -257,7 +258,7 @@ esp_err_t stratum_v1_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
             break;
         }
 
-        char *line = STRATUM_V1_receive_jsonrpc_line(transport);
+        char *line = STRATUM_V1_receive_jsonrpc_line(transport, RECEIVE_TIMEOUT_MS);
         if (!line) {
             if (stratum_reconnect_requested()) {
                 ESP_LOGI(TAG, "Reconnect requested during read");
