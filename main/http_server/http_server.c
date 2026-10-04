@@ -16,6 +16,7 @@
 #include "esp_timer.h"
 #include "esp_wifi.h"
 #include "esp_vfs.h"
+#include "esp_psram.h"
 
 #include "dns_server.h"
 #include "esp_ota_ops.h"
@@ -27,6 +28,7 @@
 #include "lwip/sockets.h"
 
 #include "cJSON.h"
+#include "yyjson.h"
 #include "global_state.h"
 #include "nvs_config.h"
 #include "system.h"
@@ -72,7 +74,6 @@ static const char * STATS_LABEL_FREE_HEAP = "freeHeap";
 static const char * STATS_LABEL_RESPONSE_TIME = "responseTime";
 
 static int system_info_prebuffer_len = 256;
-static int system_statistics_prebuffer_len = 256;
 static int system_wifi_scan_prebuffer_len = 256;
 static int api_common_prebuffer_len = 256;
 
@@ -1565,6 +1566,21 @@ static esp_err_t POST_system_boot(httpd_req_t *req)
     return send_res;
 }
 
+static void *yyjson_psram_malloc(void *ctx, size_t size)
+{
+    return heap_caps_malloc(size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+}
+
+static void *yyjson_psram_realloc(void *ctx, void *ptr, size_t old_size, size_t size)
+{
+    return heap_caps_realloc(ptr, size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+}
+
+static void yyjson_psram_free(void *ctx, void *ptr)
+{
+    heap_caps_free(ptr);
+}
+
 static esp_err_t GET_system_statistics(httpd_req_t * req)
 {
     if (is_network_allowed(req) != ESP_OK) {
@@ -1611,66 +1627,99 @@ static esp_err_t GET_system_statistics(httpd_req_t * req)
         }
     }
 
-    // Create object for statistics
-    cJSON * root = cJSON_CreateObject();
-    cJSON_AddNumberToObject(root, "currentTimestamp", (esp_timer_get_time() / 1000));
+    // Optimize TCP socket latency
+    int sockfd = httpd_req_to_sockfd(req);
+    if (sockfd >= 0) {
+        int enable = 1;
+        setsockopt(sockfd, IPPROTO_TCP, TCP_NODELAY, &enable, sizeof(enable));
+    }
 
-    cJSON * labelArray = cJSON_CreateArray();
-    if (dataSelection[SRC_HASHRATE]) { cJSON_AddItemToArray(labelArray, cJSON_CreateString(STATS_LABEL_HASHRATE)); }
-    if (dataSelection[SRC_HASHRATE_1m]) { cJSON_AddItemToArray(labelArray, cJSON_CreateString(STATS_LABEL_HASHRATE_1m)); }
-    if (dataSelection[SRC_HASHRATE_10m]) { cJSON_AddItemToArray(labelArray, cJSON_CreateString(STATS_LABEL_HASHRATE_10m)); }
-    if (dataSelection[SRC_HASHRATE_1h]) { cJSON_AddItemToArray(labelArray, cJSON_CreateString(STATS_LABEL_HASHRATE_1h)); }
-    if (dataSelection[SRC_ERROR_PERCENTAGE]) { cJSON_AddItemToArray(labelArray, cJSON_CreateString(STATS_LABEL_ERROR_PERCENTAGE)); }
-    if (dataSelection[SRC_ASIC_TEMP]) { cJSON_AddItemToArray(labelArray, cJSON_CreateString(STATS_LABEL_ASIC_TEMP)); }
-    if (dataSelection[SRC_ASIC_TEMP2]) { cJSON_AddItemToArray(labelArray, cJSON_CreateString(STATS_LABEL_ASIC_TEMP2)); }
-    if (dataSelection[SRC_VR_TEMP]) { cJSON_AddItemToArray(labelArray, cJSON_CreateString(STATS_LABEL_VR_TEMP)); }
-    if (dataSelection[SRC_ASIC_VOLTAGE]) { cJSON_AddItemToArray(labelArray, cJSON_CreateString(STATS_LABEL_ASIC_VOLTAGE)); }
-    if (dataSelection[SRC_VOLTAGE]) { cJSON_AddItemToArray(labelArray, cJSON_CreateString(STATS_LABEL_VOLTAGE)); }
-    if (dataSelection[SRC_POWER]) { cJSON_AddItemToArray(labelArray, cJSON_CreateString(STATS_LABEL_POWER)); }
-    if (dataSelection[SRC_CURRENT]) { cJSON_AddItemToArray(labelArray, cJSON_CreateString(STATS_LABEL_CURRENT)); }
-    if (dataSelection[SRC_FAN_SPEED]) { cJSON_AddItemToArray(labelArray, cJSON_CreateString(STATS_LABEL_FAN_SPEED)); }
-    if (dataSelection[SRC_FAN_RPM]) { cJSON_AddItemToArray(labelArray, cJSON_CreateString(STATS_LABEL_FAN_RPM)); }
-    if (dataSelection[SRC_FAN2_RPM]) { cJSON_AddItemToArray(labelArray, cJSON_CreateString(STATS_LABEL_FAN2_RPM)); }
-    if (dataSelection[SRC_WIFI_RSSI]) { cJSON_AddItemToArray(labelArray, cJSON_CreateString(STATS_LABEL_WIFI_RSSI)); }
-    if (dataSelection[SRC_FREE_HEAP]) { cJSON_AddItemToArray(labelArray, cJSON_CreateString(STATS_LABEL_FREE_HEAP)); }
-    if (dataSelection[SRC_RESPONSE_TIME]) { cJSON_AddItemToArray(labelArray, cJSON_CreateString(STATS_LABEL_RESPONSE_TIME)); }
-    cJSON_AddItemToArray(labelArray, cJSON_CreateString(STATS_LABEL_TIMESTAMP));
+    yyjson_alc alc;
+    const yyjson_alc *alc_ptr = NULL;
+    if (esp_psram_is_initialized()) {
+        alc.malloc = yyjson_psram_malloc;
+        alc.realloc = yyjson_psram_realloc;
+        alc.free = yyjson_psram_free;
+        alc.ctx = NULL;
+        alc_ptr = &alc;
+    }
 
-    cJSON_AddItemToObject(root, "labels", labelArray);
+    yyjson_mut_doc *doc = yyjson_mut_doc_new(alc_ptr);
+    if (!doc) {
+        httpd_resp_send_500(req);
+        return ESP_FAIL;
+    }
 
-    cJSON * statsArray = cJSON_AddArrayToObject(root, "statistics");
+    yyjson_mut_val *root = yyjson_mut_obj(doc);
+    yyjson_mut_doc_set_root(doc, root);
+
+    yyjson_mut_obj_add_uint(doc, root, "currentTimestamp", (uint64_t)(esp_timer_get_time() / 1000));
+
+    yyjson_mut_val *labelArray = yyjson_mut_obj_add_arr(doc, root, "labels");
+    if (dataSelection[SRC_HASHRATE]) { yyjson_mut_arr_add_str(doc, labelArray, STATS_LABEL_HASHRATE); }
+    if (dataSelection[SRC_HASHRATE_1m]) { yyjson_mut_arr_add_str(doc, labelArray, STATS_LABEL_HASHRATE_1m); }
+    if (dataSelection[SRC_HASHRATE_10m]) { yyjson_mut_arr_add_str(doc, labelArray, STATS_LABEL_HASHRATE_10m); }
+    if (dataSelection[SRC_HASHRATE_1h]) { yyjson_mut_arr_add_str(doc, labelArray, STATS_LABEL_HASHRATE_1h); }
+    if (dataSelection[SRC_ERROR_PERCENTAGE]) { yyjson_mut_arr_add_str(doc, labelArray, STATS_LABEL_ERROR_PERCENTAGE); }
+    if (dataSelection[SRC_ASIC_TEMP]) { yyjson_mut_arr_add_str(doc, labelArray, STATS_LABEL_ASIC_TEMP); }
+    if (dataSelection[SRC_ASIC_TEMP2]) { yyjson_mut_arr_add_str(doc, labelArray, STATS_LABEL_ASIC_TEMP2); }
+    if (dataSelection[SRC_VR_TEMP]) { yyjson_mut_arr_add_str(doc, labelArray, STATS_LABEL_VR_TEMP); }
+    if (dataSelection[SRC_ASIC_VOLTAGE]) { yyjson_mut_arr_add_str(doc, labelArray, STATS_LABEL_ASIC_VOLTAGE); }
+    if (dataSelection[SRC_VOLTAGE]) { yyjson_mut_arr_add_str(doc, labelArray, STATS_LABEL_VOLTAGE); }
+    if (dataSelection[SRC_POWER]) { yyjson_mut_arr_add_str(doc, labelArray, STATS_LABEL_POWER); }
+    if (dataSelection[SRC_CURRENT]) { yyjson_mut_arr_add_str(doc, labelArray, STATS_LABEL_CURRENT); }
+    if (dataSelection[SRC_FAN_SPEED]) { yyjson_mut_arr_add_str(doc, labelArray, STATS_LABEL_FAN_SPEED); }
+    if (dataSelection[SRC_FAN_RPM]) { yyjson_mut_arr_add_str(doc, labelArray, STATS_LABEL_FAN_RPM); }
+    if (dataSelection[SRC_FAN2_RPM]) { yyjson_mut_arr_add_str(doc, labelArray, STATS_LABEL_FAN2_RPM); }
+    if (dataSelection[SRC_WIFI_RSSI]) { yyjson_mut_arr_add_str(doc, labelArray, STATS_LABEL_WIFI_RSSI); }
+    if (dataSelection[SRC_FREE_HEAP]) { yyjson_mut_arr_add_str(doc, labelArray, STATS_LABEL_FREE_HEAP); }
+    if (dataSelection[SRC_RESPONSE_TIME]) { yyjson_mut_arr_add_str(doc, labelArray, STATS_LABEL_RESPONSE_TIME); }
+    yyjson_mut_arr_add_str(doc, labelArray, STATS_LABEL_TIMESTAMP);
+
+    yyjson_mut_val *statsArray = yyjson_mut_obj_add_arr(doc, root, "statistics");
     struct StatisticsData statsData;
     uint16_t index = 0;
 
     while (getStatisticData(index++, &statsData)) {
-        cJSON * valueArray = cJSON_CreateArray();
-        if (dataSelection[SRC_HASHRATE]) { cJSON_AddItemToArray(valueArray, cJSON_CreateFloat(statsData.hashrate)); }
-        if (dataSelection[SRC_HASHRATE_1m]) { cJSON_AddItemToArray(valueArray, cJSON_CreateFloat(statsData.hashrate_1m)); }
-        if (dataSelection[SRC_HASHRATE_10m]) { cJSON_AddItemToArray(valueArray, cJSON_CreateFloat(statsData.hashrate_10m)); }
-        if (dataSelection[SRC_HASHRATE_1h]) { cJSON_AddItemToArray(valueArray, cJSON_CreateFloat(statsData.hashrate_1h)); }
-        if (dataSelection[SRC_ERROR_PERCENTAGE]) { cJSON_AddItemToArray(valueArray, cJSON_CreateFloat(statsData.errorPercentage)); }
-        if (dataSelection[SRC_ASIC_TEMP]) { cJSON_AddItemToArray(valueArray, cJSON_CreateFloat(statsData.chipTemperature)); }
-        if (dataSelection[SRC_ASIC_TEMP2]) { cJSON_AddItemToArray(valueArray, cJSON_CreateFloat(statsData.chipTemperature2)); }
-        if (dataSelection[SRC_VR_TEMP]) { cJSON_AddItemToArray(valueArray, cJSON_CreateFloat(statsData.vrTemperature)); }
-        if (dataSelection[SRC_ASIC_VOLTAGE]) { cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.coreVoltageActual)); }
-        if (dataSelection[SRC_VOLTAGE]) { cJSON_AddItemToArray(valueArray, cJSON_CreateFloat(statsData.voltage)); }
-        if (dataSelection[SRC_POWER]) { cJSON_AddItemToArray(valueArray, cJSON_CreateFloat(statsData.power)); }
-        if (dataSelection[SRC_CURRENT]) { cJSON_AddItemToArray(valueArray, cJSON_CreateFloat(statsData.current)); }
-        if (dataSelection[SRC_FAN_SPEED]) { cJSON_AddItemToArray(valueArray, cJSON_CreateFloat(statsData.fanSpeed)); }
-        if (dataSelection[SRC_FAN_RPM]) { cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.fanRPM)); }
-        if (dataSelection[SRC_FAN2_RPM]) { cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.fan2RPM)); }
-        if (dataSelection[SRC_WIFI_RSSI]) { cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.wifiRSSI)); }
-        if (dataSelection[SRC_FREE_HEAP]) { cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.freeHeap)); }
-        if (dataSelection[SRC_RESPONSE_TIME]) { cJSON_AddItemToArray(valueArray, cJSON_CreateFloat(statsData.responseTime)); }
-        cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.timestamp));
-
-        cJSON_AddItemToArray(statsArray, valueArray);
+        yyjson_mut_val *valueArray = yyjson_mut_arr_add_arr(doc, statsArray);
+        if (dataSelection[SRC_HASHRATE]) { yyjson_mut_arr_add_real(doc, valueArray, statsData.hashrate); }
+        if (dataSelection[SRC_HASHRATE_1m]) { yyjson_mut_arr_add_real(doc, valueArray, statsData.hashrate_1m); }
+        if (dataSelection[SRC_HASHRATE_10m]) { yyjson_mut_arr_add_real(doc, valueArray, statsData.hashrate_10m); }
+        if (dataSelection[SRC_HASHRATE_1h]) { yyjson_mut_arr_add_real(doc, valueArray, statsData.hashrate_1h); }
+        if (dataSelection[SRC_ERROR_PERCENTAGE]) { yyjson_mut_arr_add_real(doc, valueArray, statsData.errorPercentage); }
+        if (dataSelection[SRC_ASIC_TEMP]) { yyjson_mut_arr_add_real(doc, valueArray, statsData.chipTemperature); }
+        if (dataSelection[SRC_ASIC_TEMP2]) { yyjson_mut_arr_add_real(doc, valueArray, statsData.chipTemperature2); }
+        if (dataSelection[SRC_VR_TEMP]) { yyjson_mut_arr_add_real(doc, valueArray, statsData.vrTemperature); }
+        if (dataSelection[SRC_ASIC_VOLTAGE]) { yyjson_mut_arr_add_sint(doc, valueArray, statsData.coreVoltageActual); }
+        if (dataSelection[SRC_VOLTAGE]) { yyjson_mut_arr_add_real(doc, valueArray, statsData.voltage); }
+        if (dataSelection[SRC_POWER]) { yyjson_mut_arr_add_real(doc, valueArray, statsData.power); }
+        if (dataSelection[SRC_CURRENT]) { yyjson_mut_arr_add_real(doc, valueArray, statsData.current); }
+        if (dataSelection[SRC_FAN_SPEED]) { yyjson_mut_arr_add_real(doc, valueArray, statsData.fanSpeed); }
+        if (dataSelection[SRC_FAN_RPM]) { yyjson_mut_arr_add_uint(doc, valueArray, statsData.fanRPM); }
+        if (dataSelection[SRC_FAN2_RPM]) { yyjson_mut_arr_add_uint(doc, valueArray, statsData.fan2RPM); }
+        if (dataSelection[SRC_WIFI_RSSI]) { yyjson_mut_arr_add_sint(doc, valueArray, statsData.wifiRSSI); }
+        if (dataSelection[SRC_FREE_HEAP]) { yyjson_mut_arr_add_uint(doc, valueArray, statsData.freeHeap); }
+        if (dataSelection[SRC_RESPONSE_TIME]) { yyjson_mut_arr_add_real(doc, valueArray, statsData.responseTime); }
+        yyjson_mut_arr_add_uint(doc, valueArray, statsData.timestamp);
     }
 
-    esp_err_t res = HTTP_send_json(req, root, &system_statistics_prebuffer_len);
+    size_t len = 0;
+    yyjson_write_flag flg = YYJSON_WRITE_FP_TO_FIXED(2);
+    char *json_str = yyjson_mut_write_opts(doc, flg, alc_ptr, &len, NULL);
+    if (!json_str) {
+        yyjson_mut_doc_free(doc);
+        httpd_resp_send_500(req);
+        return ESP_FAIL;
+    }
 
-    cJSON_Delete(root);
+    esp_err_t res = httpd_resp_send(req, json_str, len);
 
+    if (alc_ptr && alc_ptr->free) {
+        alc_ptr->free(alc_ptr->ctx, json_str);
+    } else {
+        free(json_str);
+    }
+    yyjson_mut_doc_free(doc);
     return res;
 }
 
