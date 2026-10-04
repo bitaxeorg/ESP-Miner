@@ -26,6 +26,7 @@ typedef enum
     BM1368,
     BM1370,
     BM1373,
+    BZM,
 } Asic;
 
 typedef struct AsicConfig {
@@ -62,6 +63,7 @@ typedef enum
     GAMMA_HEX,
     GAMMA_TURBO,
     NAJA_DUO,
+    BONANZA,
 } Family;
 
 typedef struct FamilyConfig {
@@ -117,6 +119,9 @@ static const uint16_t BM1368_VOLTAGE_OPTIONS[] = {1100, 1150, 1166, 1200, 1250, 
 static const uint16_t BM1370_VOLTAGE_OPTIONS[] = {1000, 1060, 1100, 1150, 1200, 1250,                   0};
 static const uint16_t BM1373_VOLTAGE_OPTIONS[] = {1000, 1060, 1100, 1150, 1200, 1250,                   0};
 
+static const uint16_t BZM_FREQUENCY_OPTIONS[] = {800, 1000, 1150, 1200, 1350, 1400, 1425, 1500, 0};
+static const uint16_t BZM_VOLTAGE_OPTIONS[] = {2800, 2900, 3000, 3100, 3200, 0};
+static const AsicConfig ASIC_BZM = { .id = BZM, .name = "BZM", .chip_id = 0xB0A0, .default_frequency_mhz = 800, .frequency_options = BZM_FREQUENCY_OPTIONS, .default_voltage_mv = 2800, .voltage_options = BZM_VOLTAGE_OPTIONS, .difficulty = 256, .core_count = 236, .small_core_count = 236, .hash_domains = 1, .hashrate_test_percentage_target = 0.85, .default_asic_timeout = 100, .hardware_version_rolling = false, .software_midstates = 4, .init_retry_attempts = 1, .domain_hashrate_scale = 1.0f };
 static const AsicConfig ASIC_BM1397 = { .id = BM1397, .name = "BM1397", .chip_id = 1397, .default_frequency_mhz = 425, .frequency_options = BM1397_FREQUENCY_OPTIONS, .default_voltage_mv = 1400, .voltage_options = BM1397_VOLTAGE_OPTIONS, .difficulty = 256, .core_count = 168, .small_core_count =  672, .hash_domains = 1, .default_asic_timeout = 20, .hardware_version_rolling = false, .software_midstates = 4, .hashrate_test_percentage_target = 0.85};
 static const AsicConfig ASIC_BM1366 = { .id = BM1366, .name = "BM1366", .chip_id = 1366, .default_frequency_mhz = 485, .frequency_options = BM1366_FREQUENCY_OPTIONS, .default_voltage_mv = 1200, .voltage_options = BM1366_VOLTAGE_OPTIONS, .difficulty = 256, .core_count = 112, .small_core_count =  894, .hash_domains = 4, .default_asic_timeout = 2000, .hardware_version_rolling = true, .software_midstates = 0, .hashrate_test_percentage_target = 0.85};
 static const AsicConfig ASIC_BM1368 = { .id = BM1368, .name = "BM1368", .chip_id = 1368, .default_frequency_mhz = 490, .frequency_options = BM1368_FREQUENCY_OPTIONS, .default_voltage_mv = 1166, .voltage_options = BM1368_VOLTAGE_OPTIONS, .difficulty = 256, .core_count =  80, .small_core_count = 1276, .hash_domains = 4, .default_asic_timeout = 500, .hardware_version_rolling = true, .software_midstates = 0, .hashrate_test_percentage_target = 0.80};
@@ -132,6 +137,7 @@ static const AsicConfig default_asic_configs[] = {
     ASIC_BM1370,
     ASIC_BM1370XP,
     ASIC_BM1373,
+    ASIC_BZM,
 };
 
 static const FamilyConfig FAMILY_MAX         = { .id = MAX,         .name = "Max",        .asic = ASIC_BM1397,   .asic_count = 1, .max_power =  25, .power_offset = 5,  .nominal_voltage = 5,  .voltage_domains = 1, .swarm_color = "red",      .tps546_config = &TPS546_CONFIG_DEFAULT, };
@@ -145,6 +151,8 @@ static const FamilyConfig FAMILY_GAMMA_TURBO = { .id = GAMMA_TURBO, .name = "Gam
 static const FamilyConfig FAMILY_NAJA_DUO    = { .id = NAJA_DUO,    .name = "NajaDuo",    .asic = ASIC_BM1373,   .asic_count = 2, .max_power =  60, .power_offset = 0,  .nominal_voltage = 12, .voltage_domains = NAJA_DUO_VOLTAGE_DOMAINS, .swarm_color = "magenta",  .tps546_config = &TPS546_CONFIG_NAJA_DUO, };
 static const FamilyConfig FAMILY_GAMMA_HEX   = { .id = GAMMA_HEX,   .name = "GammaHex",   .asic = ASIC_BM1370_HEX, .asic_count = 6, .max_power = 180, .power_offset = 25, .nominal_voltage = 12, .voltage_domains = GAMMA_HEX_VOLTAGE_DOMAINS, .swarm_color = "cyan", .tps546_config = &TPS546_CONFIG_GAMMA_HEX, };
 
+static const FamilyConfig FAMILY_BONANZA = { .id = BONANZA, .name = "Bonanza", .asic = ASIC_BZM, .asic_count = 4, .max_power = 140, .power_offset = 0, .nominal_voltage = 12, .voltage_domains = 1, .swarm_color = "yellow" };
+
 static const FamilyConfig default_families[] = {
     FAMILY_MAX,
     FAMILY_ULTRA,
@@ -155,9 +163,11 @@ static const FamilyConfig default_families[] = {
     FAMILY_GAMMA_HEX,
     FAMILY_GAMMA_TURBO,
     FAMILY_NAJA_DUO,
+    FAMILY_BONANZA,
 };
 
 static const DeviceConfig default_configs[] = {
+    { .board_version = "1002", .family = FAMILY_BONANZA, .pins = { .bap = NULL, .i2c = &DEFAULT_I2C_PINS, .i80 = NULL }, .TPS546 = true },
     { .board_version = "2.2",  .family = FAMILY_MAX,         .pins = BITAXE_ORIGINAL_PINS, .EMC2101 = true,                                                                                 .DS4432U = true, .INA260 = true, .plug_sense = true, .asic_enable = true, .power_consumption_target = 12, },
     { .board_version = "102",  .family = FAMILY_MAX,         .pins = BITAXE_ORIGINAL_PINS, .EMC2101 = true,                                                                                 .DS4432U = true, .INA260 = true, .plug_sense = true, .asic_enable = true, .power_consumption_target = 12, },
     { .board_version = "0.11", .family = FAMILY_ULTRA,       .pins = BITAXE_ORIGINAL_PINS, .EMC2101 = true, .emc_internal_temp = true,                                  .temp_offset = 5,   .DS4432U = true, .INA260 = true, .plug_sense = true, .asic_enable = true, .power_consumption_target = 12, },

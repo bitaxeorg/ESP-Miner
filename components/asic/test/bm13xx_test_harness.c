@@ -23,8 +23,8 @@ const bm13xx_harness_driver_t
 
 enum { MAX_PACKETS = 128, JOB_SLOT = 0x10, JOB_SLOTS = 128 };
 static GlobalState fixture_state;
-static bm_job saved_job;
-static bm_job *active_jobs[JOB_SLOTS];
+static asic_job_t saved_job;
+static asic_job_t *active_jobs[JOB_SLOTS];
 static uint8_t valid_jobs[JOB_SLOTS];
 static bm13xx_harness_packet_t packets[MAX_PACKETS];
 static size_t packet_count;
@@ -60,7 +60,7 @@ void bm13xx_harness_end(void)
 {
     for (size_t index = 0; index < JOB_SLOTS; ++index) {
         if (active_jobs[index] != NULL && active_jobs[index] != &saved_job) {
-            free_bm_job(active_jobs[index]);
+            free(active_jobs[index]);
             active_jobs[index] = NULL;
         }
     }
@@ -90,13 +90,13 @@ const bm13xx_harness_packet_t *bm13xx_harness_packet(size_t index)
     return &packets[index];
 }
 
-bm_job *bm13xx_harness_active_job(uint8_t job_id)
+asic_job_t *bm13xx_harness_active_job(uint8_t job_id)
 {
     TEST_ASSERT_TRUE(job_id < JOB_SLOTS);
     return active_jobs[job_id];
 }
 
-void bm13xx_harness_install_job(uint8_t job_id, bm_job *job)
+void bm13xx_harness_install_job(uint8_t job_id, asic_job_t *job)
 {
     TEST_ASSERT_TRUE(job_id < JOB_SLOTS);
     TEST_ASSERT_NULL(active_jobs[job_id]);
@@ -116,7 +116,7 @@ unsigned bm13xx_harness_delay_count(void)
 
 void bm13xx_harness_set_job(uint32_t version, bool valid, bool present)
 {
-    saved_job = (bm_job) {.version = version};
+    saved_job = (asic_job_t) {.version = version};
     active_jobs[JOB_SLOT] = present ? &saved_job : NULL;
     valid_jobs[JOB_SLOT] = valid;
 }

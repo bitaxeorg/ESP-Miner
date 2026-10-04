@@ -20,6 +20,11 @@ static const char *TAG = "asic_init";
 
 uint8_t asic_initialize(GlobalState *GLOBAL_STATE, asic_init_mode_t mode, uint32_t stabilization_delay_ms)
 {
+    if (GLOBAL_STATE->DEVICE_CONFIG.family.id == BONANZA) {
+        GLOBAL_STATE->SYSTEM_MODULE.asic_status = "Bonanza startup is owned by its board driver";
+        return 0;
+    }
+
     const char *mode_str = (mode == ASIC_INIT_COLD_BOOT) ? "cold boot" : "recovery";
     const uint8_t max_attempts = GLOBAL_STATE->DEVICE_CONFIG.family.asic.init_retry_attempts > 0
                                      ? GLOBAL_STATE->DEVICE_CONFIG.family.asic.init_retry_attempts

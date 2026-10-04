@@ -1,4 +1,8 @@
 #include "thermal.h"
+#include "bzm/bridge.h"
+#include "bzm/driver.h"
+#include "bonanza_power_task.h"
+#include <math.h>
 #include "device_config.h"
 #include "global_state.h"
 
@@ -15,9 +19,16 @@ static const char * TAG = "thermal";
 #define BM1373_TEMP_SCALE 0.9613546f
 #define BM1373_TEMP_OFFSET (-5.0858026f)
 #define NAJA_DUO_DIODE2_TEMP_OFFSET (-10.7f)
+/* Bonanza fan floor while mining; the board owner forces full speed otherwise. */
+#define BONANZA_FAN_MIN_PERCENT 36U
 
 esp_err_t Thermal_init(DeviceConfig * DEVICE_CONFIG)
 {
+    if (DEVICE_CONFIG->family.id == BONANZA) {
+        (void)BZM_bridge_init();
+        return ESP_OK; /* Board owner verifies safety before powering up. */
+    }
+
     if (DEVICE_CONFIG->EMC2101) {
         ESP_RETURN_ON_ERROR(EMC2101_init(DEVICE_CONFIG->temp_offset), TAG, "Failed to initialise EMC2101");
         // TODO: Improve this check.
@@ -62,6 +73,13 @@ esp_err_t Thermal_init(DeviceConfig * DEVICE_CONFIG)
 //percent is a float between 0.0 and 1.0
 esp_err_t Thermal_set_fan_percent(DeviceConfig * DEVICE_CONFIG, float percent)
 {
+    if (DEVICE_CONFIG->family.id == BONANZA) {
+        if (!isfinite(percent)) return ESP_ERR_INVALID_ARG;
+        if (!BONANZA_POWER_MANAGEMENT_fan_control_allowed()) percent = 1.0f;
+        percent = fmaxf(BONANZA_FAN_MIN_PERCENT / 100.0f, fminf(1.0f, percent));
+        return BZM_bridge_set_fan_percent(percent);
+    }
+
     if (DEVICE_CONFIG->EMC2101) {
         return EMC2101_set_fan_speed(percent);
     }
@@ -76,6 +94,12 @@ esp_err_t Thermal_set_fan_percent(DeviceConfig * DEVICE_CONFIG, float percent)
 
 uint16_t Thermal_get_fan_speed(DeviceConfig * DEVICE_CONFIG) 
 {
+    if (DEVICE_CONFIG->family.id == BONANZA) {
+        uint16_t rpm = 0;
+        (void)BZM_bridge_get_fan_rpm(&rpm);
+        return rpm;
+    }
+
     if (DEVICE_CONFIG->EMC2101) {
         return EMC2101_get_fan_speed();
     }
@@ -98,6 +122,9 @@ uint16_t Thermal_get_fan2_speed(DeviceConfig * DEVICE_CONFIG)
 
 float Thermal_get_chip_temp(GlobalState * GLOBAL_STATE)
 {
+    if (GLOBAL_STATE->DEVICE_CONFIG.family.id == BONANZA)
+        return BZM_read_temperature(GLOBAL_STATE);
+
     if (!GLOBAL_STATE->ASIC_initalized) {
         return -1;
     }
@@ -120,6 +147,8 @@ float Thermal_get_chip_temp(GlobalState * GLOBAL_STATE)
 
 float Thermal_get_chip_temp2(GlobalState * GLOBAL_STATE)
 {
+    if (GLOBAL_STATE->DEVICE_CONFIG.family.id == BONANZA) return -1;
+
     if (!GLOBAL_STATE->ASIC_initalized) {
         return -1;
     }

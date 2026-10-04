@@ -33,6 +33,7 @@
 #include "thermal.h"
 #include "utils.h"
 #include "self_test.h"
+#include "bzm/driver.h"
 #include "filesystem.h"
 #include "embedded_web_ui.h"
 #include "hashrate_monitor_task.h"
@@ -277,7 +278,7 @@ void SYSTEM_init_system(GlobalState * GLOBAL_STATE)
     // The stratum tasks touch valid_jobs (SYSTEM_clean_jobs_queue) as soon as they
     // connect, so tying the allocation to create_jobs_task actually starting is a
     // NULL dereference waiting to happen if that task ever fails to spawn.
-    GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs = heap_caps_calloc(MAX_ASIC_JOBS, sizeof(bm_job *), MALLOC_CAP_SPIRAM);
+    GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs = heap_caps_calloc(MAX_ASIC_JOBS, sizeof(*GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs), MALLOC_CAP_SPIRAM);
     GLOBAL_STATE->ASIC_TASK_MODULE.valid_jobs = heap_caps_calloc(MAX_ASIC_JOBS, sizeof(uint8_t), MALLOC_CAP_SPIRAM);
     if (GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs == NULL || GLOBAL_STATE->ASIC_TASK_MODULE.valid_jobs == NULL) {
         ESP_LOGE(TAG, "Failed to allocate job tracking tables");
@@ -389,7 +390,8 @@ esp_err_t SYSTEM_init_peripherals(GlobalState * GLOBAL_STATE) {
     }
 
     // For self-test, we set a stable known voltage before ASIC initialization
-    if (GLOBAL_STATE->SELF_TEST_MODULE.is_active) {
+    if (GLOBAL_STATE->SELF_TEST_MODULE.is_active &&
+        GLOBAL_STATE->DEVICE_CONFIG.family.id != BONANZA) {
         vTaskDelay(500 / portTICK_PERIOD_MS);
 
         ret = VCORE_set_voltage(GLOBAL_STATE, (float)GLOBAL_STATE->DEVICE_CONFIG.family.asic.default_voltage_mv / 1000.0f);
@@ -412,6 +414,9 @@ esp_err_t SYSTEM_init_peripherals(GlobalState * GLOBAL_STATE) {
 
 void SYSTEM_clean_jobs_queue(GlobalState * GLOBAL_STATE)
 {
+    if (GLOBAL_STATE->DEVICE_CONFIG.family.asic.id == BZM)
+        (void)BZM_clear_work(GLOBAL_STATE);
+
     ESP_LOGI(TAG, "Clean Jobs: invalidating active jobs");
 
     pthread_mutex_lock(&GLOBAL_STATE->ASIC_TASK_MODULE.valid_jobs_lock);

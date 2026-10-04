@@ -1,3 +1,5 @@
+#include "bonanza_power_task.h"
+#include "bonanza_tps546.h"
 #include <string.h>
 #include <stdlib.h>
 #include <math.h>
@@ -308,7 +310,8 @@ esp_err_t self_test_init(GlobalState * GLOBAL_STATE)
         GLOBAL_STATE->SELF_TEST_MODULE.is_active = true;
         GLOBAL_STATE->SELF_TEST_MODULE.is_factory = isFactoryTest;
         pthread_mutex_init(&GLOBAL_STATE->SELF_TEST_MODULE.nonce_measurement.lock, NULL);
-        GLOBAL_STATE->DEVICE_CONFIG.family.asic.difficulty = DIFFICULTY;
+        if (GLOBAL_STATE->DEVICE_CONFIG.family.id != BONANZA)
+            GLOBAL_STATE->DEVICE_CONFIG.family.asic.difficulty = DIFFICULTY;
         GLOBAL_STATE->SYSTEM_MODULE.is_connected = true;
 
     // No need to set version_mask, it uses default mask which is fine
@@ -370,13 +373,20 @@ static esp_err_t test_power_consumption(GlobalState * GLOBAL_STATE)
         margin = DEFAULT_POWER_CONSUMPTION_MARGIN;
     }
     float maximum_power = target_power + margin;
+    if (GLOBAL_STATE->DEVICE_CONFIG.family.id == BONANZA)
+        maximum_power = GLOBAL_STATE->DEVICE_CONFIG.family.max_power;
 
     float power = 0;
     float current = 0;
 
     uint8_t phase_count = VCORE_get_phase_count(GLOBAL_STATE);
-    if (phase_count > 1 &&
-        TPS546_check_phase_currents(phase_count, MULTIPHASE_BUCK_MIN_CURRENT_A) != ESP_OK) {
+    esp_err_t phase_result = ESP_OK;
+    if (phase_count > 1) {
+        phase_result = GLOBAL_STATE->DEVICE_CONFIG.family.id == BONANZA
+            ? BONANZA_TPS546_check_phase_currents(phase_count, MULTIPHASE_BUCK_MIN_CURRENT_A)
+            : TPS546_check_phase_currents(phase_count, MULTIPHASE_BUCK_MIN_CURRENT_A);
+    }
+    if (phase_result != ESP_OK) {
         ESP_LOGE(TAG, "MULTIPHASE BUCK test failed!");
         self_test_show_message(GLOBAL_STATE, "BUCK:FAIL");
         return ESP_FAIL;
@@ -461,6 +471,12 @@ void self_test_task(void * pvParameters)
     // Check if we already have an error message from peripheral initialization
     if (GLOBAL_STATE->SELF_TEST_MODULE.system_init_ret != ESP_OK) {
         ESP_LOGE(TAG, "Aborting self-test due to initialization failure: %s", GLOBAL_STATE->SELF_TEST_MODULE.message);
+        tests_done(GLOBAL_STATE, false);
+    }
+
+    if (GLOBAL_STATE->DEVICE_CONFIG.family.id == BONANZA &&
+        !BONANZA_POWER_MANAGEMENT_wait_started(180000)) {
+        self_test_show_message(GLOBAL_STATE, "BONANZA START:FAIL");
         tests_done(GLOBAL_STATE, false);
     }
 
@@ -605,6 +621,7 @@ void self_test_task(void * pvParameters)
                               GLOBAL_STATE->DEVICE_CONFIG.family.asic.small_core_count *
                               GLOBAL_STATE->DEVICE_CONFIG.family.asic_count / 1000.0f *
                               GLOBAL_STATE->DEVICE_CONFIG.family.asic.hashrate_test_percentage_target;
+    if (GLOBAL_STATE->DEVICE_CONFIG.family.id == BONANZA) expected_hashrate *= 4.0f / 3.0f;
     float expected_domain_hashrate = expected_hashrate /
                                      GLOBAL_STATE->DEVICE_CONFIG.family.asic.hash_domains /
                                      GLOBAL_STATE->DEVICE_CONFIG.family.asic_count;
@@ -778,8 +795,13 @@ static void tests_done(GlobalState * GLOBAL_STATE, bool isTestPassed)
 {
     GLOBAL_STATE->SELF_TEST_MODULE.is_finished = true;
     self_test_stop_nonce_measurement(GLOBAL_STATE);
-    asic_hold_reset_low();
-    if (VCORE_is_initialized()) {
+    bool bonanza = GLOBAL_STATE->DEVICE_CONFIG.family.id == BONANZA;
+    if (bonanza) {
+        isTestPassed = BONANZA_POWER_MANAGEMENT_pause() && isTestPassed;
+    } else {
+        asic_hold_reset_low();
+    }
+    if (!bonanza && VCORE_is_initialized()) {
         // Let the power monitor observe is_finished and exit before VCORE is
         // intentionally disabled, otherwise it can report the OFF status as a
         // regulator fault during self-test cleanup.

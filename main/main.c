@@ -26,6 +26,7 @@
 #include "connect.h"
 #include "asic_reset.h"
 #include "asic_init.h"
+#include "bonanza_power_task.h"
 #include "task_monitor.h"
 #include "filesystem.h"
 #include "log_buffer.h"
@@ -160,7 +161,9 @@ void app_main(void)
     esp_err_t system_init_ret = SYSTEM_init_peripherals(&GLOBAL_STATE);
     
     if (system_init_ret == ESP_OK) {
-        if (xTaskCreate(POWER_MANAGEMENT_task, "power management", 8192, (void *) &GLOBAL_STATE, 10, NULL) != pdPASS) {
+        if (GLOBAL_STATE.DEVICE_CONFIG.family.id == BONANZA) {
+            if (BONANZA_POWER_MANAGEMENT_init(&GLOBAL_STATE) != ESP_OK) system_init_ret = ESP_FAIL;
+        } else if (xTaskCreate(POWER_MANAGEMENT_task, "power management", 8192, (void *) &GLOBAL_STATE, 10, NULL) != pdPASS) {
             ESP_LOGE(TAG, "Error creating power management task");
         }
         if (!GLOBAL_STATE.SELF_TEST_MODULE.is_active) {
@@ -231,7 +234,8 @@ void app_main(void)
     miner_job_pool_init();
 
     if (system_init_ret == ESP_OK) {
-        if (asic_initialize(&GLOBAL_STATE, ASIC_INIT_COLD_BOOT, 0) == 0) {
+        if (GLOBAL_STATE.DEVICE_CONFIG.family.id != BONANZA &&
+            asic_initialize(&GLOBAL_STATE, ASIC_INIT_COLD_BOOT, 0) == 0) {
             if (!GLOBAL_STATE.SELF_TEST_MODULE.is_active) {
                 return;
             }
@@ -241,9 +245,11 @@ void app_main(void)
         } else {
             if (xTaskCreate(create_jobs_task, "stratum miner", 8192, (void *) &GLOBAL_STATE, 20, &GLOBAL_STATE.create_jobs_task_handle) != pdPASS) {
                 ESP_LOGE(TAG, "Error creating stratum miner task");
+                if (GLOBAL_STATE.DEVICE_CONFIG.family.id == BONANZA) system_init_ret = ESP_FAIL;
             }
             if (xTaskCreate(ASIC_result_task, "asic result", 8192, (void *) &GLOBAL_STATE, 15, NULL) != pdPASS) {
                 ESP_LOGE(TAG, "Error creating asic result task");
+                if (GLOBAL_STATE.DEVICE_CONFIG.family.id == BONANZA) system_init_ret = ESP_FAIL;
             }
 
             if (xTaskCreateWithCaps(hashrate_monitor_task, "hashrate monitor", 8192, (void *) &GLOBAL_STATE, 5, NULL, MALLOC_CAP_SPIRAM) != pdPASS) {
@@ -258,6 +264,7 @@ void app_main(void)
     if (!GLOBAL_STATE.SELF_TEST_MODULE.is_active) {
         if (xTaskCreateWithCaps(stratum_task, "stratum", 16384, (void *) &GLOBAL_STATE, 5, NULL, MALLOC_CAP_SPIRAM) != pdPASS) {
             ESP_LOGE(TAG, "Error creating stratum task");
+                if (GLOBAL_STATE.DEVICE_CONFIG.family.id == BONANZA) system_init_ret = ESP_FAIL;
         }
     }
 
@@ -265,6 +272,10 @@ void app_main(void)
         GLOBAL_STATE.SELF_TEST_MODULE.system_init_ret = system_init_ret;
         if (xTaskCreateWithCaps(self_test_task, "self_test", 8192, (void *) &GLOBAL_STATE, 10, NULL, MALLOC_CAP_SPIRAM) != pdPASS) {
             ESP_LOGE(TAG, "Error creating self test task");
+                if (GLOBAL_STATE.DEVICE_CONFIG.family.id == BONANZA) system_init_ret = ESP_FAIL;
         }
     }
+    if (system_init_ret == ESP_OK && GLOBAL_STATE.DEVICE_CONFIG.family.id == BONANZA)
+        BONANZA_POWER_MANAGEMENT_set_ready();
+
 }

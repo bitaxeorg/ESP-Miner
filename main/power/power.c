@@ -1,4 +1,5 @@
 #include "TPS546.h"
+#include "bonanza_tps546.h"
 #include "INA260.h"
 
 #include "global_state.h"
@@ -7,6 +8,13 @@
 
 void Power_get_output(GlobalState * GLOBAL_STATE, float * power_out, float * current_out)
 {
+    if (GLOBAL_STATE->DEVICE_CONFIG.family.id == BONANZA) {
+        float amps = BONANZA_TPS546_get_iout();
+        *current_out = amps * 1000.0f;
+        *power_out = amps * BONANZA_TPS546_get_vout();
+        return;
+    }
+
     float cur_val = 0.0f;
     float pow_val = 0.0f;
 
@@ -29,6 +37,10 @@ void Power_get_output(GlobalState * GLOBAL_STATE, float * power_out, float * cur
 
 float Power_get_input_voltage(GlobalState * GLOBAL_STATE)
 {
+    if (GLOBAL_STATE->DEVICE_CONFIG.family.id == BONANZA) {
+        return BONANZA_TPS546_get_vin() * 1000.0f;
+    }
+
     if (GLOBAL_STATE->DEVICE_CONFIG.TPS546) {
         return TPS546_get_vin() * 1000.0;
     }
@@ -41,6 +53,10 @@ float Power_get_input_voltage(GlobalState * GLOBAL_STATE)
 
 float Power_get_vreg_temp(GlobalState * GLOBAL_STATE)
 {
+    if (GLOBAL_STATE->DEVICE_CONFIG.family.id == BONANZA) {
+        return BONANZA_TPS546_get_temperature();
+    }
+
     if (GLOBAL_STATE->DEVICE_CONFIG.TPS546) {
         return TPS546_get_temperature();
     }
