@@ -516,7 +516,7 @@ static bool parse_set_extranonce(yyjson_val *root, StratumApiV1Message *message)
     }
     yyjson_val *extranonce1 = yyjson_arr_get(params, 0);
     yyjson_val *extranonce2_size = yyjson_arr_get(params, 1);
-    if (!extranonce1 || !extranonce2_size || !yyjson_is_str(extranonce1) || !yyjson_is_num(extranonce2_size)) {
+    if (!extranonce1 || !extranonce2_size || !yyjson_is_str(extranonce1) || !yyjson_is_int(extranonce2_size)) {
         ESP_LOGE(TAG, "Invalid extranonce data in set_extranonce");
         return false;
     }
@@ -529,13 +529,13 @@ static bool parse_set_extranonce(yyjson_val *root, StratumApiV1Message *message)
     if (message->extranonce_str) free(message->extranonce_str);
     message->extranonce_str = strdup(e1_str);
 
-    int extranonce_2_len = (int)yyjson_get_num(extranonce2_size);
-    if (extranonce_2_len < 0 || extranonce_2_len > MAX_EXTRANONCE_2_LEN) {
-        ESP_LOGW(TAG, "Invalid extranonce_2_len %d (clamping to 0..%d)",
-                 extranonce_2_len, MAX_EXTRANONCE_2_LEN);
-        extranonce_2_len = (extranonce_2_len < 0) ? 0 : MAX_EXTRANONCE_2_LEN;
+    int64_t raw_e2 = yyjson_get_sint(extranonce2_size);
+    if (raw_e2 < 0 || raw_e2 > MAX_EXTRANONCE_2_LEN) {
+        ESP_LOGW(TAG, "Invalid extranonce_2_len %" PRId64 " (clamping to 0..%d)",
+                 raw_e2, MAX_EXTRANONCE_2_LEN);
+        raw_e2 = (raw_e2 < 0) ? 0 : MAX_EXTRANONCE_2_LEN;
     }
-    message->extranonce_2_len = extranonce_2_len;
+    message->extranonce_2_len = (int)raw_e2;
     ESP_LOGI(TAG, "Set extranonce: %s, size: %d", message->extranonce_str, message->extranonce_2_len);
     return true;
 }
@@ -573,7 +573,7 @@ static bool parse_subscribe_result(yyjson_val *root, StratumApiV1Message *messag
     yyjson_val *result = yyjson_obj_get(root, "result");
     yyjson_val *extranonce = yyjson_arr_get(result, 1);
     yyjson_val *extranonce2_len = yyjson_arr_get(result, 2);
-    if (!extranonce || !extranonce2_len || !yyjson_is_str(extranonce) || !yyjson_is_num(extranonce2_len)) {
+    if (!extranonce || !extranonce2_len || !yyjson_is_str(extranonce) || !yyjson_is_int(extranonce2_len)) {
         ESP_LOGE(TAG, "Invalid extranonce data in subscribe result");
         return false;
     }
@@ -588,13 +588,13 @@ static bool parse_subscribe_result(yyjson_val *root, StratumApiV1Message *messag
     if (message->extranonce_str) free(message->extranonce_str);
     message->extranonce_str = strdup(e1_str);
 
-    int extranonce_2_len = (int)yyjson_get_num(extranonce2_len);
-    if (extranonce_2_len < 0 || extranonce_2_len > MAX_EXTRANONCE_2_LEN) {
-        ESP_LOGW(TAG, "Invalid extranonce_2_len %d in subscribe result (clamping to 0..%d)", 
-                 extranonce_2_len, MAX_EXTRANONCE_2_LEN);
-        extranonce_2_len = (extranonce_2_len < 0) ? 0 : MAX_EXTRANONCE_2_LEN;
+    int64_t raw_e2 = yyjson_get_sint(extranonce2_len);
+    if (raw_e2 < 0 || raw_e2 > MAX_EXTRANONCE_2_LEN) {
+        ESP_LOGW(TAG, "Invalid extranonce_2_len %" PRId64 " in subscribe result (clamping to 0..%d)", 
+                 raw_e2, MAX_EXTRANONCE_2_LEN);
+        raw_e2 = (raw_e2 < 0) ? 0 : MAX_EXTRANONCE_2_LEN;
     }
-    message->extranonce_2_len = extranonce_2_len;
+    message->extranonce_2_len = (int)raw_e2;
     message->response_success = true;
     ESP_LOGI(TAG, "Subscribe result: extranonce=%s, extranonce2_len=%d",
              message->extranonce_str, message->extranonce_2_len);
@@ -733,20 +733,12 @@ bool STRATUM_V1_parse(StratumApiV1Message *message, const char *stratum_json, mi
     // Parse message ID
     yyjson_val *id_json = yyjson_obj_get(root, "id");
     if (id_json && !yyjson_is_null(id_json)) {
-        if (!yyjson_is_num(id_json)) {
+        if (!yyjson_is_int(id_json)) {
             ESP_LOGE(TAG, "Invalid JSON-RPC message id");
             yyjson_doc_free(doc);
             return false;
         }
-        if (yyjson_is_real(id_json)) {
-            double dval = yyjson_get_real(id_json);
-            if (dval < 0 || dval > INT_MAX || dval != (double)(int)dval) {
-                ESP_LOGE(TAG, "Invalid JSON-RPC message id");
-                yyjson_doc_free(doc);
-                return false;
-            }
-            message->message_id = (int)dval;
-        } else if (yyjson_is_sint(id_json)) {
+        if (yyjson_is_sint(id_json)) {
             int64_t sval = yyjson_get_sint(id_json);
             if (sval < 0 || sval > INT_MAX) {
                 ESP_LOGE(TAG, "Invalid JSON-RPC message id");

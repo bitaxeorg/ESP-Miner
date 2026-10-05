@@ -372,6 +372,18 @@ TEST_CASE("Parse stratum mining.set_extranonce negative length clamped", "[strat
     TEST_ASSERT_TRUE(STRATUM_V1_parse(&msg, json_oversized_e2));
     TEST_ASSERT_EQUAL_INT(32, msg.extranonce_2_len);
 
+    const char *json_huge_e2 = "{\"id\":1,\"method\":\"mining.set_extranonce\",\"params\":[\"deadbeef\",1000000000000]}";
+    TEST_ASSERT_TRUE(STRATUM_V1_parse(&msg, json_huge_e2));
+    TEST_ASSERT_EQUAL_INT(32, msg.extranonce_2_len);
+
+    const char *json_neghuge_e2 = "{\"id\":1,\"method\":\"mining.set_extranonce\",\"params\":[\"deadbeef\",-1000000000000]}";
+    TEST_ASSERT_TRUE(STRATUM_V1_parse(&msg, json_neghuge_e2));
+    TEST_ASSERT_EQUAL_INT(0, msg.extranonce_2_len);
+
+    // Non-integer float should be rejected
+    const char *json_float_e2 = "{\"id\":1,\"method\":\"mining.set_extranonce\",\"params\":[\"deadbeef\",4.5]}";
+    TEST_ASSERT_FALSE(STRATUM_V1_parse(&msg, json_float_e2));
+
     // Odd hex string length should be rejected
     const char *json_odd_hex = "{\"id\":1,\"method\":\"mining.set_extranonce\",\"params\":[\"deadbee\",8]}";
     TEST_ASSERT_FALSE(STRATUM_V1_parse(&msg, json_odd_hex));
@@ -443,6 +455,18 @@ TEST_CASE("Parse stratum subscribe result extranonce negative size", "[mining.su
     const char *json_sub_oversized = "{\"result\":[[[\"mining.notify\",\"695482c0\"]],\"4de05269\",100],\"id\":2,\"error\":null}";
     TEST_ASSERT_TRUE(STRATUM_V1_parse(&msg, json_sub_oversized));
     TEST_ASSERT_EQUAL_INT(32, msg.extranonce_2_len);
+
+    const char *json_sub_huge = "{\"result\":[[[\"mining.notify\",\"695482c0\"]],\"4de05269\",1000000000000],\"id\":2,\"error\":null}";
+    TEST_ASSERT_TRUE(STRATUM_V1_parse(&msg, json_sub_huge));
+    TEST_ASSERT_EQUAL_INT(32, msg.extranonce_2_len);
+
+    const char *json_sub_neghuge = "{\"result\":[[[\"mining.notify\",\"695482c0\"]],\"4de05269\",-1000000000000],\"id\":2,\"error\":null}";
+    TEST_ASSERT_TRUE(STRATUM_V1_parse(&msg, json_sub_neghuge));
+    TEST_ASSERT_EQUAL_INT(0, msg.extranonce_2_len);
+
+    // Non-integer float in subscribe result should be rejected
+    const char *json_sub_float_e2 = "{\"result\":[[[\"mining.notify\",\"695482c0\"]],\"4de05269\",4.5],\"id\":2,\"error\":null}";
+    TEST_ASSERT_FALSE(STRATUM_V1_parse(&msg, json_sub_float_e2));
 
     // Odd length extranonce1 in subscribe result should be rejected
     const char *json_sub_odd_e1 = "{\"result\":[[[\"mining.notify\",\"695482c0\"]],\"4de0526\",4],\"id\":2,\"error\":null}";
@@ -696,8 +720,10 @@ TEST_CASE("Reject invalid numeric and trailing JSON-RPC values", "[stratum][secu
 {
     memset(&msg, 0, sizeof(msg));
 
-    // Float id
+    // Float id (including whole floats and exponential notation)
     TEST_ASSERT_FALSE(STRATUM_V1_parse(&msg, "{\"id\":1.5,\"result\":true,\"error\":null}"));
+    TEST_ASSERT_FALSE(STRATUM_V1_parse(&msg, "{\"id\":1.0,\"result\":true,\"error\":null}"));
+    TEST_ASSERT_FALSE(STRATUM_V1_parse(&msg, "{\"id\":1e2,\"result\":true,\"error\":null}"));
 
     // Trailing garbage after valid JSON
     TEST_ASSERT_FALSE(STRATUM_V1_parse(&msg, "{\"id\":1,\"result\":true,\"error\":null} trailing"));
