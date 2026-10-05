@@ -320,7 +320,7 @@ Once the build is done exit out of the docker session and flash the new firmware
 
 ### Cloning
 
-This project uses git submodules (e.g. libsecp256k1). Clone with `--recursive`:
+This project uses git submodules (e.g. libsecp256k1 and yyjson). Clone with `--recursive`:
 ```
 git clone --recursive https://github.com/bitaxeorg/ESP-Miner.git
 ```
