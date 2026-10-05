@@ -30,6 +30,7 @@
 
 #include "cJSON.h"
 #include "yyjson.h"
+#include "yyjson_psram.h"
 #include "global_state.h"
 #include "nvs_config.h"
 #include "system.h"
@@ -1603,21 +1604,6 @@ static esp_err_t GET_system_firmware_checksum(httpd_req_t *req)
     return res;
 }
 
-static void *yyjson_psram_malloc(void *ctx, size_t size)
-{
-    return heap_caps_malloc(size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-}
-
-static void *yyjson_psram_realloc(void *ctx, void *ptr, size_t old_size, size_t size)
-{
-    return heap_caps_realloc(ptr, size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-}
-
-static void yyjson_psram_free(void *ctx, void *ptr)
-{
-    heap_caps_free(ptr);
-}
-
 static esp_err_t GET_system_statistics(httpd_req_t * req)
 {
     if (is_network_allowed(req) != ESP_OK) {
@@ -1671,17 +1657,8 @@ static esp_err_t GET_system_statistics(httpd_req_t * req)
         setsockopt(sockfd, IPPROTO_TCP, TCP_NODELAY, &enable, sizeof(enable));
     }
 
-    yyjson_alc alc;
-    const yyjson_alc *alc_ptr = NULL;
-    if (esp_psram_is_initialized()) {
-        alc.malloc = yyjson_psram_malloc;
-        alc.realloc = yyjson_psram_realloc;
-        alc.free = yyjson_psram_free;
-        alc.ctx = NULL;
-        alc_ptr = &alc;
-    }
-
-    yyjson_mut_doc *doc = yyjson_mut_doc_new(alc_ptr);
+    const yyjson_alc *alc = yyjson_psram_alc();
+    yyjson_mut_doc *doc = yyjson_mut_doc_new(alc);
     if (!doc) {
         httpd_resp_send_500(req);
         return ESP_FAIL;
@@ -1742,7 +1719,7 @@ static esp_err_t GET_system_statistics(httpd_req_t * req)
 
     size_t len = 0;
     yyjson_write_flag flg = YYJSON_WRITE_FP_TO_FIXED(2);
-    char *json_str = yyjson_mut_write_opts(doc, flg, alc_ptr, &len, NULL);
+    char *json_str = yyjson_mut_write_opts(doc, flg, alc, &len, NULL);
     if (!json_str) {
         yyjson_mut_doc_free(doc);
         httpd_resp_send_500(req);
@@ -1751,11 +1728,7 @@ static esp_err_t GET_system_statistics(httpd_req_t * req)
 
     esp_err_t res = httpd_resp_send(req, json_str, len);
 
-    if (alc_ptr && alc_ptr->free) {
-        alc_ptr->free(alc_ptr->ctx, json_str);
-    } else {
-        free(json_str);
-    }
+    yyjson_alc_free(alc, json_str);
     yyjson_mut_doc_free(doc);
     return res;
 }
