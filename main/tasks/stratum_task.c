@@ -57,18 +57,6 @@ bool stratum_probe_pool(GlobalState *gs, uint16_t pool_idx)
     return stratum_v1_probe_pool(gs, pool_idx);
 }
 
-static void reset_share_stats(GlobalState *gs)
-{
-    for (int i = 0; i < gs->SYSTEM_MODULE.rejected_reason_stats_count; i++) {
-        gs->SYSTEM_MODULE.rejected_reason_stats[i].count = 0;
-        gs->SYSTEM_MODULE.rejected_reason_stats[i].message[0] = '\0';
-    }
-    gs->SYSTEM_MODULE.rejected_reason_stats_count = 0;
-    gs->SYSTEM_MODULE.shares_accepted = 0;
-    gs->SYSTEM_MODULE.shares_rejected = 0;
-    gs->SYSTEM_MODULE.work_received = 0;
-}
-
 static void stratum_heartbeat_task(void *pvParameters)
 {
     GlobalState *gs = (GlobalState *)pvParameters;
@@ -198,14 +186,16 @@ void stratum_task(void *pvParameters)
                 GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback = (first_idx == sec_idx);
                 consecutive_pool_failures = 0;
                 retry_attempts = 0;
-                reset_share_stats(GLOBAL_STATE);
+                GLOBAL_STATE->SYSTEM_MODULE.work_received = 0;
+                SYSTEM_reset_pool_session(GLOBAL_STATE);
             } else if (has_fallback && stratum_probe_pool(GLOBAL_STATE, second_idx)) {
                 ESP_LOGI(TAG, "Pool %u reachable, resuming mining", second_idx);
                 GLOBAL_STATE->SYSTEM_MODULE.pools_unavailable = false;
                 GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback = (second_idx == sec_idx);
                 consecutive_pool_failures = 0;
                 retry_attempts = 0;
-                reset_share_stats(GLOBAL_STATE);
+                GLOBAL_STATE->SYSTEM_MODULE.work_received = 0;
+                SYSTEM_reset_pool_session(GLOBAL_STATE);
             }
             continue;
         }
@@ -228,7 +218,8 @@ void stratum_task(void *pvParameters)
             consecutive_pool_failures = 0;
             retry_attempts = 0;
             GLOBAL_STATE->SYSTEM_MODULE.pools_unavailable = false;
-            reset_share_stats(GLOBAL_STATE);
+            GLOBAL_STATE->SYSTEM_MODULE.work_received = 0;
+            SYSTEM_reset_pool_session(GLOBAL_STATE);
             s_should_reconnect = false;
         } else {
             retry_attempts++;
@@ -245,7 +236,8 @@ void stratum_task(void *pvParameters)
                     ESP_LOGI(TAG, "Switching to %s pool (%s)",
                              GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback ? "fallback" : "primary",
                              GLOBAL_STATE->SYSTEM_MODULE.pools[GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback ? sec_idx : prim_idx].url);
-                    reset_share_stats(GLOBAL_STATE);
+                    GLOBAL_STATE->SYSTEM_MODULE.work_received = 0;
+                    SYSTEM_reset_pool_session(GLOBAL_STATE);
                 }
             }
             vTaskDelay(2000 / portTICK_PERIOD_MS);
