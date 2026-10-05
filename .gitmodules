@@ -1,3 +1,6 @@
 [submodule "components/libsecp256k1/libsecp256k1"]
 	path = components/libsecp256k1/libsecp256k1
 	url = https://github.com/bitcoin-core/secp256k1.git
+[submodule "components/yyjson/yyjson"]
+	path = components/yyjson/yyjson
+	url = https://github.com/ibireme/yyjson.git
