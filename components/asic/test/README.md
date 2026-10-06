@@ -12,6 +12,11 @@ the real production code.
 
 ## How the modules fit together
 
+The component tests below use the ESP-IDF driver/task harnesses and carry
+`[qemu-integration]` tags. Run them with `bash tools/run_qemu_tests.sh`.
+The portable PLL and timeout tests also run in the native host suite.
+See the [test-layer guide](../../../doc/unit_testing.md) for registration rules.
+
 1. A test case calls a test harness or a test task.
 2. The harness creates the required state and test data.
 3. A test instance builds the real production source with private test names.

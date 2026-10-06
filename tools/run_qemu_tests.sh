@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-set -e
+set -euo pipefail
 
 # Resolve script directory to execute relative paths correctly
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
@@ -51,4 +51,19 @@ cd build
 esptool --chip esp32s3 merge-bin --pad-to-size 16MB -o flash_image.bin @flash_args
 
 echo "Running tests in QEMU emulator..."
-qemu-system-xtensa -machine esp32s3 -monitor none -nographic -no-reboot -watchdog-action shutdown -drive file=flash_image.bin,if=mtd,format=raw -m 4 -serial stdio
+qemu_log="$(mktemp)"
+trap 'rm -f "$qemu_log"' EXIT
+
+timeout "${QEMU_TIMEOUT:-5m}" qemu-system-xtensa \
+    -machine esp32s3 \
+    -nographic \
+    -no-reboot \
+    -watchdog-action shutdown \
+    -drive file=flash_image.bin,if=mtd,format=raw \
+    -m 4 \
+    | tee "$qemu_log"
+
+if ! grep -Eq '[0-9]+ Tests 0 Failures 0 Ignored' "$qemu_log"; then
+    echo "ERROR: QEMU did not report a successful Unity test summary." >&2
+    exit 1
+fi

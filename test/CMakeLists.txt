@@ -12,9 +12,9 @@ set(EXTRA_COMPONENT_DIRS "../components")
 #
 set(TEST_COMPONENTS "stratum stratum_v2 asic" CACHE STRING "List of components to test")
 
-include($ENV{IDF_PATH}/tools/cmake/project.cmake)
+set(IDF_TARGET "esp32s3" CACHE STRING "IDF target")
 
-set(IDF_TARGET "esp32s3")
+include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 
 idf_build_set_property(COMPILE_DEFINITIONS "-DCONFIG_ASIC_FREQUENCY=100" APPEND)
 

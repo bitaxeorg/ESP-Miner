@@ -1,6 +1,5 @@
 #include "unity.h"
 #include "mining.h"
-#include "stratum_api.h"
 #include "utils.h"
 
 #include <limits.h>
@@ -22,9 +21,9 @@ TEST_CASE("Check coinbase tx construction", "[mining]")
     uint8_t coinbase_tx_hash[32];
     calculate_coinbase_tx_hash_bin(c1_bin, c1_len, en1_bin, en1_len, en2_bin, en2_len, c2_bin, c2_len, coinbase_tx_hash);
 
-    char expected_coinbase_tx[] = "01000000010000000000000000000000000000000000000000000000000000000000000000ffffffff20020862062f503253482f04b8864e5008e969579199999999072f736c7573682f000000000100f2052a010000001976a914d23fcdf86f7e756a64a7a9688ef9903327048ed988ac00000000";
-    size_t expected_coinbase_tx_len = strlen(expected_coinbase_tx) / 2;
-    uint8_t expected_coinbase_tx_bin[expected_coinbase_tx_len];
+    static const char expected_coinbase_tx[] = "01000000010000000000000000000000000000000000000000000000000000000000000000ffffffff20020862062f503253482f04b8864e5008e969579199999999072f736c7573682f000000000100f2052a010000001976a914d23fcdf86f7e756a64a7a9688ef9903327048ed988ac00000000";
+    const size_t expected_coinbase_tx_len = (sizeof(expected_coinbase_tx) - 1) / 2;
+    uint8_t expected_coinbase_tx_bin[(sizeof(expected_coinbase_tx) - 1) / 2];
     hex2bin(expected_coinbase_tx, expected_coinbase_tx_bin, expected_coinbase_tx_len);
 
     uint8_t expected_coinbase_tx_hash[32];
@@ -151,6 +150,7 @@ TEST_CASE("Test nonce diff checking", "[mining test_nonce][not-on-qemu]")
     static miner_job_t mjob;
     memset(&mjob, 0, sizeof(mjob));
     hex2bin("d02b10fc0d4711eae1a805af50a8a83312a2215e00017f2b0000000000000000", mjob.prev_hash, 32);
+    reverse_endianness_per_word(mjob.prev_hash);
     mjob.version = 0x20000004;
     mjob.nbits = 0x1705ae3a;
     mjob.ntime = 0x646ff1a9;
@@ -173,6 +173,7 @@ TEST_CASE("Test nonce diff checking 2", "[mining test_nonce][not-on-qemu]")
     static miner_job_t mjob;
     memset(&mjob, 0, sizeof(mjob));
     hex2bin("0c859545a3498373a57452fac22eb7113df2a465000543520000000000000000", mjob.prev_hash, 32);
+    reverse_endianness_per_word(mjob.prev_hash);
     mjob.version = 0x20000004;
     mjob.nbits = 0x1705ae3a;
     mjob.ntime = 0x647025b5;
