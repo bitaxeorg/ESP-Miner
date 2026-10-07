@@ -1,7 +1,8 @@
 import { Component, OnInit, ViewChild, Input, OnDestroy, ElementRef, HostListener, effect, NgZone, ChangeDetectionStrategy, ChangeDetectorRef } from '@angular/core';
-import { map, Observable, shareReplay, Subscription, switchMap, tap, first, Subject, takeUntil, BehaviorSubject, filter, combineLatest, finalize } from 'rxjs';
+import { map, Observable, shareReplay, Subscription, switchMap, tap, first, Subject, takeUntil, BehaviorSubject, filter, combineLatest, finalize, catchError, of, startWith } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
 import { getHttpErrorMessage } from 'src/app/utils/error-handler';
+import { isFrequencyLow } from 'src/app/utils/common-functions';
 import { FormBuilder, FormGroup } from '@angular/forms';
 import { ToastrService } from 'ngx-toastr';
 import { DateAgoPipe } from 'src/app/pipes/date-ago.pipe';
@@ -186,6 +187,8 @@ export class HomeComponent implements OnInit, OnDestroy {
   public expectedEfficiency: number = 0;
   public activePoolUserAddressPart: string = '';
   public activePoolUserSuffixPart: string = '';
+  public activePoolShareWarning: boolean = true;
+  public orderedCoinbaseOutputs: ISystemInfo['coinbaseOutputs'] = [];
   public sortedRejectionReasons: Array<{ message: string; count: number; percentage: number }> = [];
   public networkDifficultyPercentage: string = '0';
   public payoutPercentage: number = -1;
@@ -952,24 +955,21 @@ export class HomeComponent implements OnInit, OnDestroy {
         this.networkDifficultyPercentage = this.getNetworkDifficultyPercentage(info);
         this.payoutPercentage = this.getPayoutPercentage(info);
 
-        if (this.targetPoolLabel !== null) {
-          const targetMatches = (this.targetPoolLabel === 'Fallback')
-            ? (info.useFallbackStratum === 1)
-            : (info.useFallbackStratum === 0);
-          if (targetMatches) {
-            this.targetPoolLabel = null;
-          }
+        const preferredPool: PoolLabel = info.useFallbackStratum === 1 ? 'Fallback' : 'Primary';
+        const activePool: PoolLabel = info.isUsingFallbackStratum === 1 ? 'Fallback' : 'Primary';
+
+        // Keep a manual selection until its preference is acknowledged by the device.
+        if (this.targetPoolLabel === preferredPool) {
+          this.targetPoolLabel = null;
         }
 
-        if (this.targetPoolLabel !== null) {
-          this.activePoolLabel = this.targetPoolLabel;
-        } else {
-          this.activePoolLabel = info.useFallbackStratum === 1 ? 'Fallback' : 'Primary';
-        }
-        const isCurrentlyFallback = info.isUsingFallbackStratum === 1;
+        // Automatic failover changes the active pool without changing the preference.
+        this.activePoolLabel = this.targetPoolLabel ?? activePool;
+        const isCurrentlyFallback = activePool === 'Fallback';
         this.activePoolURL = isCurrentlyFallback ? info.fallbackStratumURL : info.stratumURL;
         this.activePoolUser = isCurrentlyFallback ? info.fallbackStratumUser : info.stratumUser;
         this.activePoolPort = isCurrentlyFallback ? info.fallbackStratumPort : info.stratumPort;
+        this.activePoolShareWarning = !!(isCurrentlyFallback ? info.fallbackStratumShareWarning : info.stratumShareWarning);
         const activeProtocol = isCurrentlyFallback ? info.fallbackStratumProtocol : info.stratumProtocol;
         if (activeProtocol === 'SV2') {
           const channelType = isCurrentlyFallback ? info.fallbackStratumV2ChannelType : info.stratumV2ChannelType;
@@ -981,6 +981,7 @@ export class HomeComponent implements OnInit, OnDestroy {
 
         this.activePoolUserAddressPart = this.getAddressPart(this.activePoolUser);
         this.activePoolUserSuffixPart = this.getSuffixPart(this.activePoolUser);
+        this.orderedCoinbaseOutputs = this.getOrderedCoinbaseOutputs(info);
 
         const totalShares = info.sharesAccepted + info.sharesRejected;
         this.sortedRejectionReasons = [...(info.sharesRejectedReasons ?? [])]
@@ -1076,10 +1077,15 @@ export class HomeComponent implements OnInit, OnDestroy {
       shareReplay({ refCount: true, bufferSize: 1 })
     );
 
-    this.infoSubscription = combineLatest([this.info$, this.systemInfoError$])
+    const asicSettings$ = this.systemService.getAsicSettings().pipe(
+      catchError(() => of(undefined)),
+      startWith(undefined)
+    );
+
+    this.infoSubscription = combineLatest([this.info$, this.systemInfoError$, asicSettings$])
       .pipe(takeUntil(this.destroy$))
-      .subscribe(([info, systemInfoError]) => {
-        this.handleSystemMessages(info, systemInfoError);
+      .subscribe(([info, systemInfoError, asicSettings]) => {
+        this.handleSystemMessages(info, systemInfoError, asicSettings?.frequencyOptions);
         this.setTitle(info, systemInfoError);
         this.cd.markForCheck();
       });
@@ -1202,6 +1208,19 @@ export class HomeComponent implements OnInit, OnDestroy {
     return index;
   }
 
+  // Pools that pay miners directly from the coinbase can push the user's own output far down
+  // the list, so lift it to the top. Outputs beyond the firmware's capacity are not in this
+  // array at all; they are summarised by coinbaseOthersCount / coinbaseOthersValueSatoshis.
+  getOrderedCoinbaseOutputs(info: ISystemInfo): ISystemInfo['coinbaseOutputs'] {
+    const outputs = info.coinbaseOutputs ?? [];
+    if (outputs.length <= 1 || !this.activePoolUserAddressPart) return outputs;
+
+    const userOutputs = outputs.filter(o => o.address === this.activePoolUserAddressPart);
+    if (!userOutputs.length) return outputs;
+
+    return [...userOutputs, ...outputs.filter(o => o.address !== this.activePoolUserAddressPart)];
+  }
+
   getPayoutPercentage(info: ISystemInfo) {
     if (info.coinbaseValueTotalSatoshis) {
       return (info.coinbaseValueUserSatoshis ?? 0) / info.coinbaseValueTotalSatoshis * 100;
@@ -1209,7 +1228,7 @@ export class HomeComponent implements OnInit, OnDestroy {
     return -1;
   }
 
-  public handleSystemMessages(info: ISystemInfo, systemInfoError: ISystemInfoError) {
+  public handleSystemMessages(info: ISystemInfo, systemInfoError: ISystemInfoError, frequencyOptions?: number[]) {
     const updateMessage = (
       condition: boolean,
       type: MessageType,
@@ -1239,12 +1258,13 @@ export class HomeComponent implements OnInit, OnDestroy {
     updateMessage(!!info.overheat_mode, 'DEVICE_OVERHEAT', 'error', 'Device has overheated - See settings');
     updateMessage(!!info.power_fault, 'POWER_FAULT', 'error', `${info.power_fault} Check your Power Supply.`);
     updateMessage(!!info.hardware_fault, 'HARDWARE_FAULT', 'error', `${info.hardware_fault}`);
-    updateMessage(!info.frequency || info.frequency < 400, 'FREQUENCY_LOW', 'warn', 'Device frequency is set low - See settings');
+    updateMessage(isFrequencyLow(info.frequency, frequencyOptions), 'FREQUENCY_LOW', 'warn', 'Device frequency is set low - See settings');
     updateMessage(info.isUsingFallbackStratum === 1 && info.useFallbackStratum === 0, 'FALLBACK_STRATUM', 'warn', 'Primary pool unreachable - operating on fallback pool.');
     if (info.coinbaseOutputs && info.coinbaseOutputs.length > 0) {
       let percentage = this.getPayoutPercentage(info);
-      updateMessage(percentage > 0 && percentage < 95, 'NOT_SOLO_MINING', 'warn', `Your share of the mining reward is only ${percentage.toFixed(1)}%`);
-      updateMessage(percentage === 0, 'NO_MINING_REWARD', 'warn', `You don't have a share in the mining reward`);
+      const warn = this.activePoolShareWarning;
+      updateMessage(warn && percentage > 0 && percentage < 95, 'NOT_SOLO_MINING', 'warn', `Your share of the mining reward is only ${percentage.toFixed(1)}%`);
+      updateMessage(warn && percentage === 0, 'NO_MINING_REWARD', 'warn', `You don't have a share in the mining reward`);
     }
   }
 

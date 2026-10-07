@@ -54,8 +54,22 @@ jobs:
         name: esp-miner.bin
         path: ./build/esp-miner.bin
 
+    - name: Generate SHA-256 checksum
+      working-directory: ./build
+      run: |
+        sha256sum esp-miner.bin > esp-miner.bin.sha256
+        cat esp-miner.bin.sha256
+        {
+          echo "### esp-miner.bin SHA-256"
+          echo '```'
+          cat esp-miner.bin.sha256
+          echo '```'
+        } >> "$GITHUB_STEP_SUMMARY"
+
     - name: Release esp-miner.bin
       uses: softprops/action-gh-release@v2.4.2
       if: startsWith(github.ref, 'refs/tags/')
       with:
-        files: ./build/esp-miner.bin
+        files: |
+          ./build/esp-miner.bin
+          ./build/esp-miner.bin.sha256

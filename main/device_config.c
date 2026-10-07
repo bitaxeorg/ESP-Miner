@@ -3,8 +3,7 @@
 #include "nvs_config.h"
 #include "global_state.h"
 #include "esp_log.h"
-
-#define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
+#include "array.h"
 
 static const char * TAG = "device_config";
 

@@ -56,15 +56,30 @@ static esp_err_t GET_webhook_alert_settings(httpd_req_t *req)
     return send_settings(req);
 }
 
+// A successfully transmitted error response is still a rejected request.
+static esp_err_t reject_json_request(httpd_req_t *req, httpd_err_code_t status, const char *message)
+{
+    esp_err_t result = httpd_resp_send_err(req, status, message);
+    return result == ESP_OK ? ESP_ERR_INVALID_ARG : result;
+}
+
+static esp_err_t reject_json_timeout(httpd_req_t *req)
+{
+    httpd_resp_set_status(req, "408 Request Timeout");
+    esp_err_t result = httpd_resp_send(req, "Request body timed out", HTTPD_RESP_USE_STRLEN);
+    return result == ESP_OK ? ESP_ERR_TIMEOUT : result;
+}
+
 static esp_err_t receive_json(httpd_req_t *req, cJSON **root)
 {
+    *root = NULL;
     if (req->content_len <= 0 || req->content_len >= WEBHOOK_ALERT_REQUEST_MAX_LEN) {
-        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid request size");
+        return reject_json_request(req, HTTPD_400_BAD_REQUEST, "Invalid request size");
     }
 
     char *body = malloc(req->content_len + 1);
     if (body == NULL) {
-        return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Out of memory");
+        return reject_json_request(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Out of memory");
     }
 
     int received_total = 0;
@@ -73,8 +88,7 @@ static esp_err_t receive_json(httpd_req_t *req, cJSON **root)
         if (WEBHOOK_ALERT_UTILS_deadline_expired(request_start_us, esp_timer_get_time(),
                                                  WEBHOOK_ALERT_REQUEST_DEADLINE_MS)) {
             free(body);
-            httpd_resp_set_status(req, "408 Request Timeout");
-            return httpd_resp_send(req, "Request body timed out", HTTPD_RESP_USE_STRLEN);
+            return reject_json_timeout(req);
         }
 
         int received = httpd_req_recv(req, body + received_total, req->content_len - received_total);
@@ -82,21 +96,19 @@ static esp_err_t receive_json(httpd_req_t *req, cJSON **root)
             if (WEBHOOK_ALERT_UTILS_deadline_expired(request_start_us, esp_timer_get_time(),
                                                      WEBHOOK_ALERT_REQUEST_DEADLINE_MS)) {
                 free(body);
-                httpd_resp_set_status(req, "408 Request Timeout");
-                return httpd_resp_send(req, "Request body timed out", HTTPD_RESP_USE_STRLEN);
+                return reject_json_timeout(req);
             }
             continue;
         }
         if (received <= 0) {
             free(body);
-            return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid request body");
+            return reject_json_request(req, HTTPD_400_BAD_REQUEST, "Invalid request body");
         }
         received_total += received;
         if (WEBHOOK_ALERT_UTILS_deadline_expired(request_start_us, esp_timer_get_time(),
                                                  WEBHOOK_ALERT_REQUEST_DEADLINE_MS)) {
             free(body);
-            httpd_resp_set_status(req, "408 Request Timeout");
-            return httpd_resp_send(req, "Request body timed out", HTTPD_RESP_USE_STRLEN);
+            return reject_json_timeout(req);
         }
     }
     body[received_total] = '\0';
@@ -106,7 +118,7 @@ static esp_err_t receive_json(httpd_req_t *req, cJSON **root)
     if (*root == NULL || !cJSON_IsObject(*root)) {
         cJSON_Delete(*root);
         *root = NULL;
-        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid JSON");
+        return reject_json_request(req, HTTPD_400_BAD_REQUEST, "Invalid JSON");
     }
     return ESP_OK;
 }
@@ -199,7 +211,7 @@ static esp_err_t parse_test_event(httpd_req_t *req, WebhookAlertTestEvent *test_
     }
     if (!cJSON_IsString(event)) {
         cJSON_Delete(root);
-        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "event must be a string");
+        return reject_json_request(req, HTTPD_400_BAD_REQUEST, "event must be a string");
     }
 
     if (strcmp(event->valuestring, "watchdog") == 0) {
@@ -210,7 +222,7 @@ static esp_err_t parse_test_event(httpd_req_t *req, WebhookAlertTestEvent *test_
         *test_event = WEBHOOK_ALERT_TEST_BEST_DIFFICULTY;
     } else if (strcmp(event->valuestring, "generic") != 0) {
         cJSON_Delete(root);
-        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Unknown webhook test event");
+        return reject_json_request(req, HTTPD_400_BAD_REQUEST, "Unknown webhook test event");
     }
 
     cJSON_Delete(root);
