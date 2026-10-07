@@ -100,7 +100,9 @@ BAP operates differently based on the device's WiFi connection status:
 #### Subscription Management
 - Clients can subscribe to real-time parameter updates
 - Configurable update intervals
-- Automatic timeout after 5 minutes of inactivity
+- Default display telemetry runs every 3 seconds without subscription expiry; WiFi credentials are excluded
+- Explicit subscriptions expire after 5 minutes of inactivity
+- `fan_speed` reports live RPM; `manual_fan_speed` reports the saved percentage
 - Efficient resource management with mutex protection
 
 #### Error Handling

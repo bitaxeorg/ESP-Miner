@@ -76,6 +76,7 @@ static void parse_pool_config_json(const char *json_str, PoolConfig *cfg, int in
     cfg->tls = index == 0 ? CONFIG_STRATUM_TLS : 0;
     cfg->cert = strdup("");
     cfg->decode_coinbase_tx = true;
+    cfg->share_warning = true;
     cfg->sv2_channel_type = SV2_CHANNEL_EXTENDED;
     cfg->sv2_authority_pubkey = strdup("");
     cfg->sv2_require_auth = false;
@@ -144,6 +145,11 @@ static void parse_pool_config_json(const char *json_str, PoolConfig *cfg, int in
     item = cJSON_GetObjectItem(root, "stratumDecodeCoinbase");
     if (item && (cJSON_IsBool(item) || cJSON_IsNumber(item))) {
         cfg->decode_coinbase_tx = cJSON_IsTrue(item) || (cJSON_IsNumber(item) && item->valueint != 0);
+    }
+
+    item = cJSON_GetObjectItem(root, "stratumShareWarning");
+    if (item && (cJSON_IsBool(item) || cJSON_IsNumber(item))) {
+        cfg->share_warning = cJSON_IsTrue(item) || (cJSON_IsNumber(item) && item->valueint != 0);
     }
 
     item = cJSON_GetObjectItem(root, "stratumV2ChannelType");
@@ -268,7 +274,7 @@ void SYSTEM_init_system(GlobalState * GLOBAL_STATE)
     pthread_mutex_init(&GLOBAL_STATE->transport_mutex, NULL);
 
     // Allocate the job tracking tables here rather than in create_jobs_task().
-    // The stratum tasks touch valid_jobs (SYSTEM_clean_jobs_queue) as soon as they
+    // The stratum tasks touch valid_jobs (via SYSTEM_reset_pool_session) as soon as they
     // connect, so tying the allocation to create_jobs_task actually starting is a
     // NULL dereference waiting to happen if that task ever fails to spawn.
     GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs = heap_caps_calloc(MAX_ASIC_JOBS, sizeof(bm_job *), MALLOC_CAP_SPIRAM);
@@ -404,7 +410,7 @@ esp_err_t SYSTEM_init_peripherals(GlobalState * GLOBAL_STATE) {
     return ESP_OK;
 }
 
-void SYSTEM_clean_jobs_queue(GlobalState * GLOBAL_STATE)
+static void clean_jobs_queue(GlobalState * GLOBAL_STATE)
 {
     ESP_LOGI(TAG, "Clean Jobs: invalidating active jobs");
 
@@ -458,10 +464,14 @@ void SYSTEM_notify_rejected_share(GlobalState * GLOBAL_STATE, char * error_msg)
             sizeof(module->rejected_reason_stats[0]), compare_rejected_reason_stats);
     }    
 }
-
 void SYSTEM_notify_new_ntime(GlobalState * GLOBAL_STATE, uint32_t ntime)
 {
     SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
+
+    // NTP handles sync itself
+    if (nvs_config_get_bool(NVS_CONFIG_USE_NTP)) {
+        return;
+    }
 
     // Hourly clock sync
     if (module->lastClockSync + (60 * 60) > ntime) {
@@ -478,9 +488,11 @@ void SYSTEM_notify_new_ntime(GlobalState * GLOBAL_STATE, uint32_t ntime)
 // Reset decoded coinbase UI fields (scriptsig, coinbase values, outputs, block signals).
 // Note: block_height is intentionally NOT reset here; it is preserved as the "last known good"
 // network height so the UI, screen, and BAP do not flicker or lose context on transient disconnects.
-void SYSTEM_reset_coinbase_ui_state(GlobalState * GLOBAL_STATE, const char *scriptsig_msg)
+static void reset_coinbase_ui_state(GlobalState * GLOBAL_STATE, const char *scriptsig_msg)
 {
     GLOBAL_STATE->coinbase_output_count = 0;
+    GLOBAL_STATE->coinbase_others_count = 0;
+    GLOBAL_STATE->coinbase_others_value_satoshis = 0;
     GLOBAL_STATE->coinbase_value_total_satoshis = 0;
     GLOBAL_STATE->coinbase_value_user_satoshis = 0;
     if (scriptsig_msg) {
@@ -490,6 +502,27 @@ void SYSTEM_reset_coinbase_ui_state(GlobalState * GLOBAL_STATE, const char *scri
         GLOBAL_STATE->scriptsig[0] = '\0';
     }
     GLOBAL_STATE->block_signals_count = 0;
+}
+
+void SYSTEM_reset_pool_session(GlobalState * GLOBAL_STATE)
+{
+    if (!GLOBAL_STATE) return;
+
+    SystemModule *module = &GLOBAL_STATE->SYSTEM_MODULE;
+    for (int i = 0; i < module->rejected_reason_stats_count; i++) {
+        module->rejected_reason_stats[i].count = 0;
+        module->rejected_reason_stats[i].message[0] = '\0';
+    }
+    module->rejected_reason_stats_count = 0;
+    module->shares_accepted = 0;
+    module->shares_rejected = 0;
+    module->shares_pending = 0;
+    module->response_time = 0.0f;
+    module->response_share_batch = 0;
+    module->pool_difficulty = 0.0;
+
+    clean_jobs_queue(GLOBAL_STATE);
+    reset_coinbase_ui_state(GLOBAL_STATE, "");
 }
 
 void SYSTEM_decode_and_apply_coinbase(GlobalState * GLOBAL_STATE, const miner_job_t * job)
@@ -506,14 +539,14 @@ void SYSTEM_decode_and_apply_coinbase(GlobalState * GLOBAL_STATE, const miner_jo
     // Direct Merkle Root jobs (e.g. SV2 Standard) don't carry coinbase parts
     if (job->type == JOB_TYPE_SV2_STANDARD) {
         GLOBAL_STATE->block_height = 0;
-        SYSTEM_reset_coinbase_ui_state(GLOBAL_STATE, NULL);
+        reset_coinbase_ui_state(GLOBAL_STATE, NULL);
         return;
     }
 
     mining_notification_result_t *result = heap_caps_malloc(sizeof(mining_notification_result_t), MALLOC_CAP_SPIRAM);
     if (!result) {
         ESP_LOGE(TAG, "Failed to allocate coinbase decode result in PSRAM");
-        SYSTEM_reset_coinbase_ui_state(GLOBAL_STATE, "[decode error]");
+        reset_coinbase_ui_state(GLOBAL_STATE, "[decode error]");
         return;
     }
     memset(result, 0, sizeof(mining_notification_result_t));
@@ -525,7 +558,7 @@ void SYSTEM_decode_and_apply_coinbase(GlobalState * GLOBAL_STATE, const miner_jo
     if (coinbase_process_miner_job(job, user, decode_coinbase_tx, result) != ESP_OK) {
         ESP_LOGW(TAG, "Failed to decode coinbase for job %s", job->job_id);
         free(result);
-        SYSTEM_reset_coinbase_ui_state(GLOBAL_STATE, "[decode error]");
+        reset_coinbase_ui_state(GLOBAL_STATE, "[decode error]");
         return;
     }
 
@@ -571,9 +604,13 @@ void SYSTEM_decode_and_apply_coinbase(GlobalState * GLOBAL_STATE, const miner_jo
              result->decode_coinbase_tx ? " sats" : "");
 
     if (result->output_count != GLOBAL_STATE->coinbase_output_count ||
+        result->others_count != GLOBAL_STATE->coinbase_others_count ||
+        result->others_value_satoshis != GLOBAL_STATE->coinbase_others_value_satoshis ||
         memcmp(result->outputs, GLOBAL_STATE->coinbase_outputs, sizeof(coinbase_output_t) * result->output_count) != 0) {
 
         GLOBAL_STATE->coinbase_output_count = result->output_count;
+        GLOBAL_STATE->coinbase_others_count = result->others_count;
+        GLOBAL_STATE->coinbase_others_value_satoshis = result->others_value_satoshis;
         memcpy(GLOBAL_STATE->coinbase_outputs, result->outputs, sizeof(coinbase_output_t) * result->output_count);
         GLOBAL_STATE->coinbase_value_user_satoshis = result->user_value_satoshis;
         for (int i = 0; i < result->output_count; i++) {
@@ -588,6 +625,9 @@ void SYSTEM_decode_and_apply_coinbase(GlobalState * GLOBAL_STATE, const miner_jo
             } else {
                 ESP_LOGI(TAG, "  Output %d: %s", i, result->outputs[i].address);
             }
+        }
+        if (result->others_count > 0) {
+            ESP_LOGI(TAG, "  + %d other output(s) aggregated (%llu sat)", result->others_count, result->others_value_satoshis);
         }
     }
 

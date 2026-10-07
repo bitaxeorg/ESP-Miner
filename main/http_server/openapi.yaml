@@ -82,6 +82,9 @@ components:
         stratumDecodeCoinbase:
           type: boolean
           description: Enable pool coinbase transaction decoding
+        stratumShareWarning:
+          type: boolean
+          description: Warn on the dashboard when the payout share of the coinbase reward is low. Disable for pools that pay miners directly through many coinbase outputs.
         stratumV2ChannelType:
           type: string
           enum: [standard, extended]
@@ -216,6 +219,27 @@ components:
           nullable: true
           description: Partition space usage percentage (0-100)
 
+    FirmwareChecksum:
+      type: object
+      required:
+        - partition
+        - version
+        - size
+        - sha256
+      properties:
+        partition:
+          type: string
+          description: Label of the running partition (e.g., ota_0, ota_1, factory)
+        version:
+          type: string
+          description: Firmware version of the running image
+        size:
+          type: integer
+          description: Size of the running image in bytes
+        sha256:
+          type: string
+          description: Lowercase hex SHA-256 of the running image, comparable to the release esp-miner.bin checksum
+
     SystemInfo:
       type: object
       required:
@@ -237,6 +261,7 @@ components:
         - fallbackStratumTLS
         - fallbackStratumCert
         - fallbackStratumDecodeCoinbase
+        - fallbackStratumShareWarning
         - fanrpm
         - fan2rpm
         - fanspeed
@@ -295,9 +320,11 @@ components:
         - stratumTLS
         - stratumCert
         - stratumDecodeCoinbase
+        - stratumShareWarning
         - temp
         - temp2
         - uptimeSeconds
+        - useNTP
         - version
         - axeOSVersion
         - voltage
@@ -313,6 +340,8 @@ components:
         - blockFound
         - coinbaseValueTotalSatoshis
         - coinbaseValueUserSatoshis
+        - coinbaseOthersCount
+        - coinbaseOthersValueSatoshis
         - miningPaused
         - statsLimit
         - partitions
@@ -372,6 +401,9 @@ components:
         fallbackStratumDecodeCoinbase:
           type: boolean
           description: Enable fallback pool coinbase transaction decoding
+        fallbackStratumShareWarning:
+          type: boolean
+          description: Warn on the dashboard when the payout share of the coinbase reward is low, while mining on the fallback pool
         fallbackStratumProtocol:
           type: string
           enum: [SV1, SV2]
@@ -594,6 +626,9 @@ components:
         stratumDecodeCoinbase:
           type: boolean
           description: Enable primary pool coinbase transaction decoding
+        stratumShareWarning:
+          type: boolean
+          description: Warn on the dashboard when the payout share of the coinbase reward is low, while mining on the primary pool
         temp:
           type: number
           description: Average chip temperature
@@ -672,6 +707,12 @@ components:
         coinbaseValueUserSatoshis:
           type: integer
           description: User's portion of coinbase value in satoshis
+        coinbaseOthersCount:
+          type: integer
+          description: Number of payout outputs that did not fit in coinbaseOutputs
+        coinbaseOthersValueSatoshis:
+          type: integer
+          description: Summed value in satoshis of the outputs counted in coinbaseOthersCount
         hashrateMonitor:
           type: object
           required:
@@ -696,7 +737,9 @@ components:
           description: List of available app partitions and their firmware versions
           items:
             $ref: '#/components/schemas/SystemPartition'
-
+        useNTP:
+          type: boolean
+          description: Whether NTP time sync is enabled
     SystemASIC:
       type: object
       required:
@@ -1224,6 +1267,25 @@ paths:
                 $ref: '#/components/schemas/GenericResponse'
         '400':
           description: Invalid partition label
+        '401':
+          description: Unauthorized - Client not in allowed network range
+        '500':
+          description: Internal server error
+
+  /api/system/firmware/checksum:
+    get:
+      summary: Get running firmware checksum
+      description: Returns the SHA-256 of the running firmware image, matching sha256sum of the flashed esp-miner.bin
+      operationId: getFirmwareChecksum
+      tags:
+        - system
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FirmwareChecksum'
         '401':
           description: Unauthorized - Client not in allowed network range
         '500':

@@ -19,6 +19,7 @@
 
 #include "dns_server.h"
 #include "esp_ota_ops.h"
+#include "esp_app_desc.h"
 #include "esp_wifi.h"
 #include "lwip/inet.h"
 #include <arpa/inet.h>
@@ -30,6 +31,7 @@
 #include "global_state.h"
 #include "nvs_config.h"
 #include "system.h"
+#include "firmware_checksum.h"
 #include "connect.h"
 #include "statistics_task.h"
 #include "theme_api.h"
@@ -309,6 +311,39 @@ static void normalize_hostname(char *hostname, size_t max_len) {
     }
 }
 
+// Helper function to check if a hostname is a local network or reserved private domain
+static bool is_local_network_hostname(const char *host_str) {
+    if (host_str == NULL || *host_str == '\0') {
+        return false;
+    }
+
+    // Bare hostname (no dots, only resolvable on local network)
+    if (strchr(host_str, '.') == NULL) {
+        return true;
+    }
+
+    // Reserved / non-routable private local domain suffixes
+    static const char *local_suffixes[] = {
+        ".local",       // RFC 6762 (mDNS)
+        ".lan",         // Common router private LAN domain
+        ".home.arpa",   // RFC 8375 (IETF Home Network)
+        ".internal",    // ICANN-reserved private use
+        ".localdomain", // RFC 6761
+        ".home",        // Common router default
+        ".localhost"    // RFC 6761
+    };
+
+    size_t host_len = strlen(host_str);
+    for (size_t i = 0; i < sizeof(local_suffixes) / sizeof(local_suffixes[0]); i++) {
+        size_t suffix_len = strlen(local_suffixes[i]);
+        if (host_len > suffix_len && strcasecmp(host_str + host_len - suffix_len, local_suffixes[i]) == 0) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 esp_err_t is_network_allowed(httpd_req_t * req)
 {
     if (GLOBAL_STATE->SYSTEM_MODULE.ap_enabled == true) {
@@ -382,16 +417,10 @@ esp_err_t is_network_allowed(httpd_req_t * req)
                 strncpy(host_str, host_start, host_len);
                 host_str[host_len] = '\0';
 
-                // Allow any .local hostname (mDNS, inherently local network)
-                size_t hlen = strlen(host_str);
-                if (hlen > 6 && strcasecmp(host_str + hlen - 6, ".local") == 0) {
+                // Allow local network hostnames (bare, .local, .lan, .home.arpa, .internal, etc.)
+                if (is_local_network_hostname(host_str)) {
                     is_local_hostname = true;
-                    ESP_LOGD(CORS_TAG, "Origin host '%s' is a .local mDNS hostname - allowing", host_str);
-                }
-                // Allow any bare hostname (no dots, only resolvable on local network)
-                else if (strchr(host_str, '.') == NULL) {
-                    is_local_hostname = true;
-                    ESP_LOGD(CORS_TAG, "Origin host '%s' is a bare local hostname - allowing", host_str);
+                    ESP_LOGD(CORS_TAG, "Origin host '%s' is a local network hostname - allowing", host_str);
                 }
             }
         }
@@ -761,6 +790,7 @@ static bool validate_pool_json(const cJSON *pool_item, int i) {
     if (!validate_number_range(cJSON_GetObjectItem(pool_item, "stratumTLS"), "stratumTLS", 0, 2, i)) return false;
     if (!validate_string_field(cJSON_GetObjectItem(pool_item, "stratumCert"), "stratumCert", 3000, i)) return false;
     if (!validate_bool_or_num(cJSON_GetObjectItem(pool_item, "stratumDecodeCoinbase"), "stratumDecodeCoinbase", i)) return false;
+    if (!validate_bool_or_num(cJSON_GetObjectItem(pool_item, "stratumShareWarning"), "stratumShareWarning", i)) return false;
 
     cJSON *v2chan = cJSON_GetObjectItem(pool_item, "stratumV2ChannelType");
     if (v2chan) {
@@ -813,6 +843,7 @@ static bool update_pool_nvs(const cJSON *pool_item, int i) {
     add_number_field_default(p_obj, pool_item, "stratumTLS", 0);
     add_string_field_default(p_obj, pool_item, "stratumCert", "");
     add_bool_field_default(p_obj, pool_item, "stratumDecodeCoinbase", true);
+    add_bool_field_default(p_obj, pool_item, "stratumShareWarning", true);
     add_string_field_default(p_obj, pool_item, "stratumV2ChannelType", sv2_channel_type_to_string(SV2_CHANNEL_EXTENDED));
     add_string_field_default(p_obj, pool_item, "stratumV2AuthorityPubkey", "");
     add_bool_field_default(p_obj, pool_item, "stratumV2RequireAuth", false);
@@ -1007,6 +1038,7 @@ bool check_settings_and_update(const cJSON * const root, char **redirect_url)
             }
         }
 
+        bool modified_pools[MAX_POOLS] = {false};
         // Save pools array to NVS
         if (pools_item && cJSON_IsArray(pools_item)) {
             int size = cJSON_GetArraySize(pools_item);
@@ -1017,7 +1049,7 @@ bool check_settings_and_update(const cJSON * const root, char **redirect_url)
                     int idx = id_item->valueint;
                     if (idx >= 0 && idx < MAX_POOLS) {
                         if (update_pool_nvs(pool_item, idx)) {
-                            stratum_notify_pool_modified(GLOBAL_STATE, idx);
+                            modified_pools[idx] = true;
                         }
                     }
                 }
@@ -1033,6 +1065,14 @@ bool check_settings_and_update(const cJSON * const root, char **redirect_url)
 
             if (use_fallback_item) {
                 GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback = GLOBAL_STATE->SYSTEM_MODULE.use_fallback_stratum;
+            } else if (cJSON_GetObjectItem(root, "primaryPoolIndex") != NULL && !GLOBAL_STATE->SYSTEM_MODULE.use_fallback_stratum) {
+                GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback = false;
+            }
+
+            for (int i = 0; i < MAX_POOLS; i++) {
+                if (modified_pools[i]) {
+                    stratum_notify_pool_modified(GLOBAL_STATE, i);
+                }
             }
 
             if (pool_selection_changed) {
@@ -1527,6 +1567,41 @@ static esp_err_t POST_system_boot(httpd_req_t *req)
     return send_res;
 }
 
+static esp_err_t GET_system_firmware_checksum(httpd_req_t *req)
+{
+    if (is_network_allowed(req) != ESP_OK) {
+        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+    }
+
+    httpd_resp_set_type(req, "application/json");
+
+    // Set CORS headers
+    if (set_cors_headers(req) != ESP_OK) {
+        httpd_resp_send_500(req);
+        return ESP_OK;
+    }
+
+    const esp_partition_t *running = esp_ota_get_running_partition();
+    const char *sha256_hex = NULL;
+    uint32_t image_len = 0;
+    if (running == NULL || firmware_checksum_get_running(&sha256_hex, &image_len) != ESP_OK) {
+        return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to compute firmware checksum");
+    }
+
+    const esp_app_desc_t *app_desc = esp_app_get_description();
+
+    cJSON *root = cJSON_CreateObject();
+    cJSON_AddStringToObject(root, "partition", running->label);
+    cJSON_AddStringToObject(root, "version", app_desc->version);
+    cJSON_AddNumberToObject(root, "size", image_len);
+    cJSON_AddStringToObject(root, "sha256", sha256_hex);
+
+    esp_err_t res = HTTP_send_json(req, root, &api_common_prebuffer_len);
+    cJSON_Delete(root);
+
+    return res;
+}
+
 static esp_err_t GET_system_statistics(httpd_req_t * req)
 {
     if (is_network_allowed(req) != ESP_OK) {
@@ -1654,8 +1729,11 @@ static esp_err_t GET_scoreboard(httpd_req_t * req)
     cJSON * root = cJSON_CreateArray();
 
     if (xSemaphoreTake(scoreboard->mutex, portMAX_DELAY) == pdTRUE) {
-        for (int i = 0; i < scoreboard->count; i++) {
+        for (int i = 0; i < MAX_SCOREBOARD; i++) {
             const ScoreboardEntry *e = &scoreboard->entries[i];
+            if (e->difficulty <= 0.0) {
+                break;
+            }
             cJSON *entry = cJSON_CreateObject();
 
             char nonce_str[9], version_bits_str[9];
@@ -1883,7 +1961,7 @@ esp_err_t start_rest_server(GlobalState * global_state)
     config.uri_match_fn = httpd_uri_match_wildcard;
     config.stack_size = 8192;
     config.max_open_sockets = 20;
-    config.max_uri_handlers = 25;
+    config.max_uri_handlers = 26;
     config.close_fn = websocket_close_fn;
     config.lru_purge_enable = true;
     config.keep_alive_enable = true;
@@ -1930,6 +2008,15 @@ esp_err_t start_rest_server(GlobalState * global_state)
         .user_ctx = rest_context
     };
     httpd_register_uri_handler(server, &system_boot_post_uri);
+
+    /* URI handler for fetching the running firmware checksum */
+    httpd_uri_t system_firmware_checksum_get_uri = {
+        .uri = "/api/system/firmware/checksum",
+        .method = HTTP_GET,
+        .handler = GET_system_firmware_checksum,
+        .user_ctx = rest_context
+    };
+    httpd_register_uri_handler(server, &system_firmware_checksum_get_uri);
 
     /* URI handler for fetching system asic values */
     httpd_uri_t system_asic_get_uri = {
