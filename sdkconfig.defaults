@@ -11,6 +11,12 @@ CONFIG_HTTPD_MAX_URI_LEN=2048
 CONFIG_HTTPD_WS_SUPPORT=y
 CONFIG_HTTPD_WS_PRE_HANDSHAKE_CB_SUPPORT=y
 CONFIG_HTTPD_WS_POST_HANDSHAKE_CB_SUPPORT=y
+# Bound cJSON parse recursion: the httpd task stack is 8 KiB and the stock
+# nesting limit (1000) lets a ~220-byte deeply-nested body overflow it
+# (crash threshold measured at ~105-112 levels on hardware). AxeOS API bodies
+# are flat key/value maps (deepest legitimate payload ~3 levels), so 32 leaves
+# ample headroom while capping worst-case parse stack at ~2.5 KiB.
+CONFIG_CJSON_NESTING_LIMIT=32
 CONFIG_SPIRAM=y
 CONFIG_SPIRAM_MODE_OCT=y
 CONFIG_SPIRAM_SPEED_80M=y
