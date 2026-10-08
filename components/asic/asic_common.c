@@ -196,33 +196,48 @@ esp_err_t receive_work(uint8_t * buffer, int buffer_size, uint64_t *out_timestam
     return ESP_OK;
 }
 
-void get_difficulty_mask(double difficulty, uint8_t *job_difficulty_mask)
+void get_difficulty_mask(uint8_t difficulty_power, uint8_t *job_difficulty_mask)
 {
-    // The mask must be a power of 2 so there are no holes
-    // Correct:   {0b00000000, 0b00000000, 0b11111111, 0b11111111}
-    // Incorrect: {0b00000000, 0b00000000, 0b11100111, 0b11111111}
-
-    // Round up to ensure we don't make difficulty harder than requested, then convert to int
-    uint32_t diff_int = (uint32_t)ceil(difficulty);
-
-    // Calculate largest power of 2 <= diff_int (inline of former _largest_power_of_two)
-    int power = 0;
-    while (diff_int > 1) {
-        diff_int = diff_int >> 1;
-        power++;
-    }
-    uint32_t mask = (1 << power) - 1;
+    // Register 0x14 (TICKET_MASK) filters candidate nonces by requiring `difficulty_power` leading zero bits.
+    // The mask is a contiguous bitmask (1 << power) - 1, representing difficulty 2^power.
+    uint32_t mask = (difficulty_power >= 32) ? 0xFFFFFFFFU : ((1U << difficulty_power) - 1);
 
     job_difficulty_mask[0] = 0x00;
     job_difficulty_mask[1] = 0x14; // TICKET_MASK
 
-    // convert difficulty into char array
-    // Ex: 256 = {0b00000000, 0b00000000, 0b00000000, 0b11111111}, {0x00, 0x00, 0x00, 0xff}
-    // Ex: 512 = {0b00000000, 0b00000000, 0b00000001, 0b11111111}, {0x00, 0x00, 0x01, 0xff}
     job_difficulty_mask[2] = _reverse_bits((mask >> 24) & 0xFF);
     job_difficulty_mask[3] = _reverse_bits((mask >> 16) & 0xFF);
     job_difficulty_mask[4] = _reverse_bits((mask >>  8) & 0xFF);
     job_difficulty_mask[5] = _reverse_bits( mask        & 0xFF);
+}
+
+uint8_t calculate_effective_asic_difficulty(double expected_ghs, double interval_s, double pool_difficulty)
+{
+    if (interval_s <= 0.0) {
+        interval_s = DEFAULT_SHARE_INTERVAL_S;
+    }
+
+    uint8_t power = MIN_ASIC_DIFFICULTY_POWER;
+    if (expected_ghs > 0.0) {
+        double raw_diff = expected_ghs * 1e9 * interval_s / NONCE_SPACE;
+        if (raw_diff > (double)(1U << MIN_ASIC_DIFFICULTY_POWER)) {
+            int p = MIN_ASIC_DIFFICULTY_POWER;
+            while ((p < 31) && ((double)(1U << (p + 1)) <= raw_diff + 1e-6)) {
+                p++;
+            }
+            double lower = (double)(1U << p);
+            double upper = (double)(1U << (p + 1));
+            power = ((raw_diff - lower) > (upper - raw_diff)) ? (uint8_t)(p + 1) : (uint8_t)p;
+        }
+    }
+
+    if (pool_difficulty > 0.0) {
+        while (power > MIN_ASIC_DIFFICULTY_POWER && ((double)(1U << power) > pool_difficulty + 1e-6)) {
+            power--;
+        }
+    }
+
+    return power;
 }
 
 double calculate_bm_timeout_ms(float frequency_mhz, size_t asic_count, size_t small_cores, size_t cores, size_t version_size, float timeout_percent, double default_time_ms)

@@ -77,6 +77,11 @@ static void spy_decode_coinbase(GlobalState *state, const miner_job_t *job)
     harness_result->coinbase_decode_count++;
 }
 
+static void stub_difficulty_controller_update(GlobalState *state)
+{
+    (void)state;
+}
+
 #ifdef xTaskNotifyWait
 #undef xTaskNotifyWait
 #endif
@@ -90,7 +95,9 @@ static void spy_decode_coinbase(GlobalState *state, const miner_job_t *job)
 #define ASIC_set_version_mask spy_asic_set_version_mask
 #define ASIC_get_asic_job_frequency_ms stub_asic_get_job_frequency
 #define SYSTEM_decode_and_apply_coinbase spy_decode_coinbase
+#define difficulty_controller_update stub_difficulty_controller_update
 #include "../../../main/tasks/create_jobs_task.c"
+#undef difficulty_controller_update
 #undef SYSTEM_decode_and_apply_coinbase
 #undef ASIC_get_asic_job_frequency_ms
 #undef ASIC_set_version_mask

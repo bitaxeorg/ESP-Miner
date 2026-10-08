@@ -15,6 +15,7 @@
 #include "nvs_config.h"
 #include "global_state.h"
 #include "asic.h"
+#include "asic_common.h"
 #include "asic_reset.h"
 #include "device_config.h"
 #include "PID.h"
@@ -47,9 +48,6 @@
 #define INPUT_VOLTAGE_MARGIN 0.10f // +/- 10%
 
 #define MULTIPHASE_BUCK_MIN_CURRENT_A 1.0f
-
-// Test Difficulty
-#define DIFFICULTY 16
 
 static const char * TAG = "self_test";
 
@@ -232,7 +230,10 @@ static void self_test_start_nonce_measurement(GlobalState * GLOBAL_STATE)
     measurement->accepted_count = 0;
     measurement->rejected_count = 0;
     measurement->hashes = 0.0;
-    diff_to_target(GLOBAL_STATE->DEVICE_CONFIG.family.asic.difficulty, measurement->target);
+    uint8_t power = (GLOBAL_STATE->current_difficulty_power > 0)
+                        ? GLOBAL_STATE->current_difficulty_power
+                        : MIN_ASIC_DIFFICULTY_POWER;
+    diff_to_target((double)(1U << power), measurement->target);
     measurement->is_active = true;
     pthread_mutex_unlock(&measurement->lock);
 }
@@ -276,13 +277,15 @@ static float self_test_get_nonce_hashrate(GlobalState * GLOBAL_STATE, uint64_t e
 void self_test_record_nonce(GlobalState * GLOBAL_STATE, const uint8_t hash[32])
 {
     SelfTestNonceMeasurement * measurement = &GLOBAL_STATE->SELF_TEST_MODULE.nonce_measurement;
-    double ticket_diff = GLOBAL_STATE->DEVICE_CONFIG.family.asic.difficulty;
 
     pthread_mutex_lock(&measurement->lock);
     if (measurement->is_active) {
+        uint8_t power = (GLOBAL_STATE->current_difficulty_power > 0)
+                            ? GLOBAL_STATE->current_difficulty_power
+                            : MIN_ASIC_DIFFICULTY_POWER;
         if (uint256_lte(hash, measurement->target)) {
             measurement->accepted_count++;
-            measurement->hashes += ticket_diff * NONCE_SPACE;
+            measurement->hashes += (double)(1ULL << power) * NONCE_SPACE;
         } else {
             measurement->rejected_count++;
         }
@@ -308,8 +311,8 @@ esp_err_t self_test_init(GlobalState * GLOBAL_STATE)
     if (self_test_should_run()) {
         GLOBAL_STATE->SELF_TEST_MODULE.is_active = true;
         GLOBAL_STATE->SELF_TEST_MODULE.is_factory = isFactoryTest;
+        GLOBAL_STATE->target_share_interval_s = SELF_TEST_SHARE_INTERVAL_S;
         pthread_mutex_init(&GLOBAL_STATE->SELF_TEST_MODULE.nonce_measurement.lock, NULL);
-        GLOBAL_STATE->DEVICE_CONFIG.family.asic.difficulty = DIFFICULTY;
         GLOBAL_STATE->SYSTEM_MODULE.is_connected = true;
 
     // No need to set version_mask, it uses default mask which is fine

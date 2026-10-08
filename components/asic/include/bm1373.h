@@ -19,5 +19,6 @@ float BM1373_send_hash_frequency(float frequency);
 task_result * BM1373_process_work(GlobalState * GLOBAL_STATE);
 void BM1373_read_registers(void);
 void BM1373_set_nonce_space(double nonce_percent, float frequency, uint16_t asic_count, uint16_t cores);
+void BM1373_set_difficulty(uint8_t difficulty_power);
 
 #endif /* BM1373_H_ */
