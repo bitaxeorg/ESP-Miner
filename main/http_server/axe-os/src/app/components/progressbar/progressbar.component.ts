@@ -7,6 +7,15 @@ export interface ProgressBarMarker {
   visible?: boolean;   // Optional visibility condition
 }
 
+/**
+ * Fill colour for a meter.
+ *   'brand'    - the theme colour, and the default
+ *   'auto'     - brand until the value nears its maximum, then warn/critical
+ *   'warn'     - caller decides
+ *   'critical' - caller decides
+ */
+export type ProgressBarTone = 'brand' | 'auto' | 'warn' | 'critical';
+
 @Component({
   selector: 'app-progressbar',
   standalone: true,
@@ -15,7 +24,10 @@ export interface ProgressBarMarker {
     <div class="relative w-full">
       <!-- Progress Bar Track -->
       <div class="w-full bg-progressbar rounded-sm overflow-hidden" [ngClass]="heightClass">
-        <div class="bg-progressbar-value h-full transition-[width] duration-300" [style.width.%]="progressValue"></div>
+        <div
+          class="bg-progressbar-value h-full transition-[width,background-color] duration-300"
+          [style.width.%]="progressValue"
+          [style.background]="fillColor"></div>
       </div>
 
       <!-- Optional Markers -->
@@ -36,11 +48,38 @@ export class ProgressbarComponent {
   @Input() value: number = 0;              // Current progress value (0 to 100)
   @Input() markers: ProgressBarMarker[] = []; // Optional marker lines
   @Input() heightClass: string = 'h-[6px]';  // Custom height class (e.g. h-6 for updates)
+  @Input() tone: ProgressBarTone = 'brand';
+
+  /* A working Bitaxe idles near 80% of its temperature ceiling, so 'auto'
+     stays on the theme colour until well above that. */
+  private static readonly WARN_AT = 85;
+  private static readonly CRITICAL_AT = 95;
 
   get progressValue(): number {
     if (!this.value || isNaN(this.value) || this.value < 0) {
       return 0;
     }
     return Math.min(100, this.value);
+  }
+
+  get fillColor(): string {
+    switch (this.resolvedTone) {
+      case 'warn': return 'var(--color-status-warn)';
+      case 'critical': return 'var(--color-status-critical)';
+      default: return 'var(--color-primary)';
+    }
+  }
+
+  private get resolvedTone(): ProgressBarTone {
+    if (this.tone !== 'auto') {
+      return this.tone;
+    }
+    if (this.progressValue >= ProgressbarComponent.CRITICAL_AT) {
+      return 'critical';
+    }
+    if (this.progressValue >= ProgressbarComponent.WARN_AT) {
+      return 'warn';
+    }
+    return 'brand';
   }
 }
