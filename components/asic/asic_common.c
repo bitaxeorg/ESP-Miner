@@ -156,44 +156,96 @@ int count_asic_chips(uint16_t asic_count, uint16_t chip_id, int chip_id_response
 
 esp_err_t receive_work(uint8_t * buffer, int buffer_size, uint64_t *out_timestamp_us)
 {
-    int received = SERIAL_rx(buffer, buffer_size, 10000);
+    const uint32_t timeout_ms = 10000;
+    const int64_t deadline_us = esp_timer_get_time() + (int64_t) timeout_ms * 1000;
+    int buffered = 0;
+
+    if (buffer_size < 3) {
+        ESP_LOGE(TAG, "Invalid response buffer size %i", buffer_size);
+        return ESP_FAIL;
+    }
+
+    /* UART reads are a byte stream, not packet reads. Slide over stray bytes
+     * until a complete, CRC-valid ASIC response is found. */
+    while (buffered < buffer_size) {
+        uint8_t next_byte;
+        int64_t remaining_us = deadline_us - esp_timer_get_time();
+        if (remaining_us <= 0) {
+            if (out_timestamp_us) {
+                *out_timestamp_us = esp_timer_get_time();
+            }
+            ESP_LOGD(TAG, "UART timeout in serial RX while seeking response frame");
+            return ESP_FAIL;
+        }
+
+        uint16_t remaining_ms = (uint16_t) ((remaining_us + 999) / 1000);
+        int received = SERIAL_rx(&next_byte, 1, remaining_ms);
+        if (received < 0) {
+            if (out_timestamp_us) {
+                *out_timestamp_us = esp_timer_get_time();
+            }
+            ESP_LOGE(TAG, "UART error in serial RX");
+            return ESP_FAIL;
+        }
+        if (received == 0) {
+            if (out_timestamp_us) {
+                *out_timestamp_us = esp_timer_get_time();
+            }
+            ESP_LOGD(TAG, "UART timeout in serial RX while seeking response frame");
+            return ESP_FAIL;
+        }
+
+        if (buffered < 2) {
+            if (buffered == 0) {
+                if (next_byte == (PREAMBLE >> 8)) {
+                    buffer[0] = next_byte;
+                    buffered = 1;
+                }
+            } else if (next_byte == (PREAMBLE & 0xFF)) {
+                buffer[buffered++] = next_byte;
+            } else if (next_byte == (PREAMBLE >> 8)) {
+                buffer[0] = next_byte;
+            } else {
+                buffered = 0;
+            }
+            continue;
+        }
+
+        buffer[buffered++] = next_byte;
+        if (buffered == buffer_size) {
+            if (crc5(buffer + 2, buffer_size - 2) == 0) {
+                if (out_timestamp_us) {
+                    *out_timestamp_us = esp_timer_get_time();
+                }
+                return ESP_OK;
+            }
+
+            /* This preamble was noise or a corrupted frame. Find the next
+             * preamble in its tail so a following valid frame is retained. */
+            int preamble_offset = -1;
+            for (int index = 1; index < buffer_size - 1; ++index) {
+                if (buffer[index] == (PREAMBLE >> 8) &&
+                    buffer[index + 1] == (PREAMBLE & 0xFF)) {
+                    preamble_offset = index;
+                    break;
+                }
+            }
+            if (preamble_offset >= 0) {
+                buffered = buffer_size - preamble_offset;
+                memmove(buffer, buffer + preamble_offset, buffered);
+            } else if (buffer[buffer_size - 1] == (PREAMBLE >> 8)) {
+                buffer[0] = buffer[buffer_size - 1];
+                buffered = 1;
+            } else {
+                buffered = 0;
+            }
+        }
+    }
+
     if (out_timestamp_us) {
         *out_timestamp_us = esp_timer_get_time();
     }
-
-    if (received < 0) {
-        ESP_LOGE(TAG, "UART error in serial RX");
-        return ESP_FAIL;
-    }
-
-    if (received == 0) {
-        ESP_LOGD(TAG, "UART timeout in serial RX");
-        return ESP_FAIL;
-    }
-
-    if (received != buffer_size) {
-        ESP_LOGE(TAG, "Invalid response length %i", received);
-        ESP_LOG_BUFFER_HEX(TAG, buffer, received);
-        SERIAL_clear_buffer();
-        return ESP_FAIL;
-    }
-
-    uint16_t received_preamble = (buffer[0] << 8) | buffer[1];
-    if (received_preamble != PREAMBLE) {
-        ESP_LOGE(TAG, "Preamble mismatch: got 0x%04x, expected 0x%04x", received_preamble, PREAMBLE);
-        ESP_LOG_BUFFER_HEX(TAG, buffer, received);
-        SERIAL_clear_buffer();
-        return ESP_FAIL;
-    }
-
-    if (crc5(buffer + 2, buffer_size - 2) != 0) {
-        ESP_LOGE(TAG, "Checksum failed on response");        
-        ESP_LOG_BUFFER_HEX(TAG, buffer, received);
-        SERIAL_clear_buffer();
-        return ESP_FAIL;
-    }
-
-    return ESP_OK;
+    return ESP_FAIL;
 }
 
 void get_difficulty_mask(double difficulty, uint8_t *job_difficulty_mask)
