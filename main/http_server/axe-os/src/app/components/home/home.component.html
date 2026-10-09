@@ -605,7 +605,13 @@
                   @if (asicDomainsAmount; as asicDomainsAmount) {
                     @if (asicDomainsAmount > 0) {
                       <th [attr.colspan]="asicDomainsAmount">
-                        {{ asicDomainsAmount == 1 ? "Domain" : "Domains" }}
+                        @if (asicDomainsAmount === 1) {
+                          Domain
+                        } @else if (asicDomainsAmount <= 4) {
+                          Domains
+                        } @else {
+                          Domains ({{ domainUnit }})
+                        }
                       </th>
                     }
                   }
@@ -621,12 +627,18 @@
                         {{ i + 1 }}
                       </td>
                     }
-                    @for (domain of asic?.domains; track trackByIndex($index, domain)) {
+                    @for (domain of asic?.domains; track trackByIndex($index, domain); let dIndex = $index) {
                       <td
                         [style.--lightness]="getHeatmapLightness(domain, info.expectedHashrate)"
                         [style.height]="(asicAmount <= 2 ? '2rem' : null)"
-                        class="heatmap-cell">
-                        <span class="text-xs">{{ domain | hashSuffix }}</span>
+                        class="heatmap-cell"
+                        [appTooltip]="asicDomainsAmount > 4 ? ((asicAmount > 1 ? 'ASIC ' + (i + 1) + ' - ' : '') + 'Domain ' + (dIndex + 1) + ': ' + (domain | hashSuffix)) : ''"
+                        tooltipPosition="bottom">
+                        @if (asicDomainsAmount <= 4) {
+                          <span class="text-xs">{{ domain | hashSuffix }}</span>
+                        } @else {
+                          <span class="text-xs">{{ domain | hashSuffix: { power: domainPower, hideUnit: true } }}</span>
+                        }
                       </td>
                     }
                   </tr>

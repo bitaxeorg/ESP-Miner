@@ -18,6 +18,9 @@
     td {
         &.heatmap-cell {
             text-align: center;
+            padding: 0 2px;
+            overflow: hidden;
+            text-overflow: ellipsis;
             transition: background-color 2s ease-in-out;
             background-color: oklch(from var(--color-primary) var(--lightness, 0.5) c h);
             color: contrast-color(oklch(from var(--color-primary) var(--lightness, 0.5) c h));

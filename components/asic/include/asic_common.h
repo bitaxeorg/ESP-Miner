@@ -17,6 +17,19 @@ static inline void asic_init_core_register_delay(void)
 
 static const double NONCE_SPACE = 4294967296.0; //  2^32
 
+// Physical ASIC register addresses (Bitmain BM13xx wire protocol)
+#define BM13XX_REG_HASHRATE        0x04
+#define BM13XX_REG_ERROR_COUNT     0x4C
+#define BM13XX_REG_DOMAIN_0_COUNT  0x88
+#define BM13XX_REG_DOMAIN_1_COUNT  0x89
+#define BM13XX_REG_DOMAIN_2_COUNT  0x8A
+#define BM13XX_REG_DOMAIN_3_COUNT  0x8B
+#define BM13XX_REG_DOMAIN_4_COUNT  0xAC
+#define BM13XX_REG_DOMAIN_5_COUNT  0xAD
+#define BM13XX_REG_DOMAIN_6_COUNT  0xAE
+#define BM13XX_REG_DOMAIN_7_COUNT  0xAF
+#define BM13XX_REG_TOTAL_COUNT     0x8C
+
 typedef enum
 {
     REGISTER_INVALID = 0,
@@ -26,6 +39,10 @@ typedef enum
     REGISTER_DOMAIN_1_COUNT,
     REGISTER_DOMAIN_2_COUNT,
     REGISTER_DOMAIN_3_COUNT,
+    REGISTER_DOMAIN_4_COUNT, // domain counters (BM1366,BM1368,BM1370,BM1373)
+    REGISTER_DOMAIN_5_COUNT,
+    REGISTER_DOMAIN_6_COUNT,
+    REGISTER_DOMAIN_7_COUNT,
     REGISTER_ERROR_COUNT,    // error count register (all)
     REGISTER_PLL_PARAM,      // PLL/clock config readback (BM1370)
 } register_type_t;
