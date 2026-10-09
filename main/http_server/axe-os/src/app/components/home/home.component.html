@@ -428,7 +428,7 @@
               </div>
 
               <div appTooltip="{{ activePoolUser }}" tooltipPosition="top" sensitive-data>
-                <span class="font-mono font-bold text-base">{{ activePoolUserAddressPart | address }}</span>{{ activePoolUserSuffixPart }}
+                <span class="font-bold text-base" [innerHTML]="activePoolUser | address"></span>
               </div>
             </div>
 
@@ -448,7 +448,7 @@
                 --
               }
             </div>
-            @if ((info.coinbaseOutputs?.length ?? 0) > 0) {
+            @if ((info.coinbasePayoutStatus === 'verified' || info.coinbasePayoutStatus === 'not_found') && (info.coinbaseOutputs?.length ?? 0) > 0) {
               <div class="flex flex-nowrap">
                 @let percentage = payoutPercentage;
                 @if (percentage >= 95) {
@@ -558,10 +558,10 @@
                 @for (output of orderedCoinbaseOutputs; track output; let i = $index) {
                   <div class="flex justify-between">
                     @if (output.value > 0) {
-                      @if (output.address === activePoolUserAddressPart) {
-                        <span><span class="font-mono text-sm font-bold" appTooltip="Your payout address" tooltipPosition="top" sensitive-data>{{ output.address | address }}</span>&nbsp;<i class="pi pi-star-fill text-xs"></i></span>
+                      @if (output.address && activePoolUser.toLowerCase().includes(output.address.toLowerCase())) {
+                        <span><span class="text-sm font-bold" appTooltip="Your payout address" tooltipPosition="top" sensitive-data [innerHTML]="output.address | address"></span>&nbsp;<i class="pi pi-star-fill text-xs"></i></span>
                       } @else {
-                        <span class="font-mono text-sm" appTooltip="{{ output.address }}" tooltipPosition="top">{{ output.address | address }}</span>
+                        <span class="text-sm" appTooltip="{{ output.address }}" tooltipPosition="top" [innerHTML]="output.address | address"></span>
                       }
                       <span class="text-sm">{{ output.value | sats }}</span>
                     } @else {

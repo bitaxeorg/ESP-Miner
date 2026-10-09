@@ -342,6 +342,7 @@ components:
         - coinbaseValueUserSatoshis
         - coinbaseOthersCount
         - coinbaseOthersValueSatoshis
+        - coinbasePayoutStatus
         - miningPaused
         - statsLimit
         - partitions
@@ -713,6 +714,14 @@ components:
         coinbaseOthersValueSatoshis:
           type: integer
           description: Summed value in satoshis of the outputs counted in coinbaseOthersCount
+        coinbasePayoutStatus:
+          type: string
+          description: Verification status of user payout address against coinbase transaction
+          enum:
+            - verified
+            - not_found
+            - not_applicable
+            - unknown
         hashrateMonitor:
           type: object
           required:

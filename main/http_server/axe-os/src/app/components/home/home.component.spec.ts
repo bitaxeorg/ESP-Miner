@@ -43,6 +43,7 @@ const mockSystemInfo: ISystemInfo = {
   autofanspeed: 1,
   blockSignals: [],
   coinbaseValueUserSatoshis: 0,
+  coinbasePayoutStatus: 'unknown',
   display: 'SSD1306',
   displayTimeout: 0,
   errorPercentage: 0,
@@ -258,6 +259,33 @@ describe('HomeComponent', () => {
     expect(component.messages.some(message => message.type === 'FREQUENCY_LOW')).toBeFalse();
   });
 
+  it('handles mining reward messages using coinbasePayoutStatus', () => {
+    const error = { duration: 0, startTime: null };
+    const baseInfo: ISystemInfo = {
+      ...mockSystemInfo,
+      coinbaseOutputs: [{ address: 'bc1qother', value: 50000 }],
+      coinbaseValueTotalSatoshis: 50000,
+      coinbaseValueUserSatoshis: 0,
+    };
+
+    // When payout status is not_found and share warning is enabled, alert NO_MINING_REWARD
+    component.activePoolShareWarning = true;
+    component.handleSystemMessages({ ...baseInfo, coinbasePayoutStatus: 'not_found' }, error);
+    expect(component.messages.some(message => message.type === 'NO_MINING_REWARD')).toBeTrue();
+
+    // When payout status is not_applicable (account pool), NO_MINING_REWARD is not shown
+    component.handleSystemMessages({ ...baseInfo, coinbasePayoutStatus: 'not_applicable' }, error);
+    expect(component.messages.some(message => message.type === 'NO_MINING_REWARD')).toBeFalse();
+
+    // When payout status is verified, NO_MINING_REWARD is not shown
+    component.handleSystemMessages({
+      ...baseInfo,
+      coinbaseValueUserSatoshis: 50000,
+      coinbasePayoutStatus: 'verified'
+    }, error);
+    expect(component.messages.some(message => message.type === 'NO_MINING_REWARD')).toBeFalse();
+  });
+
   it('keeps telemetry and messages live while settings load and after settings fail', () => {
     fixture.destroy();
     const settings = new Subject<{ frequencyOptions: number[] }>();
@@ -335,6 +363,75 @@ describe('HomeComponent', () => {
 
       await expectSelectedPool('Primary');
       expect(component.activePoolURL).toBe(mockSystemInfo.stratumURL);
+    });
+
+    it('should format bitcoin addresses and display account usernames naturally in DOM', () => {
+      const getUserHtml = () => fixture.debugElement.nativeElement.querySelector('[sensitive-data] span')?.innerHTML ?? '';
+
+      // 1. Account username (not an address) - displayed cleanly without address formatting or font-mono
+      emitPoolInfo({ stratumUser: 'satoshi.worker1' });
+      fixture.detectChanges();
+      expect(getUserHtml()).toBe('satoshi.worker1');
+
+      // 2. Bitcoin address (single) - address is formatted with font-mono, worker suffix preserved
+      emitPoolInfo({
+        stratumUser: 'bc1q42aueh0wluqpzg3ng32kvaugnx4thnxa7y625x.worker1',
+        coinbaseOutputs: [
+          { address: 'bc1q42aueh0wluqpzg3ng32kvaugnx4thnxa7y625x', value: 50000 }
+        ]
+      });
+      fixture.detectChanges();
+      expect(getUserHtml()).toContain('<span class="font-mono">');
+      expect(getUserHtml()).toContain('bc1q');
+      expect(getUserHtml()).toContain('...');
+      expect(getUserHtml()).toContain('</span>.worker1');
+
+      // 3. Bitcoin address (multiple addresses) - both formatted, separator preserved
+      emitPoolInfo({
+        stratumUser: 'bc1q42aueh0wluqpzg3ng32kvaugnx4thnxa7y625x, 1DYwPTnC4NgEmoqbLbcRqoSzVeH3ehmGbV.worker1',
+        coinbaseOutputs: [
+          { address: 'bc1q42aueh0wluqpzg3ng32kvaugnx4thnxa7y625x', value: 25000 },
+          { address: '1DYwPTnC4NgEmoqbLbcRqoSzVeH3ehmGbV', value: 25000 }
+        ]
+      });
+      fixture.detectChanges();
+      expect(getUserHtml()).toContain('<span class="font-mono">');
+      expect(getUserHtml()).toContain(', <span class="font-mono">');
+      expect(getUserHtml()).toContain('</span>.worker1');
+
+      // 4. SRI solo pattern - prefix and worker suffix preserved, address formatted and wrapped in font-mono
+      emitPoolInfo({
+        stratumUser: 'sri/solo/bc1q42aueh0wluqpzg3ng32kvaugnx4thnxa7y625x/worker1',
+        coinbaseOutputs: [
+          { address: 'bc1q42aueh0wluqpzg3ng32kvaugnx4thnxa7y625x', value: 50000 }
+        ]
+      });
+      fixture.detectChanges();
+      expect(getUserHtml()).toContain('sri/solo/<span class="font-mono">');
+      expect(getUserHtml()).toContain('...');
+      expect(getUserHtml()).toContain('</span>/worker1');
+
+      // 5. SRI donate pattern - donation prefix preserved, address formatted and wrapped in font-mono
+      emitPoolInfo({
+        stratumUser: 'sri/donate/10/bc1q42aueh0wluqpzg3ng32kvaugnx4thnxa7y625x/worker1',
+        coinbaseOutputs: [
+          { address: 'bc1q42aueh0wluqpzg3ng32kvaugnx4thnxa7y625x', value: 45000 }
+        ]
+      });
+      fixture.detectChanges();
+      expect(getUserHtml()).toContain('sri/donate/10/<span class="font-mono">');
+      expect(getUserHtml()).toContain('...');
+      expect(getUserHtml()).toContain('</span>/worker1');
+
+      // 6. Full donation / pool worker (no address) - displayed as-is
+      emitPoolInfo({
+        stratumUser: 'sri/donate/worker1',
+        coinbaseOutputs: [
+          { address: 'bc1qpool', value: 50000 }
+        ]
+      });
+      fixture.detectChanges();
+      expect(getUserHtml()).toBe('sri/donate/worker1');
     });
 
     it('should reflect reset pool fields (responseTime, poolDifficulty, coinbaseOutputs) on failover', async () => {

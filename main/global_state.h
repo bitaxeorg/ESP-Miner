@@ -180,6 +180,7 @@ typedef struct GlobalState
     uint64_t coinbase_others_value_satoshis;
     uint64_t coinbase_value_total_satoshis;
     uint64_t coinbase_value_user_satoshis;
+    coinbase_payout_status_t coinbase_payout_status;
     uint64_t network_nonce_diff;
     char network_diff_string[DIFF_STRING_SIZE];
     char block_signals[MAX_BLOCK_SIGNALS][MAX_BLOCK_SIGNAL_LEN];

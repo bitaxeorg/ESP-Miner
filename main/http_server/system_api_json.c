@@ -1,12 +1,10 @@
 #include <stdio.h>
 #include <string.h>
 #include "esp_partition.h"
-#include "esp_image_format.h"
 #include "esp_wifi.h"
 #include "esp_ota_ops.h"
 #include "esp_system.h"
 #include "esp_heap_caps.h"
-#include "esp_timer.h"
 #include "global_state.h"
 #include "system_api_json.h"
 #include "system.h"
@@ -85,6 +83,7 @@ static void system_api_add_telemetry(cJSON *root, GlobalState *g) {
     cJSON_AddNumberToObject(root, "networkDifficulty", g->network_nonce_diff);
     cJSON_AddNumberToObject(root, "coinbaseValueTotalSatoshis", g->coinbase_value_total_satoshis);
     cJSON_AddNumberToObject(root, "coinbaseValueUserSatoshis", g->coinbase_value_user_satoshis);
+    cJSON_AddStringToObject(root, "coinbasePayoutStatus", coinbase_payout_status_to_string(g->coinbase_payout_status));
 
     // Dynamic System Stats
     cJSON_AddNumberToObject(root, "freeHeap", esp_get_free_heap_size());

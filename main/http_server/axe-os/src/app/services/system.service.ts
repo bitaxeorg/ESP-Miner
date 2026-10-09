@@ -224,6 +224,7 @@ export class SystemApiService {
         coinbaseValueUserSatoshis: 50,
         coinbaseOthersCount: 0,
         coinbaseOthersValueSatoshis: 0,
+        coinbasePayoutStatus: 'verified' as const,
         miningPaused: false,
         workReceived: 42,
       }
