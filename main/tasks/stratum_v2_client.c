@@ -111,22 +111,9 @@ void stratum_v2_close_connection(GlobalState *GLOBAL_STATE)
     stratum_timing_reset(&s_v2_timing);
 }
 
-static void stratum_v2_update_pending_shares(GlobalState *GLOBAL_STATE)
-{
-    sv2_conn_t *conn = s_v2_conn;
-    if (!conn) {
-        return;
-    }
-    uint32_t pending = (conn->sequence_number > conn->resolved_shares)
-                           ? (conn->sequence_number - conn->resolved_shares)
-                           : 0;
-    GLOBAL_STATE->SYSTEM_MODULE.shares_pending = (uint16_t)(pending > UINT16_MAX ? UINT16_MAX : pending);
-}
-
-static void stratum_v2_track_submit(GlobalState *GLOBAL_STATE, uint32_t sequence_number)
+static void stratum_v2_track_submit(uint32_t sequence_number)
 {
     stratum_timing_record(&s_v2_timing, sequence_number, esp_timer_get_time());
-    stratum_v2_update_pending_shares(GLOBAL_STATE);
 }
 
 int stratum_v2_submit_share(GlobalState *GLOBAL_STATE, const asic_job_t *active_job,
@@ -170,7 +157,7 @@ int stratum_v2_submit_share(GlobalState *GLOBAL_STATE, const asic_job_t *active_
 
     int ret = sv2_noise_send(conn->noise_ctx, transport, buf, len);
     if (ret >= 0) {
-        stratum_v2_track_submit(GLOBAL_STATE, sequence_number);
+        stratum_v2_track_submit(sequence_number);
         if (sent_time_us) {
             *sent_time_us = esp_timer_get_time();
         }
@@ -813,7 +800,6 @@ esp_err_t stratum_v2_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
                     if (resolved > conn->resolved_shares) {
                         conn->resolved_shares = resolved;
                     }
-                    stratum_v2_update_pending_shares(GLOBAL_STATE);
                 }
                 break;
             }
@@ -835,7 +821,6 @@ esp_err_t stratum_v2_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
                     if (resolved > conn->resolved_shares) {
                         conn->resolved_shares = resolved;
                     }
-                    stratum_v2_update_pending_shares(GLOBAL_STATE);
                 }
                 break;
             }

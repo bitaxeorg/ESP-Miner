@@ -100,9 +100,6 @@ int stratum_v1_submit_share(GlobalState *GLOBAL_STATE, const asic_job_t *active_
         if (sent_time_us) {
             *sent_time_us = now;
         }
-        if (GLOBAL_STATE->SYSTEM_MODULE.shares_pending < UINT16_MAX) {
-            GLOBAL_STATE->SYSTEM_MODULE.shares_pending++;
-        }
     }
     pthread_mutex_unlock(&GLOBAL_STATE->transport_mutex);
     return ret;
@@ -418,9 +415,6 @@ esp_err_t stratum_v1_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
                         }
                     }
                 } else if (s_v1_msg->message_id > 0) {
-                    if (GLOBAL_STATE->SYSTEM_MODULE.shares_pending > 0) {
-                        GLOBAL_STATE->SYSTEM_MODULE.shares_pending--;
-                    }
                     float response_time_ms = stratum_timing_calculate_ms(&s_v1_timing, (uint32_t)s_v1_msg->message_id, (uint64_t)receive_time_us);
                     if (s_v1_msg->response_success) {
                         if (response_time_ms >= 0) {
