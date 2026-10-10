@@ -73,6 +73,10 @@ static void system_api_add_telemetry(cJSON *root, GlobalState *g) {
     cJSON_AddNumberToObject(root, "bestSessionDiff", g->SYSTEM_MODULE.best_session_nonce_diff);
     cJSON_AddNumberToObject(root, "poolDifficulty", g->SYSTEM_MODULE.pool_difficulty);
     cJSON_AddFloatToObject(root, "responseTime", g->SYSTEM_MODULE.response_time);
+    float rt_min = g->SYSTEM_MODULE.response_time_min > 0.0f ? g->SYSTEM_MODULE.response_time_min : g->SYSTEM_MODULE.last_response_time_min;
+    float rt_max = g->SYSTEM_MODULE.response_time_max > 0.0f ? g->SYSTEM_MODULE.response_time_max : g->SYSTEM_MODULE.last_response_time_max;
+    cJSON_AddFloatToObject(root, "responseTimeMin", rt_min > 0.0f ? rt_min : g->SYSTEM_MODULE.response_time);
+    cJSON_AddFloatToObject(root, "responseTimeMax", rt_max > 0.0f ? rt_max : g->SYSTEM_MODULE.response_time);
     cJSON_AddNumberToObject(root, "responseShareBatch", g->SYSTEM_MODULE.response_share_batch);
     cJSON_AddFloatToObject(root, "processTime", g->SYSTEM_MODULE.process_time);
     cJSON_AddNumberToObject(root, "workReceived", g->SYSTEM_MODULE.work_received);

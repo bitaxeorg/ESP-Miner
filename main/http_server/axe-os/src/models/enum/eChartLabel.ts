@@ -16,11 +16,19 @@ export enum eChartLabel {
     fan2Rpm = 'Fan 2 RPM',
     wifiRssi = 'Wi-Fi RSSI',
     freeHeap = 'Free Heap',
-    responseTime = 'Response Time',
+    responseTimeMin = 'Response Time Min',
+    responseTimeMax = 'Response Time Max',
     none = 'None'
 }
 
-export const ChartUnitGroups: { name: string, value: string, labels: string[] }[] = [
+export interface IChartUnitGroup {
+    name: string;
+    value: string;
+    labels: string[];
+    type?: 'line' | 'scatter';
+}
+
+export const ChartUnitGroups: IChartUnitGroup[] = [
     { name: 'Hashrate (H/s)', value: 'hashrate', labels: ['hashrate', 'hashrate_1m', 'hashrate_10m', 'hashrate_1h'] },
     { name: 'Temperature (°C)', value: 'temperature', labels: ['asicTemp', 'asicTemp2', 'vrTemp'] },
     { name: 'Voltage (V)', value: 'voltage', labels: ['asicVoltage', 'voltage'] },
@@ -30,7 +38,7 @@ export const ChartUnitGroups: { name: string, value: string, labels: string[] }[
     { name: 'Percentage (%)', value: 'percentage', labels: ['fanSpeed', 'errorPercentage'] },
     { name: 'Wi-Fi RSSI (dBm)', value: 'rssi', labels: ['wifiRssi'] },
     { name: 'Free Heap (Bytes)', value: 'heap', labels: ['freeHeap'] },
-    { name: 'Response Time (ms)', value: 'time', labels: ['responseTime'] },
+    { name: 'Response Time (ms)', value: 'time', labels: ['responseTimeMin', 'responseTimeMax'], type: 'scatter' },
     { name: 'None', value: 'none', labels: ['none'] }
 ];
 

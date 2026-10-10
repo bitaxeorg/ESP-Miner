@@ -36,6 +36,7 @@ import { LocalStorageService } from 'src/app/local-storage.service';
 import { DashboardEditService } from 'src/app/services/dashboard-edit.service';
 import { LayoutService } from 'src/app/layout/service/app.layout.service';
 import { SystemInfo as ISystemInfo, SystemStatistics as ISystemStatistics } from 'src/app/generated/models';
+import { eChartLabel } from 'src/models/enum/eChartLabel';
 
 const mockSystemInfo: ISystemInfo = {
   ASICModel: 'BM1370',
@@ -110,6 +111,8 @@ const mockSystemInfo: ISystemInfo = {
   maxPower: 20,
   poolConnectionInfo: 'Connected',
   responseTime: 45,
+  responseTimeMin: 45,
+  responseTimeMax: 45,
   responseShareBatch: 1,
   poolDifficulty: 1000,
   blockHeight: 800000,
@@ -510,6 +513,46 @@ describe('HomeComponent', () => {
       expect(component.dataLabel.length).toBe(2);
     });
 
+    it('should merge response time into closest neighbor when removed point has data in limitDataPoints', () => {
+      component['statsLimit'] = 3;
+      component.dataLabel = [1000, 2000, 2050, 4000];
+      component.hashrateData = [100, 100, 100, 100];
+      component.powerData = [10, 10, 10, 10];
+      component.chartDatasets = {
+        responseTimeMin: [null, 35.5, null, null],
+        responseTimeMax: [null, 55.5, null, null]
+      };
+
+      component.limitDataPoints(0);
+
+      expect(component.dataLabel.length).toBe(3);
+      expect(component.dataLabel).not.toContain(2000);
+      expect(component.dataLabel).toContain(2050);
+      const idx2050 = component.dataLabel.indexOf(2050);
+      expect(component.chartDatasets['responseTimeMin'][idx2050]).toBe(35.5);
+      expect(component.chartDatasets['responseTimeMax'][idx2050]).toBe(55.5);
+    });
+
+    it('should merge min and max of either points when thinning in limitDataPoints', () => {
+      component['statsLimit'] = 3;
+      component.dataLabel = [1000, 2000, 2050, 4000];
+      component.hashrateData = [100, 100, 100, 100];
+      component.powerData = [10, 10, 10, 10];
+      component.chartDatasets = {
+        responseTimeMin: [null, 35.5, 25.0, null],
+        responseTimeMax: [null, 45.5, 60.0, null]
+      };
+
+      component.limitDataPoints(0);
+
+      expect(component.dataLabel.length).toBe(3);
+      expect(component.dataLabel).toContain(2050);
+      expect(component.dataLabel).not.toContain(2000);
+      const idx2050 = component.dataLabel.indexOf(2050);
+      expect(component.chartDatasets['responseTimeMin'][idx2050]).toBe(25.0);
+      expect(component.chartDatasets['responseTimeMax'][idx2050]).toBe(60.0);
+    });
+
     it('should clear flash timeouts on destroy', () => {
       component['shareAcceptedTimeout'] = setTimeout(() => {}, 10000) as any;
       component['shareRejectedTimeout'] = setTimeout(() => {}, 10000) as any;
@@ -522,6 +565,14 @@ describe('HomeComponent', () => {
       expect(clearTimeout).toHaveBeenCalledWith(component['shareAcceptedTimeout']);
       expect(clearTimeout).toHaveBeenCalledWith(component['shareRejectedTimeout']);
       expect(clearTimeout).toHaveBeenCalledWith(component['workReceivedTimeout']);
+    });
+
+    it('should return 0 for response time min/max and undefined for others in getMinForLabel', () => {
+      expect(component.getMinForLabel(eChartLabel.responseTimeMin)).toBe(0);
+      expect(component.getMinForLabel(eChartLabel.responseTimeMax)).toBe(0);
+      expect(component.getMinForLabel(eChartLabel.hashrate)).toBeUndefined();
+      expect(component.getMinForLabel(eChartLabel.none)).toBeUndefined();
+      expect(component.getMinForLabel(undefined)).toBeUndefined();
     });
   });
 });

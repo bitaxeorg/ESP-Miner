@@ -74,7 +74,8 @@ static const char * STATS_LABEL_FAN_RPM = "fanRpm";
 static const char * STATS_LABEL_FAN2_RPM = "fan2Rpm";
 static const char * STATS_LABEL_WIFI_RSSI = "wifiRssi";
 static const char * STATS_LABEL_FREE_HEAP = "freeHeap";
-static const char * STATS_LABEL_RESPONSE_TIME = "responseTime";
+static const char * STATS_LABEL_RESPONSE_TIME_MIN = "responseTimeMin";
+static const char * STATS_LABEL_RESPONSE_TIME_MAX = "responseTimeMax";
 
 static int system_info_prebuffer_len = 256;
 static int system_wifi_scan_prebuffer_len = 256;
@@ -99,7 +100,8 @@ typedef enum
     SRC_FAN2_RPM,
     SRC_WIFI_RSSI,
     SRC_FREE_HEAP,
-    SRC_RESPONSE_TIME,
+    SRC_RESPONSE_TIME_MIN,
+    SRC_RESPONSE_TIME_MAX,
     SRC_NONE // last
 } DataSource;
 
@@ -123,7 +125,8 @@ DataSource strToDataSource(const char * sourceStr)
         if (strcmp(sourceStr, STATS_LABEL_FAN2_RPM) == 0)     return SRC_FAN2_RPM;
         if (strcmp(sourceStr, STATS_LABEL_WIFI_RSSI) == 0)    return SRC_WIFI_RSSI;
         if (strcmp(sourceStr, STATS_LABEL_FREE_HEAP) == 0)    return SRC_FREE_HEAP;
-        if (strcmp(sourceStr, STATS_LABEL_RESPONSE_TIME) == 0) return SRC_RESPONSE_TIME;
+        if (strcmp(sourceStr, STATS_LABEL_RESPONSE_TIME_MIN) == 0) return SRC_RESPONSE_TIME_MIN;
+        if (strcmp(sourceStr, STATS_LABEL_RESPONSE_TIME_MAX) == 0) return SRC_RESPONSE_TIME_MAX;
     }
     return SRC_NONE;
 }
@@ -1687,7 +1690,8 @@ static esp_err_t GET_system_statistics(httpd_req_t * req)
     if (dataSelection[SRC_FAN2_RPM]) { yyjson_mut_arr_add_str(doc, labelArray, STATS_LABEL_FAN2_RPM); }
     if (dataSelection[SRC_WIFI_RSSI]) { yyjson_mut_arr_add_str(doc, labelArray, STATS_LABEL_WIFI_RSSI); }
     if (dataSelection[SRC_FREE_HEAP]) { yyjson_mut_arr_add_str(doc, labelArray, STATS_LABEL_FREE_HEAP); }
-    if (dataSelection[SRC_RESPONSE_TIME]) { yyjson_mut_arr_add_str(doc, labelArray, STATS_LABEL_RESPONSE_TIME); }
+    if (dataSelection[SRC_RESPONSE_TIME_MIN]) { yyjson_mut_arr_add_str(doc, labelArray, STATS_LABEL_RESPONSE_TIME_MIN); }
+    if (dataSelection[SRC_RESPONSE_TIME_MAX]) { yyjson_mut_arr_add_str(doc, labelArray, STATS_LABEL_RESPONSE_TIME_MAX); }
     yyjson_mut_arr_add_str(doc, labelArray, STATS_LABEL_TIMESTAMP);
 
     yyjson_mut_val *statsArray = yyjson_mut_obj_add_arr(doc, root, "statistics");
@@ -1713,7 +1717,20 @@ static esp_err_t GET_system_statistics(httpd_req_t * req)
         if (dataSelection[SRC_FAN2_RPM]) { yyjson_mut_arr_add_uint(doc, valueArray, statsData.fan2RPM); }
         if (dataSelection[SRC_WIFI_RSSI]) { yyjson_mut_arr_add_sint(doc, valueArray, statsData.wifiRSSI); }
         if (dataSelection[SRC_FREE_HEAP]) { yyjson_mut_arr_add_uint(doc, valueArray, statsData.freeHeap); }
-        if (dataSelection[SRC_RESPONSE_TIME]) { yyjson_mut_arr_add_real(doc, valueArray, statsData.responseTime); }
+        if (dataSelection[SRC_RESPONSE_TIME_MIN]) {
+            if (statsData.responseTimeMin > 0.0f) {
+                yyjson_mut_arr_add_real(doc, valueArray, statsData.responseTimeMin);
+            } else {
+                yyjson_mut_arr_add_null(doc, valueArray);
+            }
+        }
+        if (dataSelection[SRC_RESPONSE_TIME_MAX]) {
+            if (statsData.responseTimeMax > 0.0f) {
+                yyjson_mut_arr_add_real(doc, valueArray, statsData.responseTimeMax);
+            } else {
+                yyjson_mut_arr_add_null(doc, valueArray);
+            }
+        }
         yyjson_mut_arr_add_uint(doc, valueArray, statsData.timestamp);
     }
 

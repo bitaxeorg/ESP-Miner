@@ -804,8 +804,7 @@ esp_err_t stratum_v2_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
                     if (submit_time_us > 0) {
                         float response_time_ms = (float)(esp_timer_get_time() - submit_time_us) / 1000.0f;
                         ESP_LOGI(TAG, "Shares accepted: %lu (%.1f ms)", accepted_count, response_time_ms);
-                        GLOBAL_STATE->SYSTEM_MODULE.response_time = response_time_ms;
-                        GLOBAL_STATE->SYSTEM_MODULE.response_share_batch = (uint16_t)accepted_count;
+                        SYSTEM_record_response_time(GLOBAL_STATE, response_time_ms, (uint16_t)accepted_count);
                         stratum_v2_submit_time_us[slot] = 0;
                     } else {
                         ESP_LOGI(TAG, "Shares accepted: %lu", accepted_count);

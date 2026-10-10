@@ -166,6 +166,8 @@ export class SystemApiService {
         fallbackStratumV2ChannelType: "extended" as const,
         poolDifficulty: 1000,
         responseTime: 10,
+        responseTimeMin: 10,
+        responseTimeMax: 10,
         responseShareBatch: 1,
         isUsingFallbackStratum: 0,
         useFallbackStratum: 0,
@@ -265,7 +267,7 @@ export class SystemApiService {
     const timestampData = [13131,18126,23125,28125,33125,38125,43125,48125,53125,58125];
 
     columnList.push("timestamp");
-    let statisticsList: number[][] = [];
+    let statisticsList: (number | null)[][] = [];
 
     for(let i: number = 0; i < 10; i++) {
       statisticsList[i] = [];
@@ -286,8 +288,9 @@ export class SystemApiService {
           case eChartLabel.fanRpm:       statisticsList[i][j] = fanRpmData[i];       break;
           case eChartLabel.fan2Rpm:      statisticsList[i][j] = fan2RpmData[i];      break;
           case eChartLabel.wifiRssi:     statisticsList[i][j] = wifiRssiData[i];     break;
-          case eChartLabel.freeHeap:     statisticsList[i][j] = freeHeapData[i];     break;
-          case eChartLabel.responseTime: statisticsList[i][j] = responseTimeData[i]; break;
+          case eChartLabel.freeHeap:        statisticsList[i][j] = freeHeapData[i];        break;
+          case eChartLabel.responseTimeMin: statisticsList[i][j] = responseTimeData[i] ? responseTimeData[i] - 1 : null; break;
+          case eChartLabel.responseTimeMax: statisticsList[i][j] = responseTimeData[i] ? responseTimeData[i] + 1 : null; break;
           default:
             if (columnList[j] === "timestamp") {
               statisticsList[i][j] = timestampData[i];

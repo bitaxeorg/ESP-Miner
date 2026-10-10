@@ -390,10 +390,11 @@ esp_err_t stratum_v1_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
                     if (s_v1_msg->response_success) {
                         ESP_LOGI(TAG, "message result accepted");
                         ESP_LOGI(TAG, "Stratum response time: %.1f ms", response_time_ms);
-                        GLOBAL_STATE->SYSTEM_MODULE.response_time = response_time_ms;
+                        SYSTEM_record_response_time(GLOBAL_STATE, response_time_ms, 1);
                         SYSTEM_notify_accepted_share(GLOBAL_STATE);
                     } else {
                         ESP_LOGW(TAG, "message result rejected: %s", s_v1_msg->error_str);
+                        SYSTEM_record_response_time(GLOBAL_STATE, response_time_ms, 1);
                         SYSTEM_notify_rejected_share(GLOBAL_STATE, s_v1_msg->error_str);
                     }
                 } else {
