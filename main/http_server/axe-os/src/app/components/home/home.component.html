@@ -363,7 +363,7 @@
 
           <div class="mb-4">
             <h6 class="flex justify-between mb-1" tooltipPosition="top"
-                appTooltip="{{info.fan2rpm > 0 ? 'Fan 1: ' : ''}}{{info.fanrpm}} RPM{{info.fan2rpm > 0 ? '<br>Fan 2: ' + info.fan2rpm + ' RPM' : ''}}">
+                appTooltip="{{info.fan2rpm > 0 ? 'Fan 1: ' : ''}}{{info.fanrpm}} RPM{{info.fan2rpm > 0 ? '\nFan 2: ' + info.fan2rpm + ' RPM' : ''}}">
 
               @if (info.fan2rpm > 0) {
                 Fan Speeds
@@ -592,59 +592,44 @@
     <!-- Hashrate Registers -->
     <div class="grid-stack-item" gs-id="registers">
       <div class="grid-stack-item-content">
-        <div class="card">
-          <h4 class="whitespace-nowrap overflow-hidden text-ellipsis font-medium">Hashrate Registers</h4>
+        <div class="card flex flex-col">
+          <h4 class="whitespace-nowrap overflow-hidden text-ellipsis font-medium mb-2">Hashrate Registers</h4>
 
-          @if (asicsAmount; as asicAmount) {
-            <table class="heatmap text-{{asicAmount <= 2 ? 'sm' : 'xs'}} w-full">
-              <thead>
-                <tr>
-                  @if (asicAmount > 1) {
-                    <th class="text-left">ASIC</th>
-                  }
-                  @if (asicDomainsAmount; as asicDomainsAmount) {
-                    @if (asicDomainsAmount > 0) {
-                      <th [attr.colspan]="asicDomainsAmount">
-                        @if (asicDomainsAmount === 1) {
-                          Domain
-                        } @else if (asicDomainsAmount <= 4) {
-                          Domains
-                        } @else {
-                          Domains ({{ domainUnit }})
-                        }
-                      </th>
-                    }
-                  }
-                </tr>
-              </thead>
-              <tbody>
-                @for (asic of info.hashrateMonitor?.asics; track trackByIndex($index, asic); let i = $index) {
-                  <tr class="cursor-pointer"
-                    [appTooltip]="(asicAmount > 1 ? 'ASIC ' + (i + 1) + ' - ' : '') + 'Error count: ' + asic.errorCount"
-                    tooltipPosition="bottom">
-                    @if (asicAmount > 1) {
-                      <td class="text-secondary text-left">
-                        {{ i + 1 }}
-                      </td>
-                    }
-                    @for (domain of asic?.domains; track trackByIndex($index, domain); let dIndex = $index) {
-                      <td
-                        [style.--lightness]="getHeatmapLightness(domain, info.expectedHashrate)"
-                        [style.height]="(asicAmount <= 2 ? '2rem' : null)"
-                        class="heatmap-cell"
-                        [appTooltip]="asicDomainsAmount > 4 ? ((asicAmount > 1 ? 'ASIC ' + (i + 1) + ' - ' : '') + 'Domain ' + (dIndex + 1) + ': ' + (domain | hashSuffix)) : ''"
-                        tooltipPosition="bottom">
-                        @if (asicDomainsAmount <= 4) {
-                          <span class="text-xs">{{ domain | hashSuffix }}</span>
-                        } @else {
-                          <span class="text-xs">{{ domain | hashSuffix: { power: domainPower, hideUnit: true } }}</span>
-                        }
-                      </td>
-                    }
-                  </tr>
+          @if (sparklineAsicRows.length > 0) {
+            <div class="w-full flex-1 min-h-0 flex flex-col gap-1 overflow-hidden">
+              <div class="flex items-center gap-2 shrink-0 pb-0.5">
+                @if (sparklineAsicRows.length > 1) {
+                  <span class="w-8 text-xs text-secondary font-medium shrink-0 text-center">ASIC</span>
                 }
-              </tbody>
-            </table>
+                <div class="flex gap-1.5 flex-1 min-w-0">
+                  @for (cell of sparklineAsicRows[0].cells; track cell.id) {
+                    <span class="flex-1 min-w-0 text-center text-xs text-secondary font-medium truncate">Domain {{ cell.domainNumber }}</span>
+                  }
+                </div>
+              </div>
+              @for (row of sparklineAsicRows; track row.id) {
+                <div class="flex items-stretch gap-2 flex-1 min-h-0">
+                  @if (sparklineAsicRows.length > 1) {
+                    <span class="w-8 text-xs text-secondary font-medium shrink-0 flex items-center justify-center">{{ row.label }}</span>
+                  }
+                  <div class="flex gap-1.5 flex-1 h-full min-w-0">
+                    @for (cell of row.cells; track cell.id) {
+                      <div class="sparkline-cell flex-1 min-w-0 h-full" [appTooltip]="cell.tooltip" tooltipPosition="top">
+                        <div class="absolute bottom-0.5 left-1 z-0 text-[10px] leading-none font-medium text-secondary truncate select-none pointer-events-none max-w-[calc(100%-8px)]">
+                          {{ cell.hashrate }}
+                        </div>
+                        <svg class="sparkline-svg w-full h-full" [attr.viewBox]="sparklineViewBox" preserveAspectRatio="none">
+                          <line x1="0" [attr.y1]="cell.nominalY" x2="100" [attr.y2]="cell.nominalY" class="nominal-line" />
+                          @if (cell.path) {
+                            <path [attr.d]="cell.path" class="sparkline-path" />
+                          }
+                        </svg>
+                      </div>
+                    }
+                  </div>
+                </div>
+              }
+            </div>
           }
         </div>
       </div>

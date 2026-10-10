@@ -48,6 +48,21 @@ interface ISystemInfoError {
   startTime: number | null;
 }
 
+export interface SparklineDomainCell {
+  id: string;
+  domainNumber: number;
+  hashrate: string;
+  nominalY: number;
+  path: string;
+  tooltip: string;
+}
+
+export interface SparklineAsicRow {
+  id: string;
+  label: string;
+  cells: SparklineDomainCell[];
+}
+
 const HOME_CHART_DATA_SOURCES = 'HOME_CHART_DATA_SOURCES';
 const HOME_CHART_HIDDEN_SENSORS = 'HOME_CHART_HIDDEN_SENSORS';
 const DASHBOARD_LAYOUT_KEY = 'DASHBOARD_LAYOUT_V1';
@@ -179,11 +194,8 @@ export class HomeComponent implements OnInit, OnDestroy {
 
   // Performance optimization cache properties
   private primaryColorRgb: { r: number, g: number, b: number } = { r: 0, g: 0, b: 0 };
-  private isHardwareConfigInitialized = false;
-  public asicsAmount: number = 0;
-  public asicDomainsAmount: number = 0;
-  public domainUnit: string = 'GH/s';
-  public domainPower: number = 3;
+  public sparklineAsicRows: SparklineAsicRow[] = [];
+  public sparklineViewBox: string = '0 0 100 30';
   public efficiency: number = 0;
   public efficiencyAverage: number = 0;
   public expectedEfficiency: number = 0;
@@ -977,14 +989,8 @@ export class HomeComponent implements OnInit, OnDestroy {
         this.maxFrequency = Math.max(800, info.actualFrequency || info.frequency || 0);
         this.statsLimit = info.statsLimit || 720;
 
-        // Pre-compute values for template performance
-        if (!this.isHardwareConfigInitialized && info.hashrateMonitor?.asics?.length) {
-          this.isHardwareConfigInitialized = true;
-          this.asicsAmount = info.hashrateMonitor.asics.length;
-          this.asicDomainsAmount = info.hashrateMonitor.asics[0]?.domains?.length ?? 0;
-        }
 
-        this.updateDomainUnit(info);
+        this.updateDomainSparklines(info);
 
         this.updateChartDataSources(info);
 
@@ -1243,9 +1249,6 @@ export class HomeComponent implements OnInit, OnDestroy {
   hasCoinbaseVisibility(info: ISystemInfo): boolean {
     return info.blockHeight > 0;
   }
-  trackByIndex(index: number, _item: any) {
-    return index;
-  }
 
   // Pools that pay miners directly from the coinbase can push the user's own output far down
   // the list, so lift it to the top. Outputs beyond the firmware's capacity are not in this
@@ -1322,28 +1325,75 @@ export class HomeComponent implements OnInit, OnDestroy {
     return percentage < 10 ? percentage.toPrecision(2) : percentage.toFixed(1);
   }
 
-  public getHeatmapLightness(domainHashrate: number, expectedHashrate: number): string {
-    const expected = expectedHashrate || 1;
-    const ratio = Math.max(0, Math.min(2, (domainHashrate / expected) * this.asicsAmount) * this.asicDomainsAmount);
-    const deviation = isNaN(ratio) ? 1 : Math.abs(ratio - 1);  // 0 = perfect, 1 = 100% off
-    const t = 1 - Math.pow(1 - deviation, 1.5); // Exponent controls graduality
+  private updateDomainSparklines(info: ISystemInfo): void {
+    const asics = info.hashrateMonitor?.asics;
+    if (!asics || !asics.length) {
+      return;
+    }
 
-    const direction = ratio > 1 ? 1 : -1;
-    const amount = direction * t * 0.4;
-    const lightness = 0.5 + amount;
+    const asicsCount = asics.length;
+    const domainsCount = asics[0]?.domains?.length ?? 0;
+    if (domainsCount === 0) {
+      return;
+    }
 
-    return lightness.toFixed(3);
-  }
+    const expected = info.expectedHashrate || 0;
+    const nominal = (expected > 0 && asicsCount > 0 && domainsCount > 0)
+      ? expected / (asicsCount * domainsCount)
+      : 1;
+    const power = HashSuffixPipe.getPower(nominal);
+    const suffix = HashSuffixPipe.getSuffix(power);
+    const viewportHeight = nominal * 1.5;
+    this.sparklineViewBox = `0 0 100 ${viewportHeight.toFixed(2)}`;
 
-  private updateDomainUnit(info: ISystemInfo) {
-    const totalDomains = this.asicsAmount * this.asicDomainsAmount;
-    if (totalDomains <= 0) return;
+    const nominalY = nominal;
+    const rows: SparklineAsicRow[] = [];
 
-    const totalHashrate = info.expectedHashrate || info.hashRate || 0;
-    if (totalHashrate <= 0) return;
+    for (let a = 0; a < asicsCount; a++) {
+      const domains = asics[a].domains || [];
+      const errorCount = asics[a].errorCount ?? 0;
+      const cells: SparklineDomainCell[] = [];
 
-    this.domainPower = HashSuffixPipe.getPower(totalHashrate / totalDomains);
-    this.domainUnit = HashSuffixPipe.getSuffix(this.domainPower);
+      for (let d = 0; d < domainsCount; d++) {
+        const history = this.liveDataService?.domainHistory?.[a]?.[d] ?? [domains[d] ?? 0];
+        const currentVal = domains[d] ?? 0;
+
+        let path = '';
+        const pts = history.length === 1 ? [history[0], history[0]] : history;
+        const nPts = pts.length;
+        if (nPts >= 2) {
+          for (let k = 0; k < nPts; k++) {
+            const px = (k / (nPts - 1)) * 100;
+            const py = (pts[k] != null && !isNaN(pts[k])) ? pts[k] : 0;
+            path += (k === 0 ? 'M ' : ' L ') + px.toFixed(1) + ' ' + py.toFixed(2);
+          }
+        }
+
+        const pct = nominal > 0 ? Math.round((currentVal / nominal) * 100) : 0;
+        const valStr = HashSuffixPipe.transform(currentVal, { hideUnit: true, power });
+        const title = asicsCount > 1 ? `ASIC ${a + 1} • Domain ${d + 1}` : `Domain ${d + 1}`;
+        const errorLine = errorCount > 0 ? `\nErrors: ${errorCount}` : '';
+        const tooltip = `${title}\n${valStr} ${suffix} (${pct}% target)${errorLine}`;
+
+        cells.push({
+          id: `${a}-${d}`,
+          domainNumber: d + 1,
+          hashrate: valStr,
+          nominalY,
+          path,
+          tooltip
+        });
+      }
+
+      rows.push({
+        id: `asic-${a}`,
+        label: `${a + 1}`,
+        cells
+      });
+    }
+
+    this.sparklineAsicRows = rows;
+    this.cd.markForCheck();
   }
 
   private updateChartUnitGroups() {
