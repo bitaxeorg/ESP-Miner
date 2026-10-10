@@ -50,80 +50,23 @@
 #include "websocket_api.h"
 #include "system_api_json.h"
 #include "log_buffer.h"
-#include "cjson_utils.h"
 #include "utils.h"
 
 static const char * TAG = "http_server";
 static const char * CORS_TAG = "CORS";
 
-static const char * STATS_LABEL_HASHRATE = "hashrate";
-static const char * STATS_LABEL_HASHRATE_1m = "hashrate_1m";
-static const char * STATS_LABEL_HASHRATE_10m = "hashrate_10m";
-static const char * STATS_LABEL_HASHRATE_1h = "hashrate_1h";
-static const char * STATS_LABEL_ERROR_PERCENTAGE = "errorPercentage";
-static const char * STATS_LABEL_TIMESTAMP = "timestamp";
-static const char * STATS_LABEL_ASIC_TEMP = "asicTemp";
-static const char * STATS_LABEL_ASIC_TEMP2 = "asicTemp2";
-static const char * STATS_LABEL_VR_TEMP = "vrTemp";
-static const char * STATS_LABEL_ASIC_VOLTAGE = "asicVoltage";
-static const char * STATS_LABEL_VOLTAGE = "voltage";
-static const char * STATS_LABEL_POWER = "power";
-static const char * STATS_LABEL_CURRENT = "current";
-static const char * STATS_LABEL_FAN_SPEED = "fanSpeed";
-static const char * STATS_LABEL_FAN_RPM = "fanRpm";
-static const char * STATS_LABEL_FAN2_RPM = "fan2Rpm";
-static const char * STATS_LABEL_WIFI_RSSI = "wifiRssi";
-static const char * STATS_LABEL_FREE_HEAP = "freeHeap";
-static const char * STATS_LABEL_RESPONSE_TIME = "responseTime";
-
 static int system_info_prebuffer_len = 256;
 static int system_wifi_scan_prebuffer_len = 256;
 static int api_common_prebuffer_len = 256;
 
-typedef enum
-{
-    SRC_HASHRATE,
-    SRC_HASHRATE_1m,
-    SRC_HASHRATE_10m,
-    SRC_HASHRATE_1h,
-    SRC_ERROR_PERCENTAGE,
-    SRC_ASIC_TEMP,
-    SRC_ASIC_TEMP2,
-    SRC_VR_TEMP,
-    SRC_ASIC_VOLTAGE,
-    SRC_VOLTAGE,
-    SRC_POWER,
-    SRC_CURRENT,
-    SRC_FAN_SPEED,
-    SRC_FAN_RPM,
-    SRC_FAN2_RPM,
-    SRC_WIFI_RSSI,
-    SRC_FREE_HEAP,
-    SRC_RESPONSE_TIME,
-    SRC_NONE // last
-} DataSource;
-
 DataSource strToDataSource(const char * sourceStr)
 {
     if (NULL != sourceStr) {
-        if (strcmp(sourceStr, STATS_LABEL_HASHRATE) == 0)     return SRC_HASHRATE;
-        if (strcmp(sourceStr, STATS_LABEL_HASHRATE_1m) == 0)  return SRC_HASHRATE_1m;
-        if (strcmp(sourceStr, STATS_LABEL_HASHRATE_10m) == 0) return SRC_HASHRATE_10m;
-        if (strcmp(sourceStr, STATS_LABEL_HASHRATE_1h) == 0)  return SRC_HASHRATE_1h;
-        if (strcmp(sourceStr, STATS_LABEL_ERROR_PERCENTAGE) == 0)  return SRC_ERROR_PERCENTAGE;
-        if (strcmp(sourceStr, STATS_LABEL_VOLTAGE) == 0)      return SRC_VOLTAGE;
-        if (strcmp(sourceStr, STATS_LABEL_POWER) == 0)        return SRC_POWER;
-        if (strcmp(sourceStr, STATS_LABEL_CURRENT) == 0)      return SRC_CURRENT;
-        if (strcmp(sourceStr, STATS_LABEL_ASIC_TEMP) == 0)    return SRC_ASIC_TEMP;
-        if (strcmp(sourceStr, STATS_LABEL_ASIC_TEMP2) == 0)   return SRC_ASIC_TEMP2;
-        if (strcmp(sourceStr, STATS_LABEL_VR_TEMP) == 0)      return SRC_VR_TEMP;
-        if (strcmp(sourceStr, STATS_LABEL_ASIC_VOLTAGE) == 0) return SRC_ASIC_VOLTAGE;
-        if (strcmp(sourceStr, STATS_LABEL_FAN_SPEED) == 0)    return SRC_FAN_SPEED;
-        if (strcmp(sourceStr, STATS_LABEL_FAN_RPM) == 0)      return SRC_FAN_RPM;
-        if (strcmp(sourceStr, STATS_LABEL_FAN2_RPM) == 0)     return SRC_FAN2_RPM;
-        if (strcmp(sourceStr, STATS_LABEL_WIFI_RSSI) == 0)    return SRC_WIFI_RSSI;
-        if (strcmp(sourceStr, STATS_LABEL_FREE_HEAP) == 0)    return SRC_FREE_HEAP;
-        if (strcmp(sourceStr, STATS_LABEL_RESPONSE_TIME) == 0) return SRC_RESPONSE_TIME;
+        for (int i = 0; i < SRC_NONE; i++) {
+            if (strcmp(sourceStr, STATS_LABELS[i]) == 0) {
+                return (DataSource)i;
+            }
+        }
     }
     return SRC_NONE;
 }
@@ -1604,6 +1547,31 @@ static esp_err_t GET_system_firmware_checksum(httpd_req_t *req)
     return res;
 }
 
+struct StatsSerializeContext {
+    yyjson_mut_doc *doc;
+    yyjson_mut_val *statsArray;
+    const int *active_cols;
+    int num_active;
+    const yyjson_alc *alc;
+    char *json_str;
+    size_t len;
+};
+
+static void serialize_stats_cb(const struct StatisticsData *rows, uint16_t count, void *ctx)
+{
+    struct StatsSerializeContext *sc = (struct StatsSerializeContext *)ctx;
+    for (uint16_t i = 0; i < count; i++) {
+        const struct StatisticsData *row = &rows[i];
+        yyjson_mut_val *valueArray = yyjson_mut_arr_add_arr(sc->doc, sc->statsArray);
+        for (int c = 0; c < sc->num_active; c++) {
+            yyjson_mut_val *v = yyjson_mut_raw(sc->doc, row->tokens[sc->active_cols[c]]);
+            yyjson_mut_arr_add_val(valueArray, v);
+        }
+        yyjson_mut_arr_add_uint(sc->doc, valueArray, row->timestamp);
+    }
+    sc->json_str = yyjson_mut_write_opts(sc->doc, YYJSON_WRITE_NOFLAG, sc->alc, &sc->len, NULL);
+}
+
 static esp_err_t GET_system_statistics(httpd_req_t * req)
 {
     if (is_network_allowed(req) != ESP_OK) {
@@ -1670,65 +1638,39 @@ static esp_err_t GET_system_statistics(httpd_req_t * req)
     yyjson_mut_obj_add_uint(doc, root, "currentTimestamp", (uint64_t)(esp_timer_get_time() / 1000));
 
     yyjson_mut_val *labelArray = yyjson_mut_obj_add_arr(doc, root, "labels");
-    if (dataSelection[SRC_HASHRATE]) { yyjson_mut_arr_add_str(doc, labelArray, STATS_LABEL_HASHRATE); }
-    if (dataSelection[SRC_HASHRATE_1m]) { yyjson_mut_arr_add_str(doc, labelArray, STATS_LABEL_HASHRATE_1m); }
-    if (dataSelection[SRC_HASHRATE_10m]) { yyjson_mut_arr_add_str(doc, labelArray, STATS_LABEL_HASHRATE_10m); }
-    if (dataSelection[SRC_HASHRATE_1h]) { yyjson_mut_arr_add_str(doc, labelArray, STATS_LABEL_HASHRATE_1h); }
-    if (dataSelection[SRC_ERROR_PERCENTAGE]) { yyjson_mut_arr_add_str(doc, labelArray, STATS_LABEL_ERROR_PERCENTAGE); }
-    if (dataSelection[SRC_ASIC_TEMP]) { yyjson_mut_arr_add_str(doc, labelArray, STATS_LABEL_ASIC_TEMP); }
-    if (dataSelection[SRC_ASIC_TEMP2]) { yyjson_mut_arr_add_str(doc, labelArray, STATS_LABEL_ASIC_TEMP2); }
-    if (dataSelection[SRC_VR_TEMP]) { yyjson_mut_arr_add_str(doc, labelArray, STATS_LABEL_VR_TEMP); }
-    if (dataSelection[SRC_ASIC_VOLTAGE]) { yyjson_mut_arr_add_str(doc, labelArray, STATS_LABEL_ASIC_VOLTAGE); }
-    if (dataSelection[SRC_VOLTAGE]) { yyjson_mut_arr_add_str(doc, labelArray, STATS_LABEL_VOLTAGE); }
-    if (dataSelection[SRC_POWER]) { yyjson_mut_arr_add_str(doc, labelArray, STATS_LABEL_POWER); }
-    if (dataSelection[SRC_CURRENT]) { yyjson_mut_arr_add_str(doc, labelArray, STATS_LABEL_CURRENT); }
-    if (dataSelection[SRC_FAN_SPEED]) { yyjson_mut_arr_add_str(doc, labelArray, STATS_LABEL_FAN_SPEED); }
-    if (dataSelection[SRC_FAN_RPM]) { yyjson_mut_arr_add_str(doc, labelArray, STATS_LABEL_FAN_RPM); }
-    if (dataSelection[SRC_FAN2_RPM]) { yyjson_mut_arr_add_str(doc, labelArray, STATS_LABEL_FAN2_RPM); }
-    if (dataSelection[SRC_WIFI_RSSI]) { yyjson_mut_arr_add_str(doc, labelArray, STATS_LABEL_WIFI_RSSI); }
-    if (dataSelection[SRC_FREE_HEAP]) { yyjson_mut_arr_add_str(doc, labelArray, STATS_LABEL_FREE_HEAP); }
-    if (dataSelection[SRC_RESPONSE_TIME]) { yyjson_mut_arr_add_str(doc, labelArray, STATS_LABEL_RESPONSE_TIME); }
-    yyjson_mut_arr_add_str(doc, labelArray, STATS_LABEL_TIMESTAMP);
+    int active_cols[SRC_NONE];
+    int num_active = 0;
+    for (int i = 0; i < SRC_NONE; i++) {
+        if (dataSelection[i]) {
+            active_cols[num_active++] = i;
+            yyjson_mut_arr_add_str(doc, labelArray, STATS_LABELS[i]);
+        }
+    }
+    yyjson_mut_arr_add_str(doc, labelArray, "timestamp");
 
     yyjson_mut_val *statsArray = yyjson_mut_obj_add_arr(doc, root, "statistics");
-    struct StatisticsData statsData;
-    uint16_t index = 0;
 
-    while (getStatisticData(index++, &statsData)) {
-        yyjson_mut_val *valueArray = yyjson_mut_arr_add_arr(doc, statsArray);
-        if (dataSelection[SRC_HASHRATE]) { yyjson_mut_arr_add_real(doc, valueArray, statsData.hashrate); }
-        if (dataSelection[SRC_HASHRATE_1m]) { yyjson_mut_arr_add_real(doc, valueArray, statsData.hashrate_1m); }
-        if (dataSelection[SRC_HASHRATE_10m]) { yyjson_mut_arr_add_real(doc, valueArray, statsData.hashrate_10m); }
-        if (dataSelection[SRC_HASHRATE_1h]) { yyjson_mut_arr_add_real(doc, valueArray, statsData.hashrate_1h); }
-        if (dataSelection[SRC_ERROR_PERCENTAGE]) { yyjson_mut_arr_add_real(doc, valueArray, statsData.errorPercentage); }
-        if (dataSelection[SRC_ASIC_TEMP]) { yyjson_mut_arr_add_real(doc, valueArray, statsData.chipTemperature); }
-        if (dataSelection[SRC_ASIC_TEMP2]) { yyjson_mut_arr_add_real(doc, valueArray, statsData.chipTemperature2); }
-        if (dataSelection[SRC_VR_TEMP]) { yyjson_mut_arr_add_real(doc, valueArray, statsData.vrTemperature); }
-        if (dataSelection[SRC_ASIC_VOLTAGE]) { yyjson_mut_arr_add_sint(doc, valueArray, statsData.coreVoltageActual); }
-        if (dataSelection[SRC_VOLTAGE]) { yyjson_mut_arr_add_real(doc, valueArray, statsData.voltage); }
-        if (dataSelection[SRC_POWER]) { yyjson_mut_arr_add_real(doc, valueArray, statsData.power); }
-        if (dataSelection[SRC_CURRENT]) { yyjson_mut_arr_add_real(doc, valueArray, statsData.current); }
-        if (dataSelection[SRC_FAN_SPEED]) { yyjson_mut_arr_add_real(doc, valueArray, statsData.fanSpeed); }
-        if (dataSelection[SRC_FAN_RPM]) { yyjson_mut_arr_add_uint(doc, valueArray, statsData.fanRPM); }
-        if (dataSelection[SRC_FAN2_RPM]) { yyjson_mut_arr_add_uint(doc, valueArray, statsData.fan2RPM); }
-        if (dataSelection[SRC_WIFI_RSSI]) { yyjson_mut_arr_add_sint(doc, valueArray, statsData.wifiRSSI); }
-        if (dataSelection[SRC_FREE_HEAP]) { yyjson_mut_arr_add_uint(doc, valueArray, statsData.freeHeap); }
-        if (dataSelection[SRC_RESPONSE_TIME]) { yyjson_mut_arr_add_real(doc, valueArray, statsData.responseTime); }
-        yyjson_mut_arr_add_uint(doc, valueArray, statsData.timestamp);
-    }
+    struct StatsSerializeContext serialize_ctx = {
+        .doc = doc,
+        .statsArray = statsArray,
+        .active_cols = active_cols,
+        .num_active = num_active,
+        .alc = alc,
+        .json_str = NULL,
+        .len = 0,
+    };
 
-    size_t len = 0;
-    yyjson_write_flag flg = YYJSON_WRITE_FP_TO_FIXED(2);
-    char *json_str = yyjson_mut_write_opts(doc, flg, alc, &len, NULL);
-    if (!json_str) {
+    withStatisticsData(serialize_stats_cb, &serialize_ctx);
+
+    if (!serialize_ctx.json_str) {
         yyjson_mut_doc_free(doc);
         httpd_resp_send_500(req);
         return ESP_FAIL;
     }
 
-    esp_err_t res = httpd_resp_send(req, json_str, len);
+    esp_err_t res = httpd_resp_send(req, serialize_ctx.json_str, serialize_ctx.len);
 
-    yyjson_alc_free(alc, json_str);
+    yyjson_alc_free(alc, serialize_ctx.json_str);
     yyjson_mut_doc_free(doc);
     return res;
 }
