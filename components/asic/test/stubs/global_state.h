@@ -19,6 +19,7 @@ typedef struct GlobalState {
     void *create_jobs_task_handle;
     volatile uint8_t active_job_slot_idx;
     struct {
+        const char *board_version;
         struct {
             uint16_t asic_count;
             uint8_t voltage_domains;

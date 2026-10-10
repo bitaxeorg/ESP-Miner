@@ -56,6 +56,7 @@ logic under test is unchanged.
 | `test_asic_submit.c` | Common-job ownership, invalid metadata, and submission allocation recovery. |
 | `test_pll.c` | PLL divider selection and the calculated ASIC frequency. |
 | `test_timeout.c` | ASIC timeout calculation for different chips, chain sizes, version spaces, and the zero-chip default. |
+| `test_serial_frame.c` | Production response framing with scripted UART input, including leading noise and recovery after a bad-CRC candidate. |
 
 The BM1397 packet and sparse-mask fixtures use independent OpenSSL SHA-256
 states; their frame CRC uses CRC-16/CCITT-FALSE. The BM13xx packet fixtures
