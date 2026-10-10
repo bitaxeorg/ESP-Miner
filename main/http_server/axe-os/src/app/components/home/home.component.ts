@@ -106,6 +106,7 @@ export class HomeComponent implements OnInit, OnDestroy {
   public activePoolUser!: string;
   public activePoolLabel!: PoolLabel;
   public activePoolProtocol!: string;
+  public activePoolTLS: boolean = false;
   public responseTime!: number;
   private isChangingPool: boolean = false;
   private targetPoolLabel: PoolLabel | null = null;
@@ -1009,6 +1010,7 @@ export class HomeComponent implements OnInit, OnDestroy {
         this.activePoolUser = isCurrentlyFallback ? info.fallbackStratumUser : info.stratumUser;
         this.activePoolPort = isCurrentlyFallback ? info.fallbackStratumPort : info.stratumPort;
         this.activePoolShareWarning = !!(isCurrentlyFallback ? info.fallbackStratumShareWarning : info.stratumShareWarning);
+        this.activePoolTLS = !!(isCurrentlyFallback ? info.fallbackStratumTLS : info.stratumTLS);
         const activeProtocol = isCurrentlyFallback ? info.fallbackStratumProtocol : info.stratumProtocol;
         if (activeProtocol === 'SV2') {
           const channelType = isCurrentlyFallback ? info.fallbackStratumV2ChannelType : info.stratumV2ChannelType;
@@ -1298,7 +1300,23 @@ export class HomeComponent implements OnInit, OnDestroy {
     updateMessage(!!info.power_fault, 'POWER_FAULT', 'error', `${info.power_fault} Check your Power Supply.`);
     updateMessage(!!info.hardware_fault, 'HARDWARE_FAULT', 'error', `${info.hardware_fault}`);
     updateMessage(isFrequencyLow(info.frequency, frequencyOptions), 'FREQUENCY_LOW', 'warn', 'Device frequency is set low - See settings');
-    updateMessage(info.isUsingFallbackStratum === 1 && info.useFallbackStratum === 0, 'FALLBACK_STRATUM', 'warn', 'Primary pool unreachable - operating on fallback pool.');
+    if (info.useFallbackStratum === 0) {
+      if (info.isUsingFallbackStratum === 0) {
+        updateMessage(false, 'FALLBACK_STRATUM', 'info', '');
+      } else {
+        const primaryEndpoint = info.stratumPort ? `${info.stratumURL}:${info.stratumPort}` : (info.stratumURL || 'unknown');
+        const reason = info.primaryPoolError || 'Pool unreachable';
+        const text = `Primary pool (${primaryEndpoint}): ${reason} - mining on fallback pool.`;
+        updateMessage(true, 'FALLBACK_STRATUM', 'warn', text);
+      }
+    } else {
+      if (info.isUsingFallbackStratum === 0) {
+        const fallbackEndpoint = info.fallbackStratumPort ? `${info.fallbackStratumURL}:${info.fallbackStratumPort}` : (info.fallbackStratumURL || 'unknown');
+        updateMessage(true, 'FALLBACK_STRATUM', 'warn', `Fallback pool (${fallbackEndpoint}): Pool unreachable - mining on primary pool.`);
+      } else {
+        updateMessage(true, 'FALLBACK_STRATUM', 'info', 'Mining on fallback pool by user preference.');
+      }
+    }
     if (info.coinbaseOutputs && info.coinbaseOutputs.length > 0) {
       let percentage = this.getPayoutPercentage(info);
       const warn = this.activePoolShareWarning;

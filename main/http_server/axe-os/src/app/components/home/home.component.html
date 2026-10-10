@@ -410,11 +410,14 @@
               </app-dropdown>
             </div>
 
-            <div class="flex flex-nowrap">
+            <div class="flex flex-nowrap items-baseline">
               <div class="w-24 shrink-0 text-secondary">
                 <span>URL</span>
               </div>
-              <div>
+              <div class="flex items-center gap-1">
+                @if (activePoolTLS) {
+                  <i class="pi pi-lock text-xs text-secondary" appTooltip="TLS" tooltipPosition="top"></i>
+                }
                 <tooltip-text-icon
                   text="{{ activePoolURL }}:{{activePoolPort}}"
                   tooltip="{{ info.poolConnectionInfo }}"
@@ -432,6 +435,17 @@
               </div>
             </div>
 
+            @if (info.poolBanner) {
+              <div class="flex flex-nowrap items-baseline">
+                <div class="w-24 shrink-0 text-secondary">
+                  <span>Message</span>
+                </div>
+                <div class="line-break-anywhere">
+                  {{ info.poolBanner }}
+                </div>
+              </div>
+            }
+
             <div class="flex flex-nowrap">
               <div class="w-24 shrink-0 text-secondary">
                 <tooltip-text-icon
@@ -442,7 +456,7 @@
               @if (info.responseTime > 0) {
                 {{ info.responseTime | number:'1.1-1' }} ms
                 @if ((info.responseShareBatch ?? 0) > 1) {
-                  <span class="text-neutral-500" appTooltip="The pool acknowledged {{ info.responseShareBatch }} shares in one batch; the time reflects the most recent share, so it may include the pool's batching window" tooltipPosition="top">&nbsp;(batched ×{{ info.responseShareBatch }})</span>
+                  <span class="text-secondary" appTooltip="The pool acknowledged {{ info.responseShareBatch }} shares in one batch; the time reflects the most recent share, so it may include the pool's batching window" tooltipPosition="top">&nbsp;(batched ×{{ info.responseShareBatch }})</span>
                 }
               } @else {
                 --
@@ -483,7 +497,7 @@
               }
             </div>
             <div class="flex flex-nowrap">
-              <div class="w-24 shrink-0 text-neutral-500">
+              <div class="w-24 shrink-0 text-secondary">
                 <span>Mode</span>
               </div>
               <div>{{ activePoolProtocol }}</div>

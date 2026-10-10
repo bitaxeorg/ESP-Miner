@@ -98,6 +98,8 @@ typedef struct SystemModule
     float cpu_usage;
     double pool_difficulty;
     char pool_connection_info[64];
+    char primary_pool_error[64];
+    char pool_banner[128];
     bool overheat_mode;
     bool mining_paused;
     bool pools_unavailable;

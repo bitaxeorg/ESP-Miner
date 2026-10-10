@@ -156,6 +156,8 @@ static void system_api_add_config(cJSON *root, GlobalState *g) {
 
     // Pool Configuration
     cJSON_AddStringToObject(root, "poolConnectionInfo", g->SYSTEM_MODULE.pool_connection_info);
+    cJSON_AddStringToObject(root, "primaryPoolError", g->SYSTEM_MODULE.primary_pool_error);
+    cJSON_AddStringToObject(root, "poolBanner", g->SYSTEM_MODULE.pool_banner);
     cJSON_AddNumberToObject(root, "isUsingFallbackStratum", g->SYSTEM_MODULE.is_using_fallback ? 1 : 0);
     
     uint16_t prim_idx = g->SYSTEM_MODULE.primary_pool_index;
