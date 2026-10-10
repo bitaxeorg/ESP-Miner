@@ -590,33 +590,6 @@ TEST_CASE("job task preserves maximum accepted metadata and detached ownership",
     job_pipeline_harness_result_free(&result);
 }
 
-TEST_CASE("job allocation failure skips a send and permits the next cycle",
-          "[mining][job-building][job-task]")
-{
-    (void)prepare_followup_job(1, false);
-    const job_pipeline_harness_event_t events[] = {
-        { .type = JOB_PIPELINE_HARNESS_NOTIFY, .slot = 0 },
-        { .type = JOB_PIPELINE_HARNESS_TIMEOUT },
-    };
-    job_pipeline_harness_result_t result;
-    job_pipeline_harness_run(
-        (job_pipeline_harness_config_t) {
-            .hardware_version_rolling = true,
-            .asic_initialized = true,
-            .job_frequency_ms = 1,
-            .allocation_failure_at = 1,
-        }, events, sizeof(events) / sizeof(events[0]), &result);
-
-    TEST_ASSERT_EQUAL_UINT32(2, result.allocation_count);
-    TEST_ASSERT_EQUAL_UINT32(1, result.job_count);
-    TEST_ASSERT_EQUAL_UINT32(1, result.coinbase_decode_count);
-    TEST_ASSERT_EQUAL_UINT32(1, result.version_mask_count);
-    TEST_ASSERT_EQUAL_STRING("followup", result.jobs[0]->job_id);
-    TEST_ASSERT_EQUAL_STRING("01", result.jobs[0]->extranonce2);
-    assert_packet_merkle("c528516952ea823ab4cd034973550175c63ebf0f49cb126ccee58049a3fc487c", result.jobs[0]);
-    job_pipeline_harness_result_free(&result);
-}
-
 TEST_CASE("zero-length extranonce waits for new work and preserves owned metadata",
           "[mining][job-building][job-task]")
 {
@@ -635,7 +608,7 @@ TEST_CASE("zero-length extranonce waits for new work and preserves owned metadat
         }, events, sizeof(events) / sizeof(events[0]), &result);
 
     TEST_ASSERT_EQUAL_UINT32(2, result.job_count);
-    TEST_ASSERT_EQUAL_UINT32(2, result.allocation_count);
+    TEST_ASSERT_EQUAL_UINT32(0, result.allocation_count);
     TEST_ASSERT_EQUAL_UINT32(2, result.coinbase_decode_count);
     job->job_id[0] = 'x';
     for (size_t i = 0; i < result.job_count; ++i) {
@@ -667,7 +640,7 @@ TEST_CASE("large coinbase job streams hashing and retains extranonce order",
         }, events, sizeof(events) / sizeof(events[0]), &result);
 
     TEST_ASSERT_EQUAL_UINT32(2, result.job_count);
-    TEST_ASSERT_EQUAL_UINT32(2, result.allocation_count);
+    TEST_ASSERT_EQUAL_UINT32(0, result.allocation_count);
     TEST_ASSERT_EQUAL_UINT32(1, result.coinbase_decode_count);
     TEST_ASSERT_EQUAL_STRING("00", result.jobs[0]->extranonce2);
     TEST_ASSERT_EQUAL_STRING("01", result.jobs[1]->extranonce2);
@@ -695,7 +668,7 @@ TEST_CASE("coinbase hash failures skip sending work and permit the next cycle",
                 .hash_failure_at = failure_at,
             }, events, sizeof(events) / sizeof(events[0]), &result);
 
-        TEST_ASSERT_EQUAL_UINT32(2, result.allocation_count);
+        TEST_ASSERT_EQUAL_UINT32(0, result.allocation_count);
         TEST_ASSERT_EQUAL_UINT32(failure_at <= 5 ? 1 : 0, result.hash_abort_count);
         TEST_ASSERT_EQUAL_UINT32(1, result.job_count);
         TEST_ASSERT_EQUAL_STRING("followup", result.jobs[0]->job_id);

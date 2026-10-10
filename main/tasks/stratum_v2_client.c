@@ -413,10 +413,7 @@ esp_err_t stratum_v2_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
         stratum_v2_close_connection(GLOBAL_STATE);
     }
 
-    sv2_conn_t *conn = heap_caps_calloc(1, sizeof(sv2_conn_t), MALLOC_CAP_SPIRAM);
-    if (!conn) {
-        conn = calloc(1, sizeof(sv2_conn_t));
-    }
+    sv2_conn_t *conn = calloc(1, sizeof(sv2_conn_t));
     if (!conn) {
         ESP_LOGE(TAG, "Failed to allocate sv2_conn");
         return ESP_ERR_NO_MEM;

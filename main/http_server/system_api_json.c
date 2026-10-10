@@ -81,10 +81,10 @@ static void system_api_add_telemetry(cJSON *root, GlobalState *g) {
     cJSON_AddNumberToObject(root, "blockFound", g->SYSTEM_MODULE.block_found);
     cJSON_AddBoolToObject(root, "showNewBlock", g->SYSTEM_MODULE.show_new_block);
     cJSON_AddNumberToObject(root, "blockHeight", g->block_height);
-    cJSON_AddStringToObject(root, "scriptsig", g->scriptsig);
+    cJSON_AddStringToObject(root, "scriptsig", g->coinbase.scriptsig);
     cJSON_AddNumberToObject(root, "networkDifficulty", g->network_nonce_diff);
-    cJSON_AddNumberToObject(root, "coinbaseValueTotalSatoshis", g->coinbase_value_total_satoshis);
-    cJSON_AddNumberToObject(root, "coinbaseValueUserSatoshis", g->coinbase_value_user_satoshis);
+    cJSON_AddNumberToObject(root, "coinbaseValueTotalSatoshis", g->coinbase.total_value_satoshis);
+    cJSON_AddNumberToObject(root, "coinbaseValueUserSatoshis", g->coinbase.user_value_satoshis);
 
     // Dynamic System Stats
     cJSON_AddNumberToObject(root, "freeHeap", esp_get_free_heap_size());
@@ -298,11 +298,17 @@ static void system_api_add_block_info(cJSON *root, GlobalState *g) {
 
     cJSON *outputs = cJSON_CreateArray();
     if (outputs) {
-        for (int i = 0; i < g->coinbase_output_count; i++) {
+        int count = g->coinbase.output_count;
+        if (count > MAX_COINBASE_TX_OUTPUTS) {
+            count = MAX_COINBASE_TX_OUTPUTS;
+        } else if (count < 0) {
+            count = 0;
+        }
+        for (int i = 0; i < count; i++) {
             cJSON *obj = cJSON_CreateObject();
             if (obj) {
-                cJSON_AddNumberToObject(obj, "value", g->coinbase_outputs[i].value_satoshis);
-                cJSON_AddStringToObject(obj, "address", g->coinbase_outputs[i].address);
+                cJSON_AddNumberToObject(obj, "value", g->coinbase.outputs[i].value_satoshis);
+                cJSON_AddStringToObject(obj, "address", g->coinbase.outputs[i].address);
                 cJSON_AddItemToArray(outputs, obj);
             }
         }
@@ -310,8 +316,8 @@ static void system_api_add_block_info(cJSON *root, GlobalState *g) {
     }
 
     // Outputs beyond the capacity of coinbaseOutputs, aggregated into a single entry
-    cJSON_AddNumberToObject(root, "coinbaseOthersCount", g->coinbase_others_count);
-    cJSON_AddNumberToObject(root, "coinbaseOthersValueSatoshis", g->coinbase_others_value_satoshis);
+    cJSON_AddNumberToObject(root, "coinbaseOthersCount", g->coinbase.others_count);
+    cJSON_AddNumberToObject(root, "coinbaseOthersValueSatoshis", g->coinbase.others_value_satoshis);
 }
 
 static void system_api_add_partitions(cJSON *root, GlobalState * GLOBAL_STATE) {
