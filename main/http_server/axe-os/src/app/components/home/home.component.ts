@@ -20,7 +20,7 @@ import { SystemInfo as ISystemInfo, SystemStatistics as ISystemStatistics } from
 import { Title } from '@angular/platform-browser';
 import { AppChartComponent } from '../chart/app-chart.component';
 import { SelectOption } from 'src/app/models/select-option.model';
-import { eChartLabel, ChartUnitGroups, chartLabelValue, chartLabelKey } from 'src/models/enum/eChartLabel';
+import { CHART_LABELS, ChartMetric, ChartUnitGroups, CHART_LABEL_TO_METRIC } from 'src/models/chart-labels';
 import { LocalStorageService } from 'src/app/local-storage.service';
 import { GridStack, GridItemHTMLElement } from 'gridstack';
 import { DashboardEditService, WidgetDef } from 'src/app/services/dashboard-edit.service';
@@ -538,7 +538,7 @@ export class HomeComponent implements OnInit, OnDestroy {
     const entries = labels
       .filter(label => this.isSensorSupported(label, this.latestInfo))
       .map((labelKey, index) => {
-        const label = chartLabelValue(labelKey) || labelKey;
+        const label = CHART_LABELS[labelKey as ChartMetric] ?? labelKey;
         return {
           labelKey,
           label,
@@ -843,13 +843,12 @@ export class HomeComponent implements OnInit, OnDestroy {
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: stats => {
-          const idxHashrate = stats.labels.indexOf(chartLabelKey(eChartLabel.hashrate));
-          const idxPower = stats.labels.indexOf(chartLabelKey(eChartLabel.power));
+          const idxHashrate = stats.labels.indexOf('hashrate');
+          const idxPower = stats.labels.indexOf('power');
           const idxTimestamp = stats.labels.indexOf('timestamp');
 
           stats.labels.forEach((labelKey, labelIdx) => {
-            const valEnum = chartLabelValue(labelKey);
-            if (valEnum === eChartLabel.asicVoltage || valEnum === eChartLabel.voltage || valEnum === eChartLabel.current) {
+            if (labelKey === 'asicVoltage' || labelKey === 'voltage' || labelKey === 'current') {
               stats.statistics.forEach((element: number[]) => {
                 if (element[labelIdx] !== undefined) {
                   element[labelIdx] = element[labelIdx] / 1000;
@@ -945,7 +944,7 @@ export class HomeComponent implements OnInit, OnDestroy {
       });
   }
 
-  static isSameAxisUnit(label1: eChartLabel | undefined, label2: eChartLabel | undefined) {
+  static isSameAxisUnit(label1: string | undefined, label2: string | undefined) {
     if (!label1 || !label2) return false;
     return this.getSettingsForLabel(label1).suffix == this.getSettingsForLabel(label2).suffix;
   }
@@ -1049,7 +1048,7 @@ export class HomeComponent implements OnInit, OnDestroy {
             if (!this.chartDatasets[labelKey]) {
               this.chartDatasets[labelKey] = [];
             }
-            const val = HomeComponent.getDataForLabel(chartLabelValue(labelKey) as eChartLabel, info);
+            const val = HomeComponent.getDataForLabel(labelKey, info);
             this.chartDatasets[labelKey].push(val);
           });
 
@@ -1373,9 +1372,9 @@ export class HomeComponent implements OnInit, OnDestroy {
       this.lastHasFanRpm = hasFanRpm;
       this.lastHasFan2Rpm = hasFan2Rpm;
 
-      this.chartDataSources = Object.entries(eChartLabel)
-        .filter(([key, ]) => this.isSensorSupported(key))
-        .map(([key, value]) => ({ name: value, value: key }));
+      this.chartDataSources = (Object.keys(CHART_LABELS) as ChartMetric[])
+        .filter(key => this.isSensorSupported(key))
+        .map(key => ({ name: CHART_LABELS[key], value: key }));
 
       this.updateChartUnitGroups();
       this.rebuildChartDatasets();
@@ -1419,8 +1418,8 @@ export class HomeComponent implements OnInit, OnDestroy {
         const y1Label = y1Labels.length > 0 ? y1Labels[0] : 'none';
         const y2Label = y2Labels.length > 0 ? y2Labels[0] : 'none';
 
-        this.chartOptions.scales.y.suggestedMax = this.getSuggestedMaxForLabel(chartLabelValue(y1Label) as eChartLabel, currentInfo);
-        this.chartOptions.scales.y2.suggestedMax = this.getSuggestedMaxForLabel(chartLabelValue(y2Label) as eChartLabel, currentInfo);
+        this.chartOptions.scales.y.suggestedMax = this.getSuggestedMaxForLabel(y1Label, currentInfo);
+        this.chartOptions.scales.y2.suggestedMax = this.getSuggestedMaxForLabel(y2Label, currentInfo);
 
         this.lastBucket = currentBucket;
       }
@@ -1512,88 +1511,94 @@ export class HomeComponent implements OnInit, OnDestroy {
     }
   }
 
-  public getSuggestedMaxForLabel(label: eChartLabel | undefined, info: ISystemInfo): number {
-    switch (label) {
-      case eChartLabel.hashrate:
-      case eChartLabel.hashrate_1m:
-      case eChartLabel.hashrate_10m:
-      case eChartLabel.hashrate_1h:      return info.expectedHashrate;
-      case eChartLabel.errorPercentage:  return 1;
-      case eChartLabel.asicTemp:
-      case eChartLabel.asicTemp2:        return this.maxTemp;
-      case eChartLabel.vrTemp:           return this.maxTemp + 25;
-      case eChartLabel.asicVoltage:      return info.coreVoltage;
-      case eChartLabel.voltage:          return info.nominalVoltage + .5;
-      case eChartLabel.power:            return this.maxPower;
-      case eChartLabel.current:          return this.maxPower / info.coreVoltage;
-      case eChartLabel.fanSpeed:         return 100;
-      case eChartLabel.fanRpm:           return 7000;
-      case eChartLabel.fan2Rpm:          return 7000;
-      case eChartLabel.responseTime:     return 50;
-      default:                           return 0;
+  public getSuggestedMaxForLabel(label: string | undefined, info: ISystemInfo): number {
+    if (!label) return 0;
+    const metric = CHART_LABEL_TO_METRIC[label] || (label as ChartMetric);
+    switch (metric) {
+      case 'hashrate':
+      case 'hashrate_1m':
+      case 'hashrate_10m':
+      case 'hashrate_1h':      return info.expectedHashrate;
+      case 'errorPercentage':  return 1;
+      case 'asicTemp':
+      case 'asicTemp2':        return this.maxTemp;
+      case 'vrTemp':           return this.maxTemp + 25;
+      case 'asicVoltage':      return info.coreVoltage;
+      case 'voltage':          return info.nominalVoltage + .5;
+      case 'power':            return this.maxPower;
+      case 'current':          return this.maxPower / info.coreVoltage;
+      case 'fanSpeed':         return 100;
+      case 'fanRpm':
+      case 'fan2Rpm':          return 7000;
+      case 'responseTime':     return 50;
+      default:                 return 0;
     }
   }
 
-  static getDataForLabel(label: eChartLabel | undefined, info: ISystemInfo): number {
-    switch (label) {
-      case eChartLabel.hashrate:           return info.hashRate;
-      case eChartLabel.hashrate_1m:        return info.hashRate_1m;
-      case eChartLabel.hashrate_10m:       return info.hashRate_10m;
-      case eChartLabel.hashrate_1h:        return info.hashRate_1h;
-      case eChartLabel.errorPercentage:    return info.errorPercentage;
-      case eChartLabel.asicTemp:           return info.temp;
-      case eChartLabel.asicTemp2:          return info.temp2;
-      case eChartLabel.vrTemp:             return info.vrTemp;
-      case eChartLabel.asicVoltage:        return info.coreVoltageActual;
-      case eChartLabel.voltage:            return info.voltage;
-      case eChartLabel.power:              return info.power;
-      case eChartLabel.current:            return info.current;
-      case eChartLabel.fanSpeed:           return info.fanspeed;
-      case eChartLabel.fanRpm:             return info.fanrpm;
-      case eChartLabel.fan2Rpm:            return info.fan2rpm;
-      case eChartLabel.wifiRssi:           return info.wifiRSSI;
-      case eChartLabel.freeHeap:           return info.freeHeap;
-      case eChartLabel.responseTime:       return info.responseTime;
-      default:                             return 0.0;
+  static getDataForLabel(label: string | undefined, info: ISystemInfo): number {
+    if (!label) return 0.0;
+    const metric = CHART_LABEL_TO_METRIC[label] || (label as ChartMetric);
+    switch (metric) {
+      case 'hashrate':           return info.hashRate;
+      case 'hashrate_1m':        return info.hashRate_1m;
+      case 'hashrate_10m':       return info.hashRate_10m;
+      case 'hashrate_1h':        return info.hashRate_1h;
+      case 'errorPercentage':    return info.errorPercentage;
+      case 'asicTemp':           return info.temp;
+      case 'asicTemp2':          return info.temp2;
+      case 'vrTemp':             return info.vrTemp;
+      case 'asicVoltage':        return info.coreVoltageActual;
+      case 'voltage':            return info.voltage;
+      case 'power':              return info.power;
+      case 'current':            return info.current;
+      case 'fanSpeed':           return info.fanspeed;
+      case 'fanRpm':             return info.fanrpm;
+      case 'fan2Rpm':            return info.fan2rpm;
+      case 'wifiRssi':           return info.wifiRSSI;
+      case 'freeHeap':           return info.freeHeap;
+      case 'responseTime':       return info.responseTime;
+      default:                   return 0.0;
     }
   }
 
-  static getSettingsForLabel(label: eChartLabel): {suffix: string; precision: number} {
-    switch (label) {
-      case eChartLabel.hashrate:
-      case eChartLabel.hashrate_1m:
-      case eChartLabel.hashrate_10m:
-      case eChartLabel.hashrate_1h:      return {suffix: ' H/s', precision: 0};
-      case eChartLabel.errorPercentage:  return {suffix: ' %', precision: 2};
-      case eChartLabel.asicTemp:
-      case eChartLabel.asicTemp2:
-      case eChartLabel.vrTemp:           return {suffix: ' °C', precision: 1};
-      case eChartLabel.asicVoltage:
-      case eChartLabel.voltage:          return {suffix: ' V', precision: 1};
-      case eChartLabel.power:            return {suffix: ' W', precision: 1};
-      case eChartLabel.current:          return {suffix: ' A', precision: 1};
-      case eChartLabel.fanSpeed:         return {suffix: ' %', precision: 1};
-      case eChartLabel.fanRpm:
-      case eChartLabel.fan2Rpm:          return {suffix: ' rpm', precision: 0};
-      case eChartLabel.wifiRssi:         return {suffix: ' dBm', precision: 0};
-      case eChartLabel.freeHeap:         return {suffix: ' B', precision: 0};
-      case eChartLabel.responseTime:     return {suffix: ' ms', precision: 1};
-      default:                           return {suffix: '', precision: 0};
+  static getSettingsForLabel(label: string): {suffix: string; precision: number} {
+    const metric = CHART_LABEL_TO_METRIC[label] || (label as ChartMetric);
+    switch (metric) {
+      case 'hashrate':
+      case 'hashrate_1m':
+      case 'hashrate_10m':
+      case 'hashrate_1h':      return {suffix: ' H/s', precision: 0};
+      case 'errorPercentage':  return {suffix: ' %', precision: 2};
+      case 'asicTemp':
+      case 'asicTemp2':
+      case 'vrTemp':           return {suffix: ' °C', precision: 1};
+      case 'asicVoltage':
+      case 'voltage':          return {suffix: ' V', precision: 1};
+      case 'power':            return {suffix: ' W', precision: 1};
+      case 'current':          return {suffix: ' A', precision: 1};
+      case 'fanSpeed':         return {suffix: ' %', precision: 1};
+      case 'fanRpm':
+      case 'fan2Rpm':          return {suffix: ' rpm', precision: 0};
+      case 'wifiRssi':         return {suffix: ' dBm', precision: 0};
+      case 'freeHeap':         return {suffix: ' B', precision: 0};
+      case 'responseTime':     return {suffix: ' ms', precision: 1};
+      default:                 return {suffix: '', precision: 0};
     }
   }
 
-  static cbFormatValue(value: number, datasetLabel: eChartLabel, args?: any): string {
+  static cbFormatValue(value: number, datasetLabel: string, args?: any): string {
     if (value === undefined || value === null) return '';
-    switch (datasetLabel) {
-      case eChartLabel.hashrate:
-      case eChartLabel.hashrate_1m:
-      case eChartLabel.hashrate_10m:
-      case eChartLabel.hashrate_1h:
+    const metric = CHART_LABEL_TO_METRIC[datasetLabel] || (datasetLabel as ChartMetric);
+    switch (metric) {
+      case 'hashrate':
+      case 'hashrate_1m':
+      case 'hashrate_10m':
+      case 'hashrate_1h':
         return HashSuffixPipe.transform(value, args);
-      case eChartLabel.freeHeap:
+      case 'freeHeap':
         return ByteSuffixPipe.transform(value, args);
       default:
-        const settings = HomeComponent.getSettingsForLabel(datasetLabel);
+        const settings = HomeComponent.getSettingsForLabel(metric);
         return value.toLocaleString(undefined, { useGrouping: false, maximumFractionDigits: args?.tickmark ? undefined : settings.precision }) + settings.suffix;
     }
   }
