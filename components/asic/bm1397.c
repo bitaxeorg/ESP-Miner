@@ -44,9 +44,9 @@
 #define FAST_UART_CONFIGURATION 0x28
 #define MISC_CONTROL 0x18
 
-static const register_type_t REGISTER_MAP[] = {
-    [0x04] = REGISTER_HASHRATE,
-    [0x4C] = REGISTER_ERROR_COUNT,
+static const register_type_t REGISTER_MAP[256] = {
+    [BM13XX_REG_HASHRATE]    = REGISTER_HASHRATE,
+    [BM13XX_REG_ERROR_COUNT] = REGISTER_ERROR_COUNT,
 };
 
 typedef struct __attribute__((__packed__))

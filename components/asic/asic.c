@@ -237,12 +237,7 @@ esp_err_t ASIC_get_domain_measurement(GlobalState * GLOBAL_STATE, uint8_t asic_n
     measurement_t register_measurement = monitor->domain_measurements[asic_nr][domain_nr];
     pthread_mutex_unlock(&monitor->lock);
 
-    float scale = GLOBAL_STATE->DEVICE_CONFIG.family.asic.domain_hashrate_scale;
-    if (scale <= 0.0f) {
-        scale = 1.0f;
-    }
-
     measurement->time_us = register_measurement.time_us;
-    measurement->hashrate = register_measurement.hashrate * scale;
+    measurement->hashrate = register_measurement.hashrate;
     return ESP_OK;
 }
