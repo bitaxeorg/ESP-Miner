@@ -87,11 +87,6 @@ typedef struct sv1_conn {
     int active_job_ids_count;
 } sv1_conn_t;
 
-typedef struct RequestTiming
-{
-    int64_t timestamp_us;
-    bool tracking;
-} RequestTiming;
 
 esp_transport_handle_t STRATUM_V1_transport_init(tls_mode tls, const char * cert);
 
@@ -120,7 +115,5 @@ int STRATUM_V1_extranonce_subscribe(esp_transport_handle_t transport, int send_u
 int STRATUM_V1_submit_share(esp_transport_handle_t transport, int send_uid, const char *username, const char *job_id,
                             const char *extranonce_2, const uint32_t ntime, const uint32_t nonce,
                             const uint32_t version_bits, uint64_t *out_sent_time_us);
-
-float STRATUM_V1_get_response_time_ms(int request_id, int64_t receive_time_us);
 
 #endif // STRATUM_API_H

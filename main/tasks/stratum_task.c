@@ -269,7 +269,9 @@ int stratum_submit_share(GlobalState *GLOBAL_STATE, const asic_job_t *active_job
         ret = stratum_v1_submit_share(GLOBAL_STATE, active_job, nonce, rolled_version, sent_time_us);
     }
 
-    if (ret < 0) {
+    if (ret >= 0) {
+        SYSTEM_notify_submitted_share(GLOBAL_STATE);
+    } else {
         ESP_LOGW(TAG, "Failed to submit share to socket (ret: %d, errno %d: %s)", ret, errno, strerror(errno));
         // stratum_task recv loop will detect a broken connection on its next read and handle reconnection
     }

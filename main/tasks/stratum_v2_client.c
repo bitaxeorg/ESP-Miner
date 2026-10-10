@@ -16,19 +16,18 @@
 #include "libbase58.h"
 #include "device_config.h"
 #include "esp_heap_caps.h"
+#include "stratum_timing.h"
 
 #include <string.h>
 #include <stdlib.h>
 
 #define TRANSPORT_TIMEOUT_MS 5000
 #define SV2_MAX_FRAME_SIZE 8192
-#define SV2_SUBMIT_TIMING_SLOTS 32
 
 static const char *TAG = "stratum_v2";
 
 static sv2_conn_t *s_v2_conn = NULL;
-
-static int64_t stratum_v2_submit_time_us[SV2_SUBMIT_TIMING_SLOTS] = {0};
+static stratum_timing_tracker_t s_v2_timing = {0};
 
 static bool add_active_job_id(uint32_t *active_job_ids, int *count, uint32_t job_id)
 {
@@ -108,26 +107,13 @@ void stratum_v2_close_connection(GlobalState *GLOBAL_STATE)
     }
     pthread_mutex_unlock(&GLOBAL_STATE->transport_mutex);
 
-    memset(stratum_v2_submit_time_us, 0, sizeof(stratum_v2_submit_time_us));
     SYSTEM_reset_pool_session(GLOBAL_STATE);
+    stratum_timing_reset(&s_v2_timing);
 }
 
-static void stratum_v2_update_pending_shares(GlobalState *GLOBAL_STATE)
+static void stratum_v2_track_submit(uint32_t sequence_number)
 {
-    sv2_conn_t *conn = s_v2_conn;
-    if (!conn) {
-        return;
-    }
-    uint32_t pending = (conn->sequence_number > conn->resolved_shares)
-                           ? (conn->sequence_number - conn->resolved_shares)
-                           : 0;
-    GLOBAL_STATE->SYSTEM_MODULE.shares_pending = (uint16_t)(pending > UINT16_MAX ? UINT16_MAX : pending);
-}
-
-static void stratum_v2_track_submit(GlobalState *GLOBAL_STATE, uint32_t sequence_number)
-{
-    stratum_v2_submit_time_us[sequence_number % SV2_SUBMIT_TIMING_SLOTS] = esp_timer_get_time();
-    stratum_v2_update_pending_shares(GLOBAL_STATE);
+    stratum_timing_record(&s_v2_timing, sequence_number, esp_timer_get_time());
 }
 
 int stratum_v2_submit_share(GlobalState *GLOBAL_STATE, const asic_job_t *active_job,
@@ -171,7 +157,7 @@ int stratum_v2_submit_share(GlobalState *GLOBAL_STATE, const asic_job_t *active_
 
     int ret = sv2_noise_send(conn->noise_ctx, transport, buf, len);
     if (ret >= 0) {
-        stratum_v2_track_submit(GLOBAL_STATE, sequence_number);
+        stratum_v2_track_submit(sequence_number);
         if (sent_time_us) {
             *sent_time_us = esp_timer_get_time();
         }
@@ -799,14 +785,11 @@ esp_err_t stratum_v2_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
                                  (unsigned long)accepted_count, (unsigned long)pending);
                         accepted_count = pending;
                     }
-                    int slot = last_sequence_number % SV2_SUBMIT_TIMING_SLOTS;
-                    int64_t submit_time_us = stratum_v2_submit_time_us[slot];
-                    if (submit_time_us > 0) {
-                        float response_time_ms = (float)(esp_timer_get_time() - submit_time_us) / 1000.0f;
+                    float response_time_ms = stratum_timing_calculate_ms(&s_v2_timing, last_sequence_number, esp_timer_get_time());
+                    if (response_time_ms >= 0) {
                         ESP_LOGI(TAG, "Shares accepted: %lu (%.1f ms)", accepted_count, response_time_ms);
                         GLOBAL_STATE->SYSTEM_MODULE.response_time = response_time_ms;
                         GLOBAL_STATE->SYSTEM_MODULE.response_share_batch = (uint16_t)accepted_count;
-                        stratum_v2_submit_time_us[slot] = 0;
                     } else {
                         ESP_LOGI(TAG, "Shares accepted: %lu", accepted_count);
                     }
@@ -817,7 +800,6 @@ esp_err_t stratum_v2_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
                     if (resolved > conn->resolved_shares) {
                         conn->resolved_shares = resolved;
                     }
-                    stratum_v2_update_pending_shares(GLOBAL_STATE);
                 }
                 break;
             }
@@ -839,7 +821,6 @@ esp_err_t stratum_v2_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
                     if (resolved > conn->resolved_shares) {
                         conn->resolved_shares = resolved;
                     }
-                    stratum_v2_update_pending_shares(GLOBAL_STATE);
                 }
                 break;
             }
