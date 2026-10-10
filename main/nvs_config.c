@@ -536,7 +536,7 @@ esp_err_t nvs_config_init(void)
     TaskHandle_t task_handle;
 
     // nvs_task heap _must_ be internal memory
-    BaseType_t task_result = xTaskCreate(nvs_task, "nvs_task", 8192, NULL, 5, &task_handle); 
+    BaseType_t task_result = xTaskCreate(nvs_task, "nvs_task", 8192, NULL, 4, &task_handle); 
     if (task_result != pdPASS) {
         ESP_LOGE(TAG, "Failed to create nvs_task");
 

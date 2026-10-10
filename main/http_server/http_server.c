@@ -1980,6 +1980,7 @@ esp_err_t start_rest_server(GlobalState * global_state)
     strlcpy(rest_context->base_path, base_path, sizeof(rest_context->base_path));
 
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
+    config.task_priority = 4;
     config.uri_match_fn = httpd_uri_match_wildcard;
     config.stack_size = 8192;
     config.max_open_sockets = 20;

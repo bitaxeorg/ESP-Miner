@@ -164,7 +164,7 @@ void app_main(void)
             ESP_LOGE(TAG, "Error creating power management task");
         }
         if (!GLOBAL_STATE.SELF_TEST_MODULE.is_active) {
-            if (xTaskCreate(FAN_CONTROLLER_task, "fan_controller", 8192, (void *) &GLOBAL_STATE, 10, NULL) != pdPASS) {
+            if (xTaskCreate(FAN_CONTROLLER_task, "fan_controller", 8192, (void *) &GLOBAL_STATE, 8, NULL) != pdPASS) {
                 ESP_LOGE(TAG, "Error creating fan controller task");
             }
         }
@@ -246,7 +246,7 @@ void app_main(void)
                 ESP_LOGE(TAG, "Error creating asic result task");
             }
 
-            if (xTaskCreateWithCaps(hashrate_monitor_task, "hashrate monitor", 8192, (void *) &GLOBAL_STATE, 5, NULL, MALLOC_CAP_SPIRAM) != pdPASS) {
+            if (xTaskCreateWithCaps(hashrate_monitor_task, "hashrate monitor", 8192, (void *) &GLOBAL_STATE, 7, NULL, MALLOC_CAP_SPIRAM) != pdPASS) {
                 ESP_LOGE(TAG, "Error creating hashrate monitor task");
             }
             if (xTaskCreateWithCaps(statistics_task, "statistics", 8192, (void *) &GLOBAL_STATE, 3, NULL, MALLOC_CAP_SPIRAM) != pdPASS) {
@@ -256,7 +256,7 @@ void app_main(void)
     }
 
     if (!GLOBAL_STATE.SELF_TEST_MODULE.is_active) {
-        if (xTaskCreateWithCaps(stratum_task, "stratum", 16384, (void *) &GLOBAL_STATE, 5, NULL, MALLOC_CAP_SPIRAM) != pdPASS) {
+        if (xTaskCreateWithCaps(stratum_task, "stratum", 16384, (void *) &GLOBAL_STATE, 16, NULL, MALLOC_CAP_SPIRAM) != pdPASS) {
             ESP_LOGE(TAG, "Error creating stratum task");
         }
     }

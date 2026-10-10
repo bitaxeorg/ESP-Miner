@@ -210,7 +210,7 @@ esp_err_t BAP_start_uart_receive_task(void) {
         "uart_receive_ta",
         8192,
         NULL,
-        5,
+        4,
         &uart_receive_task_handle,
         MALLOC_CAP_SPIRAM
     );
@@ -258,7 +258,7 @@ esp_err_t BAP_uart_init(void) {
         "uart_send_task",
         8192,
         NULL,
-        5,
+        4,
         &uart_send_task_handle,
         MALLOC_CAP_SPIRAM
     );

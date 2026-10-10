@@ -10,7 +10,7 @@
 #include "PID.h"
 
 #define EPSILON 0.0001f
-#define POLL_TIME_MS 100
+#define POLL_TIME_MS 500
 #define LOG_TIME_MS 2000
 
 #define PID_P 5.0
