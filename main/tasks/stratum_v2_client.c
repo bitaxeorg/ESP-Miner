@@ -55,6 +55,16 @@ static void clear_active_job_ids(uint32_t *active_job_ids, int *count)
     *count = 0;
 }
 
+static bool is_active_job_id(const uint32_t *active_job_ids, int count, uint32_t job_id)
+{
+    for (int i = 0; i < count; i++) {
+        if (active_job_ids[i] == job_id) {
+            return true;
+        }
+    }
+    return false;
+}
+
 static bool stratum_v2_load_authority_pubkey(uint8_t out[32], const char *b58_key)
 {
     if (!b58_key || strlen(b58_key) == 0) {
@@ -155,10 +165,15 @@ int stratum_v2_submit_share(GlobalState *GLOBAL_STATE, const asic_job_t *active_
         return -1;
     }
 
+    uint32_t sv2_job_id = (uint32_t)strtoul(active_job->job_id, NULL, 10);
+    if (!is_active_job_id(conn->active_job_ids, conn->active_job_ids_count, sv2_job_id)) {
+        pthread_mutex_unlock(&GLOBAL_STATE->transport_mutex);
+        ESP_LOGW(TAG, "Dropping stale share for job %lu (not in active jobs)", (unsigned long)sv2_job_id);
+        return -1;
+    }
+
     uint32_t sequence_number = conn->sequence_number++;
     uint8_t buf[SV2_SUBMIT_SHARES_MAX_FRAME_SIZE];
-
-    uint32_t sv2_job_id = (uint32_t)strtoul(active_job->job_id, NULL, 10);
     int len = sv2_build_submit_shares(buf, sizeof(buf),
                                       conn->channel_id,
                                       sequence_number,
