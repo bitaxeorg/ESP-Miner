@@ -188,8 +188,15 @@ esp_err_t stratum_v1_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
         esp_transport_ssl_set_common_name(transport, stratum_url);
     }
 
-    esp_err_t ret = esp_transport_connect(transport, conn_info.host_ip, port, TRANSPORT_TIMEOUT_MS);
-    if (ret != ESP_OK) {
+    esp_err_t ret = stratum_socket_connect_async(transport, conn_info.host_ip, port,
+                                                 TRANSPORT_TIMEOUT_MS, stratum_reconnect_requested);
+    if (ret == ESP_ERR_INVALID_STATE) {
+        ESP_LOGI(TAG, "Reconnect requested during connection attempt, aborting");
+        esp_transport_close(transport);
+        esp_transport_destroy(transport);
+        stratum_v1_close_connection(GLOBAL_STATE);
+        return ESP_ERR_INVALID_STATE;
+    } else if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Transport unable to connect to %s:%d (errno %d)", stratum_url, port, ret);
         snprintf(GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info,
                  sizeof(GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info), "SV1: Connection failed");

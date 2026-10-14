@@ -2,85 +2,105 @@
 
 #include "esp_log.h"
 #include "esp_netif.h"
+#include "lwip/dns.h"
+#include "lwip/ip_addr.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 
-#include <errno.h>
 #include <inttypes.h>
 #include <stdio.h>
 #include <string.h>
 
 static const char *TAG = "stratum_socket";
 
+typedef struct {
+    ip_addr_t ip;
+    volatile int status; // 0 = pending, 1 = success, -1 = failed, 2 = abandoned
+} dns_resolve_ctx_t;
+
+static void dns_found_cb(const char *name, const ip_addr_t *ipaddr, void *callback_arg)
+{
+    dns_resolve_ctx_t *ctx = (dns_resolve_ctx_t *)callback_arg;
+    if (!ctx) return;
+
+    if (ctx->status == 2) {
+        // Context abandoned due to timeout, clean up memory
+        free(ctx);
+        return;
+    }
+
+    if (ipaddr) {
+        ctx->ip = *ipaddr;
+        ctx->status = 1;
+    } else {
+        ctx->status = -1;
+    }
+}
+
 esp_err_t stratum_socket_resolve(const char *hostname, uint16_t port, stratum_connection_info_t *conn_info)
 {
     // Input validation
-    if (hostname == NULL || conn_info == NULL) {
+    if (hostname == NULL || conn_info == NULL || port == 0) {
         return ESP_ERR_INVALID_ARG;
     }
-    if (port == 0) {
-        ESP_LOGE(TAG, "Invalid port: 0");
-        return ESP_ERR_INVALID_ARG;
-    }
-
-    char port_str[6];
-    snprintf(port_str, sizeof(port_str), "%u", port);
 
     ESP_LOGD(TAG, "Resolving address for %s:%u", hostname, port);
 
-    struct addrinfo hints = {
-        .ai_family   = AF_UNSPEC,
-        .ai_socktype = SOCK_STREAM,
-        .ai_protocol = IPPROTO_TCP,
-        .ai_flags    = AI_NUMERICSERV
-    };
-
-    // getaddrinfo() maps to esp_getaddrinfo() when CONFIG_LWIP_USE_ESP_GETADDRINFO
-    // is enabled (as it is in the firmware), which resolves AF_UNSPEC into both
-    // IPv4 and IPv6. Using the standard name keeps this component buildable under
-    // the default lwip config too (e.g. the unit-test build).
-    struct addrinfo *res = NULL;
-    int gai_err = getaddrinfo(hostname, port_str, &hints, &res);
-    if (gai_err != 0 || res == NULL) {
-        ESP_LOGE(TAG, "DNS resolution failed for %s:%u (error: %d)", hostname, port, gai_err);
-        return ESP_ERR_NOT_FOUND;
+    dns_resolve_ctx_t *ctx = calloc(1, sizeof(dns_resolve_ctx_t));
+    if (!ctx) {
+        return ESP_ERR_NO_MEM;
     }
 
-    // Initialize connection info
-    memset(conn_info, 0, sizeof(*conn_info));
-    conn_info->addr_family = AF_UNSPEC;
+    err_t dns_err = dns_gethostbyname_addrtype(hostname, &ctx->ip, dns_found_cb, ctx, LWIP_DNS_ADDRTYPE_DEFAULT);
 
-    // Preferred order: IPv4 first, then IPv6
-    const int preferred_families[] = { AF_INET, AF_INET6 };
-    const size_t num_families = sizeof(preferred_families) / sizeof(preferred_families[0]);
-
-    const struct addrinfo *selected = NULL;
-
-    for (size_t i = 0; i < num_families && selected == NULL; i++) {
-        int family = preferred_families[i];
-
-        for (const struct addrinfo *p = res; p != NULL; p = p->ai_next) {
-            if (p->ai_family == family) {
-                selected = p;
-                break;
-            }
+    if (dns_err == ERR_OK) {
+        ctx->status = 1;
+    } else if (dns_err == ERR_INPROGRESS) {
+        int elapsed_ms = 0;
+        while (ctx->status == 0 && elapsed_ms < 10000) {
+            vTaskDelay(pdMS_TO_TICKS(50));
+            elapsed_ms += 50;
         }
     }
 
-    if (selected == NULL) {
-        ESP_LOGE(TAG, "No supported address family (IPv4 or IPv6) found for %s", hostname);
-        freeaddrinfo(res);
-        return ESP_ERR_NOT_SUPPORTED;
+    if (ctx->status != 1) {
+        if (dns_err == ERR_INPROGRESS && ctx->status == 0) {
+            ctx->status = 2; // Mark abandoned for callback cleanup
+            ESP_LOGE(TAG, "DNS resolution timed out for %s", hostname);
+            return ESP_ERR_TIMEOUT;
+        }
+
+        free(ctx);
+        ESP_LOGE(TAG, "DNS resolution failed for %s (err %d)", hostname, (int)dns_err);
+        return ESP_ERR_NOT_FOUND;
     }
 
-    // Copy selected address
-    memcpy(&conn_info->dest_addr, selected->ai_addr, selected->ai_addrlen);
-    conn_info->addrlen     = selected->ai_addrlen;
-    conn_info->addr_family = selected->ai_family;
-    conn_info->ip_protocol = (selected->ai_family == AF_INET) ? IPPROTO_IP : IPPROTO_IPV6;
+    ip_addr_t resolved_ip = ctx->ip;
+    free(ctx);
 
-    // Handle IPv6 link-local scope ID if needed
-    if (selected->ai_family == AF_INET6) {
+    // Initialize connection info from resolved_ip
+    memset(conn_info, 0, sizeof(*conn_info));
+    if (IP_IS_V4(&resolved_ip)) {
+        struct sockaddr_in *addr4 = (struct sockaddr_in *)&conn_info->dest_addr;
+        addr4->sin_family = AF_INET;
+        addr4->sin_port = htons(port);
+        addr4->sin_addr.s_addr = ip_2_ip4(&resolved_ip)->addr;
+        conn_info->addrlen = sizeof(struct sockaddr_in);
+        conn_info->addr_family = AF_INET;
+        conn_info->ip_protocol = IPPROTO_IP;
+        if (inet_ntop(AF_INET, &addr4->sin_addr, conn_info->host_ip, sizeof(conn_info->host_ip)) == NULL) {
+            snprintf(conn_info->host_ip, sizeof(conn_info->host_ip), "[invalid IPv4 addr]");
+        }
+    } else {
         struct sockaddr_in6 *addr6 = (struct sockaddr_in6 *)&conn_info->dest_addr;
+        addr6->sin6_family = AF_INET6;
+        addr6->sin6_port = htons(port);
+        memcpy(&addr6->sin6_addr, ip_2_ip6(&resolved_ip)->addr, sizeof(addr6->sin6_addr));
+        conn_info->addrlen = sizeof(struct sockaddr_in6);
+        conn_info->addr_family = AF_INET6;
+        conn_info->ip_protocol = IPPROTO_IPV6;
 
+        // Handle IPv6 link-local scope ID if needed
         if (IN6_IS_ADDR_LINKLOCAL(&addr6->sin6_addr)) {
             if (addr6->sin6_scope_id == 0) {
                 ESP_LOGW(TAG, "Link-local IPv6 address without scope ID - attempting to set from WiFi STA interface");
@@ -101,39 +121,18 @@ esp_err_t stratum_socket_resolve(const char *hostname, uint16_t port, stratum_co
                 ESP_LOGI(TAG, "Link-local IPv6 address with existing scope_id: %lu", (unsigned long)addr6->sin6_scope_id);
             }
         }
-    }
 
-    const void *src_addr;
-    int af = conn_info->addr_family;
-
-    if (af == AF_INET) {
-        struct sockaddr_in *addr4 = (struct sockaddr_in *)&conn_info->dest_addr;
-        src_addr = &addr4->sin_addr;
-    } else {
-        struct sockaddr_in6 *addr6 = (struct sockaddr_in6 *)&conn_info->dest_addr;
-        src_addr = &addr6->sin6_addr;
-    }
-
-    // Convert resolved address to string for logging and storage
-    if (inet_ntop(af, src_addr, conn_info->host_ip, sizeof(conn_info->host_ip)) == NULL) {
-        ESP_LOGW(TAG, "inet_ntop failed (errno: %d)", errno);
-        snprintf(conn_info->host_ip, sizeof(conn_info->host_ip), "[invalid %s addr]",
-                 (af == AF_INET) ? "IPv4" : "IPv6");
-    } else if (af == AF_INET6) {
-        struct sockaddr_in6 *addr6 = (struct sockaddr_in6 *)&conn_info->dest_addr;
-        if (IN6_IS_ADDR_LINKLOCAL(&addr6->sin6_addr) && addr6->sin6_scope_id != 0) {
+        if (inet_ntop(AF_INET6, &addr6->sin6_addr, conn_info->host_ip, sizeof(conn_info->host_ip)) == NULL) {
+            snprintf(conn_info->host_ip, sizeof(conn_info->host_ip), "[invalid IPv6 addr]");
+        } else if (IN6_IS_ADDR_LINKLOCAL(&addr6->sin6_addr) && addr6->sin6_scope_id != 0) {
             char zone[16];
             snprintf(zone, sizeof(zone), "%%%" PRIu32, addr6->sin6_scope_id);
-            strncat(conn_info->host_ip, zone,
-                    sizeof(conn_info->host_ip) - strlen(conn_info->host_ip) - 1);
-            // Ensure null termination
+            strncat(conn_info->host_ip, zone, sizeof(conn_info->host_ip) - strlen(conn_info->host_ip) - 1);
             conn_info->host_ip[sizeof(conn_info->host_ip) - 1] = '\0';
         }
     }
 
     ESP_LOGI(TAG, "Resolved %s:%u → %s", hostname, port, conn_info->host_ip);
-
-    freeaddrinfo(res);
     return ESP_OK;
 }
 
@@ -182,3 +181,33 @@ void stratum_socket_set_options(esp_transport_handle_t transport)
         ESP_LOGE(TAG, "Failed to set TCP_KEEPCNT");
     }
 }
+
+esp_err_t stratum_socket_connect_async(esp_transport_handle_t transport,
+                                      const char *host_ip,
+                                      uint16_t port,
+                                      int timeout_ms,
+                                      bool (*should_shutdown_fn)(void))
+{
+    if (!transport || !host_ip) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    if (should_shutdown_fn && should_shutdown_fn()) {
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    int connect_ret;
+    while ((connect_ret = esp_transport_connect_async(transport, host_ip, port, timeout_ms)) == 0) {
+        if (should_shutdown_fn && should_shutdown_fn()) {
+            return ESP_ERR_INVALID_STATE;
+        }
+        vTaskDelay(pdMS_TO_TICKS(100));
+    }
+
+    if (connect_ret == 1) {
+        return ESP_OK;
+    }
+
+    return ESP_FAIL;
+}
+
