@@ -107,6 +107,12 @@ uint16_t EMC2103_get_fan_speed(void)
     reading = tach_lsb | (tach_msb << 8);
     reading >>= 3;
 
+    // A zero count is a bad read, not a fan speed, and dividing by it panics.
+    if (reading == 0) {
+        ESP_LOGW(TAG, "Tachometer read as zero, ignoring");
+        return 0;
+    }
+
     //RPM = (3,932,160 * m)/reading
     //m is the multipler, which is default 2
     RPM = 7864320 / reading;

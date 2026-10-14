@@ -102,6 +102,12 @@ uint16_t EMC2101_get_fan_speed(void)
     // ESP_LOGI(TAG, "Raw Fan Speed = %02X %02X", tach_msb, tach_lsb);
 
     reading = tach_lsb | (tach_msb << 8);
+
+    // A zero count is a bad read, not a fan speed, and dividing by it panics.
+    if (reading == 0) {
+        ESP_LOGW(TAG, "Tachometer read as zero, ignoring");
+        return 0;
+    }
     RPM = 5400000 / reading;
 
     // ESP_LOGI(TAG, "Fan Speed = %d RPM", RPM);

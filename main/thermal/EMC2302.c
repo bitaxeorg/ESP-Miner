@@ -87,6 +87,12 @@ static uint16_t get_fan_speed(uint8_t reg_addr, uint8_t multiplier)
     }
 
     uint16_t tach_counter = (tach_data[0] << 5) | (tach_data[1] >> 3);
+
+    // A zero count is a bad read, not a fan speed, and dividing by it panics.
+    if (tach_counter == 0) {
+        ESP_LOGW(TAG, "Tachometer read as zero, ignoring");
+        return 0;
+    }
     uint32_t rpm = 3932160UL * multiplier / tach_counter;
 
     if (rpm > UINT16_MAX) {
