@@ -149,6 +149,7 @@ typedef struct AsicTaskModule
     // so we keep a list of jobs indexed by the job id
     struct asic_job **active_jobs;
     uint8_t *valid_jobs;
+    bool has_work;
     pthread_mutex_t valid_jobs_lock;
 } AsicTaskModule;
 

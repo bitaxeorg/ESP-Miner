@@ -33,6 +33,7 @@ typedef struct GlobalState {
     struct {
         struct asic_job **active_jobs;
         uint8_t *valid_jobs;
+        bool has_work;
         pthread_mutex_t valid_jobs_lock;
     } ASIC_TASK_MODULE;
     struct {

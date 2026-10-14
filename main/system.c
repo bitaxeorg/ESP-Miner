@@ -283,6 +283,7 @@ void SYSTEM_init_system(GlobalState * GLOBAL_STATE)
         ESP_LOGE(TAG, "Failed to allocate job tracking tables");
         abort();
     }
+    GLOBAL_STATE->ASIC_TASK_MODULE.has_work = false;
 }
 
 void SYSTEM_init_versions(GlobalState * GLOBAL_STATE)
@@ -415,9 +416,8 @@ static void clean_jobs_queue(GlobalState * GLOBAL_STATE)
     ESP_LOGI(TAG, "Clean Jobs: invalidating active jobs");
 
     pthread_mutex_lock(&GLOBAL_STATE->ASIC_TASK_MODULE.valid_jobs_lock);
-    for (int i = 0; i < MAX_ASIC_JOBS; i = i + 4) {
-        GLOBAL_STATE->ASIC_TASK_MODULE.valid_jobs[i] = 0;
-    }
+    memset(GLOBAL_STATE->ASIC_TASK_MODULE.valid_jobs, 0, MAX_ASIC_JOBS * sizeof(uint8_t));
+    GLOBAL_STATE->ASIC_TASK_MODULE.has_work = false;
     pthread_mutex_unlock(&GLOBAL_STATE->ASIC_TASK_MODULE.valid_jobs_lock);
 
     // Reset hashrate measurements to prevent a spike on reconnection
