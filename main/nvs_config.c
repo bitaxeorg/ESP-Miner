@@ -56,6 +56,8 @@ static Settings settings[NVS_CONFIG_COUNT] = {
     [NVS_CONFIG_WIFI_PASS]                             = {.nvs_key_name = "wifipass",        .type = TYPE_STR,   .default_value = {.str = (char *)CONFIG_ESP_WIFI_PASSWORD},            .rest_name = "wifiPass",                           .min = 0,  .max = 63},
     [NVS_CONFIG_HOSTNAME]                              = {.nvs_key_name = "hostname",        .type = TYPE_STR,   .default_value = {.str = (char *)CONFIG_LWIP_LOCAL_HOSTNAME},          .rest_name = "hostname",                           .min = 1,  .max = 32},
     [NVS_CONFIG_USE_NTP]                               = {.nvs_key_name = "usentp",         .type = TYPE_BOOL,  .default_value = {.b = false},                                         .rest_name = "useNTP",                             .min = 0,  .max = 1},
+    [NVS_CONFIG_AXEOS_PASSWORD]                        = {.nvs_key_name = "axeospassword",   .type = TYPE_STR,   .default_value = {.str = ""},                                          .rest_name = "axeosPassword",                      .min = 0,  .max = 64},
+    [NVS_CONFIG_AUTH_READ_REQUIRED]                    = {.nvs_key_name = "authreadreq",     .type = TYPE_BOOL,  .default_value = {.b = false},                                         .rest_name = "authReadRequired",                   .min = 0,  .max = 1},
 
     [NVS_CONFIG_POOL]                                  = {.nvs_key_name = "pool",            .type = TYPE_STR,   .default_value = {.str = ""},                                          .rest_name = "pools",                              .min = 0,  .max = NVS_STR_LIMIT, .array_size = MAX_POOLS},
     [NVS_CONFIG_PRIMARY_POOL_INDEX]                    = {.nvs_key_name = "prim_idx",        .type = TYPE_U16,   .default_value = {.u16 = 0},                                           .rest_name = "primaryPoolIndex",                   .min = 0,  .max = MAX_POOLS - 1},
@@ -588,24 +590,34 @@ void nvs_config_set_string(NvsConfigKey key, const char *value)
     Settings *setting = nvs_config_get_settings(key);
     if (!setting || setting->type != TYPE_STR || !value) return;
 
+    const char *final_val = value;
+    char hashed_hex[65] = {0};
+
+    if (key == NVS_CONFIG_AXEOS_PASSWORD && strlen(value) > 0) {
+        unsigned char hash[32];
+        sha256_bin((const uint8_t *)value, strlen(value), hash);
+        bin2hex(hash, 32, hashed_hex, sizeof(hashed_hex));
+        final_val = hashed_hex;
+    }
+
     xSemaphoreTake(nvs_update_mutex, portMAX_DELAY);
 
     xSemaphoreTake(nvs_cache_mutex, portMAX_DELAY);
-    if (setting->value[0].str && strcmp(setting->value[0].str, value) == 0 && setting->is_set) {
+    if (setting->value[0].str && strcmp(setting->value[0].str, final_val) == 0 && setting->is_set) {
         xSemaphoreGive(nvs_cache_mutex);
         xSemaphoreGive(nvs_update_mutex);
         return;
     }
     xSemaphoreGive(nvs_cache_mutex);
 
-    char *new_str = strdup(value);
+    char *new_str = strdup(final_val);
     if (!new_str) {
         ESP_LOGE(TAG, "Failed to allocate memory for string cache update");
         xSemaphoreGive(nvs_update_mutex);
         return;
     }
 
-    char *queue_str = strdup(value);
+    char *queue_str = strdup(final_val);
     if (!queue_str) {
         ESP_LOGE(TAG, "Failed to allocate memory for string queue update");
         free(new_str);
