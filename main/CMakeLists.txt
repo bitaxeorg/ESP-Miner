@@ -64,6 +64,8 @@ SRCS
     "./power/vcore.c"
     "./power/asic_reset.c"
     "./power/asic_init.c"
+    "display_capture.c"
+    "screen_stream.c"
     "${CMAKE_CURRENT_BINARY_DIR}/embedded_web_ui.c"
 
 INCLUDE_DIRS
@@ -73,8 +75,10 @@ INCLUDE_DIRS
     "http_server/axe-os/api/system"
     "self_test"
     "bap"
+
     "thermal"
     "power"
+    "../components/stb"
     "${CMAKE_CURRENT_BINARY_DIR}"
 
 REQUIRES
@@ -84,6 +88,7 @@ REQUIRES
     "stratum"
     "stratum_v2"
     "yyjson"
+    "stb"
 
 PRIV_REQUIRES
     "app_update"

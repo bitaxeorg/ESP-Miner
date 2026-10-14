@@ -1,6 +1,3 @@
-#include <pthread.h>
-#include <fcntl.h>
-#include <string.h>
 #include <limits.h>
 #include <sys/param.h>
 #include <sys/stat.h>
@@ -11,6 +8,7 @@
 #include "freertos/task.h"
 #include "esp_http_server.h"
 #include "esp_log.h"
+#include "esp_spiffs.h"
 #include "esp_netif.h"
 #include "esp_system.h"
 #include "esp_timer.h"
@@ -40,6 +38,8 @@
 #include "theme_api.h"
 #include "axe-os/api/system/asic_settings.h"
 #include "display.h"
+#include "screen_stream.h"
+#include "display_capture.h"
 #include "mdns.h"
 #include "http_server.h"
 #include "embedded_web_ui.h"
@@ -457,6 +457,44 @@ esp_err_t set_cors_headers(httpd_req_t * req)
     }
 
     return ESP_OK;
+}
+
+/* Screen stream handler - registers client for async streaming */
+static esp_err_t screen_stream_handler(httpd_req_t * req)
+{
+    ESP_LOGI(TAG, "Screen stream client connected");
+    
+    // Check authentication
+    if (is_network_allowed(req) != ESP_OK) {
+        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+    }
+    
+    if (req->method == HTTP_GET) {
+        // Set headers for multipart streaming
+        httpd_resp_set_type(req, "multipart/x-mixed-replace; boundary=frame");
+        httpd_resp_set_hdr(req, "X-Content-Type-Options", "nosniff");
+        
+        // Start async request to keep the socket open after this handler returns
+        httpd_req_t *async_req = NULL;
+        esp_err_t ret = httpd_req_async_handler_begin(req, &async_req);
+        if (ret != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to start async screen stream handler");
+            return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to start async handler");
+        }
+        
+        // Add client to the stream pool using the async handle
+        ret = screen_stream_add_client(async_req);
+        if (ret != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to add screen stream client to pool");
+            httpd_req_async_handler_complete(async_req);
+            return ESP_FAIL;
+        }
+        
+        // Return ESP_OK - the async handle keeps the connection alive
+        return ESP_OK;
+    }
+
+    return ESP_ERR_NOT_SUPPORTED;
 }
 
 esp_err_t HTTP_send_json_error(httpd_req_t * req, const char * status, const char * message)
@@ -1934,6 +1972,12 @@ esp_err_t start_rest_server(GlobalState * global_state)
     ESP_LOGI(TAG, "Starting HTTP Server");
     REST_CHECK(httpd_start(&server, &config) == ESP_OK, "Start server failed", err_start);
 
+    // Initialize screen streaming
+    screen_stream_init();
+    
+    // Initialize display capture for screen streaming
+    display_capture_init();
+
     // Initialize the WebSocket registry with the valid server handle
     websocket_init(server);
 
@@ -1952,6 +1996,15 @@ esp_err_t start_rest_server(GlobalState * global_state)
         .user_ctx = rest_context
     };
     httpd_register_uri_handler(server, &recovery_explicit_get_uri);
+
+    /* Screen stream handler - live PNG stream */
+    httpd_uri_t screen_stream_uri = {
+        .uri = "/api/screen/stream",
+        .method = HTTP_GET,
+        .handler = screen_stream_handler,
+        .user_ctx = NULL
+    };
+    httpd_register_uri_handler(server, &screen_stream_uri);
     
     // Register theme API endpoints
     ESP_ERROR_CHECK(register_theme_api_endpoints(server, rest_context));
