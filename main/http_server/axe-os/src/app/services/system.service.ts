@@ -170,6 +170,8 @@ export class SystemApiService {
         isUsingFallbackStratum: 0,
         useFallbackStratum: 0,
         poolConnectionInfo: "IPv4 (TLS)",
+        primaryPoolError: "",
+        poolBanner: "",
         frequency: 485,
         actualFrequency: 485,
         version: "v2.12.0",
