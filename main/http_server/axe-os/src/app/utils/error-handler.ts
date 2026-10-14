@@ -6,6 +6,20 @@ export function getHttpErrorMessage(err: any, uri?: string): string {
   if (err instanceof HttpErrorResponse) {
     if (err.status === 0) {
       message = 'Network error or connection lost. The device may have restarted or disconnected.';
+    } else if (err.status === 403 && err.headers && err.headers.get('x-ratelimit-reset')) {
+      const resetHeader = err.headers.get('x-ratelimit-reset');
+      const resetEpoch = parseInt(resetHeader!, 10);
+      let resetInfo = '';
+      if (!isNaN(resetEpoch)) {
+        const resetDate = new Date(resetEpoch * 1000);
+        const timeString = resetDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        const diffMinutes = Math.ceil((resetDate.getTime() - Date.now()) / 60000);
+        resetInfo = diffMinutes > 0
+          ? ` Rate limit resets at ${timeString} (in ~${diffMinutes} min).`
+          : ` Rate limit resets at ${timeString}.`;
+      }
+      const rawMsg = (typeof err.error === 'object' && err.error?.message) ? err.error.message : (err.message || 'API rate limit exceeded.');
+      message = rawMsg + resetInfo;
     } else if (err.error) {
       if (typeof err.error === 'string') {
         message = err.error;

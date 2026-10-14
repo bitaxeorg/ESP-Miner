@@ -22,6 +22,7 @@ export class AppTopBarComponent implements OnInit, OnDestroy {
   public sensitiveDataHidden: boolean = false;
   public isMiningPaused: boolean = false;
   public isWidgetPanelOpen = false;
+  private lastOtaStatus: string = '';
 
   @Input() isAPMode: boolean = false;
 
@@ -55,6 +56,7 @@ export class AppTopBarComponent implements OnInit, OnDestroy {
         this.wasOtaUpdating = true;
         const percent = info.firmwareUpdatePercent ?? 0;
         const status = info.firmwareUpdateStatus || 'Updating...';
+        this.lastOtaStatus = status;
         const title = `Firmware Update`;
         const message = status;
 
@@ -98,7 +100,11 @@ export class AppTopBarComponent implements OnInit, OnDestroy {
         this.toastr.clear(this.otaToastRef.toastId);
         this.otaToastRef = null;
         if (this.wasOtaUpdating) {
-          this.toastr.success('Firmware update completed!');
+          if (this.lastOtaStatus && (this.lastOtaStatus.includes('Error') || this.lastOtaStatus.includes('Failed'))) {
+            this.toastr.error(`Firmware update failed: ${this.lastOtaStatus}`, 'Update Failed', { timeOut: 8000 });
+          } else {
+            this.toastr.success('Firmware update completed!');
+          }
           this.wasOtaUpdating = false;
         }
       }

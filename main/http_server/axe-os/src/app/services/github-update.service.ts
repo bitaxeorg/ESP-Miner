@@ -4,7 +4,8 @@ import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
 
 
-interface GithubReleaseAsset {
+export interface GithubReleaseAsset {
+  id: number;
   name: string;
   browser_download_url: string;
   // e.g. "sha256:<hex>", populated by GitHub for release assets
@@ -17,6 +18,7 @@ export interface GithubRelease {
   name: string;
   html_url: string;
   prerelease: boolean;
+  body: string;
   assets: GithubReleaseAsset[];
 }
 
@@ -29,12 +31,16 @@ export class GithubUpdateService {
     private httpClient: HttpClient
   ) { }
 
-
-  public getReleases(): Observable<GithubRelease[]> {
+  public getReleases(includePrerelease: boolean = false): Observable<GithubRelease[]> {
     return this.httpClient.get<GithubRelease[]>(
       'https://api.github.com/repos/bitaxeorg/esp-miner/releases'
     ).pipe(
-      map((releases: GithubRelease[]) => releases.filter((release: GithubRelease) => !release.prerelease))
+      map((releases: GithubRelease[]) => {
+        if (includePrerelease) {
+          return releases;
+        }
+        return releases.filter((release: GithubRelease) => !release.prerelease);
+      })
     );
   }
 

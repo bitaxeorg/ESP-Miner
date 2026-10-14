@@ -5,6 +5,8 @@
 
 #include "cJSON.h"
 
+#define MAX_REST_PAYLOAD_SIZE (16384)
+
 typedef struct GlobalState GlobalState;
 
 esp_err_t is_network_allowed(httpd_req_t * req);

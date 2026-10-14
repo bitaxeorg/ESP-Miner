@@ -91,7 +91,8 @@ describe('UpdateComponent', () => {
       name: 'v2.13.0',
       html_url: 'https://github.com/bitaxeorg/esp-miner/releases/tag/v2.13.0',
       prerelease: false,
-      assets: [{ name: 'esp-miner.bin', browser_download_url: '', digest }]
+      body: '',
+      assets: [{ id: 1, name: 'esp-miner.bin', browser_download_url: '', digest }]
     });
 
     beforeEach(() => {

@@ -107,6 +107,8 @@ PRIV_REQUIRES
     "esp_driver_uart"
     "tcp_transport"
     "esp_mm"
+    "esp_http_client"
+    "mbedtls"
     "bt"
 
 EMBED_FILES "http_server/recovery_page.html"
