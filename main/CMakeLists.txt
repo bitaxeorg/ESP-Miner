@@ -36,7 +36,6 @@ SRCS
     "./http_server/websocket.c"
     "./http_server/websocket_log.c"
     "./http_server/websocket_api.c"
-    "./http_server/cjson_utils.c"
     "./http_server/system_api_json.c"
     "./http_server/theme_api.c"
     "./http_server/axe-os/api/system/asic_settings.c"

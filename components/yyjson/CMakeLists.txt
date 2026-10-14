@@ -1,6 +1,6 @@
 idf_component_register(
     SRCS "yyjson/src/yyjson.c"
-         "yyjson_psram.c"
+         "yyjson_utils.c"
     INCLUDE_DIRS "include"
                  "yyjson/src"
     REQUIRES "heap"

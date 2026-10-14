@@ -30,7 +30,7 @@
 
 #include "cJSON.h"
 #include "yyjson.h"
-#include "yyjson_psram.h"
+#include "yyjson_utils.h"
 #include "global_state.h"
 #include "nvs_config.h"
 #include "system.h"
@@ -55,7 +55,6 @@
 static const char * TAG = "http_server";
 static const char * CORS_TAG = "CORS";
 
-static int system_info_prebuffer_len = 256;
 static int system_wifi_scan_prebuffer_len = 256;
 static int api_common_prebuffer_len = 256;
 
@@ -1407,7 +1406,13 @@ static esp_err_t GET_system_info(httpd_req_t * req)
         return ESP_OK;
     }
 
-    cJSON * root = system_api_get_full_json(GLOBAL_STATE);
+    const yyjson_alc *alc = yyjson_psram_alc();
+    yyjson_mut_doc *root_doc = system_api_get_full_doc(GLOBAL_STATE, alc);
+    if (!root_doc) {
+        httpd_resp_send_500(req);
+        return ESP_FAIL;
+    }
+    yyjson_mut_val *root = yyjson_mut_doc_get_root(root_doc);
 
     // Add mDNS-specific fields on top of the base system info
     char * hostname_base = nvs_config_get_string(NVS_CONFIG_HOSTNAME);
@@ -1420,16 +1425,27 @@ static esp_err_t GET_system_info(httpd_req_t * req)
         snprintf(full_hostname, sizeof(full_hostname), "%s.local", hostname_base ? hostname_base : "unknown");
     }
 
-    cJSON_AddStringToObject(root, "fullHostname", full_hostname);
-    if (strlen(mdns_hostname) > 0) {
-        cJSON_AddStringToObject(root, "mdnsHostname", mdns_hostname);
+    yyjson_mut_obj_add_strcpy(root_doc, root, "fullHostname", full_hostname);
+    if (mdns_hostname != NULL && strlen(mdns_hostname) > 0) {
+        yyjson_mut_obj_add_strcpy(root_doc, root, "mdnsHostname", mdns_hostname);
     }
 
     free(hostname_base);
 
-    esp_err_t res = HTTP_send_json(req, root, &system_info_prebuffer_len);
+    size_t len = 0;
+    yyjson_write_err err = {0};
+    char *json_str = yyjson_mut_write_opts(root_doc, YYJSON_WRITE_INF_AND_NAN_AS_NULL | YYJSON_WRITE_ALLOW_INVALID_UNICODE, alc, &len, &err);
+    esp_err_t res = ESP_FAIL;
+    if (json_str) {
+        httpd_resp_set_type(req, "application/json");
+        res = httpd_resp_send(req, json_str, len);
+        yyjson_alc_free(alc, json_str);
+    } else {
+        ESP_LOGE(TAG, "GET_system_info yyjson_mut_write_opts failed: code %u, %s", err.code, err.msg ? err.msg : "unknown");
+        httpd_resp_send_500(req);
+    }
 
-    cJSON_Delete(root);
+    yyjson_mut_doc_free(root_doc);
 
     return res;
 }

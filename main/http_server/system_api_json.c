@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <string.h>
+#include <math.h>
 #include "esp_partition.h"
 #include "esp_wifi.h"
 #include "esp_ota_ops.h"
@@ -13,10 +14,9 @@
 #include "vcore.h"
 #include "connect.h"
 #include "hashrate_monitor_task.h"
-#include "cjson_utils.h"
 #include "statistics_task.h"
 #include "asic.h"
-
+#include "yyjson_utils.h"
 
 static const char *get_reset_reason_str(esp_reset_reason_t reason)
 {
@@ -41,152 +41,154 @@ static const char *get_reset_reason_str(esp_reset_reason_t reason)
     }
 }
 
-static void system_api_add_telemetry(cJSON *root, GlobalState *g) {
-    if (!root || !g) return;
+static void system_api_add_telemetry(yyjson_mut_doc *doc, yyjson_mut_val *root, GlobalState *g) {
+    if (!doc || !root || !g) return;
 
     // Power Group
-    cJSON_AddFloatToObject(root, "power", g->POWER_MANAGEMENT_MODULE.power);
-    cJSON_AddFloatToObject(root, "voltage", g->POWER_MANAGEMENT_MODULE.voltage);
-    cJSON_AddFloatToObject(root, "current", g->POWER_MANAGEMENT_MODULE.current);
-    cJSON_AddFloatToObject(root, "temp", g->POWER_MANAGEMENT_MODULE.chip_temp_avg);
-    cJSON_AddFloatToObject(root, "temp2", g->POWER_MANAGEMENT_MODULE.chip_temp2_avg);
-    cJSON_AddFloatToObject(root, "vrTemp", g->POWER_MANAGEMENT_MODULE.vr_temp);
-    cJSON_AddFloatToObject(root, "coreVoltageActual", g->POWER_MANAGEMENT_MODULE.core_voltage);
-    cJSON_AddFloatToObject(root, "actualFrequency", g->POWER_MANAGEMENT_MODULE.actual_frequency);
-    cJSON_AddFloatToObject(root, "expectedHashrate", g->POWER_MANAGEMENT_MODULE.expected_hashrate);
-    cJSON_AddNumberToObject(root, "fanspeed", g->POWER_MANAGEMENT_MODULE.fan_perc);
-    cJSON_AddNumberToObject(root, "fanrpm", g->POWER_MANAGEMENT_MODULE.fan_rpm);
-    cJSON_AddNumberToObject(root, "fan2rpm", g->POWER_MANAGEMENT_MODULE.fan2_rpm);
+    yyjson_mut_obj_add_float(doc, root, "power", g->POWER_MANAGEMENT_MODULE.power);
+    yyjson_mut_obj_add_float(doc, root, "voltage", g->POWER_MANAGEMENT_MODULE.voltage);
+    yyjson_mut_obj_add_float(doc, root, "current", g->POWER_MANAGEMENT_MODULE.current);
+    yyjson_mut_obj_add_float(doc, root, "temp", g->POWER_MANAGEMENT_MODULE.chip_temp_avg);
+    yyjson_mut_obj_add_float(doc, root, "temp2", g->POWER_MANAGEMENT_MODULE.chip_temp2_avg);
+    yyjson_mut_obj_add_float(doc, root, "vrTemp", g->POWER_MANAGEMENT_MODULE.vr_temp);
+    yyjson_mut_obj_add_float(doc, root, "coreVoltageActual", g->POWER_MANAGEMENT_MODULE.core_voltage);
+    yyjson_mut_obj_add_float(doc, root, "actualFrequency", g->POWER_MANAGEMENT_MODULE.actual_frequency);
+    yyjson_mut_obj_add_float(doc, root, "expectedHashrate", g->POWER_MANAGEMENT_MODULE.expected_hashrate);
+    yyjson_mut_obj_add_float(doc, root, "fanspeed", g->POWER_MANAGEMENT_MODULE.fan_perc);
+    yyjson_mut_obj_add_uint(doc, root, "fanrpm", g->POWER_MANAGEMENT_MODULE.fan_rpm);
+    yyjson_mut_obj_add_uint(doc, root, "fan2rpm", g->POWER_MANAGEMENT_MODULE.fan2_rpm);
 
     // Hashrate / Mining Group
-    cJSON_AddFloatToObject(root, "hashRate", g->SYSTEM_MODULE.current_hashrate);
-    cJSON_AddFloatToObject(root, "hashRate_1m", g->SYSTEM_MODULE.hashrate_1m);
-    cJSON_AddFloatToObject(root, "hashRate_10m", g->SYSTEM_MODULE.hashrate_10m);
-    cJSON_AddFloatToObject(root, "hashRate_1h", g->SYSTEM_MODULE.hashrate_1h);
-    cJSON_AddFloatToObject(root, "errorPercentage", g->SYSTEM_MODULE.error_percentage);
-    cJSON_AddNumberToObject(root, "sharesAccepted", g->SYSTEM_MODULE.shares_accepted);
-    cJSON_AddNumberToObject(root, "sharesRejected", g->SYSTEM_MODULE.shares_rejected);
-    cJSON_AddNumberToObject(root, "sharesPending", g->SYSTEM_MODULE.shares_pending);
-    cJSON_AddNumberToObject(root, "bestDiff", g->SYSTEM_MODULE.best_nonce_diff);
-    cJSON_AddNumberToObject(root, "bestSessionDiff", g->SYSTEM_MODULE.best_session_nonce_diff);
-    cJSON_AddNumberToObject(root, "poolDifficulty", g->SYSTEM_MODULE.pool_difficulty);
-    cJSON_AddFloatToObject(root, "responseTime", g->SYSTEM_MODULE.response_time);
-    cJSON_AddNumberToObject(root, "responseShareBatch", g->SYSTEM_MODULE.response_share_batch);
-    cJSON_AddFloatToObject(root, "processTime", g->SYSTEM_MODULE.process_time);
-    cJSON_AddNumberToObject(root, "workReceived", g->SYSTEM_MODULE.work_received);
+    yyjson_mut_obj_add_float(doc, root, "hashRate", g->SYSTEM_MODULE.current_hashrate);
+    yyjson_mut_obj_add_float(doc, root, "hashRate_1m", g->SYSTEM_MODULE.hashrate_1m);
+    yyjson_mut_obj_add_float(doc, root, "hashRate_10m", g->SYSTEM_MODULE.hashrate_10m);
+    yyjson_mut_obj_add_float(doc, root, "hashRate_1h", g->SYSTEM_MODULE.hashrate_1h);
+    yyjson_mut_obj_add_float(doc, root, "errorPercentage", g->SYSTEM_MODULE.error_percentage);
+    yyjson_mut_obj_add_uint(doc, root, "sharesAccepted", g->SYSTEM_MODULE.shares_accepted);
+    yyjson_mut_obj_add_uint(doc, root, "sharesRejected", g->SYSTEM_MODULE.shares_rejected);
+    yyjson_mut_obj_add_uint(doc, root, "sharesPending", g->SYSTEM_MODULE.shares_pending);
+    yyjson_mut_obj_add_uint(doc, root, "bestDiff", g->SYSTEM_MODULE.best_nonce_diff);
+    yyjson_mut_obj_add_uint(doc, root, "bestSessionDiff", g->SYSTEM_MODULE.best_session_nonce_diff);
+    yyjson_mut_obj_add_double(doc, root, "poolDifficulty", g->SYSTEM_MODULE.pool_difficulty);
+    yyjson_mut_obj_add_float(doc, root, "responseTime", g->SYSTEM_MODULE.response_time);
+    yyjson_mut_obj_add_uint(doc, root, "responseShareBatch", g->SYSTEM_MODULE.response_share_batch);
+    yyjson_mut_obj_add_float(doc, root, "processTime", g->SYSTEM_MODULE.process_time);
+    yyjson_mut_obj_add_uint(doc, root, "workReceived", g->SYSTEM_MODULE.work_received);
 
     // Dynamic Block Info
-    cJSON_AddNumberToObject(root, "blockFound", g->SYSTEM_MODULE.block_found);
-    cJSON_AddBoolToObject(root, "showNewBlock", g->SYSTEM_MODULE.show_new_block);
-    cJSON_AddNumberToObject(root, "blockHeight", g->block_height);
-    cJSON_AddStringToObject(root, "scriptsig", g->coinbase.scriptsig);
-    cJSON_AddNumberToObject(root, "networkDifficulty", g->network_nonce_diff);
-    cJSON_AddNumberToObject(root, "coinbaseValueTotalSatoshis", g->coinbase.total_value_satoshis);
-    cJSON_AddNumberToObject(root, "coinbaseValueUserSatoshis", g->coinbase.user_value_satoshis);
-    cJSON_AddStringToObject(root, "coinbasePayoutStatus", coinbase_payout_status_to_string(g->coinbase.payout_status));
+    yyjson_mut_obj_add_uint(doc, root, "blockFound", g->SYSTEM_MODULE.block_found);
+    yyjson_mut_obj_add_bool(doc, root, "showNewBlock", g->SYSTEM_MODULE.show_new_block);
+    yyjson_mut_obj_add_int(doc, root, "blockHeight", g->block_height);
+    yyjson_mut_obj_add_strcpy(doc, root, "scriptsig", g->coinbase.scriptsig);
+    yyjson_mut_obj_add_uint(doc, root, "networkDifficulty", g->network_nonce_diff);
+    yyjson_mut_obj_add_uint(doc, root, "coinbaseValueTotalSatoshis", g->coinbase.total_value_satoshis);
+    yyjson_mut_obj_add_uint(doc, root, "coinbaseValueUserSatoshis", g->coinbase.user_value_satoshis);
+    yyjson_mut_obj_add_strcpy(doc, root, "coinbasePayoutStatus", coinbase_payout_status_to_string(g->coinbase.payout_status));
 
     // Dynamic System Stats
-    cJSON_AddNumberToObject(root, "freeHeap", esp_get_free_heap_size());
-    cJSON_AddNumberToObject(root, "freeHeapInternal", heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
-    cJSON_AddNumberToObject(root, "freeHeapSpiram", heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
-    cJSON_AddNumberToObject(root, "minFreeHeap", esp_get_minimum_free_heap_size());
-    cJSON_AddNumberToObject(root, "maxAllocHeap", heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL));
-    cJSON_AddNumberToObject(root, "uptimeSeconds", g->SYSTEM_MODULE.uptime_seconds);
-    cJSON_AddNumberToObject(root, "totalUptimeSeconds", SYSTEM_noinit_get_total_uptime_seconds());
-    cJSON_AddNumberToObject(root, "totalHashes", SYSTEM_noinit_get_total_hashes());
-    cJSON_AddNumberToObject(root, "totalLog2Work", SYSTEM_noinit_get_total_log2_work());
-    cJSON_AddFloatToObject(root, "cpuUsage", g->SYSTEM_MODULE.cpu_usage);
-    cJSON_AddBoolToObject(root, "miningPaused", g->SYSTEM_MODULE.mining_paused);
-    cJSON_AddNumberToObject(root, "overheat_mode", g->SYSTEM_MODULE.overheat_mode ? 1 : 0);
-    cJSON_AddStringToObject(root, "wifiStatus", g->SYSTEM_MODULE.wifi_status);
+    yyjson_mut_obj_add_uint(doc, root, "freeHeap", esp_get_free_heap_size());
+    yyjson_mut_obj_add_uint(doc, root, "freeHeapInternal", heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
+    yyjson_mut_obj_add_uint(doc, root, "freeHeapSpiram", heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
+    yyjson_mut_obj_add_uint(doc, root, "minFreeHeap", esp_get_minimum_free_heap_size());
+    yyjson_mut_obj_add_uint(doc, root, "maxAllocHeap", heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL));
+    yyjson_mut_obj_add_uint(doc, root, "uptimeSeconds", g->SYSTEM_MODULE.uptime_seconds);
+    yyjson_mut_obj_add_uint(doc, root, "totalUptimeSeconds", SYSTEM_noinit_get_total_uptime_seconds());
+    yyjson_mut_obj_add_double(doc, root, "totalHashes", SYSTEM_noinit_get_total_hashes());
+    yyjson_mut_obj_add_double(doc, root, "totalLog2Work", SYSTEM_noinit_get_total_log2_work());
+    yyjson_mut_obj_add_float(doc, root, "cpuUsage", g->SYSTEM_MODULE.cpu_usage);
+    yyjson_mut_obj_add_bool(doc, root, "miningPaused", g->SYSTEM_MODULE.mining_paused);
+    yyjson_mut_obj_add_int(doc, root, "overheat_mode", g->SYSTEM_MODULE.overheat_mode ? 1 : 0);
+    yyjson_mut_obj_add_strcpy(doc, root, "wifiStatus", g->SYSTEM_MODULE.wifi_status);
 
     int8_t rssi = -90;
     get_wifi_current_rssi(&rssi);
-    cJSON_AddNumberToObject(root, "wifiRSSI", rssi);
+    yyjson_mut_obj_add_int(doc, root, "wifiRSSI", rssi);
 
     // Faults
     if (g->SYSTEM_MODULE.power_fault > 0) {
-        cJSON_AddStringToObject(root, "power_fault", VCORE_get_fault_string(g));
+        const char *fault = VCORE_get_fault_string(g);
+        if (fault) {
+            yyjson_mut_obj_add_strcpy(doc, root, "power_fault", fault);
+        }
     }
     if (g->SYSTEM_MODULE.hardware_fault) {
-        cJSON_AddStringToObject(root, "hardware_fault", g->SYSTEM_MODULE.hardware_fault_msg);
+        yyjson_mut_obj_add_strcpy(doc, root, "hardware_fault", g->SYSTEM_MODULE.hardware_fault_msg);
     }
 }
 
-static void system_api_add_config(cJSON *root, GlobalState *g) {
-    if (!root || !g) return;
+static void system_api_add_config(yyjson_mut_doc *doc, yyjson_mut_val *root, GlobalState *g) {
+    if (!doc || !root || !g) return;
 
     // Versions
-    cJSON_AddStringToObject(root, "version", g->SYSTEM_MODULE.version ? g->SYSTEM_MODULE.version : "Unknown");
-    cJSON_AddStringToObject(root, "axeOSVersion", g->SYSTEM_MODULE.axeOSVersion ? g->SYSTEM_MODULE.axeOSVersion : "Unknown");
-    cJSON_AddStringToObject(root, "idfVersion", esp_get_idf_version());
-    cJSON_AddStringToObject(root, "boardVersion", g->DEVICE_CONFIG.board_version ? g->DEVICE_CONFIG.board_version : "Unknown");
+    yyjson_mut_obj_add_str(doc, root, "version", g->SYSTEM_MODULE.version ? g->SYSTEM_MODULE.version : "Unknown");
+    yyjson_mut_obj_add_str(doc, root, "axeOSVersion", g->SYSTEM_MODULE.axeOSVersion ? g->SYSTEM_MODULE.axeOSVersion : "Unknown");
+    yyjson_mut_obj_add_str(doc, root, "idfVersion", esp_get_idf_version());
+    yyjson_mut_obj_add_str(doc, root, "boardVersion", g->DEVICE_CONFIG.board_version ? g->DEVICE_CONFIG.board_version : "Unknown");
 
     // Hardware Details
-    cJSON_AddNumberToObject(root, "maxPower", g->DEVICE_CONFIG.family.max_power);
-    cJSON_AddNumberToObject(root, "nominalVoltage", g->DEVICE_CONFIG.family.nominal_voltage);
-    cJSON_AddNumberToObject(root, "smallCoreCount", g->DEVICE_CONFIG.family.asic.small_core_count);
-    cJSON_AddStringToObject(root, "ASICModel", g->DEVICE_CONFIG.family.asic.name ? g->DEVICE_CONFIG.family.asic.name : "Unknown");
-    cJSON_AddNumberToObject(root, "isPSRAMAvailable", g->psram_is_available ? 1 : 0);
-    cJSON_AddStringToObject(root, "resetReason", get_reset_reason_str(esp_reset_reason()));
+    yyjson_mut_obj_add_uint(doc, root, "maxPower", g->DEVICE_CONFIG.family.max_power);
+    yyjson_mut_obj_add_uint(doc, root, "nominalVoltage", g->DEVICE_CONFIG.family.nominal_voltage);
+    yyjson_mut_obj_add_uint(doc, root, "smallCoreCount", g->DEVICE_CONFIG.family.asic.small_core_count);
+    yyjson_mut_obj_add_str(doc, root, "ASICModel", g->DEVICE_CONFIG.family.asic.name ? g->DEVICE_CONFIG.family.asic.name : "Unknown");
+    yyjson_mut_obj_add_int(doc, root, "isPSRAMAvailable", g->psram_is_available ? 1 : 0);
+    yyjson_mut_obj_add_str(doc, root, "resetReason", get_reset_reason_str(esp_reset_reason()));
     
     const esp_partition_t *running = esp_ota_get_running_partition();
-    cJSON_AddStringToObject(root, "runningPartition", running ? running->label : "Unknown");
+    yyjson_mut_obj_add_str(doc, root, "runningPartition", running ? running->label : "Unknown");
 
     uint8_t mac[6];
     esp_wifi_get_mac(WIFI_IF_STA, mac);
     char formattedMac[18];
     snprintf(formattedMac, sizeof(formattedMac), "%02X:%02X:%02X:%02X:%02X:%02X", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
-    cJSON_AddStringToObject(root, "macAddr", formattedMac);
+    yyjson_mut_obj_add_strcpy(doc, root, "macAddr", formattedMac);
 
     char *hostname = nvs_config_get_string(NVS_CONFIG_HOSTNAME);
-    cJSON_AddStringToObject(root, "hostname", hostname ? hostname : "Unknown");
+    yyjson_mut_obj_add_strcpy(doc, root, "hostname", hostname ? hostname : "Unknown");
     free(hostname);
 
     // Network Config
     char *ssid = nvs_config_get_string(NVS_CONFIG_WIFI_SSID);
-    cJSON_AddStringToObject(root, "ssid", ssid ? ssid : "Unknown");
+    yyjson_mut_obj_add_strcpy(doc, root, "ssid", ssid ? ssid : "Unknown");
     free(ssid);
 
-    cJSON_AddStringToObject(root, "ipv4", g->SYSTEM_MODULE.ip_addr_str);
-    cJSON_AddStringToObject(root, "ipv6", g->SYSTEM_MODULE.ipv6_addr_str);
-    cJSON_AddNumberToObject(root, "apEnabled", g->SYSTEM_MODULE.ap_enabled ? 1 : 0);
-    cJSON_AddNumberToObject(root, "useNTP", nvs_config_get_bool(NVS_CONFIG_USE_NTP) ? 1 : 0);
+    yyjson_mut_obj_add_strcpy(doc, root, "ipv4", g->SYSTEM_MODULE.ip_addr_str);
+    yyjson_mut_obj_add_strcpy(doc, root, "ipv6", g->SYSTEM_MODULE.ipv6_addr_str);
+    yyjson_mut_obj_add_int(doc, root, "apEnabled", g->SYSTEM_MODULE.ap_enabled ? 1 : 0);
+    yyjson_mut_obj_add_int(doc, root, "useNTP", nvs_config_get_bool(NVS_CONFIG_USE_NTP) ? 1 : 0);
 
     // Pool Configuration
-    cJSON_AddStringToObject(root, "poolConnectionInfo", g->SYSTEM_MODULE.pool_connection_info);
-    cJSON_AddNumberToObject(root, "isUsingFallbackStratum", g->SYSTEM_MODULE.is_using_fallback ? 1 : 0);
+    yyjson_mut_obj_add_strcpy(doc, root, "poolConnectionInfo", g->SYSTEM_MODULE.pool_connection_info);
+    yyjson_mut_obj_add_int(doc, root, "isUsingFallbackStratum", g->SYSTEM_MODULE.is_using_fallback ? 1 : 0);
     
     uint16_t prim_idx = g->SYSTEM_MODULE.primary_pool_index;
     uint16_t sec_idx = g->SYSTEM_MODULE.secondary_pool_index;
+    if (prim_idx >= MAX_POOLS) prim_idx = 0;
+    if (sec_idx >= MAX_POOLS) sec_idx = 0;
 
-    cJSON_AddNumberToObject(root, "primaryPoolIndex", prim_idx);
-    cJSON_AddNumberToObject(root, "secondaryPoolIndex", sec_idx);
-    cJSON_AddNumberToObject(root, "useFallbackStratum", g->SYSTEM_MODULE.use_fallback_stratum ? 1 : 0);
+    yyjson_mut_obj_add_uint(doc, root, "primaryPoolIndex", prim_idx);
+    yyjson_mut_obj_add_uint(doc, root, "secondaryPoolIndex", sec_idx);
+    yyjson_mut_obj_add_int(doc, root, "useFallbackStratum", g->SYSTEM_MODULE.use_fallback_stratum ? 1 : 0);
 
-    cJSON *pools_arr = cJSON_CreateArray();
-    cJSON_AddItemToObject(root, "pools", pools_arr);
+    yyjson_mut_val *pools_arr = yyjson_mut_obj_add_arr(doc, root, "pools");
     for (int i = 0; i < MAX_POOLS; i++) {
         PoolConfig *p = &g->SYSTEM_MODULE.pools[i];
         if (p->url && strlen(p->url) > 0) {
-            cJSON *p_obj = cJSON_CreateObject();
-            cJSON_AddNumberToObject(p_obj, "id", i);
-            cJSON_AddStringToObject(p_obj, "stratumProtocol", p->protocol == STRATUM_PROTOCOL_V2 ? STRATUM_V2 : STRATUM_V1);
-            cJSON_AddStringToObject(p_obj, "stratumURL", p->url);
-            cJSON_AddNumberToObject(p_obj, "stratumPort", p->port);
-            cJSON_AddStringToObject(p_obj, "stratumUser", p->user ? p->user : "");
-            cJSON_AddStringToObject(p_obj, "stratumPassword", "*****"); // hide password in GET response
-            cJSON_AddNumberToObject(p_obj, "stratumSuggestedDifficulty", p->difficulty);
-            cJSON_AddBoolToObject(p_obj, "stratumExtranonceSubscribe", p->extranonce_subscribe);
-            cJSON_AddNumberToObject(p_obj, "stratumTLS", p->tls);
-            cJSON_AddStringToObject(p_obj, "stratumCert", p->cert ? p->cert : "");
-            cJSON_AddBoolToObject(p_obj, "stratumDecodeCoinbase", p->decode_coinbase_tx);
-            cJSON_AddBoolToObject(p_obj, "stratumShareWarning", p->share_warning);
-            cJSON_AddStringToObject(p_obj, "stratumV2ChannelType", sv2_channel_type_to_string(p->sv2_channel_type));
-            cJSON_AddStringToObject(p_obj, "stratumV2AuthorityPubkey", p->sv2_authority_pubkey ? p->sv2_authority_pubkey : "");
-            cJSON_AddBoolToObject(p_obj, "stratumV2RequireAuth", p->sv2_require_auth);
-
-            cJSON_AddItemToArray(pools_arr, p_obj);
+            yyjson_mut_val *p_obj = yyjson_mut_arr_add_obj(doc, pools_arr);
+            yyjson_mut_obj_add_uint(doc, p_obj, "id", i);
+            yyjson_mut_obj_add_str(doc, p_obj, "stratumProtocol", p->protocol == STRATUM_PROTOCOL_V2 ? STRATUM_V2 : STRATUM_V1);
+            yyjson_mut_obj_add_strcpy(doc, p_obj, "stratumURL", p->url);
+            yyjson_mut_obj_add_uint(doc, p_obj, "stratumPort", p->port);
+            yyjson_mut_obj_add_strcpy(doc, p_obj, "stratumUser", p->user ? p->user : "");
+            yyjson_mut_obj_add_str(doc, p_obj, "stratumPassword", "*****"); // hide password in GET response
+            yyjson_mut_obj_add_uint(doc, p_obj, "stratumSuggestedDifficulty", p->difficulty);
+            yyjson_mut_obj_add_bool(doc, p_obj, "stratumExtranonceSubscribe", p->extranonce_subscribe);
+            yyjson_mut_obj_add_uint(doc, p_obj, "stratumTLS", p->tls);
+            yyjson_mut_obj_add_strcpy(doc, p_obj, "stratumCert", p->cert ? p->cert : "");
+            yyjson_mut_obj_add_bool(doc, p_obj, "stratumDecodeCoinbase", p->decode_coinbase_tx);
+            yyjson_mut_obj_add_bool(doc, p_obj, "stratumShareWarning", p->share_warning);
+            yyjson_mut_obj_add_str(doc, p_obj, "stratumV2ChannelType", sv2_channel_type_to_string(p->sv2_channel_type));
+            yyjson_mut_obj_add_strcpy(doc, p_obj, "stratumV2AuthorityPubkey", p->sv2_authority_pubkey ? p->sv2_authority_pubkey : "");
+            yyjson_mut_obj_add_bool(doc, p_obj, "stratumV2RequireAuth", p->sv2_require_auth);
         }
     }
 
@@ -194,177 +196,154 @@ static void system_api_add_config(cJSON *root, GlobalState *g) {
     PoolConfig *prim_pool = &g->SYSTEM_MODULE.pools[prim_idx];
     PoolConfig *sec_pool = &g->SYSTEM_MODULE.pools[sec_idx];
 
-    cJSON_AddStringToObject(root, "stratumURL", prim_pool->url ? prim_pool->url : "");
-    cJSON_AddNumberToObject(root, "stratumPort", prim_pool->port);
-    cJSON_AddStringToObject(root, "stratumUser", prim_pool->user ? prim_pool->user : "");
-    cJSON_AddNumberToObject(root, "stratumSuggestedDifficulty", prim_pool->difficulty);
-    cJSON_AddBoolToObject(root, "stratumExtranonceSubscribe", prim_pool->extranonce_subscribe);
-    cJSON_AddNumberToObject(root, "stratumTLS", prim_pool->tls);
-    cJSON_AddStringToObject(root, "stratumCert", prim_pool->cert ? prim_pool->cert : "");
-    cJSON_AddBoolToObject(root, "stratumDecodeCoinbase", prim_pool->decode_coinbase_tx);
-    cJSON_AddBoolToObject(root, "stratumShareWarning", prim_pool->share_warning);
-    cJSON_AddStringToObject(root, "stratumProtocol", prim_pool->protocol == STRATUM_PROTOCOL_V2 ? STRATUM_V2 : STRATUM_V1);
-    cJSON_AddStringToObject(root, "stratumV2AuthorityPubkey", prim_pool->sv2_authority_pubkey ? prim_pool->sv2_authority_pubkey : "");
-    cJSON_AddStringToObject(root, "stratumV2ChannelType", sv2_channel_type_to_string(prim_pool->sv2_channel_type));
+    yyjson_mut_obj_add_strcpy(doc, root, "stratumURL", prim_pool->url ? prim_pool->url : "");
+    yyjson_mut_obj_add_uint(doc, root, "stratumPort", prim_pool->port);
+    yyjson_mut_obj_add_strcpy(doc, root, "stratumUser", prim_pool->user ? prim_pool->user : "");
+    yyjson_mut_obj_add_uint(doc, root, "stratumSuggestedDifficulty", prim_pool->difficulty);
+    yyjson_mut_obj_add_bool(doc, root, "stratumExtranonceSubscribe", prim_pool->extranonce_subscribe);
+    yyjson_mut_obj_add_uint(doc, root, "stratumTLS", prim_pool->tls);
+    yyjson_mut_obj_add_strcpy(doc, root, "stratumCert", prim_pool->cert ? prim_pool->cert : "");
+    yyjson_mut_obj_add_bool(doc, root, "stratumDecodeCoinbase", prim_pool->decode_coinbase_tx);
+    yyjson_mut_obj_add_bool(doc, root, "stratumShareWarning", prim_pool->share_warning);
+    yyjson_mut_obj_add_str(doc, root, "stratumProtocol", prim_pool->protocol == STRATUM_PROTOCOL_V2 ? STRATUM_V2 : STRATUM_V1);
+    yyjson_mut_obj_add_strcpy(doc, root, "stratumV2AuthorityPubkey", prim_pool->sv2_authority_pubkey ? prim_pool->sv2_authority_pubkey : "");
+    yyjson_mut_obj_add_str(doc, root, "stratumV2ChannelType", sv2_channel_type_to_string(prim_pool->sv2_channel_type));
 
-    cJSON_AddStringToObject(root, "fallbackStratumURL", sec_pool->url ? sec_pool->url : "");
-    cJSON_AddNumberToObject(root, "fallbackStratumPort", sec_pool->port);
-    cJSON_AddStringToObject(root, "fallbackStratumUser", sec_pool->user ? sec_pool->user : "");
-    cJSON_AddNumberToObject(root, "fallbackStratumSuggestedDifficulty", sec_pool->difficulty);
-    cJSON_AddBoolToObject(root, "fallbackStratumExtranonceSubscribe", sec_pool->extranonce_subscribe);
-    cJSON_AddNumberToObject(root, "fallbackStratumTLS", sec_pool->tls);
-    cJSON_AddStringToObject(root, "fallbackStratumCert", sec_pool->cert ? sec_pool->cert : "");
-    cJSON_AddBoolToObject(root, "fallbackStratumDecodeCoinbase", sec_pool->decode_coinbase_tx);
-    cJSON_AddBoolToObject(root, "fallbackStratumShareWarning", sec_pool->share_warning);
-    cJSON_AddStringToObject(root, "fallbackStratumProtocol", sec_pool->protocol == STRATUM_PROTOCOL_V2 ? STRATUM_V2 : STRATUM_V1);
-    cJSON_AddStringToObject(root, "fallbackStratumV2AuthorityPubkey", sec_pool->sv2_authority_pubkey ? sec_pool->sv2_authority_pubkey : "");
-    cJSON_AddStringToObject(root, "fallbackStratumV2ChannelType", sv2_channel_type_to_string(sec_pool->sv2_channel_type));
+    yyjson_mut_obj_add_strcpy(doc, root, "fallbackStratumURL", sec_pool->url ? sec_pool->url : "");
+    yyjson_mut_obj_add_uint(doc, root, "fallbackStratumPort", sec_pool->port);
+    yyjson_mut_obj_add_strcpy(doc, root, "fallbackStratumUser", sec_pool->user ? sec_pool->user : "");
+    yyjson_mut_obj_add_uint(doc, root, "fallbackStratumSuggestedDifficulty", sec_pool->difficulty);
+    yyjson_mut_obj_add_bool(doc, root, "fallbackStratumExtranonceSubscribe", sec_pool->extranonce_subscribe);
+    yyjson_mut_obj_add_uint(doc, root, "fallbackStratumTLS", sec_pool->tls);
+    yyjson_mut_obj_add_strcpy(doc, root, "fallbackStratumCert", sec_pool->cert ? sec_pool->cert : "");
+    yyjson_mut_obj_add_bool(doc, root, "fallbackStratumDecodeCoinbase", sec_pool->decode_coinbase_tx);
+    yyjson_mut_obj_add_bool(doc, root, "fallbackStratumShareWarning", sec_pool->share_warning);
+    yyjson_mut_obj_add_str(doc, root, "fallbackStratumProtocol", sec_pool->protocol == STRATUM_PROTOCOL_V2 ? STRATUM_V2 : STRATUM_V1);
+    yyjson_mut_obj_add_strcpy(doc, root, "fallbackStratumV2AuthorityPubkey", sec_pool->sv2_authority_pubkey ? sec_pool->sv2_authority_pubkey : "");
+    yyjson_mut_obj_add_str(doc, root, "fallbackStratumV2ChannelType", sv2_channel_type_to_string(sec_pool->sv2_channel_type));
 
     // User Preferences
-    cJSON_AddNumberToObject(root, "useCustomWWW", nvs_config_get_bool(NVS_CONFIG_USE_CUSTOM_WWW) ? 1 : 0);
-    cJSON_AddNumberToObject(root, "overclockEnabled", nvs_config_get_bool(NVS_CONFIG_OVERCLOCK_ENABLED) ? 1 : 0);
+    yyjson_mut_obj_add_int(doc, root, "useCustomWWW", nvs_config_get_bool(NVS_CONFIG_USE_CUSTOM_WWW) ? 1 : 0);
+    yyjson_mut_obj_add_int(doc, root, "overclockEnabled", nvs_config_get_bool(NVS_CONFIG_OVERCLOCK_ENABLED) ? 1 : 0);
     char *disp_name = nvs_config_get_string(NVS_CONFIG_DISPLAY);
-    cJSON_AddStringToObject(root, "display", disp_name ? disp_name : "");
+    yyjson_mut_obj_add_strcpy(doc, root, "display", disp_name ? disp_name : "");
     free(disp_name);
-    cJSON_AddNumberToObject(root, "rotation", nvs_config_get_u16(NVS_CONFIG_ROTATION));
-    cJSON_AddNumberToObject(root, "invertscreen", nvs_config_get_bool(NVS_CONFIG_INVERT_SCREEN) ? 1 : 0);
-    cJSON_AddNumberToObject(root, "displayTimeout", nvs_config_get_i32(NVS_CONFIG_DISPLAY_TIMEOUT));
-    cJSON_AddNumberToObject(root, "autofanspeed", nvs_config_get_bool(NVS_CONFIG_AUTO_FAN_SPEED) ? 1 : 0);
-    cJSON_AddNumberToObject(root, "manualFanSpeed", nvs_config_get_u16(NVS_CONFIG_MANUAL_FAN_SPEED));
-    cJSON_AddNumberToObject(root, "minFanSpeed", nvs_config_get_u16(NVS_CONFIG_MIN_FAN_SPEED));
-    cJSON_AddNumberToObject(root, "temptarget", nvs_config_get_u16(NVS_CONFIG_TEMP_TARGET));
-    cJSON_AddNumberToObject(root, "coreVoltage", nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE));
-    cJSON_AddFloatToObject(root, "frequency", nvs_config_get_float(NVS_CONFIG_ASIC_FREQUENCY));
-    cJSON_AddNumberToObject(root, "statsFrequency", nvs_config_get_u16(NVS_CONFIG_STATISTICS_FREQUENCY));
-    cJSON_AddNumberToObject(root, "statsLimit", MAX_STATISTICS_COUNT);
+    yyjson_mut_obj_add_uint(doc, root, "rotation", nvs_config_get_u16(NVS_CONFIG_ROTATION));
+    yyjson_mut_obj_add_int(doc, root, "invertscreen", nvs_config_get_bool(NVS_CONFIG_INVERT_SCREEN) ? 1 : 0);
+    yyjson_mut_obj_add_int(doc, root, "displayTimeout", nvs_config_get_i32(NVS_CONFIG_DISPLAY_TIMEOUT));
+    yyjson_mut_obj_add_int(doc, root, "autofanspeed", nvs_config_get_bool(NVS_CONFIG_AUTO_FAN_SPEED) ? 1 : 0);
+    yyjson_mut_obj_add_uint(doc, root, "manualFanSpeed", nvs_config_get_u16(NVS_CONFIG_MANUAL_FAN_SPEED));
+    yyjson_mut_obj_add_uint(doc, root, "minFanSpeed", nvs_config_get_u16(NVS_CONFIG_MIN_FAN_SPEED));
+    yyjson_mut_obj_add_uint(doc, root, "temptarget", nvs_config_get_u16(NVS_CONFIG_TEMP_TARGET));
+    yyjson_mut_obj_add_uint(doc, root, "coreVoltage", nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE));
+    yyjson_mut_obj_add_float(doc, root, "frequency", nvs_config_get_float(NVS_CONFIG_ASIC_FREQUENCY));
+    yyjson_mut_obj_add_uint(doc, root, "statsFrequency", nvs_config_get_u16(NVS_CONFIG_STATISTICS_FREQUENCY));
+    yyjson_mut_obj_add_uint(doc, root, "statsLimit", MAX_STATISTICS_COUNT);
 }
 
-static void system_api_add_hashrate_monitor(cJSON *root, GlobalState *g) {
-    if (!root || !g || !g->HASHRATE_MONITOR_MODULE.is_initialized) return;
+static void system_api_add_hashrate_monitor(yyjson_mut_doc *doc, yyjson_mut_val *root, GlobalState *g) {
+    if (!doc || !root || !g || !g->HASHRATE_MONITOR_MODULE.is_initialized) return;
 
-    cJSON *monitor = cJSON_CreateObject();
-    cJSON_AddItemToObject(root, "hashrateMonitor", monitor);
-    
-    cJSON *asics = cJSON_CreateArray();
-    cJSON_AddItemToObject(monitor, "asics", asics);
+    yyjson_mut_val *monitor = yyjson_mut_obj_add_obj(doc, root, "hashrateMonitor");
+    yyjson_mut_val *asics = yyjson_mut_obj_add_arr(doc, monitor, "asics");
 
     int asic_count = g->DEVICE_CONFIG.family.asic_count;
     int hash_domains = g->DEVICE_CONFIG.family.asic.hash_domains;
 
     for (int i = 0; i < asic_count; i++) {
-        cJSON *asic = cJSON_CreateObject();
-        cJSON_AddItemToArray(asics, asic);
-        
-        cJSON_AddNumberToObject(asic, "total", g->HASHRATE_MONITOR_MODULE.total_measurement[i].hashrate);
-        cJSON_AddNumberToObject(asic, "errorCount", g->HASHRATE_MONITOR_MODULE.error_measurement[i].value);
-        
-        cJSON *domains = cJSON_CreateArray();
-        cJSON_AddItemToObject(asic, "domains", domains);
+        yyjson_mut_val *asic = yyjson_mut_arr_add_obj(doc, asics);
+        yyjson_mut_obj_add_float(doc, asic, "total", g->HASHRATE_MONITOR_MODULE.total_measurement[i].hashrate);
+        yyjson_mut_obj_add_uint(doc, asic, "errorCount", g->HASHRATE_MONITOR_MODULE.error_measurement[i].value);
+        yyjson_mut_val *domains = yyjson_mut_obj_add_arr(doc, asic, "domains");
         for (int j = 0; j < hash_domains; j++) {
             asic_domain_measurement_t measurement = {0};
             ASIC_get_domain_measurement(g, i, j, &measurement);
-            cJSON_AddItemToArray(domains, cJSON_CreateNumber(measurement.hashrate));
+            yyjson_mut_arr_add_float(doc, domains, measurement.hashrate);
         }
     }
 }
 
-static void system_api_add_rejected_reasons(cJSON *root, GlobalState *g) {
-    if (!root || !g) return;
-    cJSON *rejected_reasons = cJSON_CreateArray();
-    if (rejected_reasons) {
-        cJSON_AddItemToObject(root, "sharesRejectedReasons", rejected_reasons);
-        for (int i = 0; i < g->SYSTEM_MODULE.rejected_reason_stats_count; i++) {
-            cJSON *obj = cJSON_CreateObject();
-            if (obj) {
-                cJSON_AddStringToObject(obj, "message", g->SYSTEM_MODULE.rejected_reason_stats[i].message);
-                cJSON_AddNumberToObject(obj, "count", g->SYSTEM_MODULE.rejected_reason_stats[i].count);
-                cJSON_AddItemToArray(rejected_reasons, obj);
-            }
-        }
+static void system_api_add_rejected_reasons(yyjson_mut_doc *doc, yyjson_mut_val *root, GlobalState *g) {
+    if (!doc || !root || !g) return;
+    yyjson_mut_val *rejected_reasons = yyjson_mut_obj_add_arr(doc, root, "sharesRejectedReasons");
+    for (int i = 0; i < g->SYSTEM_MODULE.rejected_reason_stats_count; i++) {
+        yyjson_mut_val *obj = yyjson_mut_arr_add_obj(doc, rejected_reasons);
+        yyjson_mut_obj_add_strcpy(doc, obj, "message", g->SYSTEM_MODULE.rejected_reason_stats[i].message);
+        yyjson_mut_obj_add_uint(doc, obj, "count", g->SYSTEM_MODULE.rejected_reason_stats[i].count);
     }
 }
 
-static void system_api_add_block_info(cJSON *root, GlobalState *g) {
-    if (!root || !g) return;
+static void system_api_add_block_info(yyjson_mut_doc *doc, yyjson_mut_val *root, GlobalState *g) {
+    if (!doc || !root || !g) return;
 
-    cJSON *signals = cJSON_CreateArray();
-    if (signals) {
-        for (int i = 0; i < g->block_signals_count; i++) {
-            cJSON_AddItemToArray(signals, cJSON_CreateString(g->block_signals[i]));
-        }
-        cJSON_AddItemToObject(root, "blockSignals", signals);
+    yyjson_mut_val *signals = yyjson_mut_obj_add_arr(doc, root, "blockSignals");
+    for (int i = 0; i < g->block_signals_count; i++) {
+        yyjson_mut_arr_add_strcpy(doc, signals, g->block_signals[i]);
     }
 
-    cJSON *outputs = cJSON_CreateArray();
-    if (outputs) {
-        int count = g->coinbase.output_count;
-        if (count > MAX_COINBASE_TX_OUTPUTS) {
-            count = MAX_COINBASE_TX_OUTPUTS;
-        } else if (count < 0) {
-            count = 0;
-        }
-        for (int i = 0; i < count; i++) {
-            cJSON *obj = cJSON_CreateObject();
-            if (obj) {
-                cJSON_AddNumberToObject(obj, "value", g->coinbase.outputs[i].value_satoshis);
-                cJSON_AddStringToObject(obj, "address", g->coinbase.outputs[i].address);
-                cJSON_AddNumberToObject(obj, "isUserOutput", g->coinbase.outputs[i].is_user_output ? 1 : 0);
-                cJSON_AddItemToArray(outputs, obj);
-            }
-        }
-        cJSON_AddItemToObject(root, "coinbaseOutputs", outputs);
-        cJSON_AddNumberToObject(root, "coinbaseOthersCount", g->coinbase.others_count);
-        cJSON_AddNumberToObject(root, "coinbaseOthersValueSatoshis", g->coinbase.others_value_satoshis);
+    yyjson_mut_val *outputs = yyjson_mut_obj_add_arr(doc, root, "coinbaseOutputs");
+    int count = g->coinbase.output_count;
+    if (count > MAX_COINBASE_TX_OUTPUTS) {
+        count = MAX_COINBASE_TX_OUTPUTS;
+    } else if (count < 0) {
+        count = 0;
     }
+    for (int i = 0; i < count; i++) {
+        yyjson_mut_val *obj = yyjson_mut_arr_add_obj(doc, outputs);
+        yyjson_mut_obj_add_uint(doc, obj, "value", g->coinbase.outputs[i].value_satoshis);
+        yyjson_mut_obj_add_strcpy(doc, obj, "address", g->coinbase.outputs[i].address);
+        yyjson_mut_obj_add_int(doc, obj, "isUserOutput", g->coinbase.outputs[i].is_user_output ? 1 : 0);
+    }
+
+    yyjson_mut_obj_add_int(doc, root, "coinbaseOthersCount", g->coinbase.others_count);
+    yyjson_mut_obj_add_uint(doc, root, "coinbaseOthersValueSatoshis", g->coinbase.others_value_satoshis);
 }
 
-static void system_api_add_partitions(cJSON *root, GlobalState * GLOBAL_STATE) {
-    if (!root || !GLOBAL_STATE) return;
+static void system_api_add_partitions(yyjson_mut_doc *doc, yyjson_mut_val *root, GlobalState * GLOBAL_STATE) {
+    if (!doc || !root || !GLOBAL_STATE) return;
 
-    cJSON *partitions_array = cJSON_CreateArray();
-    cJSON_AddItemToObject(root, "partitions", partitions_array);
+    yyjson_mut_val *partitions_array = yyjson_mut_obj_add_arr(doc, root, "partitions");
 
     for (int i = 0; i < GLOBAL_STATE->SYSTEM_MODULE.cached_partitions_count; i++) {
         cached_partition_t *cp = &GLOBAL_STATE->SYSTEM_MODULE.cached_partitions[i];
         if (cp->part == NULL) continue;
 
-        cJSON *p_obj = cJSON_CreateObject();
-        cJSON_AddStringToObject(p_obj, "label", cp->part->label);
-        cJSON_AddBoolToObject(p_obj, "isCurrent", cp->isCurrent);
-        cJSON_AddBoolToObject(p_obj, "isFactory", cp->part->subtype == ESP_PARTITION_SUBTYPE_APP_FACTORY);
+        yyjson_mut_val *p_obj = yyjson_mut_arr_add_obj(doc, partitions_array);
+        yyjson_mut_obj_add_strcpy(doc, p_obj, "label", cp->part->label);
+        yyjson_mut_obj_add_bool(doc, p_obj, "isCurrent", cp->isCurrent);
+        yyjson_mut_obj_add_bool(doc, p_obj, "isFactory", cp->part->subtype == ESP_PARTITION_SUBTYPE_APP_FACTORY);
 
         if (cp->version[0] != '\0') {
-            cJSON_AddStringToObject(p_obj, "version", cp->version);
-            cJSON_AddStringToObject(p_obj, "compileDate", cp->compileDate);
-            cJSON_AddStringToObject(p_obj, "compileTime", cp->compileTime);
+            yyjson_mut_obj_add_strcpy(doc, p_obj, "version", cp->version);
+            yyjson_mut_obj_add_strcpy(doc, p_obj, "compileDate", cp->compileDate);
+            yyjson_mut_obj_add_strcpy(doc, p_obj, "compileTime", cp->compileTime);
             if (cp->usagePercent >= 0) {
-                cJSON_AddNumberToObject(p_obj, "usagePercent", cp->usagePercent);
+                yyjson_mut_obj_add_int(doc, p_obj, "usagePercent", cp->usagePercent);
             } else {
-                cJSON_AddNullToObject(p_obj, "usagePercent");
+                yyjson_mut_obj_add_null(doc, p_obj, "usagePercent");
             }
         } else {
-            cJSON_AddNullToObject(p_obj, "version");
-            cJSON_AddNullToObject(p_obj, "compileDate");
-            cJSON_AddNullToObject(p_obj, "compileTime");
-            cJSON_AddNullToObject(p_obj, "usagePercent");
+            yyjson_mut_obj_add_null(doc, p_obj, "version");
+            yyjson_mut_obj_add_null(doc, p_obj, "compileDate");
+            yyjson_mut_obj_add_null(doc, p_obj, "compileTime");
+            yyjson_mut_obj_add_null(doc, p_obj, "usagePercent");
         }
-        cJSON_AddItemToArray(partitions_array, p_obj);
     }
 }
 
-cJSON* system_api_get_full_json(GlobalState * GLOBAL_STATE) {
+yyjson_mut_doc* system_api_get_full_doc(GlobalState * GLOBAL_STATE, const yyjson_alc *alc) {
     if (!GLOBAL_STATE) return NULL;
-    cJSON *root = cJSON_CreateObject();
-    if (root == NULL) return NULL;
+    yyjson_mut_doc *doc = yyjson_mut_doc_new(alc);
+    if (doc == NULL) return NULL;
+    yyjson_mut_val *root = yyjson_mut_obj(doc);
+    yyjson_mut_doc_set_root(doc, root);
 
-    system_api_add_telemetry(root, GLOBAL_STATE);
-    system_api_add_config(root, GLOBAL_STATE);
-    system_api_add_hashrate_monitor(root, GLOBAL_STATE);
-    system_api_add_partitions(root, GLOBAL_STATE);
+    system_api_add_telemetry(doc, root, GLOBAL_STATE);
+    system_api_add_config(doc, root, GLOBAL_STATE);
+    system_api_add_hashrate_monitor(doc, root, GLOBAL_STATE);
+    system_api_add_partitions(doc, root, GLOBAL_STATE);
+    system_api_add_rejected_reasons(doc, root, GLOBAL_STATE);
+    system_api_add_block_info(doc, root, GLOBAL_STATE);
 
-    // Arrays that involve global state loops (not simple addition)
-    system_api_add_rejected_reasons(root, GLOBAL_STATE);
-    system_api_add_block_info(root, GLOBAL_STATE);
-
-    return root;
+    return doc;
 }
