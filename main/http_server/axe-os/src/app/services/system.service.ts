@@ -197,6 +197,9 @@ export class SystemApiService {
         boardtemp1: 30,
         boardtemp2: 40,
         overheat_mode: 0,
+        isFirmwareUpdate: 0 as const,
+        firmwareUpdatePercent: 0,
+        firmwareUpdateStatus: '',
         statsLimit: 720,
 
         partitions: [
