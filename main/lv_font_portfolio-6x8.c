@@ -1,7 +1,7 @@
 /*******************************************************************************
  * Size: 8 px
  * Bpp: 1
- * Opts: --font oldschool_pc_font_pack_v2.2_linux/ttf - Mx (mixed outline+bitmap)/Mx437_Portfolio_6x8.ttf --bpp 1 --size 8 --format lvgl --range 0x20-0xFFFF -o portfolio_6x8
+ * Opts: --font oldschool_pc_font_pack_v2.2_linux/ttf - Mx (mixed outline+bitmap)/Mx437_Portfolio_6x8.ttf --bpp 1 --size 8 --format lvgl --range 0x20-0xFFFF -o lv_font_portfolio_6x8.c
  ******************************************************************************/
 
 #ifdef __has_include
@@ -17,6 +17,8 @@
 #else
     #include "lvgl/lvgl.h"
 #endif
+
+
 
 #ifndef PORTFOLIO_6X8
 #define PORTFOLIO_6X8 1
@@ -1301,11 +1303,11 @@ static lv_font_fmt_txt_dsc_t font_dsc = {
 #if LVGL_VERSION_MAJOR >= 8
 const lv_font_t lv_font_portfolio_6x8 = {
 #else
-const lv_font_t lv_font_portfolio_6x8 = {
+lv_font_t lv_font_portfolio_6x8 = {
 #endif
     .get_glyph_dsc = lv_font_get_glyph_dsc_fmt_txt,    /*Function pointer to get glyph's data*/
     .get_glyph_bitmap = lv_font_get_bitmap_fmt_txt,    /*Function pointer to get glyph's bitmap*/
-    .line_height = 8,          /*The maximum line height required by the font*/
+    .line_height = 8,           /*The maximum line height required by the font*/
     .base_line = 1,             /*Baseline measured from the bottom of the line*/
 #if !(LVGL_VERSION_MAJOR == 6 && LVGL_VERSION_MINOR == 0)
     .subpx = LV_FONT_SUBPX_NONE,
@@ -1325,5 +1327,7 @@ const lv_font_t lv_font_portfolio_6x8 = {
 #endif
     .user_data = NULL,
 };
+
+
 
 #endif /*#if PORTFOLIO_6X8*/

@@ -51,7 +51,6 @@ const components = [
   AppComponent,
   NetworkEditComponent,
   HomeComponent,
-  ModalComponent,
   TooltipIconComponent,
   TooltipTextIconComponent,
   ConfettiComponent,
@@ -99,6 +98,7 @@ const components = [
     DiffSuffixPipe,
     AddressPipe,
     SatsPipe,
+    ModalComponent,
     HeatmapLightnessPipe,
   ],
   providers: [

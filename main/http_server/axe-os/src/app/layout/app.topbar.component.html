@@ -23,7 +23,7 @@
     <span class="text-secondary select-none absolute left-0 bottom-0 ml-12 md:ml-16 mb-1"
       tooltipPosition="bottom"
       appTooltip="Hostname"
-    >{{info.hostname}}</span>
+    >{{info.mdnsHostname || info.hostname}}</span>
     @if (!isAPMode) {
       <ul class="flex ml-auto list-none p-0 m-0 gap-6 lg:order-2">
         @if (dashboardEdit.editMode$ | async) {

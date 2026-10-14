@@ -27,7 +27,6 @@ describe('SwarmComponent', () => {
     TestBed.configureTestingModule({
       declarations: [
         SwarmComponent,
-        ModalComponent,
         TooltipTextIconComponent
       ],
       imports: [
@@ -40,7 +39,8 @@ describe('SwarmComponent', () => {
         DiffSuffixPipe,
         DateAgoPipe,
         AddressPipe,
-        SatsPipe
+        SatsPipe,
+        ModalComponent
       ],
       providers: [
         provideHttpClient(),
