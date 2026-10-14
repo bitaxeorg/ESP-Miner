@@ -77,7 +77,23 @@ export class SwarmComponent implements OnInit, OnDestroy {
   public refreshIntervalTime = 30;
   public refreshTimeSet = 30;
 
-  public totals: { hashRate: number; power: number; bestDiff: number } = { hashRate: 0, power: 0, bestDiff: 0 };
+  public totals: {
+    hashRate: number;
+    power: number;
+    bestDiff: number;
+    hashingDevices: number;
+    idleDevices: number;
+    pausedDevices: number;
+    notAccessibleDevices: number;
+  } = {
+    hashRate: 0,
+    power: 0,
+    bestDiff: 0,
+    hashingDevices: 0,
+    idleDevices: 0,
+    pausedDevices: 0,
+    notAccessibleDevices: 0
+  };
 
   public isRefreshing = false;
 
@@ -358,6 +374,7 @@ private isIpAddress(value: string): boolean {
       displayName: info?.['hostname'] ? info['hostname'].replace(/\.local$/i, '') : address,
       connectionAddress: address,
       ...(existingDevice ? existingDevice : {}),
+      notAccessible: false,
       ...info,
       ...asic,
       ...this.numerizeDeviceBestDiffs(info as ISystemInfo),
@@ -511,13 +528,18 @@ private isIpAddress(value: string): boolean {
       asicCount: existingDevice?.asicCount || 1,
       hashRate: 0,
       sharesAccepted: 0,
+      sharesRejected: 0,
       power: 0,
       voltage: 0,
       temp: 0,
+      temp2: 0,
+      vrTemp: 0,
       bestDiff: 0,
+      bestSessionDiff: 0,
       version: '',
       uptimeSeconds: 0,
       poolDifficulty: 0,
+      notAccessible: true,
     });
   };
 
@@ -600,10 +622,19 @@ private isIpAddress(value: string): boolean {
     });
   }
 
+  public isNotHashing(axe: any): boolean {
+    return !!axe.miningPaused || !axe.hashRate || !!axe.notAccessible;
+  }
+
   private calculateTotals() {
-    this.totals.hashRate = this.swarm.reduce((sum, axe) => sum + (axe.hashRate || 0), 0);
-    this.totals.power = this.swarm.reduce((sum, axe) => sum + (axe.power || 0), 0);
+    this.totals.hashRate = this.swarm.reduce((sum, axe) => sum + (this.isNotHashing(axe) ? 0 : (axe.hashRate || 0)), 0);
+    this.totals.power = this.swarm.reduce((sum, axe) => sum + (this.isNotHashing(axe) ? 0 : (axe.power || 0)), 0);
     this.totals.bestDiff = this.swarm.reduce((max, axe) => Math.max(max, axe.bestDiff || 0), 0);
+
+    this.totals.hashingDevices = this.swarm.filter(axe => !this.isNotHashing(axe) && !axe.notAccessible).length;
+    this.totals.idleDevices = this.swarm.filter(axe => !axe.notAccessible && !axe.miningPaused && !axe.hashRate).length;
+    this.totals.pausedDevices = this.swarm.filter(axe => !axe.notAccessible && !!axe.miningPaused).length;
+    this.totals.notAccessibleDevices = this.swarm.filter(axe => !!axe.notAccessible).length;
   }
 
   get deviceFamilies(): SwarmDevice[] {
@@ -658,30 +689,6 @@ private isIpAddress(value: string): boolean {
       case 'GammaTurbo': return 'cyan';
       default:           return 'gray';
     }
-  }
-
-  private mergeDeviceData(IP: string, existing: Partial<SwarmDevice>, info: any, asic: any): SwarmDevice {
-    const merged: any = {
-      IP,
-      ...existing,
-      power_fault: null,
-      overheat_mode: null,
-      isUsingFallbackStratum: null,
-      blockFound: null,
-      ...info,
-      ...asic,
-    };
-
-    merged.deviceModel = merged.deviceModel || this.deriveDeviceModel(merged);
-    merged.swarmColor = merged.swarmColor || this.deriveSwarmColor(merged.deviceModel);
-    merged.asicCount = merged.asicCount || 1;
-
-    merged.poolDifficulty = merged.poolDifficulty || info.stratumDiff;
-    merged.hashRate = merged.hashRate || info.hashRate_10m;
-    if (typeof merged.bestDiff === 'string') merged.bestDiff = this.parseSuffixString(merged.bestDiff);
-    if (typeof merged.bestSessionDiff === 'string') merged.bestSessionDiff = this.parseSuffixString(merged.bestSessionDiff);
-
-    return merged as SwarmDevice;
   }
 
   private parseSuffixString(input: string): number {
@@ -763,6 +770,8 @@ return this.swarm.filter(axe =>
 
   getDeviceNotification(axe: any): { color: string; msg: string } | undefined {
     switch (true) {
+      case !!axe.notAccessible:
+        return { color: 'red', msg: 'Not accessible' };
       case !!axe.miningPaused:
         return { color: 'yellow', msg: 'Paused' };
       case axe.overheat_mode === 1:
