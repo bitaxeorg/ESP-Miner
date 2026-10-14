@@ -43,7 +43,10 @@ static esp_err_t theme_post_handler(httpd_req_t *req)
         return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
     }
 
-    set_cors_headers(req);
+    if (set_cors_headers(req) != ESP_OK) {
+        httpd_resp_send_500(req);
+        return ESP_OK;
+    }
 
     // Read POST data
     char content[1024];
@@ -82,20 +85,18 @@ static esp_err_t theme_post_handler(httpd_req_t *req)
     return ESP_OK;
 }
 
-esp_err_t register_theme_api_endpoints(httpd_handle_t server, void* ctx)
+esp_err_t register_theme_api_endpoints(httpd_handle_t server)
 {
     httpd_uri_t theme_get = {
         .uri = "/api/theme",
         .method = HTTP_GET,
-        .handler = theme_get_handler,
-        .user_ctx = ctx
+        .handler = theme_get_handler
     };
 
     httpd_uri_t theme_post = {
         .uri = "/api/theme",
         .method = HTTP_POST,
-        .handler = theme_post_handler,
-        .user_ctx = ctx
+        .handler = theme_post_handler
     };
 
     ESP_ERROR_CHECK(httpd_register_uri_handler(server, &theme_get));
