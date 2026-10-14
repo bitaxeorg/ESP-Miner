@@ -181,7 +181,9 @@ void statistics_task(void * pvParameters)
             // Record every second (DEFAULT_POLL_RATE is 1000ms)
             if (currentTime >= statsData.timestamp + 1000) {
                 int8_t wifiRSSI = -90;
-                get_wifi_current_rssi(&wifiRSSI);
+                if (sys_module->network_mode == NETWORK_MODE_WIFI) {
+                    get_wifi_current_rssi(&wifiRSSI);
+                }
 
                 statsData.timestamp = currentTime;
                 snprintf(statsData.tokens[SRC_HASHRATE], STATS_TOKEN_LEN, "%.2f", sys_module->current_hashrate);
