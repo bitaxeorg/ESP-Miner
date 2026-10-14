@@ -204,6 +204,8 @@ void SYSTEM_init_system(GlobalState * GLOBAL_STATE)
     module->shares_accepted = 0;
     module->shares_rejected = 0;
     module->best_nonce_diff = nvs_config_get_u64(NVS_CONFIG_BEST_DIFF);
+    module->difficulty = 0.0;
+    module->last_difficulty = 0.0;
     module->best_session_nonce_diff = 0;
     module->start_time_us = esp_timer_get_time();
     module->lastClockSync = 0;
@@ -510,11 +512,29 @@ void SYSTEM_reset_pool_session(GlobalState * GLOBAL_STATE)
     module->shares_rejected = 0;
     module->shares_pending = 0;
     module->response_time = 0.0f;
+    module->response_time_min = 0.0f;
+    module->response_time_max = 0.0f;
+    module->last_response_time_min = 0.0f;
+    module->last_response_time_max = 0.0f;
     module->response_share_batch = 0;
     module->pool_difficulty = 0.0;
 
     clean_jobs_queue(GLOBAL_STATE);
     SYSTEM_reset_coinbase_ui_state(GLOBAL_STATE);
+}
+
+void SYSTEM_record_response_time(GlobalState * GLOBAL_STATE, float response_time_ms, uint16_t batch_count)
+{
+    if (!GLOBAL_STATE || response_time_ms <= 0.0f) return;
+    SystemModule *module = &GLOBAL_STATE->SYSTEM_MODULE;
+    module->response_time = response_time_ms;
+    module->response_share_batch = batch_count;
+    if (module->response_time_min <= 0.0f || response_time_ms < module->response_time_min) {
+        module->response_time_min = response_time_ms;
+    }
+    if (module->response_time_max <= 0.0f || response_time_ms > module->response_time_max) {
+        module->response_time_max = response_time_ms;
+    }
 }
 
 void SYSTEM_decode_and_apply_coinbase(GlobalState * GLOBAL_STATE, const miner_job_t * job)
@@ -624,6 +644,12 @@ void SYSTEM_notify_found_nonce(GlobalState * GLOBAL_STATE, double diff, bool is_
         module->block_found++;
         module->show_new_block = true;
         ESP_LOGI(TAG, "FOUND BLOCK!!!!!!!!!!!!!!!!!!!!!! diff: %f (count: %d)", diff, module->block_found);
+    }
+
+    if (diff >= module->pool_difficulty) {
+        if (diff > module->difficulty) {
+            module->difficulty = diff;
+        }
     }
 
     if ((uint64_t) diff > module->best_session_nonce_diff) {

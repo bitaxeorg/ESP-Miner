@@ -87,7 +87,7 @@ export class HomeComponent implements OnInit, OnDestroy {
   public dataLabel: number[] = [];
   public hashrateData: number[] = [];
   public powerData: number[] = [];
-  public chartDatasets: { [key: string]: number[] } = {};
+  public chartDatasets: { [key: string]: (number | null)[] } = {};
   public chartUnitGroups = ChartUnitGroups;
   public chartHiddenSensors: Record<string, boolean> = {};
   public chartData?: any;
@@ -519,15 +519,25 @@ export class HomeComponent implements OnInit, OnDestroy {
     }
   }
 
-  private createChartDatasets(
-    formControlName: 'chartY1Unit' | 'chartY2Unit',
-    baseColor: string,
-    mixColor: string,
-    fill: boolean,
-    yAxisID: 'y' | 'y2'
-  ): any[] {
+  private createChartDatasets(yAxisID: 'y' | 'y2'): any[] {
+    const isY1 = yAxisID === 'y';
+    const formControlName = isY1 ? 'chartY1Unit' : 'chartY2Unit';
     const unit = this.form?.get(formControlName)?.value;
-    const labels = ChartUnitGroups.find(g => g.value === unit)?.labels || [];
+    const group = ChartUnitGroups.find(g => g.value === unit);
+    const labels = group?.labels || [];
+    const isScatter = group?.type === 'scatter';
+
+    const showLine = !isScatter;
+    const fill = isY1 && !isScatter;
+    const pointRadius = isScatter ? 3 : 2;
+    const borderWidth = isScatter ? 0 : 1;
+
+    const documentStyle = getComputedStyle(document.documentElement);
+    const textColorSecondary = documentStyle.getPropertyValue('--color-text-secondary').trim() || '#808080';
+    const baseColor = isY1
+      ? (documentStyle.getPropertyValue('--color-primary').trim() || '#F80421')
+      : (documentStyle.getPropertyValue('--chart-axis2-color').trim() || textColorSecondary);
+    const mixColor = documentStyle.getPropertyValue('--color-text-main').trim() || '#ffffff';
 
     const entries = labels
       .filter(label => this.isSensorSupported(label, this.latestInfo))
@@ -547,7 +557,7 @@ export class HomeComponent implements OnInit, OnDestroy {
     const fillIndex = fill ? entries.findIndex(entry => !entry.hidden) : -1;
 
     return entries.map(({ labelKey, label, index, hidden }) => {
-      const borderColor = index === 0
+      const borderColor = (index === 0 || isScatter)
         ? baseColor
         : `color-mix(in srgb, ${baseColor} ${100 - index * 15}%, ${mixColor} ${index * 15}%)`;
       const backgroundColor = `color-mix(in srgb, ${borderColor}, transparent 81%)`;
@@ -559,10 +569,13 @@ export class HomeComponent implements OnInit, OnDestroy {
         fill: index === fillIndex,
         backgroundColor,
         borderColor,
+        pointBackgroundColor: borderColor,
+        pointBorderColor: borderColor,
         tension: 0,
-        pointRadius: 2,
+        showLine,
+        pointRadius,
         pointHoverRadius: 5,
-        borderWidth: 1,
+        borderWidth,
         yAxisID,
         hidden
       };
@@ -576,23 +589,16 @@ export class HomeComponent implements OnInit, OnDestroy {
    */
   private refreshChartFill(): void {
     const onFilledAxis = (this.chartData?.datasets ?? []).filter((dataset: any) => dataset.yAxisID === 'y');
-    const target = onFilledAxis.find((dataset: any) => !dataset.hidden);
+    const target = onFilledAxis.find((dataset: any) => !dataset.hidden && dataset.showLine !== false);
     onFilledAxis.forEach((dataset: any) => {
-      dataset.fill = dataset === target;
+      dataset.fill = (dataset === target && dataset.showLine !== false);
     });
   }
 
   private rebuildChartDatasets() {
-    const documentStyle = getComputedStyle(document.documentElement);
-    const primaryColor = documentStyle.getPropertyValue('--color-primary').trim() || '#F80421';
-    const textColor = documentStyle.getPropertyValue('--color-text-main').trim() || '#ffffff';
-    const textColorSecondary = documentStyle.getPropertyValue('--color-text-secondary').trim() || '#808080';
-    const axis2Color = documentStyle.getPropertyValue('--chart-axis2-color').trim() || textColorSecondary;
-
     const datasets = [
-      ...this.createChartDatasets('chartY1Unit', primaryColor, textColor, true, 'y'),
-      // 'black' as the mix colour darkened the series into the dark background.
-      ...this.createChartDatasets('chartY2Unit', axis2Color, textColor, false, 'y2')
+      ...this.createChartDatasets('y'),
+      ...this.createChartDatasets('y2')
     ];
 
     if (this.chartData) {
@@ -652,6 +658,7 @@ export class HomeComponent implements OnInit, OnDestroy {
     const textColorSecondary = documentStyle.getPropertyValue('--color-text-secondary').trim();
     const surfaceBorder = documentStyle.getPropertyValue('--color-border-content').trim();
     const primaryColor = documentStyle.getPropertyValue('--color-primary').trim();
+    const axis2Color = documentStyle.getPropertyValue('--chart-axis2-color').trim() || textColorSecondary;
 
     this.chartData = {
       labels: this.dataLabel,
@@ -704,6 +711,7 @@ export class HomeComponent implements OnInit, OnDestroy {
           }
         },
         tooltip: {
+          filter: (tooltipItem: any) => tooltipItem.raw !== null && tooltipItem.raw !== undefined,
           callbacks: {
             label: function (tooltipItem: any) {
               let label = tooltipItem.dataset.label || '';
@@ -800,7 +808,7 @@ export class HomeComponent implements OnInit, OnDestroy {
           display: true,
           position: 'right',
           ticks: {
-            color: textColorSecondary,
+            color: axis2Color,
             callback: (value: number) => {
               const y2Dataset = this.chartData?.datasets?.find((d: any) => d.yAxisID === 'y2');
               return y2Dataset?.label ? HomeComponent.cbFormatValue(value, y2Dataset.label, {tickmark: true}) : value.toString();
@@ -842,8 +850,8 @@ export class HomeComponent implements OnInit, OnDestroy {
           stats.labels.forEach((labelKey, labelIdx) => {
             const valEnum = chartLabelValue(labelKey);
             if (valEnum === eChartLabel.asicVoltage || valEnum === eChartLabel.voltage || valEnum === eChartLabel.current) {
-              stats.statistics.forEach((element: number[]) => {
-                if (element[labelIdx] !== undefined) {
+              stats.statistics.forEach((element: (number | null)[]) => {
+                if (element[labelIdx] !== undefined && element[labelIdx] !== null) {
                   element[labelIdx] = element[labelIdx] / 1000;
                 }
               });
@@ -852,15 +860,19 @@ export class HomeComponent implements OnInit, OnDestroy {
 
           this.lastStatsFrequency = 0;
           if (stats.statistics.length >= 2 && idxTimestamp !== -1) {
-            const totalDurationMs = stats.statistics[stats.statistics.length - 1][idxTimestamp] - stats.statistics[0][idxTimestamp];
-            this.lastStatsFrequency = Math.floor(totalDurationMs / (stats.statistics.length - 1) / 1000);
+            const lastTs = stats.statistics[stats.statistics.length - 1][idxTimestamp];
+            const firstTs = stats.statistics[0][idxTimestamp];
+            if (lastTs !== null && firstTs !== null) {
+              const totalDurationMs = lastTs - firstTs;
+              this.lastStatsFrequency = Math.floor(totalDurationMs / (stats.statistics.length - 1) / 1000);
+            }
           }
 
           // 1. Gather existing points only if we are not clearing
           const existingPoints = clear ? [] : this.dataLabel.map((timestamp, i) => {
-            const values: Record<string, number> = {};
+            const values: Record<string, number | null> = {};
             allLabels.forEach(labelKey => {
-              values[labelKey] = this.chartDatasets[labelKey]?.[i] ?? 0;
+              values[labelKey] = this.chartDatasets[labelKey]?.[i] ?? null;
             });
             return {
               timestamp,
@@ -871,16 +883,16 @@ export class HomeComponent implements OnInit, OnDestroy {
           }).sort((a, b) => a.timestamp - b.timestamp);
 
           // 2. Always map and sort backend statistics
-          const backendPoints = stats.statistics.map((element: number[]) => {
-            const values: Record<string, number> = {};
+          const backendPoints = stats.statistics.map((element: (number | null)[]) => {
+            const values: Record<string, number | null> = {};
             allLabels.forEach(labelKey => {
               const labelIdx = stats.labels.indexOf(labelKey);
-              values[labelKey] = labelIdx !== -1 ? element[labelIdx] : 0.0;
+              values[labelKey] = labelIdx !== -1 ? element[labelIdx] : null;
             });
             return {
-              timestamp: Date.now() - stats.currentTimestamp + element[idxTimestamp],
-              hashrate: idxHashrate !== -1 ? element[idxHashrate] : 0.0,
-              power: idxPower !== -1 ? element[idxPower] : 0.0,
+              timestamp: Date.now() - stats.currentTimestamp + (element[idxTimestamp] ?? 0),
+              hashrate: (idxHashrate !== -1 ? element[idxHashrate] : 0.0) ?? 0.0,
+              power: (idxPower !== -1 ? element[idxPower] : 0.0) ?? 0.0,
               values
             };
           }).sort((a, b) => a.timestamp - b.timestamp);
@@ -910,7 +922,7 @@ export class HomeComponent implements OnInit, OnDestroy {
                 if (!this.chartDatasets[labelKey]) {
                   this.chartDatasets[labelKey] = [];
                 }
-                this.chartDatasets[labelKey].push(p.values[labelKey] ?? 0.0);
+                this.chartDatasets[labelKey].push(p.values[labelKey] ?? null);
               });
             });
           }
@@ -1035,11 +1047,27 @@ export class HomeComponent implements OnInit, OnDestroy {
           this.hashrateData.push(info.hashRate || 0);
           this.powerData.push(info.power || 0);
 
+          const currentSharesAccepted = info.sharesAccepted;
+          const currentSharesRejected = info.sharesRejected;
+          const hasNewShare = (this.lastSharesAcceptedCount !== -1 && currentSharesAccepted > this.lastSharesAcceptedCount) ||
+                              (this.lastSharesRejectedCount !== -1 && currentSharesRejected > this.lastSharesRejectedCount);
+
           Array.from(new Set([...y1Labels, ...y2Labels])).forEach(labelKey => {
             if (!this.chartDatasets[labelKey]) {
               this.chartDatasets[labelKey] = [];
             }
-            const val = HomeComponent.getDataForLabel(chartLabelValue(labelKey) as eChartLabel, info);
+            let val: number | null;
+            if (labelKey === 'responseTimeMin') {
+              const minVal = info.responseTimeMin && info.responseTimeMin > 0 ? info.responseTimeMin : info.responseTime;
+              val = (hasNewShare && minVal > 0) ? minVal : null;
+            } else if (labelKey === 'responseTimeMax') {
+              const maxVal = info.responseTimeMax && info.responseTimeMax > 0 ? info.responseTimeMax : info.responseTime;
+              val = (hasNewShare && maxVal > 0) ? maxVal : null;
+            } else if (labelKey === 'difficulty') {
+              val = (hasNewShare && info.difficulty && info.difficulty > 0) ? info.difficulty : null;
+            } else {
+              val = HomeComponent.getDataForLabel(chartLabelValue(labelKey) as eChartLabel, info);
+            }
             this.chartDatasets[labelKey].push(val);
           });
 
@@ -1100,6 +1128,12 @@ export class HomeComponent implements OnInit, OnDestroy {
         formatted.temp = parseFloat(formatted.temp.toFixed(1));
         formatted.temp2 = parseFloat(formatted.temp2.toFixed(1));
         formatted.responseTime = parseFloat(formatted.responseTime.toFixed(1));
+        if (formatted.responseTimeMin !== undefined) {
+          formatted.responseTimeMin = parseFloat(formatted.responseTimeMin.toFixed(1));
+        }
+        if (formatted.responseTimeMax !== undefined) {
+          formatted.responseTimeMax = parseFloat(formatted.responseTimeMax.toFixed(1));
+        }
 
         return formatted;
       }),
@@ -1397,6 +1431,12 @@ export class HomeComponent implements OnInit, OnDestroy {
         const y1Label = y1Labels.length > 0 ? y1Labels[0] : 'none';
         const y2Label = y2Labels.length > 0 ? y2Labels[0] : 'none';
 
+        this.chartOptions.scales.y.type = (y1Unit === 'difficulty') ? 'logarithmic' : 'linear';
+        this.chartOptions.scales.y2.type = (y2Unit === 'difficulty') ? 'logarithmic' : 'linear';
+
+        this.chartOptions.scales.y.min = this.getMinForLabel(chartLabelValue(y1Label) as eChartLabel);
+        this.chartOptions.scales.y2.min = this.getMinForLabel(chartLabelValue(y2Label) as eChartLabel);
+
         this.chartOptions.scales.y.suggestedMax = this.getSuggestedMaxForLabel(chartLabelValue(y1Label) as eChartLabel, currentInfo);
         this.chartOptions.scales.y2.suggestedMax = this.getSuggestedMaxForLabel(chartLabelValue(y2Label) as eChartLabel, currentInfo);
 
@@ -1460,6 +1500,13 @@ export class HomeComponent implements OnInit, OnDestroy {
         }
       }
       
+      const rMin = this.chartDatasets['responseTimeMin'];
+      const rMax = this.chartDatasets['responseTimeMax'];
+      const diff = this.chartDatasets['difficulty'];
+      const removedMin = rMin?.[low];
+      const removedMax = rMax?.[low];
+      const removedDiff = diff?.[low];
+
       // Remove point at index 'low'.
       this.dataLabel.splice(low, 1);
       this.hashrateData.splice(low, 1);
@@ -1467,6 +1514,26 @@ export class HomeComponent implements OnInit, OnDestroy {
       Object.keys(this.chartDatasets).forEach(k => {
         this.chartDatasets[k].splice(low, 1);
       });
+
+      // Merge into successor (which shifted into index 'low')
+      if (rMin && removedMin != null) {
+        const currentMin = rMin[low];
+        if (currentMin == null || removedMin < currentMin) {
+          rMin[low] = removedMin;
+        }
+      }
+      if (rMax && removedMax != null) {
+        const currentMax = rMax[low];
+        if (currentMax == null || removedMax > currentMax) {
+          rMax[low] = removedMax;
+        }
+      }
+      if (diff && removedDiff != null) {
+        const currentDiff = diff[low];
+        if (currentDiff == null || removedDiff > currentDiff) {
+          diff[low] = removedDiff;
+        }
+      }
     }
 
     if (this.chartData && document.visibilityState !== 'hidden') {
@@ -1490,6 +1557,15 @@ export class HomeComponent implements OnInit, OnDestroy {
     }
   }
 
+  public getMinForLabel(label: eChartLabel | undefined): number | undefined {
+    switch (label) {
+      case eChartLabel.responseTimeMin:
+      case eChartLabel.responseTimeMax:  return 0;
+      case eChartLabel.difficulty:       return undefined;
+      default:                           return undefined;
+    }
+  }
+
   public getSuggestedMaxForLabel(label: eChartLabel | undefined, info: ISystemInfo): number {
     switch (label) {
       case eChartLabel.hashrate:
@@ -1507,7 +1583,9 @@ export class HomeComponent implements OnInit, OnDestroy {
       case eChartLabel.fanSpeed:         return 100;
       case eChartLabel.fanRpm:           return 7000;
       case eChartLabel.fan2Rpm:          return 7000;
-      case eChartLabel.responseTime:     return 50;
+      case eChartLabel.responseTimeMin:
+      case eChartLabel.responseTimeMax:  return 50;
+      case eChartLabel.difficulty:       return 10000;
       default:                           return 0;
     }
   }
@@ -1531,7 +1609,9 @@ export class HomeComponent implements OnInit, OnDestroy {
       case eChartLabel.fan2Rpm:            return info.fan2rpm;
       case eChartLabel.wifiRssi:           return info.wifiRSSI;
       case eChartLabel.freeHeap:           return info.freeHeap;
-      case eChartLabel.responseTime:       return info.responseTime;
+      case eChartLabel.responseTimeMin:    return info.responseTimeMin ?? info.responseTime;
+      case eChartLabel.responseTimeMax:    return info.responseTimeMax ?? info.responseTime;
+      case eChartLabel.difficulty:         return info.difficulty && info.difficulty > 0 ? info.difficulty : 0;
       default:                             return 0.0;
     }
   }
@@ -1555,7 +1635,9 @@ export class HomeComponent implements OnInit, OnDestroy {
       case eChartLabel.fan2Rpm:          return {suffix: ' rpm', precision: 0};
       case eChartLabel.wifiRssi:         return {suffix: ' dBm', precision: 0};
       case eChartLabel.freeHeap:         return {suffix: ' B', precision: 0};
-      case eChartLabel.responseTime:     return {suffix: ' ms', precision: 1};
+      case eChartLabel.responseTimeMin:
+      case eChartLabel.responseTimeMax:  return {suffix: ' ms', precision: 1};
+      case eChartLabel.difficulty:       return {suffix: ' diff', precision: 0};
       default:                           return {suffix: '', precision: 0};
     }
   }
@@ -1570,6 +1652,16 @@ export class HomeComponent implements OnInit, OnDestroy {
         return HashSuffixPipe.transform(value, args);
       case eChartLabel.freeHeap:
         return ByteSuffixPipe.transform(value, args);
+      case eChartLabel.difficulty:
+        if (args?.tickmark) {
+          if (value <= 0) return '';
+          const log = Math.log10(value);
+          if (Math.abs(log - Math.round(log)) > 1e-9) {
+            return '';
+          }
+          return DiffSuffixPipe.transform(value).replace(/\.00(?=\s|$)/, '');
+        }
+        return DiffSuffixPipe.transform(value);
       default:
         const settings = HomeComponent.getSettingsForLabel(datasetLabel);
         return value.toLocaleString(undefined, { useGrouping: false, maximumFractionDigits: args?.tickmark ? undefined : settings.precision }) + settings.suffix;

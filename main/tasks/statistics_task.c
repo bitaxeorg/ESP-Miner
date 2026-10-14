@@ -35,7 +35,9 @@ const char * const STATS_LABELS[SRC_NONE] = {
     [SRC_FAN2_RPM] = "fan2Rpm",
     [SRC_WIFI_RSSI] = "wifiRssi",
     [SRC_FREE_HEAP] = "freeHeap",
-    [SRC_RESPONSE_TIME] = "responseTime",
+    [SRC_RESPONSE_TIME_MIN] = "responseTimeMin",
+    [SRC_RESPONSE_TIME_MAX] = "responseTimeMax",
+    [SRC_DIFFICULTY] = "difficulty",
 };
 
 static StatisticsDataPtr statisticsBuffer;
@@ -73,6 +75,41 @@ void removeStatisticsBuffer()
         }
 
         pthread_mutex_unlock(&statisticsDataLock);
+    }
+}
+
+static inline void merge_min_positive(float *target, char *token, float val)
+{
+    if (val > 0.0f && (*target <= 0.0f || val < *target)) {
+        *target = val;
+        snprintf(token, STATS_TOKEN_LEN, "%.2f", val);
+    }
+}
+
+static inline void merge_max_positive(float *target, char *token, float val)
+{
+    if (val > 0.0f && (*target <= 0.0f || val > *target)) {
+        *target = val;
+        snprintf(token, STATS_TOKEN_LEN, "%.2f", val);
+    }
+}
+
+static inline void format_difficulty(char *token, double val)
+{
+    if (val <= 0.0) {
+        strcpy(token, "null");
+    } else if (val >= 1000.0) {
+        snprintf(token, STATS_TOKEN_LEN, "%.0f", val);
+    } else {
+        snprintf(token, STATS_TOKEN_LEN, "%.2f", val);
+    }
+}
+
+static inline void merge_max_positive_double(double *target, char *token, double val)
+{
+    if (val > 0.0 && (*target <= 0.0 || val > *target)) {
+        *target = val;
+        format_difficulty(token, val);
     }
 }
 
@@ -135,9 +172,19 @@ bool addStatisticData(StatisticsDataPtr data, uint16_t statsFrequency)
                 indexToRemove = low;
             }
 
+            struct StatisticsData *toRemove = &statisticsBuffer[indexToRemove];
+            struct StatisticsData *successor = &statisticsBuffer[indexToRemove + 1];
+
+            // Merge into successor before removing indexToRemove
+            if (indexToRemove > 0) {
+                merge_min_positive(&successor->responseTimeMin, successor->tokens[SRC_RESPONSE_TIME_MIN], toRemove->responseTimeMin);
+                merge_max_positive(&successor->responseTimeMax, successor->tokens[SRC_RESPONSE_TIME_MAX], toRemove->responseTimeMax);
+                merge_max_positive_double(&successor->difficulty, successor->tokens[SRC_DIFFICULTY], toRemove->difficulty);
+            }
+
             // Shift and append (Standard linear array shift)
             if (indexToRemove < maxDataCount - 1) {
-                memmove(&statisticsBuffer[indexToRemove], &statisticsBuffer[indexToRemove + 1], (maxDataCount - indexToRemove - 1) * sizeof(struct StatisticsData));
+                memmove(toRemove, successor, (maxDataCount - indexToRemove - 1) * sizeof(struct StatisticsData));
             }
             statisticsBuffer[maxDataCount - 1] = *data;
             result = true;
@@ -170,6 +217,7 @@ void statistics_task(void * pvParameters)
     SystemModule * sys_module = &GLOBAL_STATE->SYSTEM_MODULE;
     PowerManagementModule * power_management = &GLOBAL_STATE->POWER_MANAGEMENT_MODULE;
     struct StatisticsData statsData = {};
+    uint64_t last_shares_count = sys_module->shares_accepted + sys_module->shares_rejected;
 
     TickType_t taskWakeTime = xTaskGetTickCount();
 
@@ -201,7 +249,31 @@ void statistics_task(void * pvParameters)
                 snprintf(statsData.tokens[SRC_FAN2_RPM], STATS_TOKEN_LEN, "%u", (unsigned int)power_management->fan2_rpm);
                 snprintf(statsData.tokens[SRC_WIFI_RSSI], STATS_TOKEN_LEN, "%d", (int)wifiRSSI);
                 snprintf(statsData.tokens[SRC_FREE_HEAP], STATS_TOKEN_LEN, "%" PRIu32, esp_get_free_heap_size());
-                snprintf(statsData.tokens[SRC_RESPONSE_TIME], STATS_TOKEN_LEN, "%.2f", sys_module->response_time);
+
+                uint64_t current_shares = sys_module->shares_accepted + sys_module->shares_rejected;
+                if (current_shares != last_shares_count && sys_module->response_time > 0.0f) {
+                    statsData.responseTimeMin = sys_module->response_time_min > 0.0f ? sys_module->response_time_min : sys_module->response_time;
+                    statsData.responseTimeMax = sys_module->response_time_max > 0.0f ? sys_module->response_time_max : sys_module->response_time;
+                    sys_module->last_response_time_min = statsData.responseTimeMin;
+                    sys_module->last_response_time_max = statsData.responseTimeMax;
+                    snprintf(statsData.tokens[SRC_RESPONSE_TIME_MIN], STATS_TOKEN_LEN, "%.2f", statsData.responseTimeMin);
+                    snprintf(statsData.tokens[SRC_RESPONSE_TIME_MAX], STATS_TOKEN_LEN, "%.2f", statsData.responseTimeMax);
+                } else {
+                    statsData.responseTimeMin = 0.0f;
+                    statsData.responseTimeMax = 0.0f;
+                    sys_module->last_response_time_min = 0.0f;
+                    sys_module->last_response_time_max = 0.0f;
+                    strcpy(statsData.tokens[SRC_RESPONSE_TIME_MIN], "null");
+                    strcpy(statsData.tokens[SRC_RESPONSE_TIME_MAX], "null");
+                }
+                last_shares_count = current_shares;
+                sys_module->response_time_min = 0.0f;
+                sys_module->response_time_max = 0.0f;
+
+                statsData.difficulty = sys_module->difficulty;
+                sys_module->last_difficulty = sys_module->difficulty;
+                format_difficulty(statsData.tokens[SRC_DIFFICULTY], statsData.difficulty);
+                sys_module->difficulty = 0.0;
 
                 addStatisticData(&statsData, configStatsFrequency);
             }
