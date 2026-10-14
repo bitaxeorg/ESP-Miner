@@ -25,11 +25,6 @@ describe('SwarmComponent', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      declarations: [
-        SwarmComponent,
-        ModalComponent,
-        TooltipTextIconComponent
-      ],
       imports: [
         ReactiveFormsModule,
         FormsModule,
@@ -40,14 +35,17 @@ describe('SwarmComponent', () => {
         DiffSuffixPipe,
         DateAgoPipe,
         AddressPipe,
-        SatsPipe
+        SatsPipe,
+        SwarmComponent,
+        ModalComponent,
+        TooltipTextIconComponent
       ],
       providers: [
         provideHttpClient(),
         provideToastr()
       ]
     });
-    
+
     httpClient = TestBed.inject(HttpClient);
     spyOn(httpClient, 'get').and.callFake(((url: string) => {
       if (url.includes('/api/system/info')) {
@@ -102,8 +100,8 @@ describe('SwarmComponent', () => {
     fixture.detectChanges();
 
     const element = fixture.nativeElement;
-    
-    // Verify that components inside *ngIf are rendered
+
+    // Verify that components inside the @if block are rendered
     expect(element.querySelector('app-slider')).toBeTruthy();
     expect(element.querySelector('app-modal')).toBeTruthy();
   });

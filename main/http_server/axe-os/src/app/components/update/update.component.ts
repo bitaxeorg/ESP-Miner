@@ -9,16 +9,21 @@ import { LiveDataService } from 'src/app/services/live-data.service';
 import { LocalStorageService } from 'src/app/local-storage.service';
 import { ModalComponent } from '../modal/modal.component';
 import { FirmwareChecksum, SystemInfo } from 'src/app/generated/models';
+import { AsyncPipe } from '@angular/common';
+import { CheckboxComponent } from '../checkbox/checkbox.component';
+import { FormsModule } from '@angular/forms';
+
+import { ProgressbarComponent } from '../progressbar/progressbar.component';
 
 const IGNORE_RELEASE_CHECK_WARNING = 'IGNORE_RELEASE_CHECK_WARNING';
 
 export type FirmwareVerifyStatus = 'idle' | 'checking' | 'match' | 'mismatch' | 'no-release' | 'no-digest' | 'error';
 
 @Component({
-    selector: 'app-update',
-    templateUrl: './update.component.html',
-    styleUrls: ['./update.component.scss'],
-    standalone: false
+  selector: 'app-update',
+  templateUrl: './update.component.html',
+  styleUrls: ['./update.component.scss'],
+  imports: [ModalComponent, CheckboxComponent, ProgressbarComponent, FormsModule, AsyncPipe]
 })
 export class UpdateComponent {
 
