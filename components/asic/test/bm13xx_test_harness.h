@@ -16,6 +16,7 @@ typedef struct {
     uint8_t (*init)(GlobalState *state);
     void (*send_work)(GlobalState *state, asic_job_t *job);
     void (*set_version_mask)(uint32_t mask);
+    void (*set_difficulty)(uint8_t difficulty_power);
     task_result *(*process_work)(GlobalState *state);
     uint8_t response_job_id;
     uint8_t init_mask_count;

@@ -477,7 +477,14 @@
                 <span>Difficulty</span>
               </div>
               @if (info.poolDifficulty > 0) {
-                {{ info.poolDifficulty }}
+                <div class="flex items-center gap-1.5">
+                  <span>{{ info.poolDifficulty }}</span>
+                  @if (info.asicDifficulty && info.poolDifficulty < info.asicDifficulty) {
+                    <i class="pi pi-exclamation-triangle text-yellow-500 text-xs"
+                      appTooltip="Pool difficulty is below ASIC difficulty ({{ info.asicDifficulty }})"
+                      tooltipPosition="top"></i>
+                  }
+                </div>
               } @else {
                 --
               }

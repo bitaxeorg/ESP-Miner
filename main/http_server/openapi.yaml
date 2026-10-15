@@ -245,6 +245,7 @@ components:
       required:
         - ASICModel
         - apEnabled
+        - asicDifficulty
         - autofanspeed
         - bestDiff
         - bestSessionDiff
@@ -354,6 +355,9 @@ components:
         apEnabled:
           type: number
           description: Whether AP mode is enabled (0=no, 1=yes)
+        asicDifficulty:
+          type: integer
+          description: Current ASIC hardware difficulty
         autofanspeed:
           type: number
           description: Automatic fan speed control (0=manual, 1=auto)

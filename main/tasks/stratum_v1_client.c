@@ -17,7 +17,6 @@
 #include <esp_heap_caps.h>
 #include "esp_transport_ssl.h"
 #include "freertos/task.h"
-#include "difficulty_controller.h"
 
 #define PROBE_RECV_BUFFER_SIZE 2048
 
@@ -308,7 +307,6 @@ esp_err_t stratum_v1_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
                 diff_to_target(requested_diff, s_v1_conn->pool_target);
                 ESP_LOGI(TAG, "Set pool difficulty: %.2f", requested_diff);
                 GLOBAL_STATE->SYSTEM_MODULE.pool_difficulty = requested_diff;
-                difficulty_controller_update(GLOBAL_STATE);
                 break;
             }
 

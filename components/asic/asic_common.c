@@ -211,33 +211,14 @@ void get_difficulty_mask(uint8_t difficulty_power, uint8_t *job_difficulty_mask)
     job_difficulty_mask[5] = _reverse_bits( mask        & 0xFF);
 }
 
-uint8_t calculate_effective_asic_difficulty(double expected_ghs, double interval_s, double pool_difficulty)
+uint8_t calculate_effective_asic_difficulty(double expected_ghs)
 {
-    if (interval_s <= 0.0) {
-        interval_s = DEFAULT_SHARE_INTERVAL_S;
+    double raw_diff = expected_ghs * 1e9 / NONCE_SPACE;
+    if (raw_diff < 1.5) {
+        return 0;
     }
 
-    uint8_t power = MIN_ASIC_DIFFICULTY_POWER;
-    if (expected_ghs > 0.0) {
-        double raw_diff = expected_ghs * 1e9 * interval_s / NONCE_SPACE;
-        if (raw_diff > (double)(1U << MIN_ASIC_DIFFICULTY_POWER)) {
-            int p = MIN_ASIC_DIFFICULTY_POWER;
-            while ((p < 31) && ((double)(1U << (p + 1)) <= raw_diff + 1e-6)) {
-                p++;
-            }
-            double lower = (double)(1U << p);
-            double upper = (double)(1U << (p + 1));
-            power = ((raw_diff - lower) > (upper - raw_diff)) ? (uint8_t)(p + 1) : (uint8_t)p;
-        }
-    }
-
-    if (pool_difficulty > 0.0) {
-        while (power > MIN_ASIC_DIFFICULTY_POWER && ((double)(1U << power) > pool_difficulty + 1e-6)) {
-            power--;
-        }
-    }
-
-    return power;
+    return (uint8_t)(log2(raw_diff / 1.5) + 1);
 }
 
 double calculate_bm_timeout_ms(float frequency_mhz, size_t asic_count, size_t small_cores, size_t cores, size_t version_size, float timeout_percent, double default_time_ms)

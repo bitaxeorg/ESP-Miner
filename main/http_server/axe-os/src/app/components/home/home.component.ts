@@ -35,7 +35,8 @@ type MessageType =
   | 'FALLBACK_STRATUM'
   | 'NOT_SOLO_MINING'
   | 'NO_MINING_REWARD'
-  | 'HARDWARE_FAULT';
+  | 'HARDWARE_FAULT'
+  | 'POOL_DIFFICULTY_LOW';
 
 interface ISystemMessage {
   type: MessageType;
@@ -1277,6 +1278,7 @@ export class HomeComponent implements OnInit, OnDestroy {
     updateMessage(!!info.hardware_fault, 'HARDWARE_FAULT', 'error', `${info.hardware_fault}`);
     updateMessage(isFrequencyLow(info.frequency, frequencyOptions), 'FREQUENCY_LOW', 'warn', 'Device frequency is set low - See settings');
     updateMessage(info.isUsingFallbackStratum === 1 && info.useFallbackStratum === 0, 'FALLBACK_STRATUM', 'warn', 'Primary pool unreachable - operating on fallback pool.');
+    updateMessage(!!(info.poolDifficulty > 0 && info.asicDifficulty && info.poolDifficulty < info.asicDifficulty), 'POOL_DIFFICULTY_LOW', 'warn', `Pool difficulty (${info.poolDifficulty}) is below ASIC difficulty (${info.asicDifficulty}).`);
     if (info.coinbaseOutputs && info.coinbaseOutputs.length > 0) {
       let percentage = this.getPayoutPercentage(info);
       const warn = this.activePoolShareWarning;

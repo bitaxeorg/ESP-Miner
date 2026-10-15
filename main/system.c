@@ -34,7 +34,6 @@
 #include "utils.h"
 #include "self_test.h"
 #include "filesystem.h"
-#include "embedded_web_ui.h"
 #include "hashrate_monitor_task.h"
 #include "coinbase_decoder.h"
 #include "sv2_protocol.h"
@@ -209,6 +208,7 @@ void SYSTEM_init_system(GlobalState * GLOBAL_STATE)
     module->lastClockSync = 0;
     module->block_found = 0;
     module->show_new_block = false;
+    module->current_difficulty_power = 0;
 
     if (noinit_state.sentinel != NOINIT_SENTINEL_VALUE) {
         noinit_state.sentinel = NOINIT_SENTINEL_VALUE;

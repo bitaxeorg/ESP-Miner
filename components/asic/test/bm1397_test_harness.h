@@ -13,6 +13,7 @@ enum { BM1397_HARNESS_RESPONSE_SIZE = 9 };
 typedef struct {
     uint8_t (*init)(GlobalState *state);
     void (*send_work)(GlobalState *state, asic_job_t *job);
+    void (*set_difficulty)(uint8_t difficulty_power);
     task_result *(*process_work)(GlobalState *state);
 } bm1397_harness_driver_t;
 

@@ -230,9 +230,7 @@ static void self_test_start_nonce_measurement(GlobalState * GLOBAL_STATE)
     measurement->accepted_count = 0;
     measurement->rejected_count = 0;
     measurement->hashes = 0.0;
-    uint8_t power = (GLOBAL_STATE->current_difficulty_power > 0)
-                        ? GLOBAL_STATE->current_difficulty_power
-                        : MIN_ASIC_DIFFICULTY_POWER;
+    uint8_t power = GLOBAL_STATE->SYSTEM_MODULE.current_difficulty_power;
     diff_to_target((double)(1U << power), measurement->target);
     measurement->is_active = true;
     pthread_mutex_unlock(&measurement->lock);
@@ -280,9 +278,7 @@ void self_test_record_nonce(GlobalState * GLOBAL_STATE, const uint8_t hash[32])
 
     pthread_mutex_lock(&measurement->lock);
     if (measurement->is_active) {
-        uint8_t power = (GLOBAL_STATE->current_difficulty_power > 0)
-                            ? GLOBAL_STATE->current_difficulty_power
-                            : MIN_ASIC_DIFFICULTY_POWER;
+        uint8_t power = GLOBAL_STATE->SYSTEM_MODULE.current_difficulty_power;
         if (uint256_lte(hash, measurement->target)) {
             measurement->accepted_count++;
             measurement->hashes += (double)(1ULL << power) * NONCE_SPACE;
@@ -311,7 +307,6 @@ esp_err_t self_test_init(GlobalState * GLOBAL_STATE)
     if (self_test_should_run()) {
         GLOBAL_STATE->SELF_TEST_MODULE.is_active = true;
         GLOBAL_STATE->SELF_TEST_MODULE.is_factory = isFactoryTest;
-        GLOBAL_STATE->target_share_interval_s = SELF_TEST_SHARE_INTERVAL_S;
         pthread_mutex_init(&GLOBAL_STATE->SELF_TEST_MODULE.nonce_measurement.lock, NULL);
         GLOBAL_STATE->SYSTEM_MODULE.is_connected = true;
 
@@ -622,6 +617,10 @@ void self_test_task(void * pvParameters)
         tests_done(GLOBAL_STATE, false);
     }
     self_test_domain_averages_prime(GLOBAL_STATE, &domain_averages);
+
+    uint8_t self_test_diff_power = calculate_effective_asic_difficulty(expected_hashrate);
+    self_test_diff_power = (self_test_diff_power > 3) ? (self_test_diff_power - 3) : 0; // Targets 8 shares/sec
+    ASIC_set_difficulty(GLOBAL_STATE, self_test_diff_power);
 
     self_test_start_nonce_measurement(GLOBAL_STATE);
     ESP_LOGI(TAG, "Starting 30s hashrate monitoring loop, target temp %.1f°C", target_temp);

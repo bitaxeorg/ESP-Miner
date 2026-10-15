@@ -246,9 +246,13 @@ esp_err_t ASIC_get_domain_measurement(GlobalState * GLOBAL_STATE, uint8_t asic_n
 
 void ASIC_set_difficulty(GlobalState * GLOBAL_STATE, uint8_t difficulty_power)
 {
-    if (!GLOBAL_STATE || !GLOBAL_STATE->ASIC_initalized || difficulty_power == 0) {
+    if (!GLOBAL_STATE || !GLOBAL_STATE->ASIC_initalized) {
         return;
     }
+
+    GLOBAL_STATE->SYSTEM_MODULE.current_difficulty_power = difficulty_power;
+
+    ESP_LOGI(TAG, "ASIC difficulty set to %u", 1U << difficulty_power);
 
     switch (GLOBAL_STATE->DEVICE_CONFIG.family.asic.id) {
         case BM1397:

@@ -11,12 +11,10 @@
 #include "connect.h"
 #include "sv2_protocol.h"
 #include "sv2_noise.h"
-#include "mining.h"
 #include "utils.h"
 #include "libbase58.h"
 #include "device_config.h"
 #include "esp_heap_caps.h"
-#include "difficulty_controller.h"
 
 #include <string.h>
 #include <stdlib.h>
@@ -383,7 +381,6 @@ static void stratum_v2_handle_set_target(GlobalState *GLOBAL_STATE, sv2_conn_t *
     GLOBAL_STATE->SYSTEM_MODULE.pool_difficulty = pdiff;
 
     ESP_LOGI(TAG, "Set pool difficulty: %g", pdiff);
-    difficulty_controller_update(GLOBAL_STATE);
 }
 
 esp_err_t stratum_v2_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
@@ -716,7 +713,6 @@ esp_err_t stratum_v2_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
                  channel_id, group_channel_id,
                  sv2_channel_type_to_string(channel_type));
         ESP_LOGI(TAG, "Set pool difficulty: %g", pdiff);
-        difficulty_controller_update(GLOBAL_STATE);
     }
 
     {

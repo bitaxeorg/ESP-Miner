@@ -113,6 +113,7 @@ const mockSystemInfo: ISystemInfo = {
   responseTime: 45,
   responseShareBatch: 1,
   poolDifficulty: 1000,
+  asicDifficulty: 256,
   blockHeight: 800000,
   networkDifficulty: 5000000,
   scriptsig: 'test-scriptsig',
@@ -257,6 +258,20 @@ describe('HomeComponent', () => {
     expect(component.messages.some(message => message.type === 'FREQUENCY_LOW')).toBeTrue();
     component.handleSystemMessages(info, error, [100, 200, 300]);
     expect(component.messages.some(message => message.type === 'FREQUENCY_LOW')).toBeFalse();
+  });
+
+  it('shows POOL_DIFFICULTY_LOW warning when pool difficulty is below ASIC difficulty', () => {
+    const error = { duration: 0, startTime: null };
+    const info: ISystemInfo = { ...mockSystemInfo, poolDifficulty: 1000, asicDifficulty: 256 };
+    component.handleSystemMessages(info, error);
+    expect(component.messages.some(message => message.type === 'POOL_DIFFICULTY_LOW')).toBeFalse();
+
+    component.handleSystemMessages({ ...info, poolDifficulty: 16, asicDifficulty: 256 }, error);
+    expect(component.messages.some(message => message.type === 'POOL_DIFFICULTY_LOW')).toBeTrue();
+
+    // When pool difficulty is 0 (disconnected or waiting for diff), no warning
+    component.handleSystemMessages({ ...info, poolDifficulty: 0, asicDifficulty: 256 }, error);
+    expect(component.messages.some(message => message.type === 'POOL_DIFFICULTY_LOW')).toBeFalse();
   });
 
   it('handles mining reward messages using coinbasePayoutStatus', () => {
