@@ -24,6 +24,9 @@ export class LiveDataService {
   private connectedSubject = new BehaviorSubject<boolean>(false);
   public connected$ = this.connectedSubject.asObservable();
 
+  // Persistent rolling sparkline history across tabs (last 30 samples per domain)
+  public domainHistory: number[][][] = [];
+
   constructor(
     private systemService: SystemApiService
   ) {
@@ -79,8 +82,32 @@ export class LiveDataService {
       scan((acc: ISystemInfo, curr: Partial<ISystemInfo>) => ({ ...acc, ...curr } as ISystemInfo), {} as ISystemInfo),
       // Ensure we have at least once received a message with a recognizable field before emitting
       filter(info => !!info.version || !!info.uptimeSeconds),
+      tap(info => this.recordDomainHistory(info)),
       shareReplay(1)
     );
+  }
+
+  public recordDomainHistory(info: ISystemInfo): void {
+    const asics = info.hashrateMonitor?.asics;
+    if (!asics || !asics.length) {
+      return;
+    }
+    const maxSamples = 30;
+    for (let a = 0; a < asics.length; a++) {
+      if (!this.domainHistory[a]) {
+        this.domainHistory[a] = [];
+      }
+      const domains = asics[a].domains || [];
+      for (let d = 0; d < domains.length; d++) {
+        if (!this.domainHistory[a][d]) {
+          this.domainHistory[a][d] = [];
+        }
+        this.domainHistory[a][d].push(domains[d] ?? 0);
+        if (this.domainHistory[a][d].length > maxSamples) {
+          this.domainHistory[a][d].shift();
+        }
+      }
+    }
   }
 
   private connect(): Observable<any> {

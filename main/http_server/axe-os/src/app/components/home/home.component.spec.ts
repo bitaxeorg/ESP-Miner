@@ -19,7 +19,6 @@ import { DateAgoPipe } from 'src/app/pipes/date-ago.pipe';
 import { AddressPipe } from 'src/app/pipes/address.pipe';
 import { SatsPipe } from 'src/app/pipes/sats.pipe';
 import { ByteSuffixPipe } from 'src/app/pipes/byte-suffix.pipe';
-import { HeatmapLightnessPipe } from 'src/app/pipes/heatmap-lightness.pipe';
 
 import { TooltipTextIconComponent } from 'src/app/components/tooltip-text-icon/tooltip-text-icon.component';
 import { TooltipIconComponent } from 'src/app/components/tooltip-icon/tooltip-icon.component';
@@ -169,7 +168,8 @@ const mockSystemStatistics: ISystemStatistics = {
 
 const mockLiveDataService = {
   info$: new BehaviorSubject<ISystemInfo>(mockSystemInfo),
-  connected$: of(true)
+  connected$: of(true),
+  domainHistory: []
 };
 
 const mockSystemApiService = {
@@ -220,8 +220,7 @@ describe('HomeComponent', () => {
         DateAgoPipe,
         AddressPipe,
         SatsPipe,
-        ByteSuffixPipe,
-        HeatmapLightnessPipe
+        ByteSuffixPipe
       ],
       providers: [
         provideRouter([]),
