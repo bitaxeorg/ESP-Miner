@@ -1,0 +1,16 @@
+set(BZM_SOURCES
+    "${CMAKE_CURRENT_LIST_DIR}/bzm_platform.c"
+    "${CMAKE_CURRENT_LIST_DIR}/bzm_platform_serial.c"
+    "${CMAKE_CURRENT_LIST_DIR}/bzm_hash.c"
+    "${CMAKE_CURRENT_LIST_DIR}/bzm_job.c"
+    "${CMAKE_CURRENT_LIST_DIR}/bzm_job_store.c"
+    "${CMAKE_CURRENT_LIST_DIR}/bzm_reactor.c"
+    "${CMAKE_CURRENT_LIST_DIR}/bzm_result_dedup.c"
+    "${CMAKE_CURRENT_LIST_DIR}/bzm_protocol.c"
+    "${CMAKE_CURRENT_LIST_DIR}/bzm_frame_parser.c"
+    "${CMAKE_CURRENT_LIST_DIR}/bzm_frequency.c"
+    "${CMAKE_CURRENT_LIST_DIR}/bzm_telemetry.c"
+    "${CMAKE_CURRENT_LIST_DIR}/bzm_topology.c"
+    "${CMAKE_CURRENT_LIST_DIR}/bzm_transport.c"
+    "${CMAKE_CURRENT_LIST_DIR}/bzm_work.c"
+)
