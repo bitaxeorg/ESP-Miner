@@ -308,6 +308,11 @@ static bool self_test_should_run()
 
 esp_err_t self_test_init(GlobalState * GLOBAL_STATE)
 {
+    if (GLOBAL_STATE->DEVICE_CONFIG.family.id == BONANZA) {
+        ESP_LOGI(TAG, "Self-test is not supported on Bonanza");
+        return ESP_OK;
+    }
+
     if (self_test_should_run()) {
         GLOBAL_STATE->SELF_TEST_MODULE.is_active = true;
         GLOBAL_STATE->SELF_TEST_MODULE.is_factory = isFactoryTest;
