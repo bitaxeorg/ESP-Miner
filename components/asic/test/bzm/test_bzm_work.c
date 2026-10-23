@@ -59,3 +59,16 @@ TEST_CASE("BZM refuses a timestamp window that would wrap", "[asic][bzm][work]")
     job.ntime--;
     TEST_ASSERT_TRUE(bzm_work_build(&source, 0, 0, 60, 40, &work));
 }
+
+TEST_CASE("BZM supports all 128 timestamps without overflow", "[asic][bzm][work]")
+{
+    asic_job_t job = {.ntime = UINT32_MAX - 127};
+    bzm_work_ref_t source = {.handle = 1, .template = &job};
+    bzm_work_t work;
+    TEST_ASSERT_TRUE(bzm_work_build(&source, 0, 0, 127, 36, &work));
+    TEST_ASSERT_EQUAL_UINT8(127, work.timestamp_count);
+    TEST_ASSERT_EQUAL_HEX32(UINT32_MAX, work.start_ntime + work.timestamp_count);
+    TEST_ASSERT_FALSE(bzm_work_build(&source, 0, 0, 128, 36, &work));
+    ++job.ntime;
+    TEST_ASSERT_FALSE(bzm_work_build(&source, 0, 0, 127, 36, &work));
+}

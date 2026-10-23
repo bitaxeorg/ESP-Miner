@@ -8,9 +8,8 @@
 #include "bzm/runtime_result.h"
 #include "asic_job.h"
 
-/* BZM keeps one independently generated job active for each of its 236
- * logical engines. Keep a full 8-bit hardware-handle slot space so every
- * current assignment remains addressable while the scheduler rotates. */
+/* Preserve the full 8-bit handle slot space for current and delayed work;
+ * production row multicast shares a single stored job across each row. */
 #define BZM_JOB_STORE_CAPACITY 256
 
 typedef struct {

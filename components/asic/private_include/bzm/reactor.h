@@ -37,6 +37,7 @@ typedef struct {
     uint8_t timestamp_count;
     uint8_t lead_zeros;
     uint32_t nonce_offset;
+    bool multicast_rows;
 } bzm_reactor_config_t;
 
 typedef struct {

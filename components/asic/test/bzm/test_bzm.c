@@ -432,7 +432,7 @@ TEST_CASE("BZM transport programs ordered enhanced work and flush jobs",
 
     memset(&capture, 0, sizeof(capture));
     TEST_ASSERT_TRUE(bzm_transport_program_startup_work(
-        10, capture_register, &capture));
+        BZM_FIRST_ASIC_ID, 10, capture_register, &capture));
     TEST_ASSERT_EQUAL_UINT32(22, capture.count);
     TEST_ASSERT_EQUAL_UINT16(10, capture.writes[0].engine_id);
     TEST_ASSERT_EQUAL_HEX8(0x49, capture.writes[0].offset);

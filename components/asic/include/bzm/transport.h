@@ -96,12 +96,18 @@ typedef bool (*bzm_register_writer_t)(void * context, uint16_t engine_id, uint8_
 
 size_t bzm_transport_encode_write(uint8_t asic_id, uint16_t engine_id, uint8_t offset, const uint8_t * data, size_t data_len,
                                   uint8_t * encoded, size_t encoded_capacity);
+/* Opcode 4 addresses an engine row, or every engine with group 0xff. */
+size_t bzm_transport_encode_multicast(uint8_t asic_id, uint8_t group_id, uint8_t offset, const uint8_t *data,
+                                      size_t data_len, uint8_t *encoded, size_t encoded_capacity);
 size_t bzm_transport_encode_read(uint8_t asic_id, uint16_t engine_id, uint8_t offset, size_t data_len, uint8_t * encoded,
                                  size_t encoded_capacity);
 size_t bzm_transport_encode_noop(uint8_t asic_id, uint8_t * encoded, size_t encoded_capacity);
 
 bool bzm_partition_nonce_range(uint32_t starting_nonce, uint32_t end_nonce, size_t partition, size_t partition_count,
                                uint32_t * partition_start, uint32_t * partition_end);
+/* Split one row's full nonce domain across its valid engines on all four ASICs. */
+bool bzm_partition_row_nonce_range(uint8_t asic_id, uint16_t engine_id,
+                                   uint32_t *partition_start, uint32_t *partition_end);
 
 // Zero-initialize before first use; the caller owns state and context. Initialization allocates no memory.
 bool bzm_serial_transport_init(bzm_serial_transport_t *transport,
@@ -111,6 +117,7 @@ size_t bzm_serial_transport_ingest_bytes(bzm_serial_transport_t * transport, con
                                          uint64_t timestamp_us);
 /* Timeouts and partial frames are BZM_OK; bytes_received distinguishes an idle poll.
  * Receive errors also invoke the optional on_io_error callback, including inside transactions. */
+/* A zero timeout drains buffered input without waiting; all calls are byte-bounded. */
 bzm_serial_poll_result_t bzm_serial_poll(bzm_serial_transport_t * transport, uint16_t timeout_ms);
 bzm_serial_probe_result_t bzm_serial_probe_noop(bzm_serial_transport_t * transport, uint8_t asic_id);
 
@@ -128,16 +135,17 @@ bool bzm_serial_write_register_to(bzm_serial_transport_t * transport, uint8_t as
 bool bzm_serial_read_register(bzm_serial_transport_t * transport, uint8_t asic_id, uint16_t engine_id, uint8_t offset, void * data,
                               size_t data_len);
 bool bzm_transport_program_work(const bzm_work_t * work, bzm_register_writer_t writer, void * writer_context);
-/* Program common job fields for an all-ASIC multicast after each ASIC's
- * persistent nonce quarter has been written separately. */
+/* Program common job fields, preserving separately configured nonce ranges. */
 bool bzm_transport_program_broadcast_work(
     const bzm_work_t *work, bzm_register_writer_t writer,
     void *writer_context);
 /* Queue a deterministic, 64-leading-zero sentinel as both current and
  * pending work. It exercises the hashing datapath without opening ordinary
- * mining dispatch. */
-bool bzm_transport_program_startup_work(uint16_t engine_id, bzm_register_writer_t writer, void * writer_context);
+ * mining dispatch, and provisions this ASIC's persistent nonce quarter. */
+bool bzm_transport_program_startup_work(uint8_t asic_id, uint16_t engine_id,
+                                      bzm_register_writer_t writer, void * writer_context);
 bool bzm_transport_program_flush(uint16_t engine_count, bzm_register_writer_t writer, void * writer_context);
+/* Send a full-domain job using the persistent nonce partitions set at startup. */
 bool bzm_serial_write_work(void * context, const bzm_work_t * work);
 bool bzm_serial_flush(void * context);
 bool bzm_serial_read_result(bzm_serial_transport_t * transport, bzm_raw_result_t * result, uint16_t timeout_ms);

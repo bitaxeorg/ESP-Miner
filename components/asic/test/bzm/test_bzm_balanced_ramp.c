@@ -2,6 +2,7 @@
 
 #include "bzm/balanced_ramp.h"
 #include "bzm/registers.h"
+#include "bzm/work_registers.h"
 #include "unity.h"
 
 typedef struct
@@ -27,6 +28,9 @@ typedef struct
     uint8_t status;
     size_t busy_after_reads;
     uint8_t config;
+    uint8_t nonce_range_mask;
+    bool seeded[BZM_MAX_ASIC_COUNT][BZM_TOPOLOGY_ENGINE_COUNT];
+    size_t seeded_count;
 } ramp_mock_t;
 
 static bool mock_begin(void * context, uint8_t asic_id, uint16_t engine_id)
@@ -40,6 +44,7 @@ static bool mock_begin(void * context, uint8_t asic_id, uint16_t engine_id)
         mock->begun_engines[mock->begin_count] = engine_id;
     }
     ++mock->begin_count;
+    mock->nonce_range_mask = 0;
     return true;
 }
 
@@ -54,6 +59,32 @@ static bool mock_write(void * context, uint8_t asic_id, uint16_t engine_id, uint
     TEST_ASSERT_GREATER_THAN_UINT32(0, data_len);
     if (mock->fail_write_at >= 0 && mock->write_count == (size_t) mock->fail_write_at) {
         return false;
+    }
+    if (engine_id != BZM_CONTROL_ENGINE_ID) {
+        if (offset == BZM_REG_START_NONCE || offset == BZM_REG_END_NONCE) {
+            size_t chip;
+            TEST_ASSERT_TRUE(bzm_topology_asic_index(asic_id, &chip));
+            TEST_ASSERT_EQUAL_UINT32(4, data_len);
+            const uint8_t *bytes = data;
+            uint32_t value = (uint32_t)bytes[0] | (uint32_t)bytes[1] << 8 |
+                             (uint32_t)bytes[2] << 16 | (uint32_t)bytes[3] << 24;
+            if (offset == BZM_REG_START_NONCE) {
+                TEST_ASSERT_EQUAL_UINT8(0, mock->nonce_range_mask);
+                TEST_ASSERT_EQUAL_HEX32((uint32_t)chip << 30, value);
+                mock->nonce_range_mask = 1;
+            } else {
+                TEST_ASSERT_EQUAL_UINT8(1, mock->nonce_range_mask);
+                TEST_ASSERT_EQUAL_HEX32(((uint32_t)chip << 30) | 0x3fffffffU, value);
+                bzm_engine_location_t engine;
+                TEST_ASSERT_TRUE(bzm_topology_from_physical_id(engine_id, &engine));
+                TEST_ASSERT_FALSE(mock->seeded[chip][engine.topology_index]);
+                mock->seeded[chip][engine.topology_index] = true;
+                ++mock->seeded_count;
+                mock->nonce_range_mask = 3;
+            }
+        } else if (offset == BZM_REG_JOB_CONTROL) {
+            TEST_ASSERT_EQUAL_UINT8(3, mock->nonce_range_mask);
+        }
     }
     if (mock->write_count < 4) {
         mock->write_engines[mock->write_count] = engine_id;
@@ -125,6 +156,26 @@ static ramp_mock_t good_mock(void)
         .busy_after_reads = 0,
         .config = BZM_BALANCED_RAMP_ENGINE_CONFIG | BZM_BALANCED_RAMP_ENGINE_CONFIG_ACTIVE_MASK,
     };
+}
+
+TEST_CASE("BZM startup restores disjoint nonce quarters on every physical engine", "[asic][bzm][activation]")
+{
+    // Repeat after a simulated reset: range registers are lost, and startup must restore all of them.
+    for (size_t boot = 0; boot < 2; ++boot) {
+        for (size_t chip = 0; chip < BZM_MAX_ASIC_COUNT; ++chip) {
+            ramp_mock_t mock = good_mock();
+            bzm_balanced_ramp_report_t ramp = {0};
+            for (size_t i = 0; i < BZM_TOPOLOGY_PAIR_COUNT; ++i) {
+                bzm_engine_pair_t pair;
+                TEST_ASSERT_TRUE(bzm_topology_balanced_pair_at(i, &pair));
+                TEST_ASSERT_TRUE(bzm_balanced_ramp_commit_pair(&ramp, &MOCK_OPS, &mock,
+                                                               bzm_asic_wire_ids[chip], &pair));
+            }
+            TEST_ASSERT_EQUAL_UINT32(BZM_TOPOLOGY_ENGINE_COUNT, mock.seeded_count);
+            for (size_t i = 0; i < BZM_TOPOLOGY_ENGINE_COUNT; ++i)
+                TEST_ASSERT_TRUE(mock.seeded[chip][i]);
+        }
+    }
 }
 
 TEST_CASE("BZM engine activation activates the higher-voltage stack first", "[asic][bzm][activation]")

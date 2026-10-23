@@ -65,6 +65,7 @@ bool bzm_reactor_init(bzm_reactor_t *reactor, bzm_job_store_t *job_store,
         transport == NULL || transport->write_work == NULL ||
         config->engine_count == 0 ||
         config->engine_count > BZM_ENGINES_PER_ASIC ||
+        (config->multicast_rows && config->engine_count != BZM_ENGINE_ROWS) ||
         config->timestamp_count > 0x7f) {
         return false;
     }
@@ -161,7 +162,12 @@ bzm_assign_status_t bzm_reactor_assign(bzm_reactor_t *reactor,
         return BZM_ASSIGN_FLUSH_REQUIRED;
     }
     bzm_engine_location_t engine;
-    if (!scheduled_engine_at(schedule_index, &engine)) {
+    /* Alternate bottom and top rows, keeping the two voltage stacks balanced. */
+    uint16_t row = schedule_index / 2 +
+        (schedule_index % 2) * (BZM_ENGINE_ROWS / 2);
+    if (!(reactor->config.multicast_rows
+            ? bzm_topology_from_physical_id(row, &engine)
+            : scheduled_engine_at(schedule_index, &engine))) {
         return BZM_ASSIGN_INVALID;
     }
     bzm_assignment_t *existing = find_engine_assignment(
@@ -190,9 +196,9 @@ bzm_assign_status_t bzm_reactor_assign(bzm_reactor_t *reactor,
         bzm_job_store_release(reactor->job_store, handle);
         return BZM_ASSIGN_INVALID;
     }
-    /* Every logical engine gets an independent header and therefore searches
-     * the complete nonce domain. The serial transport performs the only
-     * partition that is required: one quarter per physical ASIC. */
+    /* Startup partitions each shared header's nonce domain across its engines.
+     * Runtime writes preserve those per-engine registers. */
+    work.multicast_row = reactor->config.multicast_rows;
     work.starting_nonce = 0;
     work.end_nonce = UINT32_MAX;
     if (!reactor->transport.write_work(reactor->transport_context, &work)) {
@@ -259,9 +265,10 @@ bool bzm_reactor_map_result(bzm_reactor_t *reactor,
     uint8_t micro_job = raw->sequence_id & 0x03;
 
     bzm_assignment_t *assignment = find_assignment(
-        reactor, raw->engine_id, logical_sequence);
+        reactor, reactor->config.multicast_rows ? raw->engine_id & 0x3f : raw->engine_id,
+        logical_sequence);
     if (assignment == NULL ||
-        assignment->logical_engine_id != logical_engine_id ||
+        (!reactor->config.multicast_rows && assignment->logical_engine_id != logical_engine_id) ||
         assignment->state != BZM_ENGINE_ASSIGNED ||
         assignment->epoch != reactor->epoch) {
         return false;
@@ -300,7 +307,7 @@ bool bzm_reactor_map_result(bzm_reactor_t *reactor,
         .version_bits = final_version ^ assignment->base_version,
         .timestamp_us = raw->timestamp_us,
         .asic_index = asic_index,
-        .engine_id = assignment->logical_engine_id,
+        .engine_id = logical_engine_id,
         .sequence_id = assignment->logical_sequence,
         .micro_job_id = micro_job,
         .generation = assignment->epoch,

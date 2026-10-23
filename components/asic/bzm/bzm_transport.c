@@ -1,7 +1,6 @@
 #include "bzm/telemetry_decode.h"
 #include "bzm/transport.h"
 #include "bzm/work_registers.h"
-#include "bzm/bytes.h"
 
 #include <string.h>
 
@@ -12,6 +11,7 @@ typedef struct
 {
     bzm_serial_transport_t *transport;
     uint8_t asic_id;
+    bool multicast;
 } serial_register_context_t;
 
 static bool addressed_asic(uint8_t asic_id)
@@ -146,8 +146,8 @@ static bool append_word(uint16_t word, uint8_t * encoded, size_t capacity, size_
     return true;
 }
 
-size_t bzm_transport_encode_write(uint8_t asic_id, uint16_t engine_id, uint8_t offset, const uint8_t * data, size_t data_len,
-                                  uint8_t * encoded, size_t encoded_capacity)
+static size_t encode_write(uint8_t opcode, uint8_t asic_id, uint16_t engine_id, uint8_t offset,
+                           const uint8_t *data, size_t data_len, uint8_t *encoded, size_t encoded_capacity)
 {
     if (data == NULL || data_len == 0 || data_len > 256 || encoded == NULL || engine_id >= BZM_MAX_ENGINE_COUNT) {
         return 0;
@@ -155,7 +155,7 @@ size_t bzm_transport_encode_write(uint8_t asic_id, uint16_t engine_id, uint8_t o
 
     size_t cursor = 0;
     if (!append_word(0x100 | asic_id, encoded, encoded_capacity, &cursor) ||
-        !append_word(0x020 | ((engine_id >> 8) & 0x0f), encoded, encoded_capacity, &cursor) ||
+        !append_word(opcode | ((engine_id >> 8) & 0x0f), encoded, encoded_capacity, &cursor) ||
         !append_word(engine_id & 0xff, encoded, encoded_capacity, &cursor) ||
         !append_word(offset, encoded, encoded_capacity, &cursor) ||
         !append_word(data_len - 1, encoded, encoded_capacity, &cursor)) {
@@ -167,6 +167,19 @@ size_t bzm_transport_encode_write(uint8_t asic_id, uint16_t engine_id, uint8_t o
         }
     }
     return append_word(0, encoded, encoded_capacity, &cursor) ? cursor : 0;
+}
+
+size_t bzm_transport_encode_write(uint8_t asic_id, uint16_t engine_id, uint8_t offset, const uint8_t *data,
+                                  size_t data_len, uint8_t *encoded, size_t encoded_capacity)
+{
+    return encode_write(0x20, asic_id, engine_id, offset, data, data_len, encoded, encoded_capacity);
+}
+
+size_t bzm_transport_encode_multicast(uint8_t asic_id, uint8_t group_id, uint8_t offset, const uint8_t *data,
+                                      size_t data_len, uint8_t *encoded, size_t encoded_capacity)
+{
+    if (group_id >= BZM_ENGINE_ROWS && group_id != 0xff) return 0;
+    return encode_write(0x40, asic_id, group_id, offset, data, data_len, encoded, encoded_capacity);
 }
 
 size_t bzm_transport_encode_read(uint8_t asic_id, uint16_t engine_id, uint8_t offset, size_t data_len, uint8_t * encoded,
@@ -212,6 +225,22 @@ bool bzm_partition_nonce_range(uint32_t starting_nonce, uint32_t end_nonce, size
     *partition_start = starting_nonce + nonce_step * partition;
     *partition_end = partition + 1 == partition_count ? end_nonce : starting_nonce + nonce_step * (partition + 1) - 1;
     return true;
+}
+
+bool bzm_partition_row_nonce_range(uint8_t asic_id, uint16_t engine_id,
+                                   uint32_t *partition_start, uint32_t *partition_end)
+{
+    bzm_engine_location_t engine;
+    size_t chip, columns = 0, rank = 0;
+    if (!bzm_topology_asic_index(asic_id, &chip) ||
+        !bzm_topology_from_physical_id(engine_id, &engine)) return false;
+    for (uint8_t column = 0; column < BZM_ENGINE_COLUMNS; ++column) {
+        if (!bzm_topology_coordinate_is_valid(engine.row, column)) continue;
+        if (column < engine.column) ++rank;
+        ++columns;
+    }
+    return bzm_partition_nonce_range(0, UINT32_MAX, chip * columns + rank,
+        BZM_MAX_ASIC_COUNT * columns, partition_start, partition_end);
 }
 
 static bool serial_write_register_raw(bzm_serial_transport_t *transport, uint8_t asic_id, uint16_t engine_id, uint8_t offset, const void * data, size_t data_len)
@@ -369,15 +398,13 @@ bzm_serial_poll_result_t bzm_serial_poll(bzm_serial_transport_t *transport, uint
         return (bzm_serial_poll_result_t){.status = BZM_ERR_INVALID_ARG};
     if (!transport->io.initialized)
         return (bzm_serial_poll_result_t){.status = BZM_ERR_INVALID_STATE};
-    if (timeout_ms == 0)
-        return result;
-
     uint8_t received[BZM_POLL_BUFFER_SIZE];
     /* uart_read_bytes may wait for the requested byte count, so asking for
      * the whole buffer turns every six-byte register response into a full
      * timeout. Block for exactly one byte, then drain everything already
      * buffered without waiting. The frame parser deliberately supports a
-     * response split across multiple calls. */
+     * response split across multiple calls. A zero timeout only drains
+     * buffered bytes, including errors, without waiting for new input. */
     uint16_t capacity = 1;
     while (result.bytes_received < BZM_POLL_MAX_DRAIN_BYTES) {
         int16_t length = transport->ops.read(transport->context, received, capacity, timeout_ms);
@@ -525,40 +552,31 @@ bool bzm_serial_read_register(bzm_serial_transport_t * transport, uint8_t asic_i
 static bool serial_register_writer(void * context, uint16_t engine_id, uint8_t offset, const void * data, size_t data_len)
 {
     serial_register_context_t * writer = context;
+    if (writer != NULL && writer->multicast) {
+        uint8_t encoded[(32 + 6) * 2];
+        if (engine_id >= BZM_ENGINE_ROWS) return false;
+        size_t length = bzm_transport_encode_multicast(writer->asic_id, engine_id,
+            offset, data, data_len, encoded, sizeof(encoded));
+        return length != 0 && writer->transport->ops.write(
+            writer->transport->context, encoded, length) == (int)length;
+    }
     return writer != NULL && serial_write_register_raw(writer->transport, writer->asic_id, engine_id, offset, data, data_len);
 }
 
 bool bzm_serial_write_work(void * context, const bzm_work_t * work)
 {
     bzm_serial_transport_t * transport = context;
-    if (transport == NULL || !transport->io.initialized || work == NULL || transport->asic_count == 0 || transport->asic_count > BZM_MAX_ASIC_COUNT) {
+    if (transport == NULL || !transport->io.initialized || work == NULL ||
+        transport->asic_count != BZM_MAX_ASIC_COUNT ||
+        work->starting_nonce != 0 || work->end_nonce != UINT32_MAX) {
         return false;
     }
 
-    for (size_t i = 0; i < transport->asic_count; ++i) {
-        bzm_work_t chip_work = *work;
-        if (!bzm_partition_nonce_range(work->starting_nonce, work->end_nonce, i, transport->asic_count, &chip_work.starting_nonce,
-                                       &chip_work.end_nonce)) {
-            return false;
-        }
-        uint8_t start_nonce[4], end_nonce[4];
-        bzm_store_le32(start_nonce, chip_work.starting_nonce);
-        bzm_store_le32(end_nonce, chip_work.end_nonce);
-        if (!serial_write_register_raw(
-                transport, transport->asic_ids[i], work->engine_id,
-                BZM_REG_START_NONCE, start_nonce, 4) ||
-            !serial_write_register_raw(
-                transport, transport->asic_ids[i], work->engine_id,
-                BZM_REG_END_NONCE, end_nonce, 4)) {
-            return false;
-        }
-    }
-    /* BIRDS preloads the per-ASIC nonce quarters, then multicasts the common
-     * engine job. Keep the explicit range writes above, but send the large
-     * midstate payload only once to all four addressed ASICs. */
+    /* Nonce partitions persist across replacement jobs and live PLL changes. */
     serial_register_context_t writer = {
         .transport = transport,
         .asic_id = BZM_ALL_ASICS,
+        .multicast = work->multicast_row,
     };
     return bzm_transport_program_broadcast_work(
         work, serial_register_writer, &writer);

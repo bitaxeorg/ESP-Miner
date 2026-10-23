@@ -20,7 +20,7 @@ target_include_directories(bzm_test_support PUBLIC
 target_link_libraries(bzm_test_support PUBLIC Threads::Threads m)
 target_compile_options(bzm_test_support PRIVATE -Wall -Wextra -Werror -Wpedantic)
 
-foreach(test transport manufacturing hash memory)
+foreach(test transport manufacturing hash platform runtime_smoke driver_fault driver_backlog driver_schedule grouped_jobs memory)
     add_executable(bzm_test_${test} test_${test}.c)
     target_link_libraries(bzm_test_${test} PRIVATE bzm_test_support)
     target_include_directories(bzm_test_${test} PRIVATE "${ASIC_DIR}/private_include")
@@ -28,7 +28,10 @@ foreach(test transport manufacturing hash memory)
     add_test(NAME bzm_${test} COMMAND bzm_test_${test})
 endforeach()
 
-foreach(header balanced_ramp board bringup chain dispatch_gate frame_parser frequency platform posix power protocol registers runtime_result status telemetry telemetry_decode topology transport work_registers)
+foreach(header balanced_ramp board bringup chain controls dispatch_gate
+               frame_parser frequency platform posix power protocol registers
+               runtime runtime_result status telemetry telemetry_decode topology
+               transport work_registers)
     add_library(bzm_header_${header} OBJECT header.c)
     target_link_libraries(bzm_header_${header} PRIVATE bzm_test_support)
     target_compile_definitions(bzm_header_${header} PRIVATE

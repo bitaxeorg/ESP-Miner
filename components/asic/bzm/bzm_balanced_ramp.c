@@ -59,7 +59,7 @@ static bool activate_engine(bzm_balanced_ramp_report_t * ramp, const bzm_balance
         return fail(ramp, BZM_BALANCED_RAMP_FAILURE_CONFIG_WRITE, asic_id, engine->physical_id, BZM_ENGINE_REG_CONFIG,
                     config, 0);
     }
-    if (!bzm_transport_program_startup_work(engine->physical_id, addressed_write, &writer)) {
+    if (!bzm_transport_program_startup_work(asic_id, engine->physical_id, addressed_write, &writer)) {
         return fail(ramp, BZM_BALANCED_RAMP_FAILURE_SENTINEL_WRITE, asic_id, engine->physical_id, 0, 1, 0);
     }
 

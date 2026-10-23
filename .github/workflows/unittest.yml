@@ -7,6 +7,18 @@ permissions:
   contents: read
 
 jobs:
+  bzm-native-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v6
+
+      - name: Build and run BZM native tests
+        run: |
+          cmake -S components/asic/test/bzm/host -B build/bzm-host -DCMAKE_BUILD_TYPE=Debug
+          cmake --build build/bzm-host --parallel 2
+          ctest --test-dir build/bzm-host --output-on-failure
+
   build-and-test:
     runs-on: ubuntu-latest
     steps:

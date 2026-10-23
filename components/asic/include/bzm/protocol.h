@@ -39,6 +39,7 @@ typedef struct {
     bzm_work_handle_t handle;
     uint16_t engine_id;
     uint8_t timestamp_count;
+    bool multicast_row;
     uint32_t starting_nonce;
     uint32_t end_nonce;
     uint8_t midstates[BZM_VERSION_VARIANTS][32];

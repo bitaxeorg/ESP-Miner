@@ -3,7 +3,11 @@ include("${CMAKE_CURRENT_LIST_DIR}/bzm/sources.cmake")
 idf_component_register(
 SRCS
     ${BZM_SOURCES}
+    "bzm/port/esp/driver.c"
+    "bzm/port/esp/platform.c"
     "bzm/port/esp/result.c"
+    "bzm/port/esp/control.c"
+    "bzm/port/esp/gpio.c"
     "bzm/port/esp/serial.c"
 
     "bm1373.c"
@@ -44,6 +48,8 @@ PRIV_REQUIRES
     "esp_driver_gpio"
     "esp_driver_ledc"
     "heap"
+    "mbedtls"
+    "esp_rom"
 )
 
 target_include_directories(${COMPONENT_LIB} PRIVATE

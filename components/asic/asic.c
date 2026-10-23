@@ -3,6 +3,10 @@
 #include <esp_log.h>
 
 #include "bm1397.h"
+#include "bzm/driver.h"
+#include "bzm/frequency.h"
+#include "hashrate_monitor_task.h"
+#include "esp_timer.h"
 #include "bm1366.h"
 #include "bm1368.h"
 #include "bm1370.h"
@@ -21,6 +25,8 @@ uint8_t ASIC_init(GlobalState * GLOBAL_STATE)
 {
     ESP_LOGI(TAG, "Initializing %dx %s", GLOBAL_STATE->DEVICE_CONFIG.family.asic_count, GLOBAL_STATE->DEVICE_CONFIG.family.asic.name);
     switch (GLOBAL_STATE->DEVICE_CONFIG.family.asic.id) {
+        case BZM:
+            return BZM_init(GLOBAL_STATE);
         case BM1397:
             return BM1397_init(GLOBAL_STATE);
         case BM1366:
@@ -39,6 +45,8 @@ uint8_t ASIC_init(GlobalState * GLOBAL_STATE)
 task_result * ASIC_process_work(GlobalState * GLOBAL_STATE)
 {
     switch (GLOBAL_STATE->DEVICE_CONFIG.family.asic.id) {
+        case BZM:
+            return BZM_process_work(GLOBAL_STATE);
         case BM1397:
             return BM1397_process_work(GLOBAL_STATE);
         case BM1366:
@@ -57,6 +65,8 @@ task_result * ASIC_process_work(GlobalState * GLOBAL_STATE)
 int ASIC_set_max_baud(GlobalState * GLOBAL_STATE)
 {
     switch (GLOBAL_STATE->DEVICE_CONFIG.family.asic.id) {
+        case BZM:
+            return BZM_set_max_baud();
         case BM1397:
             return BM1397_set_max_baud();
         case BM1366:
@@ -75,6 +85,9 @@ int ASIC_set_max_baud(GlobalState * GLOBAL_STATE)
 void ASIC_send_work(GlobalState * GLOBAL_STATE, const asic_job_t * next_job)
 {
     switch (GLOBAL_STATE->DEVICE_CONFIG.family.asic.id) {
+        case BZM:
+            BZM_submit_job(GLOBAL_STATE, next_job);
+            break;
         case BM1397:
             BM1397_send_work(GLOBAL_STATE, next_job);
             break;
@@ -99,6 +112,9 @@ void ASIC_send_work(GlobalState * GLOBAL_STATE, const asic_job_t * next_job)
 void ASIC_set_version_mask(GlobalState * GLOBAL_STATE, uint32_t mask)
 {
     switch (GLOBAL_STATE->DEVICE_CONFIG.family.asic.id) {
+        case BZM:
+            // No version-mask register: bzm_work_build uses each job's version_mask.
+            break;
         case BM1397:
             BM1397_set_version_mask(mask);
             break;
@@ -120,9 +136,17 @@ void ASIC_set_version_mask(GlobalState * GLOBAL_STATE, uint32_t mask)
     }
 }
 
+float ASIC_get_min_frequency(GlobalState * GLOBAL_STATE)
+{
+    return GLOBAL_STATE->DEVICE_CONFIG.family.asic.id == BZM ? BZM_FREQUENCY_TARGET_MIN_MHZ : 50.0f;
+}
+
 void ASIC_set_frequency(GlobalState * GLOBAL_STATE)
 {
     switch (GLOBAL_STATE->DEVICE_CONFIG.family.asic.id) {
+        case BZM:
+            BZM_set_frequency(GLOBAL_STATE);
+            return;
         case BM1397:
             do_frequency_transition(GLOBAL_STATE, BM1397_send_hash_frequency);
             return;
@@ -150,6 +174,8 @@ void ASIC_set_nonce_space(GlobalState * GLOBAL_STATE)
     float frequency = GLOBAL_STATE->POWER_MANAGEMENT_MODULE.actual_frequency;
 
     switch (GLOBAL_STATE->DEVICE_CONFIG.family.asic.id) {
+        case BZM:
+            return; // BZM transport partitions each job over four chips.
         case BM1397:
             return;
         case BM1366:
@@ -177,6 +203,8 @@ double ASIC_get_asic_job_frequency_ms(GlobalState * GLOBAL_STATE)
     int asic_default_timeout_divided = GLOBAL_STATE->DEVICE_CONFIG.family.asic.default_asic_timeout / _next_power_of_two(asic_count);
 
     switch (GLOBAL_STATE->DEVICE_CONFIG.family.asic.id) {
+        case BZM:
+            return BZM_job_frequency_ms(GLOBAL_STATE);
         case BM1397:
             // no version-rolling so same Nonce Space is splitted between Big Cores
             return calculate_bm_timeout_ms(freq, asic_count, small_cores, cores, GLOBAL_STATE->DEVICE_CONFIG.family.asic.software_midstates, 1.0, asic_default_timeout_divided);
@@ -193,6 +221,17 @@ double ASIC_get_asic_job_frequency_ms(GlobalState * GLOBAL_STATE)
 void ASIC_read_registers(GlobalState * GLOBAL_STATE)
 {
     switch (GLOBAL_STATE->DEVICE_CONFIG.family.asic.id) {
+        case BZM: {
+            uint32_t counters[BZM_MAX_ASIC_COUNT];
+            if (BZM_hashrate_counter_snapshot(GLOBAL_STATE, counters, BZM_MAX_ASIC_COUNT)) {
+                uint64_t now = esp_timer_get_time();
+                for (uint8_t chip = 0; chip < GLOBAL_STATE->DEVICE_CONFIG.family.asic_count; ++chip) {
+                    hashrate_monitor_register_read(GLOBAL_STATE, REGISTER_TOTAL_COUNT, chip, counters[chip], now);
+                    hashrate_monitor_register_read(GLOBAL_STATE, REGISTER_DOMAIN_0_COUNT, chip, counters[chip], now);
+                }
+            }
+            return;
+        }
         case BM1397:
             BM1397_read_registers(GLOBAL_STATE);
             break;
@@ -247,6 +286,10 @@ void ASIC_set_difficulty(GlobalState * GLOBAL_STATE, uint8_t difficulty_power)
     }
 
     switch (GLOBAL_STATE->DEVICE_CONFIG.family.asic.id) {
+        case BZM:
+            // The BZM work encoder uses a fixed leading-zero filter.
+            GLOBAL_STATE->current_difficulty_power = BZM_RESULT_DIFFICULTY_POWER;
+            return;
         case BM1397:
             BM1397_set_difficulty(difficulty_power);
             return;
@@ -273,6 +316,9 @@ void ASIC_clear_work(GlobalState * GLOBAL_STATE)
     }
 
     switch (GLOBAL_STATE->DEVICE_CONFIG.family.asic.id) {
+        case BZM:
+            (void)BZM_clear_work(GLOBAL_STATE);
+            return;
         case BM1397:
         case BM1366:
         case BM1368:
@@ -291,6 +337,9 @@ void ASIC_init_job_slots(GlobalState * GLOBAL_STATE)
     }
 
     switch (GLOBAL_STATE->DEVICE_CONFIG.family.asic.id) {
+        case BZM:
+            // BZM allocates its generation-aware store at board startup.
+            return;
         case BM1397:
             bm13xx_init_job_slots(&GLOBAL_STATE->job_store, BM1397_JOB_SLOT_COUNT);
             return;

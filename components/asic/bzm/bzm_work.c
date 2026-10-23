@@ -92,9 +92,12 @@ static bool program_flush_job(uint16_t engine, uint8_t job_control, bzm_register
     return writer(writer_context, engine, BZM_REG_JOB_CONTROL, &job_control, 1);
 }
 
-bool bzm_transport_program_startup_work(uint16_t engine_id, bzm_register_writer_t writer, void * writer_context)
+bool bzm_transport_program_startup_work(uint8_t asic_id, uint16_t engine_id,
+                                      bzm_register_writer_t writer, void * writer_context)
 {
-    if (engine_id >= BZM_MAX_ENGINE_COUNT || writer == NULL) {
+    size_t asic_index;
+    if (engine_id >= BZM_MAX_ENGINE_COUNT || writer == NULL ||
+        !bzm_topology_asic_index(asic_id, &asic_index)) {
         return false;
     }
 
@@ -108,14 +111,18 @@ bool bzm_transport_program_startup_work(uint16_t engine_id, bzm_register_writer_
     bzm_work_t work = {
         .engine_id = engine_id,
         .timestamp_count = 0xff,
-        .starting_nonce = 0,
-        .end_nonce = UINT32_MAX,
         .merkle_residue = 0x1002b0a0U,
         .start_ntime = 0x65010002U,
         .target = 0x1d00ffffU,
         .logical_sequence = 0x3f,
         .lead_zeros = 64,
     };
+    /* Long quarters keep sentinel work busy throughout balanced startup.
+     * The driver installs row partitions after every engine is running. */
+    if (!bzm_partition_nonce_range(0, UINT32_MAX, asic_index, BZM_MAX_ASIC_COUNT,
+                                   &work.starting_nonce, &work.end_nonce)) {
+        return false;
+    }
     for (size_t variant = 0; variant < BZM_VERSION_VARIANTS; ++variant) {
         for (size_t word = 0; word < 8; ++word) {
             uint32_t value = sha256_initial_state[word] ^ ((uint32_t) variant * 0x01010101U);

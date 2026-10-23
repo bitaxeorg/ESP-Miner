@@ -22,7 +22,9 @@ task_result * ASIC_process_work(GlobalState * GLOBAL_STATE);
 int ASIC_set_max_baud(GlobalState * GLOBAL_STATE);
 /* The caller retains ownership and may release the job after this call. */
 void ASIC_send_job(GlobalState *state, const asic_job_t *job);
+// Configure hardware version rolling; software-midstate ASICs use each job's version_mask.
 void ASIC_set_version_mask(GlobalState * GLOBAL_STATE, uint32_t mask);
+float ASIC_get_min_frequency(GlobalState * GLOBAL_STATE);
 void ASIC_set_frequency(GlobalState * GLOBAL_STATE);
 void ASIC_set_nonce_space(GlobalState * GLOBAL_STATE);
 double ASIC_get_asic_job_frequency_ms(GlobalState * GLOBAL_STATE);

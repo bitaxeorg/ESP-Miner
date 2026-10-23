@@ -1,6 +1,8 @@
 set(BZM_SOURCES
+    "${CMAKE_CURRENT_LIST_DIR}/bzm_driver.c"
     "${CMAKE_CURRENT_LIST_DIR}/bzm_platform.c"
     "${CMAKE_CURRENT_LIST_DIR}/bzm_platform_serial.c"
+    "${CMAKE_CURRENT_LIST_DIR}/bzm_control.c"
     "${CMAKE_CURRENT_LIST_DIR}/bzm_hash.c"
     "${CMAKE_CURRENT_LIST_DIR}/bzm_job.c"
     "${CMAKE_CURRENT_LIST_DIR}/bzm_job_store.c"

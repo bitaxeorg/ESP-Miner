@@ -18,6 +18,9 @@ typedef struct {
     int job_frequency_ms;
     size_t allocation_failure_at;
     size_t hash_failure_at;
+    void (*on_send)(void *context, const asic_job_t *job);
+    void (*on_clear)(void *context);
+    void *context;
 } job_pipeline_harness_config_t;
 
 #define JOB_PIPELINE_HARNESS_MAX_EVENTS 8
@@ -26,17 +29,21 @@ typedef struct {
 typedef enum {
     JOB_PIPELINE_HARNESS_TIMEOUT = 0,
     JOB_PIPELINE_HARNESS_NOTIFY,
+    JOB_PIPELINE_HARNESS_REFRESH,
 } job_pipeline_harness_event_type_t;
 
 typedef struct {
     job_pipeline_harness_event_type_t type;
     uint32_t slot;
+    bool coalesce_next;
 } job_pipeline_harness_event_t;
 
 typedef struct {
     asic_job_t storage[JOB_PIPELINE_HARNESS_MAX_JOBS];
     asic_job_t *jobs[JOB_PIPELINE_HARNESS_MAX_JOBS];
     size_t job_count;
+    size_t clear_count;
+    size_t clears_before_send[JOB_PIPELINE_HARNESS_MAX_JOBS];
     uint32_t version_masks[JOB_PIPELINE_HARNESS_MAX_JOBS];
     size_t version_mask_count;
     size_t coinbase_decode_count;
@@ -44,6 +51,8 @@ typedef struct {
     uint8_t active_job_slot;
     size_t allocation_count;
     size_t hash_abort_count;
+    uint32_t wait_ticks[JOB_PIPELINE_HARNESS_MAX_EVENTS];
+    size_t wait_count;
 } job_pipeline_harness_result_t;
 
 /* Captured jobs are owned by result; release them with job_pipeline_harness_result_free(). */

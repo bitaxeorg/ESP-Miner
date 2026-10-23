@@ -175,23 +175,23 @@ static void test_poll_results(void)
     CHECK(bzm_serial_poll(NULL, 1).status == BZM_ERR_INVALID_ARG);
     bzm_serial_poll_result_t poll = bzm_serial_poll(&t, 0);
     CHECK(poll.status == BZM_OK && poll.bytes_received == 0 && poll.frames_emitted == 0);
-    CHECK(f.reads == 0);
+    CHECK(f.reads == 1 && f.now == 1000000);
     poll = bzm_serial_poll(&t, 1);
     CHECK(poll.status == BZM_OK && poll.bytes_received == 0 && poll.frames_emitted == 0);
     const uint8_t partial[] = {0x0a, 0x0f};
     feed(&f, partial, sizeof(partial));
-    poll = bzm_serial_poll(&t, 1);
+    poll = bzm_serial_poll(&t, 0);
     CHECK(poll.status == BZM_OK && poll.bytes_received == 2 && poll.frames_emitted == 0);
     CHECK(t.io.parser.buffered_length == 2 && f.io_errors == 0);
     const uint8_t payload[] = {'2', 'Z', 'B'};
     feed(&f, payload, sizeof(payload));
-    poll = bzm_serial_poll(&t, 1);
+    poll = bzm_serial_poll(&t, 0);
     CHECK(poll.status == BZM_OK && poll.bytes_received == 3 && poll.frames_emitted == 1);
     CHECK(t.io.parser.buffered_length == 0 && f.io_errors == 0);
     const uint8_t noop[] = {0x0a, 0x0f, '2', 'Z', 'B'};
     feed(&f, noop, sizeof(noop));
     f.error_after_data = true;
-    poll = bzm_serial_poll(&t, 1);
+    poll = bzm_serial_poll(&t, 0);
     CHECK(poll.status == BZM_ERR_IO && poll.bytes_received == 5 && poll.frames_emitted == 1);
     CHECK(f.io_errors == 1);
     f.error_after_data = false;
@@ -260,6 +260,53 @@ static void test_adapter_contract(void)
     bzm_serial_transport_deinit(&t);
 }
 
+static void test_runtime_preserves_nonce_quarters(void)
+{
+    bzm_serial_transport_t t;
+    fixture_t f;
+    init(&t, &f);
+    t.asic_count = BZM_MAX_ASIC_COUNT;
+    t.engine_count = 1;
+    bzm_work_t work = {.engine_id = 0, .end_nonce = UINT32_MAX, .lead_zeros = 36};
+    for (size_t i = 0; i < 2; ++i) {
+        size_t before = f.written;
+        CHECK(bzm_serial_write_work(&t, &work));
+        CHECK(f.written - before == 462);
+        CHECK(bzm_serial_flush(&t));
+    }
+    // Decode every actual UART write, including the sequence-reuse flush: only common fields may change.
+    for (size_t cursor = 0; cursor < f.written;) {
+        CHECK(f.tx[cursor] == BZM_ALL_ASICS && f.tx[cursor + 1] == 1);
+        uint8_t offset = f.tx[cursor + 6];
+        CHECK(offset != BZM_REG_START_NONCE && offset != BZM_REG_END_NONCE);
+        size_t length = f.tx[cursor + 8] + 1U;
+        cursor += (6 + length) * 2;
+        CHECK(cursor <= f.written);
+    }
+    size_t before = f.written;
+    work.starting_nonce = 1;
+    CHECK(!bzm_serial_write_work(&t, &work));
+    CHECK(f.written == before); // A partial-domain request cannot silently reuse full-domain quarters.
+    bzm_serial_transport_deinit(&t);
+}
+
+static void test_multicast_encoding(void)
+{
+    const uint8_t value = 3;
+    uint8_t encoded[14];
+    const uint8_t expected[] = {0xff, 1, 0x40, 0, 19, 0, 0x39, 0, 0, 0, 3, 0, 0, 0};
+    CHECK(bzm_transport_encode_multicast(BZM_ALL_ASICS, 19, BZM_REG_JOB_CONTROL,
+                                         &value, 1, encoded, sizeof(encoded)) == sizeof(expected));
+    CHECK(memcmp(encoded, expected, sizeof(expected)) == 0);
+    CHECK(bzm_transport_encode_multicast(BZM_ALL_ASICS, 0xff, BZM_REG_JOB_CONTROL,
+                                         &value, 1, encoded, sizeof(encoded)) == sizeof(expected));
+    CHECK(encoded[4] == 0xff);
+    CHECK(bzm_transport_encode_multicast(BZM_ALL_ASICS, BZM_ENGINE_ROWS, BZM_REG_JOB_CONTROL,
+                                         &value, 1, encoded, sizeof(encoded)) == 0);
+    CHECK(bzm_transport_encode_multicast(BZM_ALL_ASICS, 0, BZM_REG_JOB_CONTROL,
+                                         &value, 1, encoded, sizeof(encoded) - 1) == 0);
+}
+
 int main(void)
 {
     test_adapter_contract();
@@ -268,6 +315,8 @@ int main(void)
     test_errors_and_recovery();
     test_poll_results();
     test_work_wire_bytes();
-    puts("BZM host transport: 6 scenarios passed");
+    test_runtime_preserves_nonce_quarters();
+    test_multicast_encoding();
+    puts("BZM host transport: 8 scenarios passed");
     return 0;
 }
