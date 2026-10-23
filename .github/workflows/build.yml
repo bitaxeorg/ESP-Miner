@@ -24,7 +24,11 @@ jobs:
       with:
         esp_idf_version: v6.0.3
         target: esp32s3
-        command: GITHUB_ACTIONS="true" idf.py build
+        command: >-
+          GITHUB_ACTIONS="true" idf.py build &&
+          python tools/check_bonanza_build.py &&
+          python "$IDF_PATH/components/nvs_flash/nvs_partition_generator/nvs_partition_gen.py"
+          generate configs/config-1004.csv config.bin 0x6000
         path: '.'
     - uses: actions/setup-python@v6
       with:
@@ -32,12 +36,19 @@ jobs:
         cache: 'pip'
     - run: pip install esptool
     - name: "Create factory/merged image"
-      run: "./merge_bin.sh ./esp-miner-merged.bin"
+      run: |
+        ./merge_bin.sh ./esp-miner-merged.bin
+        ./merge_bin.sh -c ./esp-miner-factory-1004.bin
     - name: upload esp-miner-merged.bin
       uses: actions/upload-artifact@v4
       with:
         name: esp-miner-factory.bin
         path: ./esp-miner-merged.bin
+    - name: upload esp-miner-factory-1004.bin
+      uses: actions/upload-artifact@v4
+      with:
+        name: esp-miner-factory-1004.bin
+        path: ./esp-miner-factory-1004.bin
     - name: upload esp-miner.bin
       uses: actions/upload-artifact@v4
       with:

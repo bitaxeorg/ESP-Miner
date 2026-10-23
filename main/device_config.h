@@ -136,6 +136,7 @@ static const AsicConfig default_asic_configs[] = {
     ASIC_BM1370XP,
     ASIC_BM1370_HEX,
     ASIC_BM1373,
+    ASIC_BZM,
 };
 
 static const FamilyConfig FAMILY_MAX         = { .id = MAX,         .name = "Max",        .asic = ASIC_BM1397,   .asic_count = 1, .max_power =  25, .power_offset = 5,  .nominal_voltage = 5,  .voltage_domains = 1, .swarm_color = "red",      .tps546_config = &TPS546_CONFIG_DEFAULT, };
@@ -162,9 +163,11 @@ static const FamilyConfig default_families[] = {
     FAMILY_GAMMA_HEX,
     FAMILY_GAMMA_TURBO,
     FAMILY_NAJA_DUO,
+    FAMILY_BONANZA,
 };
 
 static const DeviceConfig default_configs[] = {
+    { .board_version = "1004", .family = FAMILY_BONANZA, .pins = { .bap = NULL, .i2c = &DEFAULT_I2C_PINS, .i80 = NULL }, .TPS546 = true },
     { .board_version = "2.2",  .family = FAMILY_MAX,         .pins = BITAXE_ORIGINAL_PINS, .EMC2101 = true,                                                                                 .DS4432U = true, .INA260 = true, .plug_sense = true, .asic_enable = true, .power_consumption_target = 12, },
     { .board_version = "102",  .family = FAMILY_MAX,         .pins = BITAXE_ORIGINAL_PINS, .EMC2101 = true,                                                                                 .DS4432U = true, .INA260 = true, .plug_sense = true, .asic_enable = true, .power_consumption_target = 12, },
     { .board_version = "0.11", .family = FAMILY_ULTRA,       .pins = BITAXE_ORIGINAL_PINS, .EMC2101 = true, .emc_internal_temp = true,                                  .temp_offset = 5,   .DS4432U = true, .INA260 = true, .plug_sense = true, .asic_enable = true, .power_consumption_target = 12, },
