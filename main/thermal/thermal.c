@@ -1,4 +1,6 @@
 #include "thermal.h"
+#include "bzm/control.h"
+#include "bzm/driver.h"
 #include "device_config.h"
 #include "global_state.h"
 
@@ -62,6 +64,10 @@ esp_err_t Thermal_init(DeviceConfig * DEVICE_CONFIG)
 //percent is a float between 0.0 and 1.0
 esp_err_t Thermal_set_fan_percent(DeviceConfig * DEVICE_CONFIG, float percent)
 {
+    if (DEVICE_CONFIG->family.id == BONANZA) {
+        return BZM_control_set_fan_percent(percent);
+    }
+
     if (DEVICE_CONFIG->EMC2101) {
         return EMC2101_set_fan_speed(percent);
     }
@@ -76,6 +82,12 @@ esp_err_t Thermal_set_fan_percent(DeviceConfig * DEVICE_CONFIG, float percent)
 
 uint16_t Thermal_get_fan_speed(DeviceConfig * DEVICE_CONFIG) 
 {
+    if (DEVICE_CONFIG->family.id == BONANZA) {
+        uint16_t rpm = 0;
+        (void)BZM_control_get_fan_rpm(&rpm);
+        return rpm;
+    }
+
     if (DEVICE_CONFIG->EMC2101) {
         return EMC2101_get_fan_speed();
     }
@@ -98,6 +110,9 @@ uint16_t Thermal_get_fan2_speed(DeviceConfig * DEVICE_CONFIG)
 
 float Thermal_get_chip_temp(GlobalState * GLOBAL_STATE)
 {
+    if (GLOBAL_STATE->DEVICE_CONFIG.family.id == BONANZA)
+        return BZM_read_temperature(GLOBAL_STATE);
+
     if (!GLOBAL_STATE->ASIC_initalized) {
         return -1;
     }
@@ -120,6 +135,8 @@ float Thermal_get_chip_temp(GlobalState * GLOBAL_STATE)
 
 float Thermal_get_chip_temp2(GlobalState * GLOBAL_STATE)
 {
+    if (GLOBAL_STATE->DEVICE_CONFIG.family.id == BONANZA) return -1;
+
     if (!GLOBAL_STATE->ASIC_initalized) {
         return -1;
     }
