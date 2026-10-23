@@ -18,7 +18,8 @@ static int64_t s_pending_increase_time_us = 0;
 
 void difficulty_controller_update(GlobalState * GLOBAL_STATE)
 {
-    if (!GLOBAL_STATE || !GLOBAL_STATE->ASIC_initalized) {
+    if (!GLOBAL_STATE || !GLOBAL_STATE->ASIC_initalized ||
+        GLOBAL_STATE->DEVICE_CONFIG.family.asic.fixed_difficulty) {
         return;
     }
 
