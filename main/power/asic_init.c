@@ -8,6 +8,9 @@
 #include "serial.h"
 #include "asic_reset.h"
 #include "difficulty_controller.h"
+#include "nvs_config.h"
+#include "vcore.h"
+#include <stdio.h>
 
 static const char *TAG = "asic_init";
 
@@ -21,6 +24,28 @@ static const char *TAG = "asic_init";
 
 uint8_t asic_initialize(GlobalState *GLOBAL_STATE, asic_init_mode_t mode, uint32_t stabilization_delay_ms)
 {
+    if (GLOBAL_STATE->DEVICE_CONFIG.family.asic.id == BZM) {
+        // Before ASIC_init, VCORE prepares the 2.8 V startup rail; afterwards it applies the saved voltage.
+        float voltage = nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE) / 1000.0f;
+        uint8_t chips = VCORE_set_voltage(GLOBAL_STATE, voltage) == ESP_OK ? ASIC_init(GLOBAL_STATE) : 0;
+        if (chips > 0 && VCORE_set_voltage(GLOBAL_STATE, voltage) == ESP_OK) {
+            ASIC_set_frequency(GLOBAL_STATE);
+            if (!GLOBAL_STATE->SYSTEM_MODULE.hardware_fault) {
+                GLOBAL_STATE->ASIC_initalized = true;
+                difficulty_controller_update(GLOBAL_STATE);
+                vTaskDelay(pdMS_TO_TICKS(stabilization_delay_ms));
+                return chips;
+            }
+        }
+        VCORE_set_voltage(GLOBAL_STATE, 0.0f);
+        GLOBAL_STATE->ASIC_initalized = false;
+        GLOBAL_STATE->SYSTEM_MODULE.hardware_fault = true;
+        snprintf(GLOBAL_STATE->SYSTEM_MODULE.hardware_fault_msg,
+                 sizeof(GLOBAL_STATE->SYSTEM_MODULE.hardware_fault_msg), "BZM initialization failed");
+        GLOBAL_STATE->SYSTEM_MODULE.asic_status = GLOBAL_STATE->SYSTEM_MODULE.hardware_fault_msg;
+        return 0;
+    }
+
     const char *mode_str = (mode == ASIC_INIT_COLD_BOOT) ? "cold boot" : "recovery";
     const uint8_t max_attempts = GLOBAL_STATE->DEVICE_CONFIG.family.asic.init_retry_attempts > 0
                                      ? GLOBAL_STATE->DEVICE_CONFIG.family.asic.init_retry_attempts

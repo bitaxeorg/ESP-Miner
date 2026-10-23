@@ -12,6 +12,7 @@
 #include "asic_reset.h"
 #include "difficulty_controller.h"
 #include "driver/uart.h"
+#include <math.h>
 
 #define POLL_RATE 100
 #define MAX_TEMP 90.0
@@ -33,10 +34,8 @@ static void mining_stop(GlobalState * GLOBAL_STATE)
 {
     ESP_LOGI(TAG, "Stopping mining");
 
-    // Wind frequency down to 50 MHz before cutting power. This also updates
-    // the transition tracker so the ramp starts from 50 MHz on next start,
-    // rather than the stale pre-reset frequency.
-    GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value = 50;
+    // Wind down to the ASIC minimum before cutting power.
+    GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value = ASIC_get_min_frequency(GLOBAL_STATE);
     GLOBAL_STATE->POWER_MANAGEMENT_MODULE.expected_hashrate = 0;
 
     ASIC_set_frequency(GLOBAL_STATE);
@@ -90,7 +89,9 @@ static uint8_t mining_start(GlobalState * GLOBAL_STATE)
 
 static float expected_hashrate(GlobalState * GLOBAL_STATE)
 {
-    return GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value * GLOBAL_STATE->DEVICE_CONFIG.family.asic.small_core_count * GLOBAL_STATE->DEVICE_CONFIG.family.asic_count / 1000.0;
+    // Each BZM engine produces four hashes every three clocks.
+    float hashes_per_clock = GLOBAL_STATE->DEVICE_CONFIG.family.asic.id == BZM ? 4.0f / 3.0f : 1.0f;
+    return GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value * GLOBAL_STATE->DEVICE_CONFIG.family.asic.small_core_count * GLOBAL_STATE->DEVICE_CONFIG.family.asic_count * hashes_per_clock / 1000.0;
 }
 
 void POWER_MANAGEMENT_init_frequency(GlobalState * GLOBAL_STATE)
@@ -98,7 +99,7 @@ void POWER_MANAGEMENT_init_frequency(GlobalState * GLOBAL_STATE)
     float frequency = nvs_config_get_float(NVS_CONFIG_ASIC_FREQUENCY);
 
     GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value = frequency;
-    GLOBAL_STATE->POWER_MANAGEMENT_MODULE.actual_frequency = 50.0;
+    GLOBAL_STATE->POWER_MANAGEMENT_MODULE.actual_frequency = ASIC_get_min_frequency(GLOBAL_STATE);
     GLOBAL_STATE->POWER_MANAGEMENT_MODULE.expected_hashrate = expected_hashrate(GLOBAL_STATE);
     
     char expected_hashrate_str[16] = {0};
@@ -161,7 +162,7 @@ void POWER_MANAGEMENT_task(void * pvParameters)
             power_management->chip_temp_avg > THROTTLE_TEMP
             || power_management->chip_temp2_avg > THROTTLE_TEMP;
 
-        if ((power_management->vr_temp > TPS546_THROTTLE_TEMP || asic_overheat) && (power_management->frequency_value > 50 || power_management->voltage > 1000)) {
+        if ((power_management->vr_temp > TPS546_THROTTLE_TEMP || asic_overheat) && (power_management->frequency_value > ASIC_get_min_frequency(GLOBAL_STATE) || power_management->voltage > 1000)) {
             if (power_management->chip_temp2_avg > 0) {
                 ESP_LOGE(TAG, "OVERHEAT! VR: %fC ASIC1: %fC ASIC2: %fC", power_management->vr_temp, power_management->chip_temp_avg, power_management->chip_temp2_avg);
             } else {
@@ -210,6 +211,8 @@ void POWER_MANAGEMENT_task(void * pvParameters)
             
             uint16_t reduced_voltage = last_known_asic_voltage > ASIC_REDUCTION ? last_known_asic_voltage - ASIC_REDUCTION : 1000;
             float reduced_asic_frequency = last_known_asic_frequency > ASIC_REDUCTION ? last_known_asic_frequency - ASIC_REDUCTION : 400.0;
+
+            reduced_asic_frequency = fmaxf(reduced_asic_frequency, ASIC_get_min_frequency(GLOBAL_STATE));
 
             // Never drop below the regulator's minimum core voltage. TPS546_set_vout()
             // rejects anything lower (out of range), which leaves the VR stuck in a
