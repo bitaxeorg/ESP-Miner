@@ -1,5 +1,7 @@
 idf_component_register(
 SRCS
+    "power/bonanza_vcore.c"
+
     "adc.c"
     "i2c_bitaxe.c"
     "main.c"
