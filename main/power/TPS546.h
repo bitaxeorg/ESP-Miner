@@ -63,6 +63,7 @@ typedef struct TPS546_CONFIG
   uint8_t TPS546_INIT_SYNC_CONFIG; /* Sync configuration */
   uint8_t TPS546_INIT_COMPENSATION_CONFIG[5];
   uint16_t TPS546_INIT_FREQUENCY; /* Switch frequency in KHz */
+  bool TPS546_USE_ENABLE_PIN;
   
 } TPS546_CONFIG;
 
@@ -71,6 +72,7 @@ extern const TPS546_CONFIG TPS546_CONFIG_HEX;
 extern const TPS546_CONFIG TPS546_CONFIG_GAMMA_TURBO;
 extern const TPS546_CONFIG TPS546_CONFIG_NAJA_DUO;
 extern const TPS546_CONFIG TPS546_CONFIG_GAMMA_HEX;
+extern const TPS546_CONFIG TPS546_CONFIG_BONANZA_1004;
 
 /* vin voltage */
 // #define TPS546_INIT_VIN_ON  11.0  /* V */

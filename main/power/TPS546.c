@@ -121,6 +121,25 @@ const TPS546_CONFIG TPS546_CONFIG_GAMMA_HEX = {
     .TPS546_INIT_COMPENSATION_CONFIG = {0x02, 0x64, 0x82, 0x11, 0x06},
 };
 
+const TPS546_CONFIG TPS546_CONFIG_BONANZA_1004 = {
+    .TPS546_INIT_PHASE = TPS546_INIT_PHASE_MULTI,
+    .TPS546_INIT_VIN_ON = 11.0f,
+    .TPS546_INIT_VIN_OFF = 10.5f,
+    .TPS546_INIT_VIN_UV_WARN_LIMIT = 11.0f,
+    .TPS546_INIT_VIN_OV_FAULT_LIMIT = 14.0f,
+    .TPS546_INIT_SCALE_LOOP = 0.125f,
+    .TPS546_INIT_VOUT_MIN = 2.1f,
+    .TPS546_INIT_VOUT_MAX = 3.2f,
+    .TPS546_INIT_VOUT_COMMAND = 2.8f,
+    .TPS546_INIT_IOUT_OC_WARN_LIMIT = 50.0f,
+    .TPS546_INIT_IOUT_OC_FAULT_LIMIT = 55.0f,
+    .TPS546_INIT_STACK_CONFIG = TPS546_SINGLE_PHASE_STACK_CONFIG,
+    .TPS546_INIT_SYNC_CONFIG = 0x10,
+    .TPS546_INIT_FREQUENCY = 325,
+    .TPS546_INIT_COMPENSATION_CONFIG = {0x13, 0x11, 0x8c, 0x1d, 0x08},
+    .TPS546_USE_ENABLE_PIN = true,
+};
+
 static uint8_t DEVICE_ID_TPS546D24A[] = {0x54, 0x49, 0x54, 0x6D, 0x24, 0x41};
 static uint8_t DEVICE_ID_TPS546D24S[] = {0x54, 0x49, 0x54, 0x6D, 0x24, 0x62};
 // static uint8_t DEVICE_ID_TPS546B24A[] = {0x54, 0x49, 0x54, 0x6B, 0x24, 0x41};
@@ -532,12 +551,12 @@ esp_err_t TPS546_init(TPS546_CONFIG config)
     //write operation register to turn off power
     u8_value = OPERATION_OFF;
     ESP_LOGI(TAG, "Power config-OPERATION: %02X", u8_value);
-    smb_write_byte(PMBUS_OPERATION, u8_value);
+    ESP_RETURN_ON_ERROR(smb_write_byte(PMBUS_OPERATION, u8_value), TAG, "Failed to turn off regulator");
 
     /* Make sure power is turned off until commanded */
     u8_value = (ON_OFF_CONFIG_DELAY | ON_OFF_CONFIG_POLARITY | ON_OFF_CONFIG_CP | ON_OFF_CONFIG_CMD | ON_OFF_CONFIG_PU);
     ESP_LOGI(TAG, "Power config-ON_OFF_CONFIG: %02X", u8_value);
-    smb_write_byte(PMBUS_ON_OFF_CONFIG, u8_value);
+    ESP_RETURN_ON_ERROR(smb_write_byte(PMBUS_ON_OFF_CONFIG, u8_value), TAG, "Failed to configure enable control");
 
     /* Read version number and see if it matches */
     TPS546_read_mfr_info(read_mfr_revision);
@@ -547,7 +566,14 @@ esp_err_t TPS546_init(TPS546_CONFIG config)
     // ESP_LOGI(TAG, "--------------------------------");
     // ESP_LOGI(TAG, "Config version mismatch, writing new config values");
     ESP_LOGI(TAG, "Writing new config values");
-    smb_read_byte(PMBUS_VOUT_MODE, &voutmode);
+    ESP_RETURN_ON_ERROR(smb_read_byte(PMBUS_VOUT_MODE, &voutmode), TAG, "Failed to read VOUT_MODE");
+    // The voltage limit values below are ratios, including on boards provisioned in absolute mode.
+    if ((voutmode & 0x80) == 0) {
+        uint8_t relative_mode = voutmode | 0x80;
+        ESP_RETURN_ON_ERROR(smb_write_byte(PMBUS_VOUT_MODE, relative_mode), TAG, "Failed to set relative VOUT_MODE");
+        ESP_RETURN_ON_ERROR(smb_read_byte(PMBUS_VOUT_MODE, &voutmode), TAG, "Failed to verify VOUT_MODE");
+        ESP_RETURN_ON_FALSE(voutmode == relative_mode, ESP_ERR_INVALID_STATE, TAG, "VOUT_MODE write rejected");
+    }
     ESP_LOGI(TAG, "VOUT_MODE: %02x", voutmode);
     TPS546_write_entire_config();
     //}
@@ -681,6 +707,7 @@ void TPS546_write_entire_config(void)
         // ON_OFF_CONFIG
     //u8_value = (ON_OFF_CONFIG_DELAY | ON_OFF_CONFIG_POLARITY | ON_OFF_CONFIG_CP | ON_OFF_CONFIG_CMD | ON_OFF_CONFIG_PU);
     uint8_t u8_value = (ON_OFF_CONFIG_DELAY | ON_OFF_CONFIG_POLARITY | ON_OFF_CONFIG_CMD | ON_OFF_CONFIG_PU);
+    if (tps546_config.TPS546_USE_ENABLE_PIN) u8_value |= ON_OFF_CONFIG_CP;
     ESP_LOGI(TAG, "Setting ON_OFF_CONFIG: %02X", u8_value);
     smb_write_byte(PMBUS_ON_OFF_CONFIG, u8_value);
 
@@ -757,14 +784,14 @@ void TPS546_write_entire_config(void)
     ESP_LOGI(TAG, "Setting VOUT SCALE: %.2f", tps546_config.TPS546_INIT_SCALE_LOOP);
     smb_write_word(PMBUS_VOUT_SCALE_LOOP, float_2_slinear11(tps546_config.TPS546_INIT_SCALE_LOOP));
 
-    ESP_LOGI(TAG, "Setting VOUT_COMMAND: %.2fV", tps546_config.TPS546_INIT_VOUT_COMMAND);
-    smb_write_word(PMBUS_VOUT_COMMAND, float_2_ulinear16(tps546_config.TPS546_INIT_VOUT_COMMAND));
-
     ESP_LOGI(TAG, "Setting VOUT_MAX: %.2fV", tps546_config.TPS546_INIT_VOUT_MAX);
     smb_write_word(PMBUS_VOUT_MAX, float_2_ulinear16(tps546_config.TPS546_INIT_VOUT_MAX));
 
     ESP_LOGI(TAG, "Setting VOUT_MIN: %.2fV", tps546_config.TPS546_INIT_VOUT_MIN);
     smb_write_word(PMBUS_VOUT_MIN, float_2_ulinear16(tps546_config.TPS546_INIT_VOUT_MIN));
+
+    ESP_LOGI(TAG, "Setting VOUT_COMMAND: %.2fV", tps546_config.TPS546_INIT_VOUT_COMMAND);
+    smb_write_word(PMBUS_VOUT_COMMAND, float_2_ulinear16(tps546_config.TPS546_INIT_VOUT_COMMAND));
 
     if (TPS546_write_vout_limit_ratios(tps546_config.TPS546_INIT_VOUT_COMMAND) != ESP_OK) {
         ESP_LOGE(TAG, "Failed to write VOUT limit ratios");
