@@ -749,6 +749,7 @@ esp_err_t stratum_v2_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
 
         sv2_parse_frame_header(hdr_buf, &hdr);
 
+        bool channel_closed = false;
         switch (hdr.msg_type) {
             // Job messages must match the channel we negotiated. Consumers pick
             // the job struct type from the channel type, so accepting the wrong
@@ -768,6 +769,28 @@ esp_err_t stratum_v2_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
                 }
                 stratum_v2_handle_new_extended_mining_job(GLOBAL_STATE, conn, recv_buf, hdr.msg_length);
                 break;
+
+            case SV2_MSG_CLOSE_CHANNEL: {
+                uint32_t closing_channel_id;
+                char reason_code[64];
+                if (sv2_parse_close_channel(recv_buf, hdr.msg_length,
+                                            &closing_channel_id, reason_code,
+                                            sizeof(reason_code)) != 0) {
+                    ESP_LOGW(TAG, "Ignoring malformed SV2 CloseChannel");
+                    break;
+                }
+                if (closing_channel_id != conn->channel_id &&
+                    (!conn->has_group_channel || closing_channel_id != conn->group_channel_id)) {
+                    ESP_LOGW(TAG, "Ignoring CloseChannel for unrelated channel %lu",
+                             (unsigned long)closing_channel_id);
+                    break;
+                }
+                ESP_LOGW(TAG, "Upstream closed mining channel %lu: %s",
+                         (unsigned long)closing_channel_id, reason_code);
+                run_result = ESP_FAIL;
+                channel_closed = true;
+                break;
+            }
 
             case SV2_MSG_SET_NEW_PREV_HASH:
                 stratum_v2_handle_set_new_prev_hash(GLOBAL_STATE, conn, recv_buf, hdr.msg_length);
@@ -836,6 +859,7 @@ esp_err_t stratum_v2_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
                 ESP_LOGW(TAG, "Unknown SV2 message type: 0x%02x (len=%lu)", hdr.msg_type, hdr.msg_length);
                 break;
         }
+        if (channel_closed) break;
     }
 
     stratum_v2_close_connection(GLOBAL_STATE);
