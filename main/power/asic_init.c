@@ -95,6 +95,7 @@ uint8_t asic_initialize(GlobalState *GLOBAL_STATE, asic_init_mode_t mode, uint32
     }
     SERIAL_clear_buffer();
 
+    __atomic_fetch_add(&GLOBAL_STATE->ASIC_work_epoch, 1U, __ATOMIC_RELEASE);
     GLOBAL_STATE->ASIC_initalized = true;
     uint8_t difficulty_power = calculate_effective_asic_difficulty(GLOBAL_STATE->POWER_MANAGEMENT_MODULE.expected_hashrate);
     ASIC_set_difficulty(GLOBAL_STATE, difficulty_power);
