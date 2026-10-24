@@ -7,6 +7,7 @@
 #include "asic_common.h"
 #include "device_config.h"
 #include "global_state.h"
+#include "power_management_task.h"
 
 #define DIFFICULTY_INCREASE_GRACE_PERIOD_S 30.0
 #define DIFFICULTY_INCREASE_GRACE_PERIOD_US ((uint64_t)(DIFFICULTY_INCREASE_GRACE_PERIOD_S * 1000000ULL))
@@ -22,21 +23,14 @@ void difficulty_controller_update(GlobalState * GLOBAL_STATE)
         return;
     }
 
-    float expected_ghs = GLOBAL_STATE->POWER_MANAGEMENT_MODULE.expected_hashrate;
-    if (expected_ghs <= 0.0f) {
-        float freq = GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value;
-        if (freq <= 0.0f) {
-            freq = (float)GLOBAL_STATE->DEVICE_CONFIG.family.asic.default_frequency_mhz;
-        }
-        expected_ghs = freq * GLOBAL_STATE->DEVICE_CONFIG.family.asic.small_core_count * GLOBAL_STATE->DEVICE_CONFIG.family.asic_count / 1000.0f;
-    }
+    float expected_ghs = POWER_MANAGEMENT_get_nominal_hashrate(GLOBAL_STATE);
 
     double interval_s = (GLOBAL_STATE->target_share_interval_s > 0.0)
                             ? GLOBAL_STATE->target_share_interval_s
                             : DEFAULT_SHARE_INTERVAL_S;
 
     double pool_diff = GLOBAL_STATE->SYSTEM_MODULE.pool_difficulty;
-    uint8_t eff_power = calculate_effective_asic_difficulty((double)expected_ghs, interval_s, pool_diff);
+    uint8_t eff_power = calculate_effective_asic_difficulty(expected_ghs, (float)interval_s, pool_diff);
     uint8_t power_to_apply = 0;
 
     // Initial setup, self-test, or downward adjustment: apply immediately!

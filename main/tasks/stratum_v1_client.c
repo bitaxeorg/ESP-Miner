@@ -295,6 +295,9 @@ esp_err_t stratum_v1_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
                     ESP_LOGW(TAG, "Ignoring duplicate notify for job %s", target_job->job_id);
                 } else {
                     GLOBAL_STATE->SYSTEM_MODULE.work_received++;
+                    if (!GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback) {
+                        GLOBAL_STATE->SYSTEM_MODULE.primary_pool_error[0] = '\0';
+                    }
                     SYSTEM_notify_new_ntime(GLOBAL_STATE, target_job->ntime);
                     
                     target_job->pool_id = (uint8_t)pool_idx;

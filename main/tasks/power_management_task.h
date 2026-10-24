@@ -22,6 +22,8 @@ typedef struct
 
 void POWER_MANAGEMENT_init_frequency(GlobalState * GLOBAL_STATE);
 
+float POWER_MANAGEMENT_get_nominal_hashrate(const GlobalState * GLOBAL_STATE);
+
 void POWER_MANAGEMENT_task(void * pvParameters);
 
 #endif

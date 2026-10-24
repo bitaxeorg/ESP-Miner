@@ -214,28 +214,28 @@ void get_difficulty_mask(uint8_t difficulty_power, uint8_t *job_difficulty_mask)
     job_difficulty_mask[5] = _reverse_bits( mask        & 0xFF);
 }
 
-uint8_t calculate_effective_asic_difficulty(double expected_ghs, double interval_s, double pool_difficulty)
+uint8_t calculate_effective_asic_difficulty(float expected_ghs, float interval_s, double pool_difficulty)
 {
-    if (interval_s <= 0.0) {
+    if (interval_s <= 0.0f) {
         interval_s = DEFAULT_SHARE_INTERVAL_S;
     }
 
     uint8_t power = MIN_ASIC_DIFFICULTY_POWER;
-    if (expected_ghs > 0.0) {
-        double raw_diff = expected_ghs * 1e9 * interval_s / NONCE_SPACE;
-        if (raw_diff > (double)(1U << MIN_ASIC_DIFFICULTY_POWER)) {
+    if (expected_ghs > 0.0f) {
+        float raw_diff = expected_ghs * 1e9f * interval_s / NONCE_SPACE;
+        if (raw_diff > 1U << MIN_ASIC_DIFFICULTY_POWER) {
             int p = MIN_ASIC_DIFFICULTY_POWER;
-            while ((p < 31) && ((double)(1U << (p + 1)) <= raw_diff + 1e-6)) {
+            while (p < 31 && (1U << (p + 1)) <= raw_diff + 1e-4f) {
                 p++;
             }
-            double lower = (double)(1U << p);
-            double upper = (double)(1U << (p + 1));
-            power = ((raw_diff - lower) > (upper - raw_diff)) ? (uint8_t)(p + 1) : (uint8_t)p;
+            float lower = 1U << p;
+            float upper = 1U << (p + 1);
+            power = (raw_diff - lower > upper - raw_diff) ? p + 1 : p;
         }
     }
 
     if (pool_difficulty > 0.0) {
-        while (power > MIN_ASIC_DIFFICULTY_POWER && ((double)(1U << power) > pool_difficulty + 1e-6)) {
+        while (power > MIN_ASIC_DIFFICULTY_POWER && (1U << power) > pool_difficulty + 1e-6) {
             power--;
         }
     }
@@ -243,32 +243,32 @@ uint8_t calculate_effective_asic_difficulty(double expected_ghs, double interval
     return power;
 }
 
-double calculate_bm_timeout_ms(float frequency_mhz, size_t asic_count, size_t small_cores, size_t cores, size_t version_size, float timeout_percent, double default_time_ms)
+float calculate_bm_timeout_ms(float frequency_mhz, size_t asic_count, size_t small_cores, size_t cores, size_t version_size, float timeout_percent, float default_time_ms)
 {
     if (asic_count <= 0)
         return default_time_ms;
 
     // Round up to the nearest power of 2 some asic constants
-    int cores_up = _next_power_of_two((int)cores);
-    int small_cores_up = _next_power_of_two((int)small_cores);
-    int asic_count_up = _next_power_of_two((int)asic_count);
+    int cores_up = _next_power_of_two(cores);
+    int small_cores_up = _next_power_of_two(small_cores);
+    int asic_count_up = _next_power_of_two(asic_count);
 
-    if ((small_cores_up < cores_up) || (frequency_mhz <= 0.0f))
+    if (small_cores_up < cores_up || frequency_mhz <= 0.0f)
         return default_time_ms;
 
     // Calulate the time to scan the full nonce * version space
     // effectively how many iterations we have to do
     // First we remove the paralell nonces/versions
     // then we end up with `time = space / frequency`
-    double midstates = (double)small_cores_up / (double)cores_up;
-    double serial_versions = (double)version_size / midstates;
-    double serial_nonces = (double)NONCE_SPACE / (double)cores_up / (double)asic_count_up;
-    double fullspace_timeout_ms = serial_versions * serial_nonces / ((double)frequency_mhz * 1000.0);
+    float midstates = (float)small_cores_up / cores_up;
+    float serial_versions = version_size / midstates;
+    float serial_nonces = NONCE_SPACE / cores_up / asic_count_up;
+    float fullspace_timeout_ms = serial_versions * serial_nonces / (frequency_mhz * 1000.0f);
 
-    if (!(fullspace_timeout_ms > 0.0))
+    if (fullspace_timeout_ms <= 0.0f)
         return default_time_ms;
 
-    return (double)timeout_percent * fullspace_timeout_ms;
+    return timeout_percent * fullspace_timeout_ms;
 }
 
 bool bm13xx_decode_job_result(asic_job_store_t *store,

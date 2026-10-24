@@ -17,6 +17,7 @@
 #include "esp_heap_caps.h"
 #include "stratum_timing.h"
 #include "difficulty_controller.h"
+#include "power_management_task.h"
 
 #include <string.h>
 #include <stdlib.h>
@@ -217,6 +218,9 @@ static void stratum_v2_handle_new_extended_mining_job(GlobalState *GLOBAL_STATE,
         job->clean_jobs = false;
 
         GLOBAL_STATE->SYSTEM_MODULE.work_received++;
+        if (!GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback) {
+            GLOBAL_STATE->SYSTEM_MODULE.primary_pool_error[0] = '\0';
+        }
         SYSTEM_notify_new_ntime(GLOBAL_STATE, job->ntime);
         if (GLOBAL_STATE->create_jobs_task_handle) {
             xTaskNotify(GLOBAL_STATE->create_jobs_task_handle, slot, eSetValueWithOverwrite);
@@ -272,6 +276,9 @@ static void stratum_v2_handle_new_mining_job(GlobalState *GLOBAL_STATE, sv2_conn
         job->clean_jobs = false;
 
         GLOBAL_STATE->SYSTEM_MODULE.work_received++;
+        if (!GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback) {
+            GLOBAL_STATE->SYSTEM_MODULE.primary_pool_error[0] = '\0';
+        }
         SYSTEM_notify_new_ntime(GLOBAL_STATE, job->ntime);
         if (GLOBAL_STATE->create_jobs_task_handle) {
             xTaskNotify(GLOBAL_STATE->create_jobs_task_handle, slot, eSetValueWithOverwrite);
@@ -333,6 +340,9 @@ static void stratum_v2_handle_set_new_prev_hash(GlobalState *GLOBAL_STATE, sv2_c
         }
 
         GLOBAL_STATE->SYSTEM_MODULE.work_received++;
+        if (!GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback) {
+            GLOBAL_STATE->SYSTEM_MODULE.primary_pool_error[0] = '\0';
+        }
         SYSTEM_notify_new_ntime(GLOBAL_STATE, job->ntime);
         if (GLOBAL_STATE->create_jobs_task_handle) {
             xTaskNotify(GLOBAL_STATE->create_jobs_task_handle, slot, eSetValueWithOverwrite);
@@ -596,8 +606,7 @@ esp_err_t stratum_v2_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
 
     // 3. Send OpenMiningChannel
     {
-        float expected_gh = GLOBAL_STATE->POWER_MANAGEMENT_MODULE.expected_hashrate;
-        float hash_rate = (expected_gh > 0.0f) ? (expected_gh * 1e9f) : 1e12f;
+        float hash_rate = POWER_MANAGEMENT_get_nominal_hashrate(GLOBAL_STATE) * 1e9;
         int frame_len;
 
         if (channel_type == SV2_CHANNEL_EXTENDED) {
