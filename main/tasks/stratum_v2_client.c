@@ -821,6 +821,7 @@ esp_err_t stratum_v2_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
                 }
                 ESP_LOGW(TAG, "Upstream closed mining channel %lu: %s",
                          (unsigned long)closing_channel_id, reason_code);
+                POOL_set_connection_info(GLOBAL_STATE, pool_idx, "Channel closed by pool");
                 run_result = ESP_FAIL;
                 channel_closed = true;
                 break;
