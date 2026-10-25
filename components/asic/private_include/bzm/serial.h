@@ -6,12 +6,13 @@
 
 #include "esp_err.h"
 #include "bzm/serial_buffers.h"
+#include "bzm/protocol.h"
 
 #define BZM_UART_FREQ 115200
 
 #define BZM_SERIAL_HARDWARE_FIFO_BYTES 128U
 #define BZM_SERIAL_RX_FIFO_FULL_THRESHOLD 32U
-#define BZM_SERIAL_WIRE_BYTES_PER_SECOND 200000U
+#define BZM_SERIAL_WIRE_BYTES_PER_SECOND (BZM_BAUD_RATE / 10U)
 #define BZM_SERIAL_MAX_ISR_LATENCY_US 150U
 
 static inline bool BZM_SERIAL_fifo_reserve_covers(uint32_t fifo_bytes,

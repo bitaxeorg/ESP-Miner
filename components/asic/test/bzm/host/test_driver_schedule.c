@@ -48,6 +48,8 @@ static int16_t read_bytes(void *context, uint8_t *data, uint16_t size, uint16_t 
 static int write_bytes(void *context, const uint8_t *data, size_t size)
 {
     (void)context;
+    CHECK(size % 2 == 0);
+    for (size_t i = 1; i < size; i += 2) CHECK(data[i] <= 1); // Bridge byte-pair contract.
     if (data[6] == BZM_REG_START_NONCE || data[6] == BZM_REG_END_NONCE) {
         CHECK(!fixture.dispatching && DRIVER_BRINGUP.running);
         if (fixture.fail_nonce) return -1;
@@ -64,8 +66,8 @@ static int write_bytes(void *context, const uint8_t *data, size_t size)
         if (data[6] == BZM_REG_TIMESTAMP_COUNT) CHECK(data[10] == 0xff);
     }
     if (fixture.tx_done < fixture.now) fixture.tx_done = fixture.now;
-    fixture.tx_done += (int64_t)size * 5; // 2 Mbaud 8N1 with a bounded TX ring.
-    int64_t room_at = fixture.tx_done - BZM_SERIAL_TX_BUFFER_BYTES * 5;
+    fixture.tx_done += (int64_t)size * 10 * 1000000 / BZM_BAUD_RATE; // 8N1, bounded TX ring.
+    int64_t room_at = fixture.tx_done - (int64_t)BZM_SERIAL_TX_BUFFER_BYTES * 10 * 1000000 / BZM_BAUD_RATE;
     if (fixture.now < room_at) fixture.now = room_at;
     fixture.bytes += size;
     ++fixture.writes;
@@ -163,7 +165,9 @@ int main(void)
     }
     CHECK(fixture.bytes == BZM_ENGINE_ROWS * 462);
     CHECK(fixture.drains == drains + 1 && fixture.tx_done == fixture.now);
-    CHECK(fixture.now - started == 1000 + BZM_ENGINE_ROWS * 2310);
+    const int64_t row_wire_us = (int64_t)462 * 10 * 1000000 / BZM_BAUD_RATE;
+    const int64_t row_interval_us = row_wire_us > 1000 ? row_wire_us : 1000;
+    CHECK(fixture.now - started == 1000 + (BZM_ENGINE_ROWS - 1) * row_interval_us + row_wire_us);
     CHECK(bzm_driver_job_frequency_ms(&device) > 1700);
     CHECK(bzm_driver_job_frequency_ms(&device) < 1720);
     // Every row must renew before its shortest partition runs out, including

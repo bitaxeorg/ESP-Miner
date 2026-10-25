@@ -7,7 +7,7 @@
 #define bzm_bringup_start fixture_chip_start
 #include "../../../bzm/bzm_driver.c"
 
-/* Continuous 2 Mbaud 8N1 RX; assignment checkpoints and the idle service drain it. */
+/* Continuous production-baud 8N1 RX; assignment checkpoints and the idle service drain it. */
 /* Parsing is instantaneous; ESP scheduling, ISR, PSRAM and allocator delays are not modeled. */
 #define MODEL_BITS_PER_BYTE 10U
 #define MODEL_RX_RATE (BZM_BAUD_RATE / MODEL_BITS_PER_BYTE)
@@ -97,11 +97,12 @@ static void run(bool scheduled, bool stalled)
     for (unsigned i = 0; i < BZM_ENGINE_ROWS * 3; ++i) {
         if (scheduled) {
             uint64_t delay = (uint64_t)(bzm_driver_job_frequency_ms(&device) * 1000);
-            // Model the 100 ms service while work runs; no delay within a refill.
-            while (delay > 100000) {
-                advance(100000);
+            // Use the production service interval; no delay within a refill.
+            const uint64_t service_us = BZM_SERIAL_SERVICE_INTERVAL_MS * 1000U;
+            while (delay > service_us) {
+                advance(service_us);
                 CHECK(bzm_serial_poll(&TRANSPORT, 0).status == BZM_OK);
-                delay -= 100000;
+                delay -= service_us;
             }
             advance(delay);
         }

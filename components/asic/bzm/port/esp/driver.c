@@ -2,6 +2,7 @@
 #include "bzm/runtime.h"
 #include "bzm/esp.h"
 #include "bzm/result.h"
+#include "bzm/serial_buffers.h"
 #include "global_state.h"
 #include "create_jobs_task.h"
 #include <stdio.h>
@@ -55,7 +56,7 @@ static void device_io_task(void *context)
     for (;;) {
         bzm_device_t device = device_view(state);
         bzm_driver_service(&device);
-        vTaskDelay(pdMS_TO_TICKS(100));
+        vTaskDelay(pdMS_TO_TICKS(BZM_SERIAL_SERVICE_INTERVAL_MS));
     }
 }
 uint8_t BZM_init(GlobalState *state)
