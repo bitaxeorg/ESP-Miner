@@ -66,6 +66,16 @@ byte. RX is the framed TDM byte stream. A host fixture must provide that bridge
 protocol; a direct 8-bit UART connection is not interchangeable. This library
 does not open a serial port or select GPIO pins.
 
+Bonanza 1004 uses a fixed 5 Mbaud, 8N1 ESP-to-bridge link. It requires the
+matching [DMA bridge firmware](https://github.com/johnny9/bonanza-bridge-fw/tree/fix/1004-5mbaud-queues)
+(`0.1.0-1004.2`, validated implementation `e73b18a`) with continuous receive
+queues and block transmit DMA in both directions. The ASIC side remains
+5 Mbaud, 9N1. Older bridge firmware fixed at 2 Mbaud is incompatible: update
+the ESP and bridge as a pair, and retain both previous images for rollback.
+The ESP OTA image does not update the RP2040 bridge. See the bridge's
+[validation report](https://github.com/johnny9/bonanza-bridge-fw/blob/fix/1004-5mbaud-queues/docs/5mbaud-validation.md)
+for transport coverage and the remaining shared late-share limitation.
+
 The first manufacturing target is Linux with a USB/UART bridge. Bind the
 callbacks to the bridge's serial device in raw mode, using `poll` for read
 timeouts, `CLOCK_MONOTONIC` for time, and a complete-write loop. The bridge must
@@ -107,7 +117,7 @@ callbacks and contexts must remain valid for the lifetime of the driver.
 For Linux, `bzm_platform_posix_defaults` fills clock, delay, and logging callbacks.
 Add bridge serial and board-control callbacks before binding. The runtime owns
 one chain; keep its device context alive, serialize startup and configuration,
-and schedule `bzm_driver_service` about every 100 ms from the host. The library
+and schedule `bzm_driver_service` every 50 ms or faster from the host. The library
 does not create tasks. The result reader and submitter can run on separate
 threads, with the driver serializing transport and job state. `bzm_device_t`
 provides callbacks for submission permission, faults, frequency updates, and
@@ -144,15 +154,16 @@ The shared ASIC API and Bitmain drivers retain their ESP implementations.
 
 The ESP RX ring remains 32 KiB. Mining polls after each row assignment,
 not after a sweep of all 944 physical engines. The native `test_driver_backlog`
-models the production encoder and checkpoint with bounded 2 Mbaud 8N1 TX and
-continuous RX. One row assignment takes 2.310 ms of wire time, and a full
-20-row refill takes 46.2 ms. Checkpoints drain RX without sleeping or waiting
+models the production encoder and checkpoint with bounded 5 Mbaud 8N1 TX and
+continuous RX. One row assignment takes 0.924 ms of wire time, and a full
+20-row refill requires 18.48 ms of wire time. Checkpoints drain RX without sleeping or waiting
 for new bytes; TX overlaps job generation, draining at refill completion,
 each ordinary row renewal, and before live clock changes. The modeled peak RX
 backlog during refill is 2,510 bytes, including the final TX drain. With the
-100 ms service polling between renewals at 800 MHz, the largest modeled backlog
-is 20,000 bytes; an added 200 ms stall before renewal raises it to 41,662 bytes.
-The test uses the production RX and TX buffer constants. Parsing is instantaneous
+50 ms service polling between renewals at 800 MHz, the largest modeled backlog
+is 25,000 bytes; an added 200 ms stall before renewal raises it to 106,962 bytes.
+The test uses the production baud, service interval, and RX/TX buffer constants.
+The ESP TX ring remains 2 KiB. Parsing is instantaneous
 in this model; ESP scheduling, ISR, PSRAM, and allocation delays are not measured.
 These figures do not establish a hardware worst case or justify a smaller ring.
 Measure on-device backlog and latency before reducing it.
