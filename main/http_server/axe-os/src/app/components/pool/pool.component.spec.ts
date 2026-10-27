@@ -95,105 +95,100 @@ describe('PoolComponent', () => {
     fixture.detectChanges();
   });
 
-  it('should create and initialize form with mock data', () => {
+  it('should create and initialize form with mock data in priority order', () => {
     expect(component).toBeTruthy();
     expect(component.form.get('primaryPoolIndex')?.value).toBe(0);
     expect(component.form.get('secondaryPoolIndex')?.value).toBe(1);
     expect(component.poolsArray.length).toBe(2);
   });
 
-  it('should save both modified pool details and changed pool indices when updateSystem is called', () => {
-    // 1. Change primary pool index to 1 (which swaps secondary to 0)
-    component.form.get('primaryPoolIndex')?.setValue(1);
+  it('should save modified pool details with position-as-priority', () => {
+    const pool0Group = component.poolsArray.at(0);
+    pool0Group.get('stratumURL')?.setValue('pool0-modified.com');
+    pool0Group.get('stratumURL')?.markAsDirty();
     fixture.detectChanges();
 
-    expect(component.form.get('primaryPoolIndex')?.value).toBe(1);
-    expect(component.form.get('secondaryPoolIndex')?.value).toBe(0);
-
-    // 2. Change pool 1 details (e.g. stratumURL)
-    const pool1Group = component.poolsArray.at(1);
-    pool1Group.get('stratumURL')?.setValue('pool1-modified.com');
-    pool1Group.get('stratumURL')?.markAsDirty();
-    fixture.detectChanges();
-
-    // 3. Call updateSystem
     component.updateSystem();
 
     expect(systemServiceSpy.updateSystem).toHaveBeenCalled();
     const callArgs = systemServiceSpy.updateSystem.calls.mostRecent().args;
     const updatePayload = callArgs[1];
 
-    expect(updatePayload.primaryPoolIndex).toBe(1);
-    expect(updatePayload.secondaryPoolIndex).toBe(0);
-    expect(updatePayload.pools[1].stratumURL).toBe('pool1-modified.com');
+    expect(updatePayload.primaryPoolIndex).toBe(0);
+    expect(updatePayload.secondaryPoolIndex).toBe(1);
+    expect(updatePayload.pools[0].stratumURL).toBe('pool0-modified.com');
   });
 
-  it('should update form values when interacting through dropdown DOM elements and inputs', () => {
-    // 1. Click primary dropdown to open
-    const primaryDropdown = fixture.debugElement.query(By.css('#primaryPoolSelect'));
-    const trigger = primaryDropdown.query(By.css('.cursor-pointer'));
-    trigger.nativeElement.click();
-    fixture.detectChanges();
+  it('should correctly determine whether advanced options should be displayed', () => {
+    // SV1 pool should have advanced options
+    expect(component.hasAdvancedOptions(0)).toBe(true);
 
-    // 2. Select Option 2 (value: 1)
-    const options = primaryDropdown.queryAll(By.css('li'));
-    expect(options.length).toBe(2);
-    options[1].nativeElement.click();
-    fixture.detectChanges();
+    // Switch pool 0 to SV2 Standard channel -> should NOT have advanced options
+    component.poolsArray.at(0).get('stratumProtocol')?.setValue('SV2');
+    component.poolsArray.at(0).get('stratumV2ChannelType')?.setValue('standard');
+    expect(component.hasAdvancedOptions(0)).toBe(false);
 
-    expect(component.form.get('primaryPoolIndex')?.value).toBe(1);
-    expect(component.form.get('secondaryPoolIndex')?.value).toBe(0);
+    // Switch pool 0 to SV2 Extended channel -> should have advanced options
+    component.poolsArray.at(0).get('stratumV2ChannelType')?.setValue('extended');
+    expect(component.hasAdvancedOptions(0)).toBe(true);
+  });
+
+  it('should reorder pools using move buttons, swapping slots and keeping slot 0 as primary', () => {
+    // Initially: pool 0 is 'pool0.com' (Primary), pool 1 is 'pool1.com' (Fallback)
+    expect(component.poolsArray.at(0).get('stratumURL')?.value).toBe('pool0.com');
+    expect(component.poolsArray.at(0).get('id')?.value).toBe(0);
+    expect(component.poolsArray.at(1).get('stratumURL')?.value).toBe('pool1.com');
+    expect(component.poolsArray.at(1).get('id')?.value).toBe(1);
+
+    // Moving index 0 up should be a no-op
+    component.movePoolUp(0);
+    expect(component.poolsArray.at(0).get('stratumURL')?.value).toBe('pool0.com');
+
+    // Moving index 1 down should be a no-op
+    component.movePoolDown(1);
+    expect(component.poolsArray.at(1).get('stratumURL')?.value).toBe('pool1.com');
+
+    // Move pool 0 down (swaps with pool 1)
+    component.movePoolDown(0);
+
+    // Now index 0 is 'pool1.com' with id 0 (new Primary!), index 1 is 'pool0.com' with id 1 (new Fallback!)
+    expect(component.poolsArray.at(0).get('stratumURL')?.value).toBe('pool1.com');
+    expect(component.poolsArray.at(0).get('id')?.value).toBe(0);
+    expect(component.poolsArray.at(1).get('stratumURL')?.value).toBe('pool0.com');
+    expect(component.poolsArray.at(1).get('id')?.value).toBe(1);
+
+    expect(component.form.get('primaryPoolIndex')?.value).toBe(0);
+    expect(component.form.get('secondaryPoolIndex')?.value).toBe(1);
     expect(component.form.dirty).toBe(true);
 
-    // 3. Edit input in pool details
-    const urlInput = fixture.debugElement.query(By.css('#stratumURL_0'));
-    urlInput.nativeElement.value = 'pool0-new.com';
-    urlInput.nativeElement.dispatchEvent(new Event('input'));
-    fixture.detectChanges();
-
-    expect(component.form.get('primaryPoolIndex')?.value).toBe(1);
-    expect(component.poolsArray.at(0).get('stratumURL')?.value).toBe('pool0-new.com');
-
-    // 4. Submit
-    component.updateSystem();
-    const callArgs = systemServiceSpy.updateSystem.calls.mostRecent().args;
-    const payload = callArgs[1];
-    expect(payload.primaryPoolIndex).toBe(1);
-    expect(payload.pools[0].stratumURL).toBe('pool0-new.com');
+    // Move pool 1 back up
+    component.movePoolUp(1);
+    expect(component.poolsArray.at(0).get('stratumURL')?.value).toBe('pool0.com');
+    expect(component.poolsArray.at(0).get('id')?.value).toBe(0);
+    expect(component.poolsArray.at(1).get('stratumURL')?.value).toBe('pool1.com');
+    expect(component.poolsArray.at(1).get('id')?.value).toBe(1);
   });
 
-  it('should handle secondaryPoolIndex swap, mark controls dirty, and update previousPrim/previousSec on save', () => {
-    // Initially primary = 0, secondary = 1
-    expect(component['previousPrim']).toBe(0);
-    expect(component['previousSec']).toBe(1);
+  it('should handle pool deletion, shift remaining pools, and prevent deleting only pool', () => {
+    expect(component.isDeleteDisabled()).toBe(false);
 
-    // Change secondary to 0 (should swap primary to 1 and mark it dirty)
-    component.form.get('secondaryPoolIndex')?.setValue(0);
+    // Delete pool at index 0 (which was pool0.com)
+    component.deletePool(0);
     fixture.detectChanges();
 
-    expect(component.form.get('primaryPoolIndex')?.value).toBe(1);
+    // Now only 1 pool remains (which is pool1.com, renumbered to id 0)
+    expect(component.poolsArray.length).toBe(1);
+    expect(component.poolsArray.at(0).get('stratumURL')?.value).toBe('pool1.com');
+    expect(component.poolsArray.at(0).get('id')?.value).toBe(0);
+    expect(component.form.get('primaryPoolIndex')?.value).toBe(0);
     expect(component.form.get('secondaryPoolIndex')?.value).toBe(0);
-    expect(component.form.get('primaryPoolIndex')?.dirty).toBe(true);
-    expect(component['previousPrim']).toBe(1);
-    expect(component['previousSec']).toBe(0);
 
-    // Modify a pool detail
-    component.poolsArray.at(0).get('stratumPort')?.setValue(4444);
-    component.poolsArray.at(0).get('stratumPort')?.markAsDirty();
+    // Delete should now be disabled because only 1 pool remains
+    expect(component.isDeleteDisabled()).toBe(true);
 
-    // Call updateSystem
-    component.updateSystem();
-
-    const callArgs = systemServiceSpy.updateSystem.calls.mostRecent().args;
-    const payload = callArgs[1];
-    expect(payload.primaryPoolIndex).toBe(1);
-    expect(payload.secondaryPoolIndex).toBe(0);
-    expect(payload.pools[0].stratumPort).toBe(4444);
-
-    // Verify onSaveSuccess updated previous values and reset dirty state
-    expect(component['previousPrim']).toBe(1);
-    expect(component['previousSec']).toBe(0);
-    expect(component.form.pristine).toBe(true);
+    // Trying to delete the only pool should be rejected
+    component.deletePool(0);
+    expect(component.poolsArray.length).toBe(1);
   });
 });
 

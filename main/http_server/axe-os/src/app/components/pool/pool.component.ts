@@ -1,13 +1,12 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { getHttpErrorMessage } from 'src/app/utils/error-handler';
-import { Component, Input, OnInit } from '@angular/core';
+import { Component, Input, OnInit, ChangeDetectorRef } from '@angular/core';
 import { FormBuilder, FormGroup, FormArray, Validators, ValidatorFn, ValidationErrors, AbstractControl, FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { ToastrService } from 'ngx-toastr';
 import { LoadingService } from 'src/app/services/loading.service';
 import { SystemApiService } from 'src/app/services/system.service';
 import { LiveDataService } from 'src/app/services/live-data.service';
 import { first } from 'rxjs';
-import { DropdownComponent } from '../dropdown/dropdown.component';
 import { TooltipDirective } from '../../directives/tooltip.directive';
 import { TooltipTextIconComponent } from '../tooltip-text-icon/tooltip-text-icon.component';
 import { RadioButtonComponent } from '../radio-button/radio-button.component';
@@ -28,21 +27,14 @@ interface IChannelOption {
   label: string;
 }
 
-interface IPoolDropdownOption {
-  value: number;
-  label: string;
-}
-
 @Component({
   selector: 'app-pool',
   templateUrl: './pool.component.html',
-  imports: [FormsModule, ReactiveFormsModule, DropdownComponent, TooltipDirective, TooltipTextIconComponent, RadioButtonComponent, CheckboxComponent]
+  imports: [FormsModule, ReactiveFormsModule, TooltipDirective, TooltipTextIconComponent, RadioButtonComponent, CheckboxComponent]
 })
 export class PoolComponent implements OnInit {
   public form!: FormGroup;
 
-  private previousPrim: number = 0;
-  private previousSec: number = 1;
   private pendingDeletePoolIds: number[] = [];
 
   public readonly DEFAULT_BITCOIN_ADDRESS = 'bc1qnp980s5fpp8l94p5cvttmtdqy8rvrq74qly2yrfmzkdsntqzlc5qkc4rkq';
@@ -76,7 +68,8 @@ export class PoolComponent implements OnInit {
     private systemService: SystemApiService,
     private liveDataService: LiveDataService,
     private toastr: ToastrService,
-    private loadingService: LoadingService
+    private loadingService: LoadingService,
+    private cdr: ChangeDetectorRef
   ) { }
 
   ngOnInit(): void {
@@ -86,11 +79,9 @@ export class PoolComponent implements OnInit {
         this.asicModel = info.ASICModel || '';
 
         const poolsList = [...(info.pools || [])];
-        
-        // Ensure primary pool index slot is in the list
-        if (!poolsList.some(p => p.id === info.primaryPoolIndex)) {
-          poolsList.push({
-            id: info.primaryPoolIndex,
+        const orderedList: any[] = poolsList.length > 0 ? poolsList : [
+          {
+            id: 0,
             stratumProtocol: 'SV1',
             stratumURL: '',
             stratumPort: 3333,
@@ -105,34 +96,14 @@ export class PoolComponent implements OnInit {
             stratumV2ChannelType: 'extended',
             stratumV2AuthorityPubkey: '',
             stratumV2RequireAuth: false
-          });
-        }
-        
-        // Ensure secondary pool index slot is in the list
-        if (!poolsList.some(p => p.id === info.secondaryPoolIndex)) {
-          poolsList.push({
-            id: info.secondaryPoolIndex,
-            stratumProtocol: 'SV1',
-            stratumURL: '',
-            stratumPort: 3333,
-            stratumUser: '',
-            stratumPassword: '',
-            stratumSuggestedDifficulty: 0,
-            stratumExtranonceSubscribe: false,
-            stratumTLS: 0,
-            stratumCert: '',
-            stratumDecodeCoinbase: true,
-            stratumShareWarning: true,
-            stratumV2ChannelType: 'extended',
-            stratumV2AuthorityPubkey: '',
-            stratumV2RequireAuth: false
-          });
-        }
+          }
+        ];
 
-        // Sort by ID to keep the card order ascending
-        poolsList.sort((a, b) => (a.id ?? 0) - (b.id ?? 0));
+        orderedList.forEach((pool, idx) => {
+          pool.id = idx;
+        });
 
-        const poolsFormGroups = poolsList.map((pool: any) => {
+        const poolsFormGroups = orderedList.map((pool: any) => {
           this.showPassword[pool.id] = false;
           this.showAdvancedOptions[pool.id] = false;
 
@@ -164,8 +135,8 @@ export class PoolComponent implements OnInit {
         });
 
         this.form = this.fb.group({
-          primaryPoolIndex: [info.primaryPoolIndex, [Validators.required]],
-          secondaryPoolIndex: [info.secondaryPoolIndex, [Validators.required]],
+          primaryPoolIndex: [0, [Validators.required]],
+          secondaryPoolIndex: [orderedList.length > 1 ? 1 : 0, [Validators.required]],
           pools: this.fb.array(poolsFormGroups)
         });
 
@@ -173,62 +144,13 @@ export class PoolComponent implements OnInit {
           this.setupTlsValidationForIndex(i);
         }
 
-        this.previousPrim = info.primaryPoolIndex;
-        this.previousSec = info.secondaryPoolIndex;
-
-        this.updatePoolDropdownOptions();
-        this.poolsArray.valueChanges.subscribe(() => {
-          this.updatePoolDropdownOptions();
-        });
-
-        this.form.get('primaryPoolIndex')?.valueChanges.subscribe(primVal => {
-          const secVal = this.form.get('secondaryPoolIndex')?.value;
-          if (primVal === secVal) {
-            this.form.get('secondaryPoolIndex')?.setValue(this.previousPrim, { emitEvent: false });
-            this.form.get('secondaryPoolIndex')?.markAsDirty();
-            this.previousSec = this.previousPrim;
-          }
-          this.previousPrim = primVal;
-        });
-
-        this.form.get('secondaryPoolIndex')?.valueChanges.subscribe(secVal => {
-          const primVal = this.form.get('primaryPoolIndex')?.value;
-          if (secVal === primVal) {
-            this.form.get('primaryPoolIndex')?.setValue(this.previousSec, { emitEvent: false });
-            this.form.get('primaryPoolIndex')?.markAsDirty();
-            this.previousPrim = this.previousSec;
-          }
-          this.previousSec = secVal;
-        });
-      });
+              });
   }
 
   get poolsArray(): FormArray {
     return this.form?.get('pools') as FormArray;
   }
 
-  public poolDropdownOptions: IPoolDropdownOption[] = [];
-
-  public updatePoolDropdownOptions(): void {
-    if (!this.poolsArray) {
-      this.poolDropdownOptions = [];
-      return;
-    }
-    const newOptions = this.poolsArray.controls.map((control) => {
-      const id = control.get('id')?.value;
-      const url = control.get('stratumURL')?.value || '';
-      const proto = control.get('stratumProtocol')?.value || 'SV1';
-      const urlDisplay = url ? `${url} (${proto})` : '(not configured)';
-      return {
-        value: id,
-        label: `Pool ${id + 1}: ${urlDisplay}`
-      };
-    });
-
-    if (JSON.stringify(newOptions) !== JSON.stringify(this.poolDropdownOptions)) {
-      this.poolDropdownOptions = newOptions;
-    }
-  }
 
   setupTlsValidationForIndex(index: number) {
     const poolGroup = this.poolsArray.at(index) as FormGroup;
@@ -247,23 +169,13 @@ export class PoolComponent implements OnInit {
     poolGroup.get('stratumTLS')?.updateValueAndValidity();
   }
 
-  private getFirstAvailableId(): number {
-    const existingIds = this.poolsArray.controls.map(c => c.get('id')?.value);
-    for (let i = 0; i < 8; i++) {
-      if (!existingIds.includes(i)) {
-        return i;
-      }
-    }
-    return 0;
-  }
-
   toggleCard(index: number) {
     this.activeCardIndex = this.activeCardIndex === index ? null : index;
   }
 
   addPool() {
     if (this.poolsArray.length < 8) {
-      const nextId = this.getFirstAvailableId();
+      const nextId = this.poolsArray.length;
       const poolGroup = this.fb.group({
         id: [nextId],
         stratumProtocol: ['SV1'],
@@ -294,29 +206,35 @@ export class PoolComponent implements OnInit {
       this.showPassword[nextId] = false;
       this.showAdvancedOptions[nextId] = false;
 
-      // Sort visual cards ascending by ID
-      this.poolsArray.controls.sort((a, b) => a.get('id')?.value - b.get('id')?.value);
+      this.setupTlsValidationForIndex(nextId);
+      this.activeCardIndex = nextId; // Expand newly added pool
 
-      const index = this.poolsArray.controls.findIndex(c => c.get('id')?.value === nextId);
-      this.setupTlsValidationForIndex(index);
-      this.activeCardIndex = index; // Expand newly added pool
+      this.form.get('primaryPoolIndex')?.setValue(0, { emitEvent: false });
+      this.form.get('secondaryPoolIndex')?.setValue(this.poolsArray.length > 1 ? 1 : 0, { emitEvent: false });
       this.form.markAsDirty();
     }
   }
 
   deletePool(index: number) {
-    const poolGroup = this.poolsArray.at(index);
-    if (!poolGroup) return;
-    const id = poolGroup.get('id')?.value;
-    const prim = this.form.get('primaryPoolIndex')?.value;
-    const sec = this.form.get('secondaryPoolIndex')?.value;
-    if (id === prim || id === sec) {
-      this.toastr.error('Cannot delete a pool that is currently selected as primary or fallback.');
+    if (this.poolsArray.length <= 1) {
+      this.toastr.error('Cannot delete the only configured pool.');
       return;
     }
 
+    const poolGroup = this.poolsArray.at(index);
+    if (!poolGroup) return;
+
+    const oldTotal = this.poolsArray.length;
     this.poolsArray.removeAt(index);
-    this.pendingDeletePoolIds.push(id);
+    this.pendingDeletePoolIds.push(oldTotal - 1);
+
+    this.poolsArray.controls.forEach((ctrl, newIdx) => {
+      ctrl.get('id')?.setValue(newIdx, { emitEvent: false });
+    });
+
+    this.form.get('primaryPoolIndex')?.setValue(0, { emitEvent: false });
+    this.form.get('secondaryPoolIndex')?.setValue(this.poolsArray.length > 1 ? 1 : 0, { emitEvent: false });
+
     this.form.markAsDirty();
 
     if (this.activeCardIndex === index) {
@@ -326,10 +244,8 @@ export class PoolComponent implements OnInit {
     }
   }
 
-  isDeleteDisabled(id: number): boolean {
-    const prim = this.form?.get('primaryPoolIndex')?.value;
-    const sec = this.form?.get('secondaryPoolIndex')?.value;
-    return id === prim || id === sec;
+  isDeleteDisabled(): boolean {
+    return this.poolsArray?.length <= 1;
   }
 
   public updateSystem() {
@@ -369,8 +285,6 @@ export class PoolComponent implements OnInit {
     this.toastr.success(successMessage);
     this.pendingDeletePoolIds = [];
     this.form.markAsPristine();
-    this.previousPrim = this.form.get('primaryPoolIndex')?.value ?? 0;
-    this.previousSec = this.form.get('secondaryPoolIndex')?.value ?? 1;
   }
 
   private extractPort(url: string): { cleanUrl: string, port?: number } {
@@ -501,8 +415,65 @@ export class PoolComponent implements OnInit {
     return poolGroup?.get('stratumV2ChannelType')?.value === 'extended';
   }
 
+  hasAdvancedOptions(index: number): boolean {
+    return !this.isPoolV2Enabled(index) || this.isPoolV2Extended(index);
+  }
+
   getProtocolLabel(value: string): string {
     const option = this.protocolOptions.find(opt => opt.value === value);
     return option ? option.label : value;
+  }
+
+  movePoolUp(index: number): void {
+    if (index > 0) {
+      this.movePool(index, index - 1);
+    }
+  }
+
+  movePoolDown(index: number): void {
+    if (index < this.poolsArray.length - 1) {
+      this.movePool(index, index + 1);
+    }
+  }
+
+  movePool(fromIndex: number, toIndex: number): void {
+    if (fromIndex < 0 || fromIndex >= this.poolsArray.length ||
+        toIndex < 0 || toIndex >= this.poolsArray.length ||
+        fromIndex === toIndex) {
+      return;
+    }
+
+    const groupA = this.poolsArray.at(fromIndex);
+    const groupB = this.poolsArray.at(toIndex);
+
+    const valA = { ...groupA.getRawValue() };
+    const valB = { ...groupB.getRawValue() };
+
+    valB.id = fromIndex;
+    valA.id = toIndex;
+
+    groupA.setValue(valB);
+    groupB.setValue(valA);
+
+    const showPwA = this.showPassword[fromIndex] ?? false;
+    const showPwB = this.showPassword[toIndex] ?? false;
+    this.showPassword[fromIndex] = showPwB;
+    this.showPassword[toIndex] = showPwA;
+
+    const showAdvA = this.showAdvancedOptions[fromIndex] ?? false;
+    const showAdvB = this.showAdvancedOptions[toIndex] ?? false;
+    this.showAdvancedOptions[fromIndex] = showAdvB;
+    this.showAdvancedOptions[toIndex] = showAdvA;
+
+    if (this.activeCardIndex === fromIndex) {
+      this.activeCardIndex = toIndex;
+    } else if (this.activeCardIndex === toIndex) {
+      this.activeCardIndex = fromIndex;
+    }
+
+    this.form.get('primaryPoolIndex')?.setValue(0, { emitEvent: false });
+    this.form.get('secondaryPoolIndex')?.setValue(this.poolsArray.length > 1 ? 1 : 0, { emitEvent: false });
+    this.form.markAsDirty();
+    this.cdr.detectChanges();
   }
 }
