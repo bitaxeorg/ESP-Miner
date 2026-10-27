@@ -255,15 +255,19 @@ static void system_api_add_hashrate_monitor(yyjson_mut_doc *doc, yyjson_mut_val 
 
     int asic_count = g->DEVICE_CONFIG.family.asic_count;
     int hash_domains = g->DEVICE_CONFIG.family.asic.hash_domains;
+    bool from_shares = g->DEVICE_CONFIG.family.asic.hashrate_from_shares;
 
     for (int i = 0; i < asic_count; i++) {
         yyjson_mut_val *asic = yyjson_mut_arr_add_obj(doc, asics);
-        yyjson_mut_obj_add_float(doc, asic, "total", g->HASHRATE_MONITOR_MODULE.total_measurement[i].hashrate);
+        float total_hashrate = from_shares ? hashrate_monitor_get_asic_rate(g, i)
+            : g->HASHRATE_MONITOR_MODULE.total_measurement[i].hashrate;
+        yyjson_mut_obj_add_float(doc, asic, "total", total_hashrate);
         yyjson_mut_obj_add_uint(doc, asic, "errorCount", g->HASHRATE_MONITOR_MODULE.error_measurement[i].value);
         yyjson_mut_val *domains = yyjson_mut_obj_add_arr(doc, asic, "domains");
         for (int j = 0; j < hash_domains; j++) {
             asic_domain_measurement_t measurement = {0};
-            ASIC_get_domain_measurement(g, i, j, &measurement);
+            if (from_shares) measurement.hashrate = hashrate_monitor_get_domain_rate(g, i, j);
+            else ASIC_get_domain_measurement(g, i, j, &measurement);
             yyjson_mut_arr_add_float(doc, domains, measurement.hashrate);
         }
     }

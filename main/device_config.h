@@ -44,6 +44,7 @@ typedef struct AsicConfig {
     bool hardware_version_rolling;
     uint8_t software_midstates;
     uint8_t init_retry_attempts;
+    bool hashrate_from_shares; // No hardware hashrate or hash-count registers.
     // test values
     float hashrate_test_percentage_target;
 } AsicConfig;
@@ -118,7 +119,7 @@ static const uint16_t BM1373_VOLTAGE_OPTIONS[] = {1000, 1060, 1100, 1150, 1200, 
 
 static const uint16_t BZM_FREQUENCY_OPTIONS[] = {800, 1000, 1150, 1200, 1350, 1400, 1425, 1500, 0};
 static const uint16_t BZM_VOLTAGE_OPTIONS[] = {2800, 2900, 3000, 3100, 3200, 0};
-static const AsicConfig ASIC_BZM = { .id = BZM, .name = "BZM", .chip_id = 0xB0A0, .default_frequency_mhz = 800, .frequency_options = BZM_FREQUENCY_OPTIONS, .default_voltage_mv = 2800, .voltage_options = BZM_VOLTAGE_OPTIONS, .core_count = 236, .small_core_count = 236, .hash_domains = 1, .hashrate_test_percentage_target = 0.85, .default_asic_timeout = 100, .hardware_version_rolling = false, .software_midstates = 4, .init_retry_attempts = 1 };
+static const AsicConfig ASIC_BZM = { .id = BZM, .name = "BZM", .chip_id = 0xB0A0, .default_frequency_mhz = 800, .frequency_options = BZM_FREQUENCY_OPTIONS, .default_voltage_mv = 2800, .voltage_options = BZM_VOLTAGE_OPTIONS, .core_count = 236, .small_core_count = 236, .hash_domains = 1, .hashrate_test_percentage_target = 0.85, .default_asic_timeout = 100, .hardware_version_rolling = false, .software_midstates = 4, .init_retry_attempts = 1, .hashrate_from_shares = true };
 static const AsicConfig ASIC_BM1397 = { .id = BM1397, .name = "BM1397", .chip_id = 1397, .default_frequency_mhz = 425, .frequency_options = BM1397_FREQUENCY_OPTIONS, .default_voltage_mv = 1400, .voltage_options = BM1397_VOLTAGE_OPTIONS, .core_count = 168, .small_core_count =  672, .hash_domains = 1, .default_asic_timeout = 20, .hardware_version_rolling = false, .software_midstates = 4, .hashrate_test_percentage_target = 0.85};
 static const AsicConfig ASIC_BM1366 = { .id = BM1366, .name = "BM1366", .chip_id = 1366, .default_frequency_mhz = 485, .frequency_options = BM1366_FREQUENCY_OPTIONS, .default_voltage_mv = 1200, .voltage_options = BM1366_VOLTAGE_OPTIONS, .core_count = 112, .small_core_count =  894, .hash_domains = 4, .default_asic_timeout = 2000, .hardware_version_rolling = true, .software_midstates = 0, .hashrate_test_percentage_target = 0.85};
 static const AsicConfig ASIC_BM1368 = { .id = BM1368, .name = "BM1368", .chip_id = 1368, .default_frequency_mhz = 490, .frequency_options = BM1368_FREQUENCY_OPTIONS, .default_voltage_mv = 1166, .voltage_options = BM1368_VOLTAGE_OPTIONS, .core_count =  80, .small_core_count = 1276, .hash_domains = 4, .default_asic_timeout = 500, .hardware_version_rolling = true, .software_midstates = 0, .hashrate_test_percentage_target = 0.80};
