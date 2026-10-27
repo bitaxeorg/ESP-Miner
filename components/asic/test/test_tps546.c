@@ -12,6 +12,7 @@ typedef struct GlobalState { SystemModule SYSTEM_MODULE; } GlobalState;
 typedef void *i2c_master_dev_handle_t;
 
 static uint8_t registers[256][8];
+static uint8_t first_byte_written[256];
 static unsigned writes[256], write_count, fail_write_at;
 static int fail_read, ignored_write;
 static TickType_t ticks;
@@ -26,6 +27,7 @@ static esp_err_t tps_read(i2c_master_dev_handle_t device, uint8_t reg, uint8_t *
 }
 static esp_err_t tps_write(uint8_t reg, const uint8_t *data, size_t length)
 {
+    if (writes[reg] == 0 && length == 1) first_byte_written[reg] = data[0];
     ++writes[reg];
     if (++write_count == fail_write_at) return ESP_FAIL;
     if (reg == ignored_write) return ESP_OK; /* PMBus may ACK a rejected write. */
@@ -73,6 +75,7 @@ static TickType_t tps_ticks(void) { return ticks; }
 static void reset_pmbus(void)
 {
     memset(registers, 0, sizeof(registers));
+    memset(first_byte_written, 0, sizeof(first_byte_written));
     memset(writes, 0, sizeof(writes));
     write_count = fail_write_at = ticks = 0;
     fail_read = ignored_write = -1;
@@ -116,6 +119,21 @@ TEST_CASE("Bonanza regulator initializes its board profile with output off", "[a
     TEST_ASSERT_EQUAL_UINT32(0, writes[PMBUS_INTERLEAVE]);
     TEST_ASSERT_EQUAL_UINT32(0, writes[PMBUS_VOUT_OV_FAULT_RESPONSE]);
     TEST_ASSERT_EQUAL_UINT32(0, writes[PMBUS_VOUT_UV_FAULT_RESPONSE]);
+}
+
+TEST_CASE("TPS546 initial and full configuration honor enable-pin control", "[asic][tps546]")
+{
+    for (unsigned use_enable_pin = 0; use_enable_pin <= 1; ++use_enable_pin) {
+        reset_pmbus();
+        TPS546_CONFIG config = TPS546_CONFIG_BONANZA_1004;
+        config.TPS546_USE_ENABLE_PIN = use_enable_pin;
+        const uint8_t expected = use_enable_pin ? 0x1f : 0x1b;
+        TEST_ASSERT_EQUAL(ESP_OK, TPS546_init(config));
+        TEST_ASSERT_EQUAL_UINT32(2, writes[PMBUS_ON_OFF_CONFIG]);
+        TEST_ASSERT_EQUAL_HEX8(expected, first_byte_written[PMBUS_ON_OFF_CONFIG]);
+        TEST_ASSERT_EQUAL_HEX8(expected, registers[PMBUS_ON_OFF_CONFIG][0]);
+        TEST_ASSERT_EQUAL_HEX8(OPERATION_OFF, registers[PMBUS_OPERATION][0]);
+    }
 }
 
 TEST_CASE("Bonanza 1004 programs Anvil compensation on D24A and D24S", "[asic][bonanza][tps546]")

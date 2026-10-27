@@ -554,7 +554,8 @@ esp_err_t TPS546_init(TPS546_CONFIG config)
     ESP_RETURN_ON_ERROR(smb_write_byte(PMBUS_OPERATION, u8_value), TAG, "Failed to turn off regulator");
 
     /* Make sure power is turned off until commanded */
-    u8_value = (ON_OFF_CONFIG_DELAY | ON_OFF_CONFIG_POLARITY | ON_OFF_CONFIG_CP | ON_OFF_CONFIG_CMD | ON_OFF_CONFIG_PU);
+    u8_value = (ON_OFF_CONFIG_DELAY | ON_OFF_CONFIG_POLARITY | ON_OFF_CONFIG_CMD | ON_OFF_CONFIG_PU);
+    if (tps546_config.TPS546_USE_ENABLE_PIN) u8_value |= ON_OFF_CONFIG_CP;
     ESP_LOGI(TAG, "Power config-ON_OFF_CONFIG: %02X", u8_value);
     ESP_RETURN_ON_ERROR(smb_write_byte(PMBUS_ON_OFF_CONFIG, u8_value), TAG, "Failed to configure enable control");
 
