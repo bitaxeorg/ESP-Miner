@@ -339,15 +339,6 @@ idf.py build && ./merge_bin.sh ./esp-miner-merged.bin
 
 Note: the merge_bin.sh script is a custom script that merges the bootloader, partition table, and the application binary into a single file.
 
-Standard builds load `sdkconfig.defaults` and `configs/sdkconfig.bonanza` to use
-the USB Serial/JTAG console on all boards. This keeps GPIO43/44 free for the
-Bonanza bridge in the shared OTA and factory firmware; a USB connection is not
-required to mine. Stable and prerelease factory builds include board 1004.
-If an existing `sdkconfig` selects the UART console, use `idf.py menuconfig` to
-select the USB Serial/JTAG primary console and no secondary console before
-rebuilding. Explicit `SDKCONFIG_DEFAULTS` overrides must include
-`configs/sdkconfig.bonanza` when building firmware for Bonanza.
-
 Note: if using VSCode, you may have to configure the settings.json file to match your esp hardware version. For example, if your bitaxe has something other than an esp32-s3, you will need to change the version in the `.vscode/settings.json` file.
 
 ### Flashing
