@@ -6,7 +6,6 @@
 #include "asic_job.h"
 
 
-void bzm_sha256_midstate(const uint8_t data[64], uint8_t digest[32]);
 bool bzm_sha256(const uint8_t *data, size_t size, uint8_t digest[32]);
 bool bzm_double_sha256(const uint8_t *data, size_t size, uint8_t digest[32]);
 bool bzm_nonce_hash(const asic_job_t *job, uint32_t nonce, uint32_t version, uint8_t hash[32]);

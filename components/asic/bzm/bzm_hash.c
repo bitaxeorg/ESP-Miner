@@ -96,14 +96,6 @@ static void compress(uint32_t state[8], const uint8_t *data)
     }
 }
 
-void bzm_sha256_midstate(const uint8_t data[64], uint8_t digest[32])
-{
-    uint32_t state[8];
-    memcpy(state, sha256_initial_state, sizeof(state));
-    compress(state, data);
-    for (size_t i = 0; i < 8; ++i) sha256_store_be32(state[i], digest + i * 4);
-}
-
 bool bzm_sha256(const uint8_t *data, size_t size, uint8_t digest[32])
 {
     if (digest == NULL || (data == NULL && size != 0)) return false;

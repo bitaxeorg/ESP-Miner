@@ -11,6 +11,7 @@ get_filename_component(ASIC_DIR "${CMAKE_CURRENT_LIST_DIR}/../../.." ABSOLUTE)
 include("${ASIC_DIR}/bzm/sources.cmake")
 add_library(bzm_test_support STATIC
     ${BZM_SOURCES}
+    "${ASIC_DIR}/bm_job_midstate.c"
     "${ASIC_DIR}/bzm/port/posix/platform.c"
     "${ASIC_DIR}/../mining_job/asic_job.c")
 target_include_directories(bzm_test_support PUBLIC

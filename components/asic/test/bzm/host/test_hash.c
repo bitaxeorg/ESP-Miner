@@ -40,9 +40,16 @@ int main(void)
     CHECK(work.merkle_residue == 0x78563412);
     CHECK(work.versions[0] == 0x20000000 && work.versions[1] == 0x20002000);
     CHECK(work.versions[2] == 0x20004000 && work.versions[3] == 0x20006000);
+    const char *midstates[4] = {
+        "fab2449298967ae732d8dc6a0bb20789de33b02d9c20b25ba28cb0cc540c047b",
+        "cd0bcf702436ce9340a5b98e93328502911f646e84cef0417543c5bad9a5b9b6",
+        "576a91fb7f649fee9dc546ee5ac87bdb4f9e260f8b85b1fdf9d96374c705f1cd",
+        "5f7561bb0aaa75a26771f8bbcf71c5d0ca9b2e5accb7579fa484307fb14fb4d1",
+    };
+    for (size_t i = 0; i < 4; ++i) check_hex(work.midstates[i], midstates[i]);
     job.version_mask = 0;
     CHECK(bzm_work_build(&ref, 1, 0, 16, 36, &work));
-    CHECK(memcmp(work.midstates[0], work.midstates[3], 32) == 0);
+    for (size_t i = 0; i < 4; ++i) check_hex(work.midstates[i], midstates[0]);
     bzm_result_dedup_t cache = {0};
     bzm_result_t result = {.nonce = 123, .final_ntime = 1234, .final_version = job.version};
     CHECK(!bzm_result_is_duplicate(&cache, &job, &result));

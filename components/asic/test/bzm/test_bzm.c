@@ -160,7 +160,26 @@ TEST_CASE("BZM reactor bounds compact assignments to 236 logical engines",
     delete_store(store);
 }
 
-TEST_CASE("BZM work builder derives four family-private midstates",
+static void assert_shared_midstates(const asic_job_t *job, const bzm_work_t *work)
+{
+    bm1397_job_packet_t bm;
+    bm1397_encode_job_packet(job, 4, 4, &bm);
+    TEST_ASSERT_EQUAL_UINT8(job->version_mask ? 4 : 1, bm.num_midstates);
+    for (size_t variant = 0; variant < 4; ++variant) {
+        size_t shared_variant = job->version_mask ? variant : 0;
+        for (size_t word = 0; word < 8; ++word) {
+            const uint8_t *big_endian_word = bm.midstates[shared_variant] + (7 - word) * 4;
+            const uint8_t expected_bzm_word[4] = {
+                big_endian_word[3], big_endian_word[2],
+                big_endian_word[1], big_endian_word[0],
+            };
+            TEST_ASSERT_EQUAL_UINT8_ARRAY(expected_bzm_word,
+                                          work->midstates[variant] + word * 4, 4);
+        }
+    }
+}
+
+TEST_CASE("BZM work builder reuses shared midstates with family byte order",
           "[asic][bzm][work][qemu-integration]")
 {
     asic_job_t template = bzm_template("work");
@@ -184,18 +203,29 @@ TEST_CASE("BZM work builder derives four family-private midstates",
     TEST_ASSERT_EQUAL_HEX32(template.starting_nonce, work.starting_nonce);
     TEST_ASSERT_EQUAL_HEX32(UINT32_MAX, work.end_nonce);
 
-    bm1397_job_packet_t bm;
-    bm1397_encode_job_packet(&template, 4, 4, &bm);
-    for (size_t word = 0; word < 8; ++word) {
-        const uint8_t *big_endian_word = bm.midstates[0] + (7 - word) * 4;
-        const uint8_t expected_birds_word[4] = {
-            big_endian_word[3], big_endian_word[2],
-            big_endian_word[1], big_endian_word[0],
-        };
-        TEST_ASSERT_EQUAL_UINT8_ARRAY(expected_birds_word,
-                                      work.midstates[0] + word * 4, 4);
-    }
+    assert_shared_midstates(&template, &work);
+}
 
+TEST_CASE("BZM shared midstates preserve version wraparound and repeated base versions",
+          "[asic][bzm][work][qemu-integration]")
+{
+    const struct {
+        uint32_t version, mask, versions[4];
+    } cases[] = {
+        {0x20006004, 0x6000, {0x20006004, 0x20000004, 0x20002004, 0x20004004}},
+        {0x2000a004, 0xa000, {0x2000a004, 0x20000004, 0x20002004, 0x20008004}},
+        {0x20001234, 0, {0x20001234, 0x20001234, 0x20001234, 0x20001234}},
+    };
+    for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); ++i) {
+        asic_job_t template = bzm_template("shared-midstate");
+        template.version = cases[i].version;
+        template.version_mask = cases[i].mask;
+        bzm_work_ref_t source = {.handle = 0x1234, .template = &template};
+        bzm_work_t work;
+        TEST_ASSERT_TRUE(bzm_work_build(&source, 7, 5, 16, 36, &work));
+        TEST_ASSERT_EQUAL_HEX32_ARRAY(cases[i].versions, work.versions, 4);
+        assert_shared_midstates(&template, &work);
+    }
 }
 
 TEST_CASE("BZM keeps enhanced sequence identity when version rolling is unavailable",

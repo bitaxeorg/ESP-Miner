@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "bzm/hash.h"
+#include "bm_job_midstate.h"
 
 bool bzm_work_build(const bzm_work_ref_t *source, uint16_t engine_id,
                     uint8_t logical_sequence, uint8_t timestamp_count,
@@ -42,7 +43,7 @@ bool bzm_work_build(const bzm_work_ref_t *source, uint16_t engine_id,
             version = bzm_increment_version(version, template->version_mask);
         work->versions[i] = version;
         asic_job_header(template, template->starting_nonce, version, midstate_data);
-        bzm_sha256_midstate(midstate_data, digest);
+        midstate_sha256_bin(midstate_data, 64, digest);
         /* SHA-256 state words are encoded as big-endian bytes.
          * BIRDS/cgminer writes native little-endian uint32_t h0..h7 words to
          * Bonanza, so swap bytes within each word while preserving the word
