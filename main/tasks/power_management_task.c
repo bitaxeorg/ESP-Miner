@@ -126,6 +126,7 @@ void POWER_MANAGEMENT_task(void * pvParameters)
     uint16_t last_known_asic_voltage = 0;
     float last_known_asic_frequency = 0.0;
     bool is_paused = false;
+    const int16_t min_voltage = VCORE_get_voltage_min_mv(GLOBAL_STATE);
 
     while (1) {
         if (GLOBAL_STATE->SELF_TEST_MODULE.is_finished) {
@@ -162,7 +163,7 @@ void POWER_MANAGEMENT_task(void * pvParameters)
             power_management->chip_temp_avg > THROTTLE_TEMP
             || power_management->chip_temp2_avg > THROTTLE_TEMP;
 
-        if ((power_management->vr_temp > TPS546_THROTTLE_TEMP || asic_overheat) && (power_management->frequency_value > ASIC_get_min_frequency(GLOBAL_STATE) || power_management->voltage > 1000)) {
+        if ((power_management->vr_temp > TPS546_THROTTLE_TEMP || asic_overheat) && (power_management->frequency_value > ASIC_get_min_frequency(GLOBAL_STATE) || power_management->core_voltage > min_voltage)) {
             if (power_management->chip_temp2_avg > 0) {
                 ESP_LOGE(TAG, "OVERHEAT! VR: %fC ASIC1: %fC ASIC2: %fC", power_management->vr_temp, power_management->chip_temp_avg, power_management->chip_temp2_avg);
             } else {
@@ -218,7 +219,6 @@ void POWER_MANAGEMENT_task(void * pvParameters)
             // rejects anything lower (out of range), which leaves the VR stuck in a
             // "power fault" — and the invalid value is persisted to NVS, so it survives
             // reboots. Frequency reduction still provides the cooling headroom.
-            int16_t min_voltage = VCORE_get_voltage_min_mv(GLOBAL_STATE);
             if (min_voltage > 0 && reduced_voltage < min_voltage) {
                 reduced_voltage = (uint16_t) min_voltage;
             }

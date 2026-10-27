@@ -52,6 +52,7 @@ static esp_err_t shared_flush(uart_port_t port);
 static GlobalState state;
 static float saved_frequency, applied_frequency, applied_voltage, chip_temp;
 static uint16_t saved_voltage;
+static float board_input_mv;
 static unsigned chip_inits, clock_writes, serial_calls, resets, cooling_delays, polls;
 static bool overheat, edit_settings, fail_init;
 
@@ -65,7 +66,7 @@ esp_err_t shared_voltage(GlobalState *s, float volts) { (void)s; applied_voltage
 int16_t shared_voltage_mv(GlobalState *s) { (void)s; return applied_voltage * 1000; }
 int16_t shared_min_voltage(GlobalState *s) { return s->DEVICE_CONFIG.family.asic.id == BZM ? 2100 : 1000; }
 esp_err_t shared_check_fault(GlobalState *s) { (void)s; return ESP_OK; }
-float shared_input(GlobalState *s) { (void)s; return 12000; }
+float shared_input(GlobalState *s) { (void)s; return board_input_mv; }
 void shared_output(GlobalState *s, float *power, float *current) { (void)s; *power = 40; *current = 3.3f; }
 float shared_vr_temp(GlobalState *s) { (void)s; return 40; }
 float shared_chip_temp(GlobalState *s) { (void)s; return chip_temp; }
@@ -103,6 +104,7 @@ static void fixture(AsicConfig asic)
     saved_voltage = asic.default_voltage_mv;
     applied_frequency = applied_voltage = 0;
     chip_temp = 40;
+    board_input_mv = 12000;
     chip_inits = clock_writes = serial_calls = resets = cooling_delays = polls = 0;
     overheat = edit_settings = fail_init = false;
 }
@@ -185,4 +187,45 @@ TEST_CASE("BZM initialization failure leaves power off and mining uninitialized"
     TEST_ASSERT_EQUAL_FLOAT(0, applied_voltage);
     TEST_ASSERT_FALSE(state.ASIC_initalized);
     TEST_ASSERT_EQUAL_UINT32(0, clock_writes);
+}
+
+TEST_CASE("Shared thermal guard ignores board input voltage when ASIC settings are at minimum", "[asic][power][shared]")
+{
+    const FamilyConfig families[] = {FAMILY_BONANZA, FAMILY_GAMMA};
+    const float board_inputs[] = {5000, 12000};
+    for (unsigned a = 0; a < sizeof(families) / sizeof(families[0]); ++a) {
+        for (unsigned b = 0; b < sizeof(board_inputs) / sizeof(board_inputs[0]); ++b) {
+            fixture(families[a].asic);
+            state.DEVICE_CONFIG.family = families[a];
+            saved_frequency = shared_min_frequency(&state);
+            saved_voltage = shared_min_voltage(&state);
+            applied_voltage = saved_voltage / 1000.0f;
+            board_input_mv = board_inputs[b];
+            chip_temp = 80;
+            shared_power_task(&state);
+            TEST_ASSERT_EQUAL_UINT32(0, cooling_delays);
+            TEST_ASSERT_EQUAL_UINT32(0, resets);
+            TEST_ASSERT_EQUAL_UINT32(0, chip_inits);
+            TEST_ASSERT_EQUAL_UINT16(shared_min_voltage(&state), saved_voltage);
+        }
+    }
+}
+
+TEST_CASE("Shared thermal guard permits voltage reduction at minimum ASIC frequency", "[asic][power][shared]")
+{
+    const FamilyConfig families[] = {FAMILY_BONANZA, FAMILY_GAMMA};
+    for (unsigned a = 0; a < sizeof(families) / sizeof(families[0]); ++a) {
+        fixture(families[a].asic);
+        state.DEVICE_CONFIG.family = families[a];
+        saved_frequency = shared_min_frequency(&state);
+        saved_voltage = shared_min_voltage(&state) + 50;
+        applied_voltage = saved_voltage / 1000.0f;
+        board_input_mv = 0; // Missing board-input telemetry must not mask the ASIC voltage.
+        chip_temp = 80;
+        shared_power_task(&state);
+        TEST_ASSERT_EQUAL_UINT32(6, cooling_delays);
+        TEST_ASSERT_GREATER_THAN_UINT32(0, resets);
+        TEST_ASSERT_EQUAL_UINT32(1, chip_inits);
+        TEST_ASSERT_EQUAL_UINT16(shared_min_voltage(&state), saved_voltage);
+    }
 }
