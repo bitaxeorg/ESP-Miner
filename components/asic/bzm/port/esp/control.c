@@ -1,8 +1,8 @@
 #include "bzm/control.h"
 #include "bzm/esp.h"
 #include "bzm/gpio.h"
+#include "driver/gpio.h"
 #include <string.h>
-#include "sdkconfig.h"
 
 static bool initialized;
 
@@ -11,11 +11,12 @@ esp_err_t BZM_control_init(const char *board_version)
     if (board_version == NULL || strcmp(board_version, "1004") != 0) return ESP_ERR_NOT_SUPPORTED;
     if (!bzm_platform_esp_init()) return ESP_FAIL;
     if (initialized) return ESP_OK;
-#if CONFIG_ESP_CONSOLE_UART_DEFAULT
-    /* GPIO43/44 are wired to the RP2040. */
-    return ESP_ERR_INVALID_STATE;
-#endif
-    esp_err_t err = bzm_gpio_init();
+    // Disconnect UART0 console pins from the bridge; future use could forward bridge stats or logs.
+    esp_err_t err = gpio_reset_pin(GPIO_NUM_43);
+    if (err != ESP_OK) return err;
+    err = gpio_reset_pin(GPIO_NUM_44);
+    if (err != ESP_OK) return err;
+    err = bzm_gpio_init();
     initialized = err == ESP_OK;
     return err;
 }

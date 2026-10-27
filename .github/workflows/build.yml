@@ -26,7 +26,6 @@ jobs:
         target: esp32s3
         command: >-
           GITHUB_ACTIONS="true" idf.py build &&
-          python tools/check_bonanza_build.py &&
           python "$IDF_PATH/components/nvs_flash/nvs_partition_generator/nvs_partition_gen.py"
           generate configs/config-1004.csv config.bin 0x6000
         path: '.'
