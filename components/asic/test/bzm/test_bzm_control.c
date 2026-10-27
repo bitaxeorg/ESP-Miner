@@ -1,6 +1,7 @@
 #include <string.h>
 #include "driver/gpio.h"
 #include "unity.h"
+#include "device_pins.h"
 
 esp_err_t control_test_reset_pin(gpio_num_t pin);
 #define gpio_reset_pin control_test_reset_pin
@@ -27,7 +28,12 @@ esp_err_t control_test_reset_pin(gpio_num_t pin)
     reset_pins[pin_reset_calls++] = pin;
     return pin_reset_calls == fail_pin_reset ? ESP_FAIL : ESP_OK;
 }
-esp_err_t control_test_gpio_init(void) { ++init_calls; return init_result; }
+esp_err_t control_test_gpio_init(const bzm_control_pins_t *pins)
+{
+    TEST_ASSERT_EQUAL_PTR(&BONANZA_1004_CONTROL_PINS, pins);
+    ++init_calls;
+    return init_result;
+}
 esp_err_t control_test_gpio_status(bzm_control_status_t *status)
 {
     *status = (bzm_control_status_t){.valid = true, .state = BZM_CONTROL_STATE_SAFE_OFF};
@@ -45,35 +51,44 @@ static void control_fixture(void)
 TEST_CASE("Bonanza control accepts only 1004 before touching hardware", "[asic][bonanza][control]")
 {
     control_fixture();
-    TEST_ASSERT_EQUAL(ESP_ERR_NOT_SUPPORTED, control_test_init(NULL));
-    TEST_ASSERT_EQUAL(ESP_ERR_NOT_SUPPORTED, control_test_init("1002"));
-    TEST_ASSERT_EQUAL(ESP_ERR_NOT_SUPPORTED, control_test_init("1005"));
+    TEST_ASSERT_EQUAL(ESP_ERR_NOT_SUPPORTED, control_test_init(NULL, NULL));
+    TEST_ASSERT_EQUAL(ESP_ERR_NOT_SUPPORTED, control_test_init("1002", NULL));
+    TEST_ASSERT_EQUAL(ESP_ERR_NOT_SUPPORTED, control_test_init("1005", NULL));
     TEST_ASSERT_EQUAL_UINT32(0, init_calls);
     TEST_ASSERT_EQUAL_UINT32(0, pin_reset_calls);
     TEST_ASSERT_EQUAL(ESP_ERR_INVALID_STATE, control_test_core(true));
-    TEST_ASSERT_EQUAL(ESP_OK, control_test_init("1004"));
-    TEST_ASSERT_EQUAL(ESP_OK, control_test_init("1004"));
+    TEST_ASSERT_EQUAL(ESP_OK, control_test_init("1004", &BONANZA_1004_CONTROL_PINS));
+    TEST_ASSERT_EQUAL(ESP_OK, control_test_init("1004", NULL));
     TEST_ASSERT_EQUAL_UINT32(1, init_calls);
     TEST_ASSERT_EQUAL_UINT32(2, pin_reset_calls);
     TEST_ASSERT_EQUAL(GPIO_NUM_43, reset_pins[0]);
     TEST_ASSERT_EQUAL(GPIO_NUM_44, reset_pins[1]);
-    TEST_ASSERT_EQUAL(ESP_ERR_NOT_SUPPORTED, control_test_init("1002"));
+    TEST_ASSERT_EQUAL(ESP_ERR_NOT_SUPPORTED, control_test_init("1002", NULL));
     bzm_control_status_t status;
     TEST_ASSERT_EQUAL(ESP_OK, control_test_status(&status));
     TEST_ASSERT_TRUE(status.valid);
+}
+
+TEST_CASE("Bonanza control requires configured pins before its first initialization", "[asic][bonanza][control]")
+{
+    control_fixture();
+    TEST_ASSERT_EQUAL(ESP_ERR_INVALID_ARG, control_test_init("1004", NULL));
+    TEST_ASSERT_EQUAL_UINT32(0, init_calls);
+    TEST_ASSERT_EQUAL_UINT32(0, pin_reset_calls);
+    TEST_ASSERT_EQUAL(ESP_ERR_INVALID_STATE, control_test_core(true));
 }
 
 TEST_CASE("Bonanza control initialization failure leaves status unusable and permits retry", "[asic][bonanza][control]")
 {
     control_fixture();
     init_result = ESP_FAIL;
-    TEST_ASSERT_EQUAL(ESP_FAIL, control_test_init("1004"));
+    TEST_ASSERT_EQUAL(ESP_FAIL, control_test_init("1004", &BONANZA_1004_CONTROL_PINS));
     bzm_control_status_t status = {.valid = true};
     TEST_ASSERT_EQUAL(ESP_ERR_INVALID_STATE, control_test_status(&status));
     TEST_ASSERT_FALSE(status.valid);
     TEST_ASSERT_EQUAL(BZM_CONTROL_FAULT_STATUS_INVALID, status.fault);
     init_result = ESP_OK;
-    TEST_ASSERT_EQUAL(ESP_OK, control_test_init("1004"));
+    TEST_ASSERT_EQUAL(ESP_OK, control_test_init("1004", &BONANZA_1004_CONTROL_PINS));
     TEST_ASSERT_EQUAL_UINT32(2, init_calls);
 }
 
@@ -82,12 +97,12 @@ TEST_CASE("Bonanza control fails before board initialization if UART0 pin releas
     for (unsigned failed = 1; failed <= 2; ++failed) {
         control_fixture();
         fail_pin_reset = failed;
-        TEST_ASSERT_EQUAL(ESP_FAIL, control_test_init("1004"));
+        TEST_ASSERT_EQUAL(ESP_FAIL, control_test_init("1004", &BONANZA_1004_CONTROL_PINS));
         TEST_ASSERT_EQUAL_UINT32(failed, pin_reset_calls);
         TEST_ASSERT_EQUAL_UINT32(0, init_calls);
         TEST_ASSERT_EQUAL(ESP_ERR_INVALID_STATE, control_test_core(true));
         fail_pin_reset = 0;
-        TEST_ASSERT_EQUAL(ESP_OK, control_test_init("1004"));
+        TEST_ASSERT_EQUAL(ESP_OK, control_test_init("1004", &BONANZA_1004_CONTROL_PINS));
         TEST_ASSERT_EQUAL_UINT32(failed + 2, pin_reset_calls);
         TEST_ASSERT_EQUAL(GPIO_NUM_43, reset_pins[failed]);
         TEST_ASSERT_EQUAL(GPIO_NUM_44, reset_pins[failed + 1]);

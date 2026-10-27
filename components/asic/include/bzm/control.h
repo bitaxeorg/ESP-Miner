@@ -7,7 +7,12 @@
 
 #include "bzm/controls.h"
 
-esp_err_t BZM_control_init(const char *board_version);
+typedef struct bzm_control_pins {
+    int reset, trip, fan_pwm, fan_tach, core_enable, pgood, five_volt_enable;
+} bzm_control_pins_t;
+
+// NULL reuses controls already initialized from device configuration.
+esp_err_t BZM_control_init(const char *board_version, const bzm_control_pins_t *pins);
 esp_err_t BZM_control_get_safety_status(bzm_control_status_t *status);
 esp_err_t BZM_control_clear_safety_fault(bzm_control_status_t *status);
 esp_err_t BZM_control_safe_off(bzm_control_status_t *status);

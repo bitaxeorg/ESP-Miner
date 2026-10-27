@@ -3,16 +3,7 @@
 
 #include "bzm/control.h"
 
-/* bitaxeBonanza tag 1004x-PCBA-order, commit a0c96ae0. */
-#define BZM_GPIO_RESET 1
-#define BZM_GPIO_TRIP 2
-#define BZM_GPIO_FAN_PWM 8
-#define BZM_GPIO_FAN_TACH 9
-#define BZM_GPIO_CORE_ENABLE 10
-#define BZM_GPIO_PGOOD 11
-#define BZM_GPIO_5V_ENABLE 21
-
-esp_err_t bzm_gpio_init(void);
+esp_err_t bzm_gpio_init(const bzm_control_pins_t *pins);
 esp_err_t bzm_gpio_get_safety_status(bzm_control_status_t *status);
 esp_err_t bzm_gpio_clear_safety_fault(bzm_control_status_t *status);
 esp_err_t bzm_gpio_safe_off(bzm_control_status_t *status);

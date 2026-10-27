@@ -31,9 +31,6 @@ typedef struct GlobalState {
 #define CONFIG_GPIO_I2C_SDA 12
 #undef CONFIG_GPIO_I2C_SCL
 #define CONFIG_GPIO_I2C_SCL 13
-#define TAG display_test_pins_tag
-#include "../../../main/device_pins.c"
-#undef TAG
 #define TAG display_test_config_tag
 #include "../../../main/device_config.c"
 #undef TAG

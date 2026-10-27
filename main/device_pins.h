@@ -6,6 +6,8 @@
 #include "esp_err.h"
 #include "soc/gpio_num.h"
 
+typedef struct bzm_control_pins bzm_control_pins_t;
+
 typedef struct {
     gpio_num_t tx;
     gpio_num_t rx;
@@ -32,12 +34,14 @@ typedef struct {
     const I2cPins * i2c;
     const I2cPins * oled; // Optional OLED connection on the shared I2C bus.
     const I80Pins * i80;
+    const bzm_control_pins_t * bzm;
 } DevicePins;
 
 extern const BapPins DEFAULT_BAP_PINS;
 extern const I2cPins DEFAULT_I2C_PINS;
 extern const I2cPins BITAXE_COLOR_I2C_PINS;
 extern const I80Pins ST7789_I80_PINS;
+extern const bzm_control_pins_t BONANZA_1004_CONTROL_PINS;
 
 #define BITAXE_ORIGINAL_DEVICE_PINS { .bap = &DEFAULT_BAP_PINS, .i2c = &DEFAULT_I2C_PINS, .oled = &DEFAULT_I2C_PINS, .i80 = NULL }
 #define BITAXE_COLOR_DEVICE_PINS    { .bap = NULL,              .i2c = &BITAXE_COLOR_I2C_PINS, .oled = NULL, .i80 = &ST7789_I80_PINS }

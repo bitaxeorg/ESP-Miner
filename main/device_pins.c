@@ -1,9 +1,18 @@
 #include "device_pins.h"
+#include "bzm/control.h"
 #include "driver/gpio.h"
 #include "esp_log.h"
 #include "sdkconfig.h"
 
 static const char * TAG = "device_pins";
+
+/* bitaxeBonanza tag 1004x-PCBA-order, commit a0c96ae0. */
+const bzm_control_pins_t BONANZA_1004_CONTROL_PINS = {
+    .reset = GPIO_NUM_1, .trip = GPIO_NUM_2,
+    .fan_pwm = GPIO_NUM_8, .fan_tach = GPIO_NUM_9,
+    .core_enable = GPIO_NUM_10, .pgood = GPIO_NUM_11,
+    .five_volt_enable = GPIO_NUM_21,
+};
 
 const BapPins DEFAULT_BAP_PINS = {
     .tx = GPIO_NUM_39,
@@ -74,6 +83,16 @@ static esp_err_t device_pins_validate(const DevicePins * pins)
         if (check_pin(pins->i80->rst, "LCD RST", &allocated_pins_mask) != ESP_OK) status = ESP_ERR_INVALID_STATE;
         if (check_pin(pins->i80->pwr, "LCD PWR", &allocated_pins_mask) != ESP_OK) status = ESP_ERR_INVALID_STATE;
         if (check_pin(pins->i80->bk_light, "LCD BK_LIGHT", &allocated_pins_mask) != ESP_OK) status = ESP_ERR_INVALID_STATE;
+    }
+
+    if (pins->bzm) {
+        if (check_pin(pins->bzm->reset, "ASIC reset", &allocated_pins_mask) != ESP_OK) status = ESP_ERR_INVALID_STATE;
+        if (check_pin(pins->bzm->trip, "ASIC trip", &allocated_pins_mask) != ESP_OK) status = ESP_ERR_INVALID_STATE;
+        if (check_pin(pins->bzm->fan_pwm, "Fan PWM", &allocated_pins_mask) != ESP_OK) status = ESP_ERR_INVALID_STATE;
+        if (check_pin(pins->bzm->fan_tach, "Fan tach", &allocated_pins_mask) != ESP_OK) status = ESP_ERR_INVALID_STATE;
+        if (check_pin(pins->bzm->core_enable, "Core enable", &allocated_pins_mask) != ESP_OK) status = ESP_ERR_INVALID_STATE;
+        if (check_pin(pins->bzm->pgood, "Core PGOOD", &allocated_pins_mask) != ESP_OK) status = ESP_ERR_INVALID_STATE;
+        if (check_pin(pins->bzm->five_volt_enable, "5 V enable", &allocated_pins_mask) != ESP_OK) status = ESP_ERR_INVALID_STATE;
     }
 
     return status;

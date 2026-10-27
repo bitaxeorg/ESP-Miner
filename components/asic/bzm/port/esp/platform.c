@@ -58,7 +58,7 @@ static int16_t serial_read(void *ctx, uint8_t *data, uint16_t size, uint16_t ms)
 { (void)ctx; return BZM_SERIAL_rx(data, size, ms); }
 static bzm_status_t serial_clear(void *ctx) { (void)ctx; return uart_flush_input(UART_NUM_1); }
 
-static bzm_status_t control_init(void *ctx, const char * board_version) { (void)ctx; return BZM_control_init(board_version); }
+static bzm_status_t control_init(void *ctx, const char * board_version) { (void)ctx; return BZM_control_init(board_version, NULL); }
 
 static bzm_status_t control_get_safety_status(void *ctx, bzm_control_status_t * status) { (void)ctx; return BZM_control_get_safety_status(status); }
 

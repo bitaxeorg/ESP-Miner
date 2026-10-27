@@ -167,7 +167,7 @@ static const FamilyConfig default_families[] = {
 };
 
 static const DeviceConfig default_configs[] = {
-    { .board_version = "1004", .family = FAMILY_BONANZA, .pins = { .bap = NULL, .i2c = &DEFAULT_I2C_PINS, .oled = NULL, .i80 = NULL }, .TPS546 = true },
+    { .board_version = "1004", .family = FAMILY_BONANZA, .pins = { .bap = NULL, .i2c = &DEFAULT_I2C_PINS, .oled = NULL, .i80 = NULL, .bzm = &BONANZA_1004_CONTROL_PINS }, .TPS546 = true },
     { .board_version = "2.2",  .family = FAMILY_MAX,         .pins = BITAXE_ORIGINAL_PINS, .EMC2101 = true,                                                                                 .DS4432U = true, .INA260 = true, .plug_sense = true, .asic_enable = true, .power_consumption_target = 12, },
     { .board_version = "102",  .family = FAMILY_MAX,         .pins = BITAXE_ORIGINAL_PINS, .EMC2101 = true,                                                                                 .DS4432U = true, .INA260 = true, .plug_sense = true, .asic_enable = true, .power_consumption_target = 12, },
     { .board_version = "0.11", .family = FAMILY_ULTRA,       .pins = BITAXE_ORIGINAL_PINS, .EMC2101 = true, .emc_internal_temp = true,                                  .temp_offset = 5,   .DS4432U = true, .INA260 = true, .plug_sense = true, .asic_enable = true, .power_consumption_target = 12, },

@@ -6,17 +6,18 @@
 
 static bool initialized;
 
-esp_err_t BZM_control_init(const char *board_version)
+esp_err_t BZM_control_init(const char *board_version, const bzm_control_pins_t *pins)
 {
     if (board_version == NULL || strcmp(board_version, "1004") != 0) return ESP_ERR_NOT_SUPPORTED;
+    if (initialized) return pins == NULL ? ESP_OK : bzm_gpio_init(pins);
+    if (pins == NULL) return ESP_ERR_INVALID_ARG;
     if (!bzm_platform_esp_init()) return ESP_FAIL;
-    if (initialized) return ESP_OK;
     // Disconnect UART0 console pins from the bridge; future use could forward bridge stats or logs.
     esp_err_t err = gpio_reset_pin(GPIO_NUM_43);
     if (err != ESP_OK) return err;
     err = gpio_reset_pin(GPIO_NUM_44);
     if (err != ESP_OK) return err;
-    err = bzm_gpio_init();
+    err = bzm_gpio_init(pins);
     initialized = err == ESP_OK;
     return err;
 }

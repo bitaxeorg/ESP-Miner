@@ -11,12 +11,11 @@
 #include "bzm/control.h"
 #include "bzm/power.h"
 #include "global_state.h"
-#define GPIO_TPS546_PGOOD 11
 static const char *TAG = "bonanza_vcore";
 static float minimum_input_voltage;
 esp_err_t BONANZA_VCORE_init(GlobalState *GLOBAL_STATE, TPS546_CONFIG config)
 {
-    ESP_RETURN_ON_ERROR(BZM_control_init(GLOBAL_STATE->DEVICE_CONFIG.board_version),
+    ESP_RETURN_ON_ERROR(BZM_control_init(GLOBAL_STATE->DEVICE_CONFIG.board_version, GLOBAL_STATE->DEVICE_CONFIG.pins.bzm),
                         TAG, "board control initialization failed");
     ESP_RETURN_ON_ERROR(BZM_control_set_5v_enabled(false), TAG, "5 V safe-state failed");
     minimum_input_voltage = config.TPS546_INIT_VIN_OFF;
@@ -50,9 +49,9 @@ static esp_err_t bonanza_set_vout(void *context, float volts)
 
 static esp_err_t bonanza_validate_power(void *context, float expected_vout)
 {
-    (void)context;
+    GlobalState *state = context;
     if (!bzm_power_runtime_voltage_is_allowed(expected_vout) ||
-        gpio_get_level(GPIO_TPS546_PGOOD) == 0) {
+        gpio_get_level(state->DEVICE_CONFIG.pins.bzm->pgood) == 0) {
         ESP_LOGE(TAG, "TPS546 PGOOD remained low");
         return ESP_FAIL;
     }
