@@ -30,6 +30,7 @@ typedef struct {
 typedef struct {
     const BapPins * bap;
     const I2cPins * i2c;
+    const I2cPins * oled; // Optional OLED connection on the shared I2C bus.
     const I80Pins * i80;
 } DevicePins;
 
@@ -38,8 +39,8 @@ extern const I2cPins DEFAULT_I2C_PINS;
 extern const I2cPins BITAXE_COLOR_I2C_PINS;
 extern const I80Pins ST7789_I80_PINS;
 
-#define BITAXE_ORIGINAL_DEVICE_PINS { .bap = &DEFAULT_BAP_PINS, .i2c = &DEFAULT_I2C_PINS, .i80 = NULL }
-#define BITAXE_COLOR_DEVICE_PINS    { .bap = NULL,              .i2c = &BITAXE_COLOR_I2C_PINS, .i80 = &ST7789_I80_PINS }
+#define BITAXE_ORIGINAL_DEVICE_PINS { .bap = &DEFAULT_BAP_PINS, .i2c = &DEFAULT_I2C_PINS, .oled = &DEFAULT_I2C_PINS, .i80 = NULL }
+#define BITAXE_COLOR_DEVICE_PINS    { .bap = NULL,              .i2c = &BITAXE_COLOR_I2C_PINS, .oled = NULL, .i80 = &ST7789_I80_PINS }
 
 #define BITAXE_ORIGINAL_PINS        BITAXE_ORIGINAL_DEVICE_PINS
 #define BITAXE_COLOR_PINS           BITAXE_COLOR_DEVICE_PINS

@@ -111,5 +111,6 @@ esp_err_t device_pins_init(DevicePins * pins)
         return ESP_ERR_INVALID_ARG;
     }
     apply_kconfig_pin_overrides(pins);
+    if (pins->oled != NULL) pins->oled = pins->i2c;
     return device_pins_validate(pins);
 }

@@ -88,8 +88,8 @@ static esp_err_t read_display_config(GlobalState * GLOBAL_STATE)
 
 esp_err_t display_init(GlobalState * GLOBAL_STATE)
 {
-    if (GLOBAL_STATE->DEVICE_CONFIG.family.id == BONANZA) {
-        /* Bonanza has no panel on the miner's peripheral bus. */
+    if (GLOBAL_STATE->DEVICE_CONFIG.pins.i80 == NULL && GLOBAL_STATE->DEVICE_CONFIG.pins.oled == NULL) {
+        /* Ignore saved panel settings on boards without a display. */
         GLOBAL_STATE->DISPLAY_CONFIG = *get_display_config("NONE");
     } else {
         ESP_RETURN_ON_ERROR(read_display_config(GLOBAL_STATE), TAG, "Failed to read display config");
