@@ -27,10 +27,8 @@ static const char * TAG = "bzm";
 
 #define BZM_IDLE_CHECK_INTERVAL_MS 100.0
 
-/* A 36-bit filter reports difficulty-16 results. Derive local validation
- * and hashrate credits from the same setting programmed into the engines. */
-#define BZM_RESULT_LEAD_ZEROS (32U + BZM_RESULT_DIFFICULTY_POWER)
-#define BZM_RESULT_DIFFICULTY (UINT64_C(1) << (BZM_RESULT_LEAD_ZEROS - 32U))
+/* Bootstrap at D16 until the application controller selects its filter. */
+#define BZM_INITIAL_LEAD_ZEROS 36U
 #define BZM_CANCEL_CHECK_INTERVAL_MS 250U
 
 typedef struct {
@@ -282,6 +280,25 @@ bool bzm_driver_clear_work(bzm_device_t * state)
         BZM_LOGE(TAG, "BZM clean-job barrier failed");
     }
     return cleared;
+}
+
+bool bzm_driver_set_difficulty(bzm_device_t *state, uint8_t difficulty_power)
+{
+    if (BZM_STATE == NULL || state == NULL || difficulty_power < 4 || difficulty_power > 31)
+        return false;
+    pthread_mutex_lock(&REACTOR_LOCK);
+    bool ready = INITIALIZED && !bzm_driver_has_io_fault();
+    if (ready) {
+        uint8_t lead_zeros = 32U + difficulty_power;
+        if (REACTOR.config.lead_zeros != lead_zeros) {
+            REACTOR.config.lead_zeros = lead_zeros;
+            // Retain previous filters while refilling rows for the new difficulty.
+            start_work_replacement_locked(REACTOR.config.engine_count);
+        }
+        state->difficulty_power = difficulty_power;
+    }
+    pthread_mutex_unlock(&REACTOR_LOCK);
+    return ready;
 }
 
 double bzm_driver_job_frequency_ms(bzm_device_t *state)
@@ -967,7 +984,7 @@ bzm_bringup_outcome_t bzm_driver_start(bzm_device_t *state, const bzm_bringup_te
         .engine_count = BZM_ENGINE_ROWS,
         .multicast_rows = true,
         .timestamp_count = 127, // Seven count bits encode 128 timestamp values.
-        .lead_zeros = BZM_RESULT_LEAD_ZEROS,
+        .lead_zeros = BZM_INITIAL_LEAD_ZEROS,
         .nonce_offset = BZM_NONCE_GAP,
     };
     INITIALIZED = bzm_reactor_init(&REACTOR, &BZM_STATE->job_store, &config, &DRIVER_MINING_OPS, &TRANSPORT);
@@ -977,7 +994,7 @@ bzm_bringup_outcome_t bzm_driver_start(bzm_device_t *state, const bzm_bringup_te
     }
     /* Prime every engine with fresh work, including after resume. */
     start_work_replacement_locked(config.engine_count);
-    state->difficulty_power = BZM_RESULT_DIFFICULTY_POWER;
+    state->difficulty_power = 0; // Let the controller apply its initial value immediately.
     pthread_mutex_unlock(&REACTOR_LOCK);
     return BZM_BRINGUP_GOOD;
 
@@ -1081,10 +1098,11 @@ const bzm_result_t *bzm_driver_process_result(bzm_device_t *state)
     if (!bzm_nonce_hash(&job, share->nonce, share->final_version, hash)) return NULL;
     /* A clean job may preempt software validation after the initial lookup. */
     if (!bzm_job_store_contains(&BZM_STATE->job_store, share->work_handle)) return NULL;
-    bool valid = bzm_hash_meets_difficulty(hash, BZM_RESULT_DIFFICULTY_POWER);
+    if (share->difficulty_power < 4 || share->difficulty_power > 31) return NULL;
+    bool valid = bzm_hash_meets_difficulty(hash, share->difficulty_power);
     if (valid && share->asic_index < BZM_MAX_ASIC_COUNT) {
         atomic_fetch_add_explicit(&HASHRATE_DIFFICULTY_ONE_COUNTERS[share->asic_index],
-                                  BZM_RESULT_DIFFICULTY, memory_order_relaxed);
+                                  UINT64_C(1) << share->difficulty_power, memory_order_relaxed);
     }
     return valid ? share : NULL;
 }

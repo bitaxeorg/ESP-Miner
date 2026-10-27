@@ -13,10 +13,8 @@ static bool program_work(const bzm_work_t *work,
         return false;
     }
 
-    /* Match the production BIRDS encoding exactly: ZEROS_TO_FIND stores the
-     * requested leading-zero count after the fixed 32-bit difficulty-one
-     * prefix. This must stay aligned with BZM_record_local_result(), which
-     * credits each result as 2^(lead_zeros - 32) difficulty-one units. */
+    // bzmd stores the leading-zero count after the fixed 32-bit prefix.
+    // The driver credits results using the filter retained with each assignment.
     uint8_t zero_count = work->lead_zeros > 32
         ? (uint8_t)(work->lead_zeros - 32)
         : 0;

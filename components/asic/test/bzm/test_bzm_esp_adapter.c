@@ -5,6 +5,7 @@
 
 #define BZM_init adapter_test_init
 #define BZM_set_frequency adapter_test_set_frequency
+#define BZM_set_difficulty adapter_test_set_difficulty
 #define BZM_driver_state_init adapter_test_state_init
 #define BZM_set_max_baud adapter_test_set_max_baud
 #define BZM_submit_job adapter_test_submit_job
@@ -27,6 +28,7 @@
 #define bzm_platform_esp_init adapter_mock_platform_init
 #define bzm_driver_state_init adapter_mock_state_init
 #define bzm_driver_init adapter_mock_init
+#define bzm_driver_set_difficulty adapter_mock_set_difficulty
 #define bzm_driver_hold_reset adapter_mock_hold_reset
 #define bzm_driver_process_result adapter_mock_process_result
 #define create_jobs_refresh adapter_mock_refresh
@@ -34,7 +36,8 @@ static BaseType_t adapter_create_task(TaskFunction_t task, const char *name, voi
 #define xTaskCreate(task, name, stack, context, priority, handle) adapter_create_task(task, name, context, handle)
 #include "../../bzm/port/esp/driver.c"
 
-static bool platform_ok, allocation_ok, task_ok;
+static bool platform_ok, allocation_ok, task_ok, difficulty_ok;
+static uint8_t applied_difficulty;
 static uint8_t startup_count;
 static unsigned task_calls, reset_calls;
 static bzm_device_t last_device;
@@ -48,8 +51,15 @@ bool adapter_mock_state_init(bzm_device_t *device) { last_device = *device; retu
 uint8_t adapter_mock_init(bzm_device_t *device)
 {
     bzm_device_record_frequency(device, 800);
-    device->difficulty_power = BZM_RESULT_DIFFICULTY_POWER;
+    device->difficulty_power = 0;
     return startup_count;
+}
+bool adapter_mock_set_difficulty(bzm_device_t *device, uint8_t power)
+{
+    last_device = *device;
+    applied_difficulty = power;
+    device->difficulty_power = power;
+    return difficulty_ok;
 }
 bool adapter_mock_hold_reset(void) { ++reset_calls; return true; }
 const bzm_result_t *adapter_mock_process_result(bzm_device_t *device) { (void)device; return &share; }
@@ -90,7 +100,12 @@ TEST_CASE("BZM ESP adapter owns task retry, application callbacks and result con
     TEST_ASSERT_EQUAL_UINT8(4, BZM_init(&state));
     TEST_ASSERT_EQUAL_UINT32(2, task_calls);
     TEST_ASSERT_EQUAL_FLOAT(800, state.POWER_MANAGEMENT_MODULE.actual_frequency);
-    TEST_ASSERT_EQUAL_UINT8(BZM_RESULT_DIFFICULTY_POWER, state.current_difficulty_power);
+    TEST_ASSERT_EQUAL_UINT8(0, state.current_difficulty_power);
+    difficulty_ok = true;
+    BZM_set_difficulty(&state, 9);
+    TEST_ASSERT_EQUAL_UINT8(9, applied_difficulty);
+    TEST_ASSERT_EQUAL_PTR(&state, last_device.context);
+    TEST_ASSERT_FALSE(state.SYSTEM_MODULE.hardware_fault);
     TEST_ASSERT_TRUE(last_device.can_submit(last_device.context));
     TEST_ASSERT_NOT_NULL(last_device.request_work);
     last_device.request_work(last_device.context);
@@ -111,6 +126,11 @@ TEST_CASE("BZM ESP adapter owns task retry, application callbacks and result con
     TEST_ASSERT_EQUAL_UINT32(101, result->job.ntime);
     TEST_ASSERT_EQUAL_UINT32(100, share.job.ntime);
     TEST_ASSERT_EQUAL_HEX32(0x20002000, result->rolled_version);
+    state.SYSTEM_MODULE.hardware_fault = false;
+    difficulty_ok = false;
+    BZM_set_difficulty(&state, 10);
+    TEST_ASSERT_TRUE(state.SYSTEM_MODULE.hardware_fault);
+    TEST_ASSERT_EQUAL_STRING("BZM difficulty update failed", state.SYSTEM_MODULE.hardware_fault_msg);
     share.job_valid = false;
     TEST_ASSERT_NULL(BZM_process_work(&state));
 }

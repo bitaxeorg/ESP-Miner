@@ -287,8 +287,7 @@ void ASIC_set_difficulty(GlobalState * GLOBAL_STATE, uint8_t difficulty_power)
 
     switch (GLOBAL_STATE->DEVICE_CONFIG.family.asic.id) {
         case BZM:
-            // The BZM work encoder uses a fixed leading-zero filter.
-            GLOBAL_STATE->current_difficulty_power = BZM_RESULT_DIFFICULTY_POWER;
+            BZM_set_difficulty(GLOBAL_STATE, difficulty_power);
             return;
         case BM1397:
             BM1397_set_difficulty(difficulty_power);

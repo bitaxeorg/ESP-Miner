@@ -28,6 +28,8 @@ typedef struct {
     uint16_t engine_id;
     uint8_t sequence_id;
     uint8_t micro_job_id;
+    // Filter of the matched assignment, including delayed previous results.
+    uint8_t difficulty_power;
     uint32_t generation;
 } bzm_result_t;
 

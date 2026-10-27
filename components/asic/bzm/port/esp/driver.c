@@ -80,6 +80,13 @@ void BZM_set_frequency(GlobalState *state)
     bzm_device_t device = device_view(state);
     bzm_driver_set_frequency(&device);
 }
+void BZM_set_difficulty(GlobalState *state, uint8_t difficulty_power)
+{
+    if (!state) return;
+    bzm_device_t device = device_view(state);
+    if (!bzm_driver_set_difficulty(&device, difficulty_power))
+        report_fault(state, "BZM difficulty update failed");
+}
 void BZM_submit_job(GlobalState *state, const asic_job_t *job)
 {
     if (!state) return;

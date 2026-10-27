@@ -7,6 +7,7 @@
 
 
 #define bzm_driver_init test_driver_init
+#define bzm_driver_set_difficulty test_bzm_set_difficulty
 #define bzm_driver_set_frequency test_driver_set_frequency
 #define bzm_driver_state_init test_driver_state_init
 #define bzm_driver_set_max_baud test_driver_set_max_baud
@@ -170,7 +171,7 @@ static void fixture_init(void)
     atomic_init(&WORK_REPLACEMENT_GENERATION, 0);
     for (size_t i = 0; i < BZM_MAX_ASIC_COUNT; ++i) atomic_init(&HASHRATE_DIFFICULTY_ONE_COUNTERS[i], 0);
     bzm_reactor_config_t config = {.engine_count = BZM_ENGINES_PER_ASIC, .timestamp_count = 16,
-                                   .nonce_offset = BZM_NONCE_GAP};
+                                   .lead_zeros = 36, .nonce_offset = BZM_NONCE_GAP};
     bzm_transport_ops_t ops = {.write_work = write_work, .flush = flush};
     TEST_ASSERT_TRUE(bzm_reactor_init(&REACTOR, &BZM_STATE->job_store, &config, &ops, NULL));
     INITIALIZED = DRIVER_TRANSPORT_READY = DRIVER_BRINGUP.running = true;
@@ -356,27 +357,32 @@ TEST_CASE("BZM real transport errors latch but withdrawn dispatch does not", "[a
 
 TEST_CASE("BZM difficulty filtering rejects nonfinite results and credits only valid hashes", "[asic][bzm][driver]")
 {
-    fixture_init();
-    asic_job_t job = template();
-    TEST_ASSERT_TRUE(driver_send_work(&test_state, &job));
-    raw_result = (bzm_raw_result_t){.asic_id = BZM_FIRST_ASIC_ID, .engine_id = last_work.engine_id,
-                                   .status = 8, .time = 16, .sequence_id = 0};
-    const double cases[] = {NAN, INFINITY, -INFINITY, 0.0, 15.99, 16.0, 32.0};
-    uint32_t counters[BZM_MAX_ASIC_COUNT] = {0};
-    for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); ++i) {
-        result_difficulty = cases[i];
-        ++raw_result.nonce;
-        const bzm_result_t *result = bzm_driver_process_result(&test_state);
-        TEST_ASSERT_EQUAL(i >= 5, result != NULL);
+    const uint8_t powers[] = {4, 8, 9};
+    for (size_t p = 0; p < sizeof(powers); ++p) {
+        fixture_init();
+        uint32_t difficulty = 1U << powers[p];
+        TEST_ASSERT_TRUE(bzm_driver_set_difficulty(&test_state, powers[p]));
+        asic_job_t job = template();
+        TEST_ASSERT_TRUE(driver_send_work(&test_state, &job));
+        raw_result = (bzm_raw_result_t){.asic_id = BZM_FIRST_ASIC_ID, .engine_id = last_work.engine_id,
+                                       .status = 8, .time = 16, .sequence_id = 0};
+        const double cases[] = {NAN, INFINITY, -INFINITY, 0.0, difficulty - 0.01, difficulty, difficulty * 2.0};
+        uint32_t counters[BZM_MAX_ASIC_COUNT] = {0};
+        for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); ++i) {
+            result_difficulty = cases[i];
+            ++raw_result.nonce;
+            const bzm_result_t *result = bzm_driver_process_result(&test_state);
+            TEST_ASSERT_EQUAL(i >= 5, result != NULL);
+        }
+        TEST_ASSERT_TRUE(bzm_driver_hashrate_counter_snapshot(&test_state, counters, BZM_MAX_ASIC_COUNT));
+        TEST_ASSERT_EQUAL_UINT32(2 * difficulty, counters[0]);
+        TEST_ASSERT_EQUAL_UINT32(0, counters[1]);
+        // A lucky hash and a duplicate must not earn extra credit beyond the filter.
+        TEST_ASSERT_NULL(bzm_driver_process_result(&test_state));
+        TEST_ASSERT_TRUE(bzm_driver_hashrate_counter_snapshot(&test_state, counters, BZM_MAX_ASIC_COUNT));
+        TEST_ASSERT_EQUAL_UINT32(2 * difficulty, counters[0]);
+        fixture_destroy();
     }
-    TEST_ASSERT_TRUE(bzm_driver_hashrate_counter_snapshot(&test_state, counters, BZM_MAX_ASIC_COUNT));
-    TEST_ASSERT_EQUAL_UINT32(32, counters[0]);
-    TEST_ASSERT_EQUAL_UINT32(0, counters[1]);
-    // A duplicate valid result must not earn a second hashrate credit.
-    TEST_ASSERT_NULL(bzm_driver_process_result(&test_state));
-    TEST_ASSERT_TRUE(bzm_driver_hashrate_counter_snapshot(&test_state, counters, BZM_MAX_ASIC_COUNT));
-    TEST_ASSERT_EQUAL_UINT32(32, counters[0]);
-    fixture_destroy();
 }
 
 TEST_CASE("BZM drops work retired during software nonce validation", "[asic][bzm][driver]")
@@ -484,7 +490,7 @@ TEST_CASE("BZM startup primes every engine and waits for board dispatch authoriz
     TEST_ASSERT_TRUE(DRIVER_BRINGUP.running);
     TEST_ASSERT_FALSE(startup_reset_asserted);
     TEST_ASSERT_EQUAL_UINT32(1, startup_chip_calls);
-    TEST_ASSERT_EQUAL_UINT8(BZM_RESULT_DIFFICULTY_POWER, test_state.difficulty_power);
+    TEST_ASSERT_EQUAL_UINT8(0, test_state.difficulty_power);
     TEST_ASSERT_EQUAL_UINT8_ARRAY(bzm_asic_wire_ids, TRANSPORT.asic_ids, BZM_MAX_ASIC_COUNT);
     TEST_ASSERT_EQUAL_UINT16(BZM_ENGINE_ROWS, REFILL_REMAINING);
     TEST_ASSERT_EQUAL_UINT16(BZM_ENGINE_ROWS, BZM_STATE->work_replacement_remaining);

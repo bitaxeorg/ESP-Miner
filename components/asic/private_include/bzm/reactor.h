@@ -52,6 +52,7 @@ typedef struct {
     uint16_t engine_id;
     uint8_t logical_sequence;
     uint8_t timestamp_count;
+    uint8_t difficulty_power;
     bool active;
 } bzm_assignment_t;
 

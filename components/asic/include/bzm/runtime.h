@@ -29,14 +29,12 @@ static inline void bzm_device_record_frequency(bzm_device_t *device, float actua
     if (device->frequency_changed) device->frequency_changed(device->context, actual_mhz);
 }
 
-/* Keep self-test accounting in sync with the fixed hardware filter. */
-#define BZM_RESULT_DIFFICULTY_POWER 4U
-
 /* Allocation placement is selected by the platform allocator. */
 bool bzm_driver_state_init(bzm_device_t *state);
 
 uint8_t bzm_driver_init(bzm_device_t *state);
 void bzm_driver_set_frequency(bzm_device_t *state);
+bool bzm_driver_set_difficulty(bzm_device_t *state, uint8_t difficulty_power);
 int bzm_driver_set_max_baud(void);
 void bzm_driver_submit_job(bzm_device_t *state, const asic_job_t *job);
 bool bzm_driver_clear_work(bzm_device_t * state);

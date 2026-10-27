@@ -13,7 +13,7 @@ static struct {
     int64_t now, tx_done;
     size_t bytes;
     unsigned sleeps, polls, requests, writes, drains, clock_steps, nonce_writes;
-    bool dispatching, allowed, fail_drain, fail_nonce, retire_during_hash, hashing_nonce;
+    bool dispatching, allowed, fail_drain, fail_nonce, retire_during_hash, hashing_nonce, weak_result;
 } fixture;
 
 static int64_t now_us(void *context) { (void)context; return fixture.now; }
@@ -35,6 +35,7 @@ static bzm_status_t hash_bytes(void *context, const uint8_t *data, size_t size, 
         CHECK(bzm_driver_clear_work(NULL));
     }
     memset(digest, 0, 32);
+    if (fixture.weak_result) digest[27] = 1; // Passes D16, fails D256 and above.
     return BZM_OK;
 }
 static int16_t read_bytes(void *context, uint8_t *data, uint16_t size, uint16_t timeout_ms)
@@ -64,6 +65,7 @@ static int write_bytes(void *context, const uint8_t *data, size_t size)
     } else if (fixture.dispatching) {
         CHECK(data[0] == BZM_ALL_ASICS && data[2] == 0x40 && data[4] < BZM_ENGINE_ROWS);
         if (data[6] == BZM_REG_TIMESTAMP_COUNT) CHECK(data[10] == 0xff);
+        if (data[6] == BZM_REG_ZEROS_TO_FIND) CHECK(data[10] == REACTOR.config.lead_zeros - 32);
     }
     if (fixture.tx_done < fixture.now) fixture.tx_done = fixture.now;
     fixture.tx_done += (int64_t)size * 10 * 1000000 / BZM_BAUD_RATE; // 8N1, bounded TX ring.
@@ -127,6 +129,68 @@ static bzm_raw_result_t response(size_t engine)
     return (bzm_raw_result_t){.asic_id = BZM_FIRST_ASIC_ID,
         .engine_id = assignment->engine_id, .sequence_id = assignment->logical_sequence << 2,
         .status = 8, .time = REACTOR.config.timestamp_count};
+}
+
+static const bzm_result_t *receive(bzm_device_t *device, bzm_raw_result_t raw, uint32_t nonce)
+{
+    raw.nonce = nonce;
+    TRANSPORT.io.pending_result_head = 0;
+    TRANSPORT.io.pending_result_length = 1;
+    TRANSPORT.io.pending_results[0] = raw;
+    return bzm_driver_process_result(device);
+}
+
+static void test_difficulty(bzm_device_t *device, asic_job_t *job)
+{
+    bzm_raw_result_t d16 = response(0);
+    uint32_t before[4], after[4];
+    CHECK(bzm_driver_hashrate_counter_snapshot(device, before, 4));
+    unsigned requests = fixture.requests;
+    CHECK(!bzm_driver_set_difficulty(device, 3));
+    CHECK(!bzm_driver_set_difficulty(device, 32));
+    CHECK(bzm_driver_set_difficulty(device, 8));
+    CHECK(device->difficulty_power == 8 && REACTOR.config.lead_zeros == 40);
+    CHECK(fixture.requests == requests + 1 && REFILL_REMAINING == BZM_ENGINE_ROWS);
+    CHECK(bzm_driver_set_difficulty(device, 8));
+    CHECK(fixture.requests == requests + 1); // Idempotent updates do not restart refills.
+    for (size_t i = 0; i < BZM_ENGINE_ROWS; ++i) submit(device, job);
+    fixture.weak_result = true;
+    const bzm_result_t *share = receive(device, d16, 99);
+    CHECK(share && share->difficulty_power == 4); // Old D16 must not be checked at D256.
+    fixture.weak_result = false;
+    bzm_raw_result_t d256 = response(0);
+    CHECK(bzm_driver_set_difficulty(device, 9));
+    CHECK(REACTOR.config.lead_zeros == 41);
+    for (size_t i = 0; i < BZM_ENGINE_ROWS; ++i) submit(device, job);
+    bzm_raw_result_t d512 = response(0);
+    CHECK(receive(device, d16, 100) == NULL); // More than one generation old.
+    share = receive(device, d256, 101);
+    CHECK(share && share->difficulty_power == 8); // Previous filter survives a change.
+    CHECK(receive(device, d256, 101) == NULL); // Duplicate gets no credit.
+    share = receive(device, d512, 102);
+    CHECK(share && share->difficulty_power == 9);
+    fixture.weak_result = true;
+    CHECK(receive(device, d256, 103) == NULL);
+    CHECK(receive(device, d512, 104) == NULL);
+    fixture.weak_result = false;
+    CHECK(bzm_driver_hashrate_counter_snapshot(device, after, 4));
+    CHECK(after[0] - before[0] == 16 + 256 + 512);
+    for (size_t i = 1; i < 4; ++i) CHECK(after[i] == before[i]);
+    CHECK(bzm_driver_set_difficulty(device, 4));
+    for (size_t i = 0; i < BZM_ENGINE_ROWS; ++i) submit(device, job);
+    fixture.weak_result = true;
+    share = receive(device, d512, 105); // Delayed high-filter work is still checked at D512.
+    CHECK(share == NULL);
+    share = receive(device, response(0), 106);
+    CHECK(share && share->difficulty_power == 4);
+    fixture.weak_result = false;
+    CHECK(bzm_driver_hashrate_counter_snapshot(device, after, 4));
+    CHECK(after[0] - before[0] == 16 + 256 + 512 + 16);
+    CHECK(bzm_driver_clear_work(device));
+    CHECK(receive(device, d512, 107) == NULL); // Clean jobs never credit retired work.
+    CHECK(bzm_driver_hashrate_counter_snapshot(device, before, 4));
+    CHECK(before[0] == after[0]);
+    for (size_t i = 0; i < BZM_ENGINE_ROWS; ++i) submit(device, job);
 }
 
 int main(void)
@@ -241,6 +305,7 @@ int main(void)
     while (REFILL_REMAINING) submit(&device, &job);
     double delay = bzm_driver_job_frequency_ms(&device);
     CHECK(delay > 830 && delay < 860);
+    test_difficulty(&device, &job);
     fixture.allowed = false;
     unsigned writes = fixture.writes;
     bzm_driver_submit_job(&device, &job);
@@ -260,6 +325,7 @@ int main(void)
     fixture.fail_drain = true;
     CHECK(!driver_send_work(&device, &job));
     CHECK(bzm_driver_has_io_fault());
+    CHECK(!bzm_driver_set_difficulty(&device, 9));
     CHECK(bzm_driver_work_replacement_snapshot(&generation, &completed, &pending));
     CHECK(pending && generation != completed);
     fixture.fail_drain = false;

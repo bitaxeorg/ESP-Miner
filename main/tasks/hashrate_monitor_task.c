@@ -108,9 +108,9 @@ static float calculate_avg_nan_safe(const float arr[], int size) {
     return (count > 0) ? (sum / count) : 0.0f;
 }
 
-static void update_hashrate_averages(SystemModule * SYSTEM_MODULE)
+static void update_hashrate_averages(SystemModule * SYSTEM_MODULE, float interval_hashrate)
 {
-    hashrate_1m[poll_count % HASHRATE_1M_SIZE] = SYSTEM_MODULE->current_hashrate;
+    hashrate_1m[poll_count % HASHRATE_1M_SIZE] = interval_hashrate;
     SYSTEM_MODULE->hashrate_1m = calculate_avg_nan_safe(hashrate_1m, HASHRATE_1M_SIZE);
 
     int hashrate_10m_blend = poll_count % HASHRATE_1M_SIZE;
@@ -180,24 +180,23 @@ void hashrate_monitor_task(void *pvParameters)
         }
         was_asic_initialized = is_asic_initialized;
 
+        float interval_hashrate = 0;
         if (is_asic_initialized) {
             ASIC_read_registers(GLOBAL_STATE);
             vTaskDelay(100 / portTICK_PERIOD_MS);
 
             pthread_mutex_lock(&HASHRATE_MONITOR_MODULE->lock);
-            float current_hashrate = sum_hashrates(HASHRATE_MONITOR_MODULE->total_measurement, asic_count);
+            interval_hashrate = sum_hashrates(HASHRATE_MONITOR_MODULE->total_measurement, asic_count);
             float error_hashrate = sum_hashrates(HASHRATE_MONITOR_MODULE->error_measurement, asic_count);
             pthread_mutex_unlock(&HASHRATE_MONITOR_MODULE->lock);
 
-            SYSTEM_MODULE->current_hashrate = current_hashrate;
-            SYSTEM_MODULE->error_percentage = current_hashrate > 0 ? error_hashrate / current_hashrate * 100.f : 0;
-
-            if (current_hashrate > 0.0f) update_hashrate_averages(SYSTEM_MODULE);
-        } else {
-            SYSTEM_MODULE->current_hashrate = 0;
+            SYSTEM_MODULE->error_percentage = interval_hashrate > 0 ? error_hashrate / interval_hashrate * 100.f : 0;
         }
 
-        SYSTEM_noinit_update(SYSTEM_MODULE);
+        // Every polling interval contributes, including no-result and paused intervals.
+        update_hashrate_averages(SYSTEM_MODULE, interval_hashrate);
+        SYSTEM_MODULE->current_hashrate = SYSTEM_MODULE->hashrate_1m;
+        SYSTEM_noinit_update(SYSTEM_MODULE, interval_hashrate);
 
         vTaskDelayUntil(&taskWakeTime, POLL_RATE / portTICK_PERIOD_MS);
     }

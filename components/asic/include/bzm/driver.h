@@ -10,15 +10,13 @@
 
 typedef struct GlobalState GlobalState;
 
-/* Keep self-test accounting in sync with the fixed hardware filter. */
-#define BZM_RESULT_DIFFICULTY_POWER 4U
-
 /* The large Bonanza reactor and transport state is created only after board
  * detection selects BZM, and must reside in external RAM. */
 bool BZM_driver_state_init(GlobalState *state);
 
 uint8_t BZM_init(GlobalState *state);
 void BZM_set_frequency(GlobalState *state);
+void BZM_set_difficulty(GlobalState *state, uint8_t difficulty_power);
 int BZM_set_max_baud(void);
 void BZM_submit_job(GlobalState *state, const asic_job_t *job);
 bool BZM_clear_work(GlobalState * state);
