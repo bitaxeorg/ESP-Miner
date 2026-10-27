@@ -1,6 +1,7 @@
 #include "bzm/platform.h"
 #include "bzm/control.h"
 #include "bzm/serial.h"
+#include "serial.h"
 #include "bzm/esp.h"
 #include "esp_heap_caps.h"
 #include "esp_psram.h"
@@ -49,11 +50,11 @@ static void log_message(void *ctx, char level, const char *tag, const char *form
     esp_log_write(severity, tag, "\n");
 }
 static bzm_status_t serial_init(void *ctx) { (void)ctx; return BZM_SERIAL_init(); }
-static bool serial_ready(void *ctx) { (void)ctx; return BZM_SERIAL_is_initialized(); }
+static bool serial_ready(void *ctx) { (void)ctx; return SERIAL_is_initialized(); }
 static bzm_status_t serial_baud(void *ctx, int baud) { (void)ctx; return BZM_SERIAL_set_baud(baud); }
 static bzm_status_t serial_wait(void *ctx, uint32_t ms) { (void)ctx; return BZM_SERIAL_wait_tx_done(ms); }
 static int serial_write(void *ctx, const uint8_t *data, size_t size)
-{ (void)ctx; return BZM_SERIAL_send((uint8_t *)data, (int)size, false); }
+{ (void)ctx; return SERIAL_send((uint8_t *)data, (int)size, false); }
 static int16_t serial_read(void *ctx, uint8_t *data, uint16_t size, uint16_t ms)
 { (void)ctx; return BZM_SERIAL_rx(data, size, ms); }
 static bzm_status_t serial_clear(void *ctx) { (void)ctx; return uart_flush_input(UART_NUM_1); }

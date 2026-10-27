@@ -27,11 +27,9 @@ static inline bool BZM_SERIAL_fifo_reserve_covers(uint32_t fifo_bytes,
            (uint64_t) bytes_per_second * latency_us;
 }
 
-int BZM_SERIAL_send(uint8_t *, int, bool);
 esp_err_t BZM_SERIAL_init(void);
 int16_t BZM_SERIAL_rx(uint8_t *, uint16_t, uint16_t);
 esp_err_t BZM_SERIAL_set_baud(int baud);
 esp_err_t BZM_SERIAL_wait_tx_done(uint32_t timeout_ms);
-bool BZM_SERIAL_is_initialized(void);
 
 #endif /* BZM_ESP_SERIAL_H_ */

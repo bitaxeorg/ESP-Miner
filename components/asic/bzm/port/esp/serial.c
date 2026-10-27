@@ -1,13 +1,13 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include <stdio.h>
 
 #include "driver/uart.h"
 
 #include "esp_log.h"
 
 #include "bzm/serial.h"
-#include "utils.h"
+#include "serial.h"
+#include "serial_internal.h"
 
 #define ECHO_TEST_TXD (17)
 #define ECHO_TEST_RXD (18)
@@ -58,11 +58,6 @@ esp_err_t BZM_SERIAL_init(void)
     return ESP_OK;
 }
 
-bool BZM_SERIAL_is_initialized(void)
-{
-    return uart_is_driver_installed(UART_NUM_1);
-}
-
 esp_err_t BZM_SERIAL_set_baud(int baud)
 {
     ESP_LOGI(TAG, "Changing UART baud to %i", baud);
@@ -78,7 +73,7 @@ esp_err_t BZM_SERIAL_set_baud(int baud)
 
 esp_err_t BZM_SERIAL_wait_tx_done(uint32_t timeout_ms)
 {
-    if (!BZM_SERIAL_is_initialized()) {
+    if (!SERIAL_is_initialized()) {
         return ESP_ERR_INVALID_STATE;
     }
     TickType_t timeout_ticks = pdMS_TO_TICKS(timeout_ms);
@@ -88,21 +83,6 @@ esp_err_t BZM_SERIAL_wait_tx_done(uint32_t timeout_ms)
     return uart_wait_tx_done(UART_NUM_1, timeout_ticks);
 }
 
-int BZM_SERIAL_send(uint8_t * data, int len, bool debug)
-{
-    if (debug) {
-        printf("tx: ");
-        prettyHex((unsigned char *) data, len);
-        printf("\n");
-    }
-
-    return uart_write_bytes(UART_NUM_1, (const char *) data, len);
-}
-
-/// @brief waits for a serial response from the device
-/// @param buf buffer to read data into
-/// @param buf number of ms to wait before timing out
-/// @return number of bytes read, or -1 on error
 static TickType_t timeout_ticks(uint32_t timeout_ms)
 {
     if (timeout_ms == 0) return 0;
@@ -112,19 +92,6 @@ static TickType_t timeout_ticks(uint32_t timeout_ms)
 
 int16_t BZM_SERIAL_rx(uint8_t * buf, uint16_t size, uint16_t timeout_ms)
 {
-    if (buf == NULL || size == 0 || !BZM_SERIAL_is_initialized()) return -1;
-    int16_t bytes_read = (int16_t) uart_read_bytes(
-        UART_NUM_1, buf, size, timeout_ticks(timeout_ms));
-
-#if BM1397_SERIALRX_DEBUG || BM1366_SERIALRX_DEBUG || BM1368_SERIALRX_DEBUG || BM1370_SERIALRX_DEBUG || BM1373_SERIALRX_DEBUG
-    size_t buff_len = 0;
-    if (bytes_read > 0) {
-        uart_get_buffered_data_len(UART_NUM_1, &buff_len);
-        printf("rx: ");
-        prettyHex((unsigned char *) buf, bytes_read);
-        printf(" [%d]\n", buff_len);
-    }
-#endif
-
-    return bytes_read;
+    if (buf == NULL || size == 0 || !SERIAL_is_initialized()) return -1;
+    return SERIAL_rx_ticks(buf, size, timeout_ticks(timeout_ms));
 }
