@@ -557,5 +557,14 @@
     "reset": "Reset Layout",
     "standard_width": "Standard Width",
     "wide_view": "Wide View"
+  },
+  "scoreboard": {
+    "rank": "Rank",
+    "difficulty": "Difficulty",
+    "job_id": "Job ID",
+    "extranonce2": "ExtraNonce2",
+    "time": "Time",
+    "nonce": "Nonce",
+    "version_bits": "Version Bits"
   }
 }
