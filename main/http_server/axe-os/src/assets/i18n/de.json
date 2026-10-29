@@ -257,69 +257,7 @@
     "domain": "Domäne",
     "domains": "Domänen",
     "asic_error_count": "Fehleranzahl: {count}",
-    "asic_error_count_with_index": "ASIC {index} - Fehleranzahl: {count}",
-    "rejection_reasons": {
-      "invalid_nonce2_length": "Ungültige Nonce2-Länge",
-      "worker_mismatch": "Worker stimmt nicht",
-      "no_nonce": "Keine Nonce",
-      "no_ntime": "Keine ntime",
-      "no_nonce2": "Keine Nonce2",
-      "no_job_id": "Keine Job-ID",
-      "no_username": "Kein Benutzername",
-      "invalid_array_size": "Ungültige Array-Größe",
-      "params_not_array": "Parameter kein Array",
-      "valid": "Gültig",
-      "invalid_job_id": "Ungültige JobID",
-      "stale": "Stale",
-      "ntime_out_of_range": "Ntime außerhalb des Bereichs",
-      "duplicate": "Duplikat",
-      "above_target": "Difficulty zu niedrig",
-      "invalid_version_mask": "Ungültige Versionsmaske",
-      "subscription_validation_error": "Subscription ungültig",
-      "configuration_validation_error": "Konfiguration ungültig",
-      "authorization_validation_error": "Autorisierung ungültig",
-      "suggest_difficulty_validation_error": "Difficulty-Vorschlag ungültig",
-      "mining_submit_validation_error": "Mining-Submit ungültig",
-      "job_not_found": "Job nicht gefunden",
-      "duplicate_share": "Doppelter Share",
-      "difficulty_too_low": "Difficulty zu niedrig"
-    },
-    "rejection_explanations": {
-      "invalid_nonce2_length": "Der nonce2-Wert hat nicht die erwartete Länge für diesen Mining-Job.",
-      "worker_mismatch": "Der gesendete Worker-Name entspricht nicht dem erwarteten bzw. authentifizierten Worker.",
-      "no_nonce": "Der Share-Einreichung fehlte ein Nonce-Wert.",
-      "no_ntime": "Der Einreichung fehlte die Netzwerkzeit (ntime).",
-      "no_nonce2": "Die Einreichung enthielt keinen nonce2-Wert.",
-      "no_job_id": "Die Einreichung enthielt keine Job-ID.",
-      "no_username": "Der Einreichung fehlte der Benutzername (Worker-Name).",
-      "invalid_array_size": "Die JSON-Array-Parameter hatten eine unerwartete Größe.",
-      "params_not_array": "Das Parameterfeld war nicht als JSON-Array formatiert.",
-      "valid": "Das ist kein Ablehnungsgrund - es zeigt einen gültigen Share an.",
-      "invalid_job_id": "Die Job-ID in der Einreichung wurde nicht erkannt oder ist nicht mehr gültig.",
-      "stale": "Während dieser Share eingereicht wurde, hat das Netzwerk bereits einen neuen Block gefunden; dadurch ist der Share ungültig.",
-      "ntime_out_of_range": "Der angegebene ntime-Wert lag außerhalb des zulässigen Bereichs.",
-      "duplicate": "Dieser Share wurde bereits eingereicht.",
-      "above_target": "Der eingereichte Share erfüllt die erforderliche Mindest-Difficulty nicht.",
-      "invalid_version_mask": "Die angegebene Versionsmaske war für diesen Job ungültig.",
-      "subscription_validation_error": "Die Subscription-Anfrage des Miners war ungültig oder fehlerhaft.",
-      "configuration_validation_error": "Der Miner hat eine ungültige Mining-Konfiguration bzw. Einstellungen gesendet.",
-      "authorization_validation_error": "Die vom Miner angegebenen Zugangsdaten waren falsch oder nicht autorisiert.",
-      "suggest_difficulty_validation_error": "Der Miner hat einen ungültigen Difficulty-Wert vorgeschlagen.",
-      "mining_submit_validation_error": "Die eingereichte Mining-Arbeit war ungültig oder falsch formatiert.",
-      "job_not_found": "Während dieser Share eingereicht wurde, hat das Netzwerk bereits einen neuen Block gefunden; dadurch ist der Share ungültig.",
-      "duplicate_share": "Dieser Share wurde bereits eingereicht.",
-      "difficulty_too_low": "Der eingereichte Share erfüllt die erforderliche Mindest-Difficulty nicht.",
-      "invalid_subscription_message": "The miner's mining.subscribe request was malformed.",
-      "invalid_configuration_message": "The miner's mining.configure request was malformed.",
-      "invalid_authorization_message": "The miner's mining.authorize request was malformed.",
-      "invalid_bitcoin_address": "The submitted username is not a valid Bitcoin address.",
-      "invalid_suggest_difficulty_message": "The mining.suggest_difficulty request was malformed.",
-      "suggest_difficulty_disabled": "This pool port does not allow miners to suggest a difficulty.",
-      "invalid_mining_submit_message": "The mining.submit request was malformed.",
-      "unauthorized_worker": "This worker has not been authorized — submit mining.authorize first.",
-      "not_subscribed": "This connection has not subscribed — submit mining.subscribe first.",
-      "invalid_channel_id": "The SV2 channel ID in the share submission is not known to the pool."
-    }
+    "asic_error_count_with_index": "ASIC {index} - Fehleranzahl: {count}"
   },
   "device": {
     "system": {
@@ -383,5 +321,149 @@
   "logs": {
     "realtime_title": "Echtzeit-Logs",
     "case_sensitive_filter": "Groß-/Kleinschreibung beachten"
+  },
+  "share_rejection": {
+    "Invalid nonce2 length": {
+      "label": "Ungültige Nonce2-Länge",
+      "explanation": "Der nonce2-Wert hat nicht die erwartete Länge für diesen Mining-Job."
+    },
+    "Worker mismatch": {
+      "label": "Worker stimmt nicht",
+      "explanation": "Der gesendete Worker-Name entspricht nicht dem erwarteten bzw. authentifizierten Worker."
+    },
+    "No nonce": {
+      "label": "Keine Nonce",
+      "explanation": "Der Share-Einreichung fehlte ein Nonce-Wert."
+    },
+    "No ntime": {
+      "label": "Keine ntime",
+      "explanation": "Der Einreichung fehlte die Netzwerkzeit (ntime)."
+    },
+    "No nonce2": {
+      "label": "Keine Nonce2",
+      "explanation": "Die Einreichung enthielt keinen nonce2-Wert."
+    },
+    "No job_id": {
+      "label": "Keine Job-ID",
+      "explanation": "Die Einreichung enthielt keine Job-ID."
+    },
+    "No username": {
+      "label": "Kein Benutzername",
+      "explanation": "Der Einreichung fehlte der Benutzername (Worker-Name)."
+    },
+    "Invalid array size": {
+      "label": "Ungültige Array-Größe",
+      "explanation": "Die JSON-Array-Parameter hatten eine unerwartete Größe."
+    },
+    "Params not array": {
+      "label": "Parameter kein Array",
+      "explanation": "Das Parameterfeld war nicht als JSON-Array formatiert."
+    },
+    "Valid": {
+      "label": "Gültig",
+      "explanation": "Das ist kein Ablehnungsgrund - es zeigt einen gültigen Share an."
+    },
+    "Invalid JobID": {
+      "label": "Ungültige JobID",
+      "explanation": "Die Job-ID in der Einreichung wurde nicht erkannt oder ist nicht mehr gültig."
+    },
+    "Stale": {
+      "label": "Stale",
+      "explanation": "Während dieser Share eingereicht wurde, hat das Netzwerk bereits einen neuen Block gefunden; dadurch ist der Share ungültig."
+    },
+    "Ntime out of range": {
+      "label": "Ntime außerhalb des Bereichs",
+      "explanation": "Der angegebene ntime-Wert lag außerhalb des zulässigen Bereichs."
+    },
+    "Duplicate": {
+      "label": "Duplikat",
+      "explanation": "Dieser Share wurde bereits eingereicht."
+    },
+    "Above target": {
+      "label": "Difficulty zu niedrig",
+      "explanation": "Der eingereichte Share erfüllt die erforderliche Mindest-Difficulty nicht."
+    },
+    "Invalid version mask": {
+      "label": "Ungültige Versionsmaske",
+      "explanation": "Die angegebene Versionsmaske war für diesen Job ungültig."
+    },
+    "Subscription validation error": {
+      "label": "Subscription ungültig",
+      "explanation": "Die Subscription-Anfrage des Miners war ungültig oder fehlerhaft."
+    },
+    "Configuration validation error": {
+      "label": "Konfiguration ungültig",
+      "explanation": "Der Miner hat eine ungültige Mining-Konfiguration bzw. Einstellungen gesendet."
+    },
+    "Authorization validation error": {
+      "label": "Autorisierung ungültig",
+      "explanation": "Die vom Miner angegebenen Zugangsdaten waren falsch oder nicht autorisiert."
+    },
+    "Suggest difficulty validation error": {
+      "label": "Difficulty-Vorschlag ungültig",
+      "explanation": "Der Miner hat einen ungültigen Difficulty-Wert vorgeschlagen."
+    },
+    "Mining Submit validation error": {
+      "label": "Mining-Submit ungültig",
+      "explanation": "Die eingereichte Mining-Arbeit war ungültig oder falsch formatiert."
+    },
+    "Job not found": {
+      "label": "Job nicht gefunden",
+      "explanation": "Während dieser Share eingereicht wurde, hat das Netzwerk bereits einen neuen Block gefunden; dadurch ist der Share ungültig."
+    },
+    "Duplicate share": {
+      "label": "Doppelter Share",
+      "explanation": "Dieser Share wurde bereits eingereicht."
+    },
+    "Difficulty too low": {
+      "label": "Difficulty zu niedrig",
+      "explanation": "Der eingereichte Share erfüllt die erforderliche Mindest-Difficulty nicht."
+    },
+    "Invalid subscription message": {
+      "explanation": "The miner's mining.subscribe request was malformed."
+    },
+    "Invalid configuration message": {
+      "explanation": "The miner's mining.configure request was malformed."
+    },
+    "Invalid authorization message": {
+      "explanation": "The miner's mining.authorize request was malformed."
+    },
+    "Invalid Bitcoin address": {
+      "explanation": "The submitted username is not a valid Bitcoin address."
+    },
+    "Invalid suggest difficulty message": {
+      "explanation": "The mining.suggest_difficulty request was malformed."
+    },
+    "Suggest difficulty is disabled for this connection": {
+      "explanation": "This pool port does not allow miners to suggest a difficulty."
+    },
+    "Invalid mining submit message": {
+      "explanation": "The mining.submit request was malformed."
+    },
+    "Unauthorized worker": {
+      "explanation": "This worker has not been authorized — submit mining.authorize first."
+    },
+    "Not subscribed": {
+      "explanation": "This connection has not subscribed — submit mining.subscribe first."
+    },
+    "stale": {
+      "label": "Stale",
+      "explanation": "Während dieser Share eingereicht wurde, hat das Netzwerk bereits einen neuen Block gefunden; dadurch ist der Share ungültig."
+    },
+    "invalid-channel-id": {
+      "explanation": "The SV2 channel ID in the share submission is not known to the pool."
+    },
+    "invalid-job-id": {
+      "label": "Ungültige JobID",
+      "explanation": "Die Job-ID in der Einreichung wurde nicht erkannt oder ist nicht mehr gültig."
+    },
+    "stale-share": {
+      "label": "Stale",
+      "explanation": "Während dieser Share eingereicht wurde, hat das Netzwerk bereits einen neuen Block gefunden; dadurch ist der Share ungültig."
+    },
+    "difficulty-too-low": {
+      "label": "Difficulty zu niedrig",
+      "explanation": "Der eingereichte Share erfüllt die erforderliche Mindest-Difficulty nicht."
+    }
   }
 }

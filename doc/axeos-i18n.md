@@ -11,9 +11,9 @@ This document explains how internationalization (i18n) works in the AxeOS web UI
   - `en.json` (baseline)
   - `de.json`
   - `es.json`
-- Share rejection mapping: `main/http_server/axe-os/src/assets/share-rejection-explanations.json`
-  - Maps backend rejection reason strings to i18n keys under `miner.rejection_explanations.*` (tooltip explanations).
-  - Labels use the same map with `miner.rejection_reasons.*` keys; if missing, the raw reason is shown.
+- Share rejection reasons: backend rejection message strings are used directly as keys under the `share_rejection.*` category.
+  - Each entry has a `label` (short name shown in lists) and an `explanation` (shown in tooltips).
+  - Unknown or missing reason strings fall back to the raw backend message.
 
 ## Key naming convention
 Use dot-separated namespaces with stable identifiers:
@@ -24,6 +24,7 @@ Use dot-separated namespaces with stable identifiers:
 - `errors.*`
 - `settings.*`
 - `miner.*`
+- `share_rejection.*`
 - `device.*`
 - `units.*`
 
