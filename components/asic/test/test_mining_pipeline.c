@@ -335,7 +335,7 @@ TEST_CASE("SV2 standard messages produce expected Bitmain job fields",
         sizeof(unavailable_events) / sizeof(unavailable_events[0]), &result);
     TEST_ASSERT_EQUAL_UINT32(0, result.job_count);
     TEST_ASSERT_EQUAL_UINT32(0, result.version_mask_count);
-    TEST_ASSERT_EQUAL_UINT32(1, result.coinbase_decode_count);
+    TEST_ASSERT_EQUAL_UINT32(0, result.coinbase_decode_count);
 }
 
 TEST_CASE("SV2 extended messages roll extranonce into the ASIC job byte exact",
@@ -495,7 +495,8 @@ TEST_CASE("job task harness preserves idle and staged work behavior",
     TEST_ASSERT_EQUAL_UINT32(1, result.delay_count);
     TEST_ASSERT_EQUAL_UINT32(1, result.job_count);
     TEST_ASSERT_EQUAL_UINT32(1, result.coinbase_decode_count);
-    TEST_ASSERT_EQUAL_UINT32(0, result.version_mask_count);
+    TEST_ASSERT_EQUAL_UINT32(1, result.version_mask_count);
+    TEST_ASSERT_EQUAL_HEX32(0, result.version_masks[0]);
     TEST_ASSERT_EQUAL_UINT8(5, result.active_job_slot);
     TEST_ASSERT_EQUAL_STRING("staged", result.jobs[0]->job_id);
     job_pipeline_harness_result_free(&result);
@@ -528,7 +529,7 @@ TEST_CASE("job task harness rejects oversized extranonce work",
         events, sizeof(events) / sizeof(events[0]), &result);
 
     TEST_ASSERT_EQUAL_UINT32(0, result.job_count);
-    TEST_ASSERT_EQUAL_UINT32(1, result.coinbase_decode_count);
+    TEST_ASSERT_EQUAL_UINT32(0, result.coinbase_decode_count);
     job_pipeline_harness_result_free(&result);
 }
 
@@ -550,6 +551,65 @@ static miner_job_t *prepare_followup_job(uint8_t extranonce_len, bool large_coin
     job->coinbase_suffix[0] = large_coinbase ? 0x5a : 0x02;
     job->coinbase_suffix_len = 1;
     return job;
+}
+
+TEST_CASE("version mask UART writes occur only after mask or ASIC epoch changes",
+          "[mining][job-task]")
+{
+    (void)prepare_followup_job(1, false);
+    const job_pipeline_harness_event_t events[] = {
+        { .type = JOB_PIPELINE_HARNESS_NOTIFY, .slot = 0 },
+        { .type = JOB_PIPELINE_HARNESS_TIMEOUT },
+        { .type = JOB_PIPELINE_HARNESS_SET_VERSION_MASK, .slot = 0x0fffe000 },
+        { .type = JOB_PIPELINE_HARNESS_TIMEOUT },
+        { .type = JOB_PIPELINE_HARNESS_ASIC_REINITIALIZED },
+        { .type = JOB_PIPELINE_HARNESS_TIMEOUT },
+        { .type = JOB_PIPELINE_HARNESS_SET_VERSION_MASK, .slot = 0 },
+        { .type = JOB_PIPELINE_HARNESS_TIMEOUT },
+    };
+    job_pipeline_harness_result_t result;
+    job_pipeline_harness_run(
+        (job_pipeline_harness_config_t) {
+            .hardware_version_rolling = true,
+            .asic_initialized = true,
+            .job_frequency_ms = 1,
+        }, events, sizeof(events) / sizeof(events[0]), &result);
+
+    TEST_ASSERT_EQUAL_UINT32(8, result.job_count);
+    TEST_ASSERT_EQUAL_UINT32(4, result.version_mask_count);
+    TEST_ASSERT_EQUAL_HEX32(0x1fffe000, result.version_masks[0]);
+    TEST_ASSERT_EQUAL_HEX32(0x0fffe000, result.version_masks[1]);
+    TEST_ASSERT_EQUAL_HEX32(0x0fffe000, result.version_masks[2]);
+    TEST_ASSERT_EQUAL_HEX32(0, result.version_masks[3]);
+    TEST_ASSERT_EQUAL_UINT32(1, result.coinbase_decode_count);
+    job_pipeline_harness_result_free(&result);
+}
+
+TEST_CASE("ASIC recovery redispatches nonrollable work and restores zero mask",
+          "[mining][job-task]")
+{
+    miner_job_t *job = prepare_followup_job(0, false);
+    job->version_mask = 0;
+    const job_pipeline_harness_event_t events[] = {
+        { .type = JOB_PIPELINE_HARNESS_NOTIFY, .slot = 0 },
+        { .type = JOB_PIPELINE_HARNESS_TIMEOUT },
+        { .type = JOB_PIPELINE_HARNESS_ASIC_REINITIALIZED },
+        { .type = JOB_PIPELINE_HARNESS_TIMEOUT },
+    };
+    job_pipeline_harness_result_t result;
+    job_pipeline_harness_run(
+        (job_pipeline_harness_config_t) {
+            .hardware_version_rolling = true,
+            .asic_initialized = true,
+            .job_frequency_ms = 1,
+        }, events, sizeof(events) / sizeof(events[0]), &result);
+
+    TEST_ASSERT_EQUAL_UINT32(2, result.job_count);
+    TEST_ASSERT_EQUAL_UINT32(2, result.version_mask_count);
+    TEST_ASSERT_EQUAL_HEX32(0, result.version_masks[0]);
+    TEST_ASSERT_EQUAL_HEX32(0, result.version_masks[1]);
+    TEST_ASSERT_EQUAL_UINT32(1, result.coinbase_decode_count);
+    job_pipeline_harness_result_free(&result);
 }
 
 TEST_CASE("job task preserves maximum accepted metadata and detached ownership",

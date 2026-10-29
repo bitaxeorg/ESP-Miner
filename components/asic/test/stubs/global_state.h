@@ -35,6 +35,7 @@ typedef struct GlobalState {
         float actual_frequency;
     } POWER_MANAGEMENT_MODULE;
     bool ASIC_initalized;
+    uint32_t ASIC_work_epoch;
     struct {
         float process_time;
         Scoreboard scoreboard;

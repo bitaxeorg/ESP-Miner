@@ -37,6 +37,13 @@ static BaseType_t fake_task_notify_wait(
         *notification_value = event->slot;
         return pdTRUE;
     }
+    if (event->type == JOB_PIPELINE_HARNESS_SET_VERSION_MASK) {
+        miner_job_t *job = miner_job_get_slot(harness_state.active_job_slot_idx);
+        job->version_mask = event->slot;
+    } else if (event->type == JOB_PIPELINE_HARNESS_ASIC_REINITIALIZED) {
+        __atomic_fetch_add(&harness_state.ASIC_work_epoch, 1U, __ATOMIC_RELEASE);
+        harness_state.ASIC_initalized = true;
+    }
     return pdFALSE;
 }
 

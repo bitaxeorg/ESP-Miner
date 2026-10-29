@@ -16,9 +16,15 @@
 
 static const char *TAG = "create_jobs_task";
 
-static void generate_work_from_miner_job(GlobalState *GLOBAL_STATE, const miner_job_t *job, uint64_t extranonce_2, uint32_t current_version)
+typedef struct {
+    bool valid;
+    uint32_t epoch;
+    uint32_t version_mask;
+} asic_version_mask_cache_t;
+
+static bool generate_work_from_miner_job(GlobalState *GLOBAL_STATE, const miner_job_t *job, uint64_t extranonce_2, uint32_t current_version, uint32_t *dispatch_epoch, asic_version_mask_cache_t *mask_cache)
 {
-    if (!job) return;
+    if (!job) return false;
 
     asic_job_t next_job;
     uint32_t effective_version = job->version;
@@ -27,13 +33,24 @@ static void generate_work_from_miner_job(GlobalState *GLOBAL_STATE, const miner_
     }
     if (!mining_build_asic_job(job, extranonce_2, effective_version, &next_job)) {
         ESP_LOGE(TAG, "Failed to build ASIC job");
-        return;
+        return false;
     }
     if (!GLOBAL_STATE->ASIC_initalized) {
         ESP_LOGW(TAG, "ASIC not initialized, skipping job send");
-        return;
+        return false;
+    }
+    *dispatch_epoch = __atomic_load_n(&GLOBAL_STATE->ASIC_work_epoch, __ATOMIC_ACQUIRE);
+    // Programming the mask sends a UART command. Cache it for this ASIC epoch.
+    // Initialization advances the epoch, including recovery after a reset.
+    if (!mask_cache->valid || mask_cache->epoch != *dispatch_epoch ||
+        mask_cache->version_mask != job->version_mask) {
+        ASIC_set_version_mask(GLOBAL_STATE, job->version_mask);
+        mask_cache->version_mask = job->version_mask;
+        mask_cache->epoch = *dispatch_epoch;
+        mask_cache->valid = true;
     }
     ASIC_send_job(GLOBAL_STATE, &next_job);
+    return true;
 }
 
 void create_jobs_task(void *pvParameters)
@@ -43,9 +60,10 @@ void create_jobs_task(void *pvParameters)
     // active_jobs slots are zeroed by SYSTEM_init_system(),
     // before any task that touches them can run.
 
-    uint32_t current_version_mask = 0;
     miner_job_t *current_work = NULL;
     bool current_work_sent = false;
+    uint32_t sent_work_epoch = 0;
+    asic_version_mask_cache_t mask_cache = {0};
     uint64_t extranonce_2 = 0;
     uint32_t current_version = 0;
     int timeout_ms = ASIC_get_asic_job_frequency_ms(GLOBAL_STATE);
@@ -68,11 +86,6 @@ void create_jobs_task(void *pvParameters)
             current_work_sent = false;
             current_version = new_work->version;
 
-            if (new_work->version_mask != current_version_mask && GLOBAL_STATE->ASIC_initalized) {
-                ESP_LOGI(TAG, "Set chip version rolls %i", (int)(new_work->version_mask >> 13));
-                ASIC_set_version_mask(GLOBAL_STATE, new_work->version_mask);
-                current_version_mask = new_work->version_mask;
-            }
 
             extranonce_2 = 0;
 
@@ -89,17 +102,23 @@ void create_jobs_task(void *pvParameters)
                 vTaskDelay(100 / portTICK_PERIOD_MS);
                 continue;
             }
-            if (!miner_job_is_rollable(current_work) && current_work_sent && GLOBAL_STATE->DEVICE_CONFIG.family.asic.hardware_version_rolling) {
+            if (!miner_job_is_rollable(current_work) && current_work_sent && GLOBAL_STATE->DEVICE_CONFIG.family.asic.hardware_version_rolling &&
+                sent_work_epoch == __atomic_load_n(&GLOBAL_STATE->ASIC_work_epoch, __ATOMIC_ACQUIRE)) {
                 timeout_ms = ASIC_get_asic_job_frequency_ms(GLOBAL_STATE);
                 continue;
             }
         }
 
-        generate_work_from_miner_job(GLOBAL_STATE, current_work, extranonce_2, current_version);
+        uint32_t dispatch_epoch;
+        if (!generate_work_from_miner_job(GLOBAL_STATE, current_work, extranonce_2, current_version, &dispatch_epoch, &mask_cache)) {
+            timeout_ms = ASIC_get_asic_job_frequency_ms(GLOBAL_STATE);
+            continue;
+        }
         if (!current_work_sent) {
             SYSTEM_decode_and_apply_coinbase(GLOBAL_STATE, current_work);
         }
         current_work_sent = true;
+        sent_work_epoch = dispatch_epoch;
 
         if (miner_job_is_rollable(current_work)) {
             extranonce_2++;

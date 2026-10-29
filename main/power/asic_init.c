@@ -96,6 +96,7 @@ uint8_t asic_initialize(GlobalState *GLOBAL_STATE, asic_init_mode_t mode, uint32
     }
     SERIAL_clear_buffer();
 
+    __atomic_fetch_add(&GLOBAL_STATE->ASIC_work_epoch, 1U, __ATOMIC_RELEASE);
     GLOBAL_STATE->ASIC_initalized = true;
     difficulty_controller_update(GLOBAL_STATE);
     
