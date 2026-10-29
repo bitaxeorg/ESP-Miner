@@ -302,7 +302,7 @@ export class UpdateComponent {
   }
 
   public restart(): void {
-    if (confirm('Are you sure you want to restart the device?')) {
+    if (confirm(this.i18n.t('common.restart_device_confirm'))) {
       this.systemService.restart().subscribe({
         next: () => {
           this.toastrService.success('Restart command sent.');

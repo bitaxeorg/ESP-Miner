@@ -170,7 +170,7 @@
                     <button
                       type="button"
                       class="btn btn-secondary p-2 text-sm cursor-pointer"
-                      [appTooltip]="axe.miningPaused ? 'Resume Mining' : 'Pause Mining'"
+                      [appTooltip]="(axe.miningPaused ? 'actions.resume_mining' : 'actions.pause_mining') | t"
                       tooltipPosition="top"
                       (click)="postAction(axe, axe.miningPaused ? 'resume' : 'pause')">
                       <i [class]="'pi ' + (axe.miningPaused ? 'pi-play-circle' : 'pi-pause-circle')"></i>
@@ -366,7 +366,7 @@
                       <button
                         type="button"
                         class="btn btn-secondary p-2 text-xs cursor-pointer"
-                        [appTooltip]="axe.miningPaused ? 'Resume Mining' : 'Pause Mining'"
+                        [appTooltip]="(axe.miningPaused ? 'actions.resume_mining' : 'actions.pause_mining') | t"
                         tooltipPosition="top"
                         (click)="postAction(axe, axe.miningPaused ? 'resume' : 'pause')">
                         <i [class]="'pi ' + (axe.miningPaused ? 'pi-play-circle' : 'pi-pause-circle')"></i>

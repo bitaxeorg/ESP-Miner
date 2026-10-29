@@ -78,12 +78,12 @@ export class AppTopBarComponent implements OnInit, OnDestroy {
         this.isMiningPaused = newPausedState;
         this.toastr.success(response.message);
       },
-      error: () => this.toastr.error('Failed to change mining state')
+      error: () => this.toastr.error(this.i18n.t('errors.mining_state_failed'))
     });
   }
 
   public restart() {
-    if (confirm('Are you sure you want to restart the device?')) {
+    if (confirm(this.i18n.t('common.restart_device_confirm'))) {
       this.systemService.restart().subscribe({
         next: () => this.toastr.success(this.i18n.t('messages.device_restarted')),
         error: () => this.toastr.error(this.i18n.t('errors.restart_failed', { error: '' }))

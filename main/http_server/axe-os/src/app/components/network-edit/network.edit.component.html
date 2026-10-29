@@ -46,8 +46,8 @@
       <div class="flex flex-col md:flex-row md:items-center mb-4 gap-2">
         <label for="useNTP" class="w-full md:w-2/12 font-medium cursor-pointer select-none">
             <tooltip-text-icon
-              text="Enable Time Sync"
-              tooltip="Your device will sync with a DHCP-provided NTP server, or the nearest if not provided"
+              text="{{ 'device.network.time_sync' | t }}"
+              tooltip="{{ 'device.network.time_sync_help' | t }}"
             />
         </label>
         <div class="w-full md:w-10/12 flex items-center">

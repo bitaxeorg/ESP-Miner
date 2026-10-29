@@ -1262,7 +1262,7 @@ export class HomeComponent implements OnInit, OnDestroy {
       )
       .subscribe({
         next: () => {
-          this.toastr.success('Block found notification dismissed');
+          this.toastr.success(this.i18n.t('messages.block_found_dismissed'));
         },
         error: (err: HttpErrorResponse) => {
           this.toastr.error(`Error dismissing notification: ${getHttpErrorMessage(err, this.uri)}`);

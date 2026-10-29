@@ -30,7 +30,7 @@
           <li class="hidden md:block">
             <a class="block py-2 text-main cursor-pointer"
               tooltipPosition="bottom"
-              appTooltip="Widgets"
+              [appTooltip]="'widgets.title' | t"
               (click)="isWidgetPanelOpen = !isWidgetPanelOpen"
               >
               <i class="pi pi-list-check text-2xl block"></i>
@@ -39,7 +39,7 @@
           <li class="hidden md:block">
             <a class="block py-2 text-main cursor-pointer"
               tooltipPosition="bottom"
-              [appTooltip]="layoutService.isWideView() ? 'Standard Width' : 'Wide View'"
+              [appTooltip]="(layoutService.isWideView() ? 'layout.standard_width' : 'layout.wide_view') | t"
               (click)="layoutService.toggleWideView()"
               >
               <i class="pi text-xl block"
@@ -49,7 +49,7 @@
           <li class="hidden md:block">
             <a class="block py-2 text-main cursor-pointer"
               tooltipPosition="bottom"
-              appTooltip="Reset Layout"
+              [appTooltip]="'layout.reset' | t"
               (click)="dashboardEdit.requestReset()"
               >
               <i class="pi pi-replay text-xl block"></i>
@@ -59,7 +59,7 @@
         <li class="hidden md:block">
           <a class="block py-2 text-main cursor-pointer"
             tooltipPosition="bottom"
-            [appTooltip]="(dashboardEdit.editMode$ | async) ? 'Save Layout' : 'Edit Layout'"
+            [appTooltip]="((dashboardEdit.editMode$ | async) ? 'layout.save' : 'layout.edit') | t"
             (click)="dashboardEdit.toggleEditMode()"
             >
             <i class="pi text-xl block"
@@ -87,7 +87,7 @@
         <li>
           <a class="block py-2 text-main cursor-pointer"
             tooltipPosition="bottom"
-            [appTooltip]="isMiningPaused ? 'Resume Mining' : 'Pause Mining'"
+            [appTooltip]="(isMiningPaused ? 'actions.resume_mining' : 'actions.pause_mining') | t"
             (click)="toggleMiningPaused()"
             >
             <i class="pi text-xl block" [class]="isMiningPaused ? 'pi-play-circle' : 'pi-pause-circle'"></i>

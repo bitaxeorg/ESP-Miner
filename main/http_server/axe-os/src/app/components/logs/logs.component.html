@@ -33,7 +33,7 @@
             class="btn btn-secondary p-3.5"
             [disabled]="loadingLogs"
             (click)="downloadLogs()"
-            appTooltip="Download Logs"
+            [appTooltip]="'actions.download_logs' | t"
             tooltipPosition="left">
             <i class="pi pi-{{loadingLogs ? 'spinner pi-spin' : 'download'}} text-lg"></i>
           </button>

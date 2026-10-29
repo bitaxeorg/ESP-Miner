@@ -44,7 +44,13 @@
     "remove": "Eliminar",
     "clear_logs": "Borrar logs",
     "minimize": "Minimizar",
-    "maximize": "Maximizar"
+    "maximize": "Maximizar",
+    "close": "Close",
+    "verify": "Verify",
+    "download_logs": "Download Logs",
+    "dismiss": "Dismiss",
+    "pause_mining": "Pause Mining",
+    "resume_mining": "Resume Mining"
   },
   "common": {
     "app_name": "AxeOS",
@@ -72,7 +78,17 @@
     "password": "Contraseña",
     "dont_show_again": "No volver a mostrar",
     "scrolling": "Desplazamiento",
-    "logs": "Logs"
+    "logs": "Logs",
+    "message": "Message",
+    "mode": "Mode",
+    "amount": "Amount",
+    "actions": "Actions",
+    "active": "Active",
+    "total_uptime": "Total Uptime",
+    "tls": "TLS",
+    "restart_device_confirm": "Are you sure you want to restart the device?",
+    "address": "Address",
+    "paused": "Paused"
   },
   "messages": {
     "restart_required": "Debes reiniciar el dispositivo después de guardar.",
@@ -108,7 +124,8 @@
     "overheated_short": "Sobrecalentado",
     "power_fault_short": "Fallo de alimentación",
     "frequency_low_short": "Frecuencia baja",
-    "fallback_pool_short": "Pool de respaldo"
+    "fallback_pool_short": "Pool de respaldo",
+    "block_found_dismissed": "Block found notification dismissed"
   },
   "errors": {
     "save_failed": "No se pudo guardar. {error}",
@@ -132,7 +149,10 @@
     "device_action_failed": "Acción fallida: {action}",
     "device_action_failed_detail": "Acción fallida: {action}. {error}",
     "websocket_connection_failed": "Error al abrir la conexión WebSocket",
-    "identify_failed": "No se pudo identificar el dispositivo. {error}"
+    "identify_failed": "No se pudo identificar el dispositivo. {error}",
+    "redirect_failed": "Failed to redirect due to invalid URL.",
+    "mining_state_failed": "Failed to change mining state",
+    "pool_delete_active": "Cannot delete a pool that is currently selected as primary or fallback."
   },
   "settings": {
     "title": "Ajustes",
@@ -174,7 +194,25 @@
       "certificate_placeholder": "Introduce o elige un certificado (.pem, .crt, .cer)",
       "tls_none": "Sin TLS",
       "tls_system": "TLS (certificado del sistema)",
-      "tls_custom": "TLS (CA personalizada)"
+      "tls_custom": "TLS (CA personalizada)",
+      "active_selection": "Active Pool Selection",
+      "primary_pool": "Primary Pool",
+      "fallback_pool": "Fallback Pool",
+      "configurations": "Pool Configurations",
+      "delete_pool": "Delete Pool",
+      "stratum_protocol": "Stratum Protocol",
+      "stratum_protocol_help": "Select Stratum protocol version. Note: Not all pools support Stratum V2.",
+      "sv2_channel_type": "SV2 Channel Type",
+      "sv2_channel_type_help": "Extended Channels are recommended for external pools — the pool sends the coinbase template so the miner can verify it. Standard Channels should only be used with a locally deployed SV2 node or JD client.",
+      "sv2_authority_pubkey": "SV2 Authority Pubkey",
+      "sv2_authority_pubkey_help": "The pool operator provides this key to prove you are connecting to the real pool and not an impersonator. Without it, the connection is still encrypted but a man-in-the-middle attack could redirect your hashrate.",
+      "sv2_authority_pubkey_placeholder": "Enter base58-encoded authority public key (optional, e.g., 9auqWEzQ...)",
+      "require_authentication": "Require Authentication",
+      "require_authentication_help": "Refuse to connect unless the server certificate is verified against the Authority Pubkey above. Protects against the man-in-the-middle redirect described for the Authority Pubkey. When enabled without a key set, the miner will not connect.",
+      "decode_coinbase_tx": "Decode Coinbase Tx",
+      "decode_coinbase_tx_help": "Enable decoding of the coinbase transaction to show payout addresses. Disable when mining on non-Bitcoin chains.",
+      "share_warning": "Share Warning",
+      "share_warning_help": "Warn on the dashboard when your share of the coinbase reward is low. Disable for pools that pay miners directly through many coinbase outputs."
     },
     "device": {
       "custom_settings_warning": "Los ajustes personalizados pueden causar daños e inestabilidad. Modifícalos solo si entiendes los riesgos.",
@@ -254,7 +292,26 @@
     "domain": "Dominio",
     "domains": "Dominios",
     "asic_error_count": "Conteo de errores: {count}",
-    "asic_error_count_with_index": "ASIC {index} - Conteo de errores: {count}"
+    "asic_error_count_with_index": "ASIC {index} - Conteo de errores: {count}",
+    "misc": "Misc",
+    "hashes": "Hashes",
+    "hashes_help": "Approximate number of your total accumulated hashes (personal mining effort).",
+    "hashes_total_tooltip": "{count} total hashes",
+    "work_received": "Work Received",
+    "pool_response_batched": "(batched ×{count})",
+    "pool_response_batched_help": "The pool acknowledged {count} shares in one batch; the time reflects the most recent share, so it may include the pool's batching window",
+    "coinbase_value": "Value",
+    "coinbase_value_help": "Total value of transaction outputs in BTC. For non-bitcoin chains, disable 'Decode Coinbase Tx' in Advanced Pool Options.",
+    "coinbase_outputs": "Outputs",
+    "coinbase_your_payout": "Your payout address",
+    "coinbase_others_help": "Further payout outputs, not listed individually",
+    "coinbase_other_recipient": "other recipient",
+    "coinbase_other_recipients": "other recipients",
+    "coinbase_fee": "Fee",
+    "coinbase_fee_help": "Percentage of the bitcoin block reward that will be paid out to the pool if you find a block.",
+    "coinbase_share": "Share",
+    "coinbase_share_help": "Percentage of the bitcoin block reward that will be paid out to your address if you find a block.",
+    "hash_error_help": "Hash error percentage as reported by the ASIC. A small amount of errors every few seconds is normal. Frequency changes, agressive overclocking, undervoltage or a bad power supply can significantly increase the error rate."
   },
   "device": {
     "system": {
@@ -291,7 +348,35 @@
       "privacy_warning_title": "Aviso de privacidad",
       "release_notes": "Notas de versión",
       "axeos": "Actualizar AxeOS",
-      "firmware": "Actualizar firmware"
+      "firmware": "Actualizar firmware",
+      "firmware_integrity": "Firmware Integrity",
+      "firmware_integrity_help": "Compares the SHA-256 of the running firmware with the official esp-miner.bin of the same release.",
+      "checksum_computing": "Computing checksum...",
+      "checksum_matches_prefix": "Matches the official",
+      "checksum_matches_suffix": "release",
+      "checksum_mismatch_prefix": "Does not match the official",
+      "checksum_mismatch_suffix": "release",
+      "no_release_found": "No official release found for {version}. This is likely a development or custom build.",
+      "no_digest": "The {version} release does not provide a checksum for esp-miner.bin.",
+      "device_checksum": "Device ({partition}):",
+      "release_checksum": "Release",
+      "custom_frontend": "Custom Frontend",
+      "enable_custom_www": "Enable custom web UI",
+      "custom_www_restart_hint": "* A device restart is required to apply this change.",
+      "custom_www_incompatible_hint_prefix": "If an incompatible custom UI is loaded, visit",
+      "custom_www_incompatible_hint_suffix": "to disable Custom Frontend",
+      "upload_custom_www": "Upload Custom UI",
+      "installed_firmware": "Installed Firmware",
+      "partition": "Partition",
+      "build_time": "Build time",
+      "space": "Space",
+      "activate": "Activate",
+      "updating_target": "Updating {target}",
+      "restart_device": "Restart Device"
+    },
+    "network": {
+      "time_sync": "Enable Time Sync",
+      "time_sync_help": "Your device will sync with a DHCP-provided NTP server, or the nearest if not provided"
     }
   },
   "units": {},
@@ -462,5 +547,15 @@
       "label": "Worker no coincide",
       "explanation": "El nombre del worker enviado no coincide con el worker esperado o autenticado."
     }
+  },
+  "widgets": {
+    "title": "Widgets"
+  },
+  "layout": {
+    "edit": "Edit Layout",
+    "save": "Save Layout",
+    "reset": "Reset Layout",
+    "standard_width": "Standard Width",
+    "wide_view": "Wide View"
   }
 }

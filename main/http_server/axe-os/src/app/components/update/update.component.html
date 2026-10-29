@@ -34,32 +34,32 @@
         }
 
         <div class="mt-4 pt-3 border-t border-white/10">
-          <h5 class="mb-2">Firmware Integrity: <button class="btn text-sm ml-2" [disabled]="verifyStatus === 'checking'" (click)="handleFirmwareVerify()">Verify</button></h5>
-          <small class="text-secondary block">Compares the SHA-256 of the running firmware with the official esp-miner.bin of the same release.</small>
+          <h5 class="mb-2">{{ 'device.update.firmware_integrity' | t }}: <button class="btn text-sm ml-2" [disabled]="verifyStatus === 'checking'" (click)="handleFirmwareVerify()">{{ 'actions.verify' | t }}</button></h5>
+          <small class="text-secondary block">{{ 'device.update.firmware_integrity_help' | t }}</small>
 
           @switch (verifyStatus) {
             @case ('checking') {
-              <div class="mt-2">Computing checksum...</div>
+              <div class="mt-2">{{ 'device.update.checksum_computing' | t }}</div>
             }
             @case ('match') {
-              <div class="mt-2 text-green-500 flex items-center gap-2"><i class="pi pi-check-circle"></i>Matches the official <a class="underline" target="_blank" [href]="verifyReleaseUrl">{{ deviceChecksum?.version }}</a> release</div>
+              <div class="mt-2 text-green-500 flex items-center gap-2"><i class="pi pi-check-circle"></i>{{ 'device.update.checksum_matches_prefix' | t }} <a class="underline" target="_blank" [href]="verifyReleaseUrl">{{ deviceChecksum?.version }}</a> {{ 'device.update.checksum_matches_suffix' | t }}</div>
             }
             @case ('mismatch') {
-              <div class="mt-2 text-red-500 flex items-center gap-2"><i class="pi pi-times-circle"></i>Does not match the official <a class="underline" target="_blank" [href]="verifyReleaseUrl">{{ deviceChecksum?.version }}</a> release</div>
+              <div class="mt-2 text-red-500 flex items-center gap-2"><i class="pi pi-times-circle"></i>{{ 'device.update.checksum_mismatch_prefix' | t }} <a class="underline" target="_blank" [href]="verifyReleaseUrl">{{ deviceChecksum?.version }}</a> {{ 'device.update.checksum_mismatch_suffix' | t }}</div>
             }
             @case ('no-release') {
-              <div class="mt-2 text-orange-500">No official release found for {{ deviceChecksum?.version }}. This is likely a development or custom build.</div>
+              <div class="mt-2 text-orange-500">{{ 'device.update.no_release_found' | t:{ version: deviceChecksum?.version ?? '' } }}</div>
             }
             @case ('no-digest') {
-              <div class="mt-2 text-orange-500">The {{ deviceChecksum?.version }} release does not provide a checksum for esp-miner.bin.</div>
+              <div class="mt-2 text-orange-500">{{ 'device.update.no_digest' | t:{ version: deviceChecksum?.version ?? '' } }}</div>
             }
           }
 
           @if (deviceChecksum) {
             <div class="mt-2 text-xs font-mono break-all">
-              <div><span class="text-secondary">Device ({{ deviceChecksum.partition }}):</span> {{ deviceChecksum.sha256 }}</div>
+              <div><span class="text-secondary">{{ 'device.update.device_checksum' | t:{ partition: deviceChecksum.partition } }}</span> {{ deviceChecksum.sha256 }}</div>
               @if (releaseChecksum) {
-                <div><span class="text-secondary">Release:</span> {{ releaseChecksum }}</div>
+                <div><span class="text-secondary">{{ 'device.update.release_checksum' | t }}:</span> {{ releaseChecksum }}</div>
               }
             </div>
           }
@@ -84,10 +84,10 @@
     </div>
     <div class="w-full lg:w-1/2 xl:w-1/3 px-2 mb-4 lg:mb-0">
       <div class="card h-full">
-        <h3>Update Firmware</h3>
+        <h3>{{ 'device.update.firmware' | t }}</h3>
         <label class="btn w-full text-center relative flex justify-center items-center gap-2 cursor-pointer my-2">
           <i class="pi pi-upload"></i>
-          <span>Browse</span>
+          <span>{{ 'actions.browse' | t }}</span>
           <input #firmwareUpload type="file" accept=".bin" (change)="onFileSelected($event, 'firmwareUpload')" class="hidden">
         </label>
 
@@ -96,7 +96,7 @@
     </div>
     <div class="w-full lg:w-1/2 xl:w-1/3 px-2">
       <div class="card h-full">
-        <h3>Custom Frontend</h3>
+        <h3>{{ 'device.update.custom_frontend' | t }}</h3>
 
         <div class="flex items-center gap-2 mb-2">
           <app-checkbox 
@@ -105,17 +105,17 @@
             [ngModel]="(info$ | async)?.useCustomWWW === 1"
             (onChange)="toggleCustomWWW($event.checked)">
           </app-checkbox>
-          <label for="customWWWToggle" class="font-medium cursor-pointer">Enable custom web UI</label>
+          <label for="customWWWToggle" class="font-medium cursor-pointer">{{ 'device.update.enable_custom_www' | t }}</label>
         </div>
-        <small class="text-orange-500 block mb-2">* A device restart is required to apply this change.</small>
-        <small class="text-secondary block mb-4">If an incompatible custom UI is loaded, visit <a href="/recovery" target="_blank" class="underline">/recovery</a> to disable Custom Frontend</small>
+        <small class="text-orange-500 block mb-2">{{ 'device.update.custom_www_restart_hint' | t }}</small>
+        <small class="text-secondary block mb-4">{{ 'device.update.custom_www_incompatible_hint_prefix' | t }} <a href="/recovery" target="_blank" class="underline">/recovery</a> {{ 'device.update.custom_www_incompatible_hint_suffix' | t }}</small>
 
         @if ((info$ | async)?.useCustomWWW === 1) {
           <div class="rounded p-3 bg-white/5 border border-white/10">
-            <h5 class="mt-0 mb-3 text-main">Upload Custom UI</h5>
+            <h5 class="mt-0 mb-3 text-main">{{ 'device.update.upload_custom_www' | t }}</h5>
             <label class="btn w-full text-center relative flex justify-center items-center gap-2 cursor-pointer my-2">
               <i class="pi pi-upload"></i>
-              <span>Browse</span>
+              <span>{{ 'actions.browse' | t }}</span>
               <input #websiteUpload type="file" accept=".bin" (change)="onFileSelected($event, 'websiteUpload')" class="hidden">
             </label>
             <small class="block mt-1 text-secondary">(www.bin)</small>
@@ -126,7 +126,7 @@
   </div>
 </div>
 
-<app-modal #progressModal [headline]="'Updating ' + updateTarget" [closable]="updateStatus !== 'progress'">
+<app-modal #progressModal [headline]="'device.update.updating_target' | t:{ target: updateTarget }" [closable]="updateStatus !== 'progress'">
   <div class="flex flex-col items-center justify-center p-4">
     @if (updateStatus === 'progress') {
       @if (updateTarget === 'AxeOS' && websiteUpdateProgress !== null) {
@@ -156,7 +156,7 @@
       <div class="text-lg text-center">{{ updateMessage }}</div>
       @if (updateTarget !== 'AxeOS') {
         <div class="mt-4">
-          <button class="btn" (click)="progressModal.isVisible = false">Close</button>
+          <button class="btn" (click)="progressModal.isVisible = false">{{ 'actions.close' | t }}</button>
         </div>
       }
     }
@@ -165,24 +165,24 @@
       <i class="pi pi-times-circle text-red-500" style="font-size: 3.5rem; margin-bottom: 1rem;"></i>
       <div class="text-lg text-center text-red-500">{{ updateMessage }}</div>
       <div class="mt-4">
-        <button class="btn" (click)="progressModal.isVisible = false">Close</button>
+        <button class="btn" (click)="progressModal.isVisible = false">{{ 'actions.close' | t }}</button>
       </div>
     }
   </div>
 </app-modal>
 
 <div class="card mt-4">
-  <h3 class="mb-4">Installed Firmware</h3>
+  <h3 class="mb-4">{{ 'device.update.installed_firmware' | t }}</h3>
 
   <div class="overflow-x-auto">
     <table class="w-full">
       <thead>
         <tr>
-          <th class="text-secondary font-medium pb-2 text-left w-1/4">Partition</th>
-          <th class="text-secondary font-medium pb-2 text-left w-1/4">Version</th>
-          <th class="text-secondary font-medium pb-2 text-left w-1/4">Build time</th>
-          <th class="text-secondary font-medium pb-2 text-left w-1/4">Space</th>
-          <th class="text-secondary font-medium pb-2 text-left">Actions</th>
+          <th class="text-secondary font-medium pb-2 text-left w-1/4">{{ 'device.update.partition' | t }}</th>
+          <th class="text-secondary font-medium pb-2 text-left w-1/4">{{ 'common.version' | t }}</th>
+          <th class="text-secondary font-medium pb-2 text-left w-1/4">{{ 'device.update.build_time' | t }}</th>
+          <th class="text-secondary font-medium pb-2 text-left w-1/4">{{ 'device.update.space' | t }}</th>
+          <th class="text-secondary font-medium pb-2 text-left">{{ 'common.actions' | t }}</th>
         </tr>
       </thead>
       <tbody>
@@ -192,7 +192,7 @@
               <i class="pi pi-box mr-2"></i>
               {{ partition.label }}
               @if (partition.isCurrent) {
-                <span class="ml-2 px-2 py-0.5 text-xs font-semibold rounded bg-blue-500/20 text-blue-400 border border-blue-500/30">Active</span>
+                <span class="ml-2 px-2 py-0.5 text-xs font-semibold rounded bg-blue-500/20 text-blue-400 border border-blue-500/30">{{ 'common.active' | t }}</span>
               }
             </td>
             <td class="font-mono">
@@ -221,10 +221,10 @@
             <td class="text-left">
               <div class="flex gap-2 justify-start items-center">
                 @if (!partition.isCurrent && partition.version) {
-                  <button 
+                  <button
                     (click)="switchPartition(partition.label)"
                     class="btn btn-secondary py-1 px-3 text-sm">
-                    Activate
+                    {{ 'device.update.activate' | t }}
                   </button>
                 }
               </div>
@@ -240,7 +240,7 @@
       (click)="restart()"
       class="btn btn-danger py-1 px-3 text-sm flex items-center gap-1">
       <i class="pi pi-refresh"></i>
-      <span>Restart Device</span>
+      <span>{{ 'device.update.restart_device' | t }}</span>
     </button>
   </div>
 </div>

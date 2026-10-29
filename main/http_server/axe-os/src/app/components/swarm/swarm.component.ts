@@ -489,7 +489,7 @@ private isIpAddress(value: string): boolean {
   }
 
   public postAction(device: any, action: string) {
-    if (action === 'restart' && !confirm('Are you sure you want to restart the device?')) {
+    if (action === 'restart' && !confirm(this.i18n.t('common.restart_device_confirm'))) {
       return;
     }
     this.httpClient.post(`http://${device.connectionAddress}/api/system/${action}`, {}, { responseType: 'text' }).pipe(
@@ -790,7 +790,7 @@ return this.swarm.filter(axe =>
       case !!axe.notAccessible:
         return { color: 'red', msg: 'Not accessible' };
       case !!axe.miningPaused:
-        return { color: 'yellow', msg: 'Paused' };
+        return { color: 'yellow', msg: this.i18n.t('common.paused') };
       case axe.overheat_mode === 1:
         return { color: 'red', msg: this.i18n.t('messages.overheated_short') };
       case !!axe.power_fault:

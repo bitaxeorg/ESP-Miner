@@ -92,7 +92,7 @@ export class NetworkEditComponent implements OnInit {
                  newHostname = new URL(redirectResponse.redirect.url).hostname;
                 } catch (error) {
                   console.error('Invalid redirect URL:', redirectResponse.redirect.url, error);
-                  this.toastr.error('Failed to redirect due to invalid URL.');
+                  this.toastr.error(this.i18n.t('errors.redirect_failed'));
                   return; // Skip redirect on malformed URL
                 }
                const redirectUrl = redirectResponse.redirect.url;
