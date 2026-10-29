@@ -5,6 +5,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { provideToastr } from 'ngx-toastr';
 import { provideRouter } from '@angular/router';
 import { FormControl, FormGroup } from '@angular/forms';
+import { I18nService } from 'src/app/i18n/i18n.service';
 
 describe('EditComponent', () => {
   let component: EditComponent;
@@ -34,5 +35,20 @@ describe('EditComponent', () => {
     });
 
     expect(component.isDisplayConfigurable).toBeFalse();
+  });
+
+  it('should offer localized language options', () => {
+    const i18n = TestBed.inject(I18nService);
+
+    i18n.setLocale('en');
+    expect(component.languageOptions.map(o => o.label)).toEqual(['English', 'German', 'Spanish']);
+
+    i18n.setLocale('de');
+    expect(component.languageOptions.map(o => o.label)).toEqual(['Englisch', 'Deutsch', 'Spanisch']);
+
+    i18n.setLocale('es');
+    expect(component.languageOptions.map(o => o.label)).toEqual(['Inglés', 'Alemán', 'Español']);
+
+    i18n.setLocale('en');
   });
 });
