@@ -98,9 +98,7 @@
     "default_btc_address_warning_suffix": "field to your own Bitcoin address to receive mining rewards.",
     "release_check_notice_prefix": "Please note, this will connect to",
     "release_check_notice_suffix": "to check for the latest release.",
-    "update_download_both": "Download both files for update!",
     "firmware_updated": "Firmware updated. Device has been successfully restarted.",
-    "axeos_updated_reload": "AxeOS updated. The page will reload in a few seconds.",
     "no_matches": "No matches",
     "swarm_empty": "No devices found",
     "overheated_short": "Overheated",
@@ -110,8 +108,7 @@
     "device_overheated": "Device has overheated - See settings",
     "power_fault_check": "{fault} Check your Power Supply.",
     "frequency_low": "Device frequency is set low - See settings",
-    "fallback_pool": "Using fallback pool - Share stats reset. Check Pool Settings and / or reboot Device.",
-    "version_mismatch": "Firmware ({fw}) and AxeOS ({axeos}) versions do not match. Please make sure to update both www.bin and esp-miner.bin."
+    "fallback_pool": "Using fallback pool - Share stats reset. Check Pool Settings and / or reboot Device."
   },
   "errors": {
     "save_failed": "Could not save. {error}",
