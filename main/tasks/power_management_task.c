@@ -7,6 +7,7 @@
 #include "thermal.h"
 #include "power.h"
 #include "asic.h"
+#include "asic_common.h"
 #include "utils.h"
 #include "asic_init.h"
 #include "asic_reset.h"
@@ -89,9 +90,10 @@ static uint8_t mining_start(GlobalState * GLOBAL_STATE)
 
 static float expected_hashrate(GlobalState * GLOBAL_STATE)
 {
-    // Each BZM engine produces four hashes every three clocks.
-    float hashes_per_clock = GLOBAL_STATE->DEVICE_CONFIG.family.asic.id == BZM ? 4.0f / 3.0f : 1.0f;
-    return GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value * GLOBAL_STATE->DEVICE_CONFIG.family.asic.small_core_count * GLOBAL_STATE->DEVICE_CONFIG.family.asic_count * hashes_per_clock / 1000.0;
+    const AsicConfig *asic = &GLOBAL_STATE->DEVICE_CONFIG.family.asic;
+    return calculate_expected_hashrate_ghs(GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value,
+                                          GLOBAL_STATE->DEVICE_CONFIG.family.asic_count,
+                                          asic->small_core_count, asic->hashes_per_clock);
 }
 
 void POWER_MANAGEMENT_init_frequency(GlobalState * GLOBAL_STATE)

@@ -71,7 +71,7 @@ void shared_output(GlobalState *s, float *power, float *current) { (void)s; *pow
 float shared_vr_temp(GlobalState *s) { (void)s; return 40; }
 float shared_chip_temp(GlobalState *s) { (void)s; return chip_temp; }
 float shared_chip_temp2(GlobalState *s) { (void)s; return -1; }
-float shared_min_frequency(GlobalState *s) { return s->DEVICE_CONFIG.family.asic.id == BZM ? 800 : 50; }
+float shared_min_frequency(GlobalState *s) { return s->DEVICE_CONFIG.family.asic.min_frequency_mhz; }
 void shared_frequency(GlobalState *s) { ++clock_writes; applied_frequency = s->POWER_MANAGEMENT_MODULE.frequency_value; }
 void shared_nonce_space(GlobalState *s) { (void)s; }
 void shared_difficulty(GlobalState *s) { (void)s; }
@@ -176,6 +176,20 @@ TEST_CASE("Shared power retains the Bitmain stop frequency and UART initializati
     TEST_ASSERT_EQUAL_UINT8(4, mining_start(&state));
     TEST_ASSERT_GREATER_THAN_UINT32(0, serial_calls);
     TEST_ASSERT_TRUE(state.ASIC_initalized);
+}
+
+TEST_CASE("Shared power uses configured throughput and frequency floor independently of ASIC ID", "[asic][power][shared]")
+{
+    AsicConfig asic = ASIC_BM1370;
+    asic.min_frequency_mhz = 125;
+    asic.hashes_per_clock = 0.5f;
+    fixture(asic);
+    saved_frequency = 600;
+    shared_init_frequency(&state);
+    TEST_ASSERT_EQUAL_FLOAT(125, state.POWER_MANAGEMENT_MODULE.actual_frequency);
+    TEST_ASSERT_FLOAT_WITHIN(0.01f, 2448.0f, state.POWER_MANAGEMENT_MODULE.expected_hashrate);
+    mining_stop(&state);
+    TEST_ASSERT_EQUAL_FLOAT(125, applied_frequency);
 }
 
 TEST_CASE("BZM initialization failure leaves power off and mining uninitialized", "[asic][power][shared]")

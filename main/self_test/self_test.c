@@ -308,8 +308,8 @@ static bool self_test_should_run()
 
 esp_err_t self_test_init(GlobalState * GLOBAL_STATE)
 {
-    if (GLOBAL_STATE->DEVICE_CONFIG.family.id == BONANZA) {
-        ESP_LOGI(TAG, "Self-test is not supported on Bonanza");
+    if (!GLOBAL_STATE->DEVICE_CONFIG.family.asic.self_test_supported) {
+        ESP_LOGI(TAG, "Self-test is not supported on %s", GLOBAL_STATE->DEVICE_CONFIG.family.asic.name);
         return ESP_OK;
     }
 

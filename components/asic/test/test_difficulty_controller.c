@@ -86,3 +86,17 @@ TEST_CASE("Max keeps the same controller policy", "[asic][difficulty]")
     TEST_ASSERT_EQUAL_UINT8(5, applied_power);
     TEST_ASSERT_EQUAL_UINT32(2, apply_count);
 }
+
+TEST_CASE("BZM fallback difficulty includes configured throughput at saved and default frequencies", "[asic][difficulty]")
+{
+    GlobalState state = controller_fixture(ASIC_BZM);
+    state.POWER_MANAGEMENT_MODULE.expected_hashrate = 0;
+    state.POWER_MANAGEMENT_MODULE.frequency_value = 1400;
+    difficulty_controller_update(&state);
+    TEST_ASSERT_EQUAL_UINT8(10, applied_power);
+
+    state = controller_fixture(ASIC_BZM);
+    state.POWER_MANAGEMENT_MODULE.expected_hashrate = 0;
+    difficulty_controller_update(&state);
+    TEST_ASSERT_EQUAL_UINT8(9, applied_power);
+}

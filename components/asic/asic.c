@@ -4,7 +4,6 @@
 
 #include "bm1397.h"
 #include "bzm/driver.h"
-#include "bzm/frequency.h"
 #include "hashrate_monitor_task.h"
 #include "esp_timer.h"
 #include "bm1366.h"
@@ -138,7 +137,7 @@ void ASIC_set_version_mask(GlobalState * GLOBAL_STATE, uint32_t mask)
 
 float ASIC_get_min_frequency(GlobalState * GLOBAL_STATE)
 {
-    return GLOBAL_STATE->DEVICE_CONFIG.family.asic.id == BZM ? BZM_FREQUENCY_TARGET_MIN_MHZ : 50.0f;
+    return GLOBAL_STATE->DEVICE_CONFIG.family.asic.min_frequency_mhz;
 }
 
 void ASIC_set_frequency(GlobalState * GLOBAL_STATE)
