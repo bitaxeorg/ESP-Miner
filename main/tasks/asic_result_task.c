@@ -17,8 +17,6 @@ static const char *TAG = "asic_result";
 void ASIC_result_task(void *pvParameters)
 {
     GlobalState *GLOBAL_STATE = (GlobalState *)pvParameters;
-    const esp_log_level_t result_log_level =
-        GLOBAL_STATE->DEVICE_CONFIG.family.asic.id == BZM ? ESP_LOG_DEBUG : ESP_LOG_INFO;
 
     while (1)
     {
@@ -64,7 +62,7 @@ void ASIC_result_task(void *pvParameters)
             if (submit_result >= 0 && sent_time_us > 0) {
                 float process_time = (sent_time_us - asic_result->timestamp_us) / 1000.0f;
                 GLOBAL_STATE->SYSTEM_MODULE.process_time = process_time;
-                ESP_LOG_LEVEL_LOCAL(result_log_level, TAG, "Processing time: %0.1f ms", process_time);
+                ESP_LOGI(TAG, "Processing time: %0.1f ms", process_time);
             }
         }
 
@@ -77,7 +75,7 @@ void ASIC_result_task(void *pvParameters)
         scoreboard_add(&GLOBAL_STATE->SYSTEM_MODULE.scoreboard, nonce_diff, job->job_id, job->extranonce2, job->ntime, asic_result->nonce, version_bits);
 
         // Log the ASIC response
-        ESP_LOG_LEVEL_LOCAL(result_log_level, TAG, "ID: %s, ASIC nr: %d, Core: %d/%d, ver: %08" PRIX32 " Nonce %08" PRIX32 " diff %.1f of %g.",
+        ESP_LOGI(TAG, "ID: %s, ASIC nr: %d, Core: %d/%d, ver: %08" PRIX32 " Nonce %08" PRIX32 " diff %.1f of %g.",
                  job->job_id, asic_result->asic_nr, asic_result->core_id, asic_result->small_core_id,
                  asic_result->rolled_version, asic_result->nonce, nonce_diff, target_to_diff(job->pool_target));
     }
