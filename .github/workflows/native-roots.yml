@@ -1,0 +1,22 @@
+name: Native roots and SDK lifecycle regression
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  native-roots:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Prepare exact release SDK sources
+        run: |
+          git clone --depth 1 --branch v6.0.2 https://github.com/espressif/esp-idf.git "$RUNNER_TEMP/idf"
+          git -C "$RUNNER_TEMP/idf" submodule update --init --depth 1 components/mbedtls/mbedtls
+          python -m pip install cryptography
+      - name: Exercise production roots and characterize SDK lifecycle offline
+        run: python tools/test_native_roots.py --idf-path "$RUNNER_TEMP/idf" --output "$RUNNER_TEMP/native-results"

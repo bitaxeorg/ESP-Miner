@@ -11,7 +11,7 @@
 #include "esp_transport.h"
 #include "esp_transport_ssl.h"
 #include "esp_transport_tcp.h"
-#include "esp_crt_bundle.h"
+#include "real_roots.h"
 #include "utils.h"
 #include "esp_timer.h"
 #include "esp_heap_caps.h"
@@ -72,7 +72,7 @@ esp_transport_handle_t STRATUM_V1_transport_init(tls_mode tls, char * cert)
         switch(tls){
             case BUNDLED_CRT:
                 ESP_LOGI(TAG, "Using default cert bundle");
-                esp_transport_ssl_crt_bundle_attach(transport, esp_crt_bundle_attach);
+                esp_transport_ssl_crt_bundle_attach(transport, real_roots_attach);
                 break;
             case CUSTOM_CRT:
                 ESP_LOGI(TAG, "Using custom cert");

@@ -1,2 +1,4 @@
 CONFIG_ESP_INT_WDT=n
 CONFIG_ESP_TASK_WDT=n
+# Stratum's system-root component uses the native trusted-certificate callback.
+CONFIG_MBEDTLS_X509_TRUSTED_CERT_CALLBACK=y

@@ -1,0 +1,8 @@
+{
+  "attacker-full.pem": "3f7ebfd42afb47ae5dd49d9095fac30f0117e25aace3035c3c1beb24648a5990",
+  "bad-signature.pem": "55a40657fd000a07d92e5334b5a14c490ba7a66096a7398aa65a51bec6aa9863",
+  "braiins.com-full.pem": "ee0c261a5ff5c781caf2f31e9229e4bc1304524c1ce5874a319939d0d07e3b06",
+  "braiins.com-short.pem": "bf1f135cc8846f476b2b536dec5835704b0aa56f697d89bec7c71a944253c435",
+  "public-pool.io-full.pem": "a26940576e7b6dbaab5aee40f1f594ff840405510dc94c6fc625970f92cf6eea",
+  "self.pem": "d52d4f04503942c71fa946f99627b465e8bfb32007c7c47e7b9ec4f464dec0d5"
+}

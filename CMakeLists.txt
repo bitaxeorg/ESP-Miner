@@ -11,6 +11,11 @@ include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 
 project(esp-miner)
 
+if(NOT CONFIG_MBEDTLS_X509_TRUSTED_CERT_CALLBACK
+   OR CONFIG_MBEDTLS_CERTIFICATE_BUNDLE_CROSS_SIGNED_VERIFY)
+    message(FATAL_ERROR "ESP-Miner pinned real roots require native trusted callbacks and the synthetic cross-sign option disabled.")
+endif()
+
 # Existing sdkconfig files override sdkconfig.defaults, including revoked roots.
 if(NOT CONFIG_MBEDTLS_CERTIFICATE_BUNDLE
    OR NOT CONFIG_MBEDTLS_CERTIFICATE_BUNDLE_DEFAULT_NONE
