@@ -30,14 +30,6 @@ static float hashrate_1h[HASHRATE_1H_SIZE];
 
 static const char *TAG = "hashrate_monitor";
 
-struct HashrateCache {
-    double sum;
-    _Atomic float rate;
-    uint32_t count;
-};
-
-_Static_assert(sizeof(float) == sizeof(uint32_t), "Cached rates use 32-bit atomics");
-
 static float sum_hashrates(measurement_t * measurement, int asic_count)
 {
     if (asic_count == 1) return measurement[0].hashrate;
@@ -116,55 +108,19 @@ static float calculate_avg_nan_safe(const float arr[], int size) {
     return (count > 0) ? (sum / count) : 0.0f;
 }
 
-static void update_measurement_history(HashrateMonitorModule *monitor, int asic_count,
-                                        int hash_domains, bool active)
-{
-    size_t series = 0;
-    for (int asic = 0; asic < asic_count; ++asic) {
-        for (int domain = -1; domain < hash_domains; ++domain) {
-            measurement_t *measurement = domain < 0 ? &monitor->total_measurement[asic]
-                : &monitor->domain_measurements[asic][domain];
-            // A single hash domain covers the whole ASIC, so reuse its total history.
-            if (hash_domains == 1 && domain == 0) continue;
-            struct HashrateCache *cache = &monitor->hashrate_cache[series];
-            float *history = monitor->hashrate_history + series++ * HASHRATE_1M_SIZE;
-            size_t slot = poll_count % HASHRATE_1M_SIZE;
-            float rate = active ? measurement->hashrate : 0;
-            cache->sum += (double)rate - history[slot];
-            history[slot] = rate;
-            if (cache->count < HASHRATE_1M_SIZE) ++cache->count;
-            atomic_store_explicit(&cache->rate, cache->sum / cache->count, memory_order_relaxed);
-        }
-    }
-}
-
-static float reported_rate(void *pvParameters, uint8_t asic_nr, int domain_nr)
-{
-    GlobalState *state = pvParameters;
-    if (state == NULL || !state->HASHRATE_MONITOR_MODULE.is_initialized ||
-        asic_nr >= state->DEVICE_CONFIG.family.asic_count ||
-        domain_nr >= state->DEVICE_CONFIG.family.asic.hash_domains) return 0;
-    bool from_shares = state->DEVICE_CONFIG.family.asic.hashrate_from_shares;
-    if (from_shares && (!state->ASIC_initalized || state->SYSTEM_MODULE.mining_paused)) return 0;
-    HashrateMonitorModule *monitor = &state->HASHRATE_MONITOR_MODULE;
-    if (from_shares) {
-        int domains = state->DEVICE_CONFIG.family.asic.hash_domains;
-        size_t series = asic_nr * (domains == 1 ? 1 : domains + 1);
-        if (domains > 1 && domain_nr >= 0) series += domain_nr + 1;
-        return atomic_load_explicit(&monitor->hashrate_cache[series].rate, memory_order_relaxed);
-    }
-    pthread_mutex_lock(&monitor->lock);
-    const measurement_t *measurement = domain_nr < 0 ? &monitor->total_measurement[asic_nr]
-        : &monitor->domain_measurements[asic_nr][domain_nr];
-    float rate = measurement->hashrate;
-    pthread_mutex_unlock(&monitor->lock);
-    return rate;
-}
-
 float hashrate_monitor_get_asic_rate(void *state, uint8_t asic_nr)
-{ return reported_rate(state, asic_nr, -1); }
+{
+    asic_domain_measurement_t measurement = {0};
+    ASIC_get_asic_measurement(state, asic_nr, &measurement);
+    return measurement.hashrate;
+}
+
 float hashrate_monitor_get_domain_rate(void *state, uint8_t asic_nr, uint8_t domain_nr)
-{ return reported_rate(state, asic_nr, domain_nr); }
+{
+    asic_domain_measurement_t measurement = {0};
+    ASIC_get_domain_measurement(state, asic_nr, domain_nr, &measurement);
+    return measurement.hashrate;
+}
 
 static void update_hashrate_averages(SystemModule * SYSTEM_MODULE, float interval_hashrate)
 {
@@ -209,34 +165,19 @@ void hashrate_monitor_task(void *pvParameters)
     int asic_count = GLOBAL_STATE->DEVICE_CONFIG.family.asic_count;
     int hash_domains = GLOBAL_STATE->DEVICE_CONFIG.family.asic.hash_domains;
 
-    bool from_shares = GLOBAL_STATE->DEVICE_CONFIG.family.asic.hashrate_from_shares;
     HASHRATE_MONITOR_MODULE->total_measurement = heap_caps_malloc(asic_count * sizeof(measurement_t), MALLOC_CAP_SPIRAM);
     measurement_t* data = heap_caps_malloc(asic_count * hash_domains * sizeof(measurement_t), MALLOC_CAP_SPIRAM);
     HASHRATE_MONITOR_MODULE->domain_measurements = heap_caps_malloc(asic_count * sizeof(measurement_t*), MALLOC_CAP_SPIRAM);
     HASHRATE_MONITOR_MODULE->error_measurement = heap_caps_malloc(asic_count * sizeof(measurement_t), MALLOC_CAP_SPIRAM);
-    size_t history_count = 0;
-    HASHRATE_MONITOR_MODULE->hashrate_history = NULL;
-    HASHRATE_MONITOR_MODULE->hashrate_cache = NULL;
-    if (from_shares) {
-        history_count = (size_t)asic_count * (hash_domains == 1 ? 1 : hash_domains + 1);
-        HASHRATE_MONITOR_MODULE->hashrate_history = heap_caps_calloc(history_count * HASHRATE_1M_SIZE, sizeof(float), MALLOC_CAP_SPIRAM);
-        // Internal RAM avoids ESP-IDF's spinlock workaround for atomics in PSRAM.
-        HASHRATE_MONITOR_MODULE->hashrate_cache = heap_caps_calloc(history_count, sizeof(struct HashrateCache), MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
-    }
     if (!HASHRATE_MONITOR_MODULE->total_measurement || !data || !HASHRATE_MONITOR_MODULE->domain_measurements ||
-        !HASHRATE_MONITOR_MODULE->error_measurement ||
-        (from_shares && (!HASHRATE_MONITOR_MODULE->hashrate_history || !HASHRATE_MONITOR_MODULE->hashrate_cache))) {
+        !HASHRATE_MONITOR_MODULE->error_measurement) {
         heap_caps_free(HASHRATE_MONITOR_MODULE->total_measurement);
         heap_caps_free(data);
         heap_caps_free(HASHRATE_MONITOR_MODULE->domain_measurements);
         heap_caps_free(HASHRATE_MONITOR_MODULE->error_measurement);
-        heap_caps_free(HASHRATE_MONITOR_MODULE->hashrate_history);
-        heap_caps_free(HASHRATE_MONITOR_MODULE->hashrate_cache);
         HASHRATE_MONITOR_MODULE->total_measurement = NULL;
         HASHRATE_MONITOR_MODULE->domain_measurements = NULL;
         HASHRATE_MONITOR_MODULE->error_measurement = NULL;
-        HASHRATE_MONITOR_MODULE->hashrate_history = NULL;
-        HASHRATE_MONITOR_MODULE->hashrate_cache = NULL;
         ESP_LOGE(TAG, "Hashrate monitor allocation failed");
         vTaskDelete(NULL);
         return;
@@ -244,7 +185,6 @@ void hashrate_monitor_task(void *pvParameters)
     for (size_t asic_nr = 0; asic_nr < asic_count; asic_nr++) {
         HASHRATE_MONITOR_MODULE->domain_measurements[asic_nr] = data + (asic_nr * hash_domains);
     }
-    for (size_t i = 0; i < history_count; ++i) atomic_init(&HASHRATE_MONITOR_MODULE->hashrate_cache[i].rate, 0);
 
     pthread_mutex_init(&HASHRATE_MONITOR_MODULE->lock, NULL);
     memset(HASHRATE_MONITOR_MODULE->total_measurement, 0, asic_count * sizeof(measurement_t));
@@ -275,26 +215,20 @@ void hashrate_monitor_task(void *pvParameters)
             pthread_mutex_lock(&HASHRATE_MONITOR_MODULE->lock);
             float current_hashrate = sum_hashrates(HASHRATE_MONITOR_MODULE->total_measurement, asic_count);
             float error_hashrate = sum_hashrates(HASHRATE_MONITOR_MODULE->error_measurement, asic_count);
-            if (from_shares) update_measurement_history(HASHRATE_MONITOR_MODULE, asic_count, hash_domains, true);
             pthread_mutex_unlock(&HASHRATE_MONITOR_MODULE->lock);
 
             interval_hashrate = current_hashrate;
-            if (!from_shares) SYSTEM_MODULE->current_hashrate = current_hashrate;
             SYSTEM_MODULE->error_percentage = current_hashrate > 0 ? error_hashrate / current_hashrate * 100.f : 0;
-
-            if (current_hashrate > 0.0f && !from_shares) update_hashrate_averages(SYSTEM_MODULE, current_hashrate);
-        } else {
-            SYSTEM_MODULE->current_hashrate = 0;
         }
 
-        if (from_shares) {
-            if (!is_asic_initialized) {
-                update_measurement_history(HASHRATE_MONITOR_MODULE, asic_count, hash_domains, false);
+        float reported_hashrate = 0;
+        if (is_asic_initialized && !SYSTEM_MODULE->mining_paused) {
+            for (int asic = 0; asic < asic_count; ++asic) {
+                reported_hashrate += hashrate_monitor_get_asic_rate(GLOBAL_STATE, asic);
             }
-            update_hashrate_averages(SYSTEM_MODULE, interval_hashrate);
-            SYSTEM_MODULE->current_hashrate = is_asic_initialized && !SYSTEM_MODULE->mining_paused
-                ? SYSTEM_MODULE->hashrate_1m : 0;
         }
+        SYSTEM_MODULE->current_hashrate = reported_hashrate;
+        update_hashrate_averages(SYSTEM_MODULE, interval_hashrate);
 
         SYSTEM_noinit_update(SYSTEM_MODULE, interval_hashrate);
 

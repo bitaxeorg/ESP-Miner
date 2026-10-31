@@ -29,6 +29,8 @@ void ASIC_set_frequency(GlobalState * GLOBAL_STATE);
 void ASIC_set_nonce_space(GlobalState * GLOBAL_STATE);
 double ASIC_get_asic_job_frequency_ms(GlobalState * GLOBAL_STATE);
 void ASIC_read_registers(GlobalState * GLOBAL_STATE);
+esp_err_t ASIC_get_asic_measurement(GlobalState * GLOBAL_STATE, uint8_t asic_nr,
+                                    asic_domain_measurement_t * measurement);
 esp_err_t ASIC_get_domain_measurement(GlobalState * GLOBAL_STATE, uint8_t asic_nr,
                                       uint8_t domain_nr, asic_domain_measurement_t * measurement);
 void ASIC_set_difficulty(GlobalState * GLOBAL_STATE, uint8_t difficulty_power);

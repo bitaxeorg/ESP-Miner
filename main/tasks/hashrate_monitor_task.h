@@ -15,8 +15,6 @@ typedef struct {
     measurement_t* total_measurement;
     measurement_t** domain_measurements;
     measurement_t* error_measurement;
-    float* hashrate_history;
-    struct HashrateCache* hashrate_cache;
 
     pthread_mutex_t lock;
     atomic_bool is_initialized;
@@ -26,7 +24,7 @@ void hashrate_monitor_task(void *pvParameters);
 void hashrate_monitor_register_read(void *pvParameters, register_type_t register_type, uint8_t asic_nr, uint32_t value, uint64_t timestamp_us);
 void hashrate_monitor_reset_measurements(void *pvParameters);
 
-// Display GH/s; only share estimates are smoothed and cut off while paused/stopped.
+// Display GH/s supplied through the ASIC measurement interface.
 float hashrate_monitor_get_asic_rate(void *pvParameters, uint8_t asic_nr);
 float hashrate_monitor_get_domain_rate(void *pvParameters, uint8_t asic_nr, uint8_t domain_nr);
 

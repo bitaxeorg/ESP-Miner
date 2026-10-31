@@ -20,6 +20,7 @@ SRCS
     "asic_common.c"
     "asic_job_slot.c"
     "asic.c"
+    "asic_measurement.c"
     "asic_submit.c"
     "bm_hashrate.c"
     "bm_job_packet.c"

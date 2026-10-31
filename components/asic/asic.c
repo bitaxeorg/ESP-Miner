@@ -252,31 +252,6 @@ void ASIC_read_registers(GlobalState * GLOBAL_STATE)
     }
 }
 
-esp_err_t ASIC_get_domain_measurement(GlobalState * GLOBAL_STATE, uint8_t asic_nr,
-                                      uint8_t domain_nr, asic_domain_measurement_t * measurement)
-{
-    if (GLOBAL_STATE == NULL || measurement == NULL) {
-        return ESP_ERR_INVALID_ARG;
-    }
-
-    HashrateMonitorModule * monitor = &GLOBAL_STATE->HASHRATE_MONITOR_MODULE;
-    if (!monitor->is_initialized) {
-        return ESP_ERR_INVALID_STATE;
-    }
-
-    if (asic_nr >= GLOBAL_STATE->DEVICE_CONFIG.family.asic_count ||
-        domain_nr >= GLOBAL_STATE->DEVICE_CONFIG.family.asic.hash_domains) {
-        return ESP_ERR_INVALID_ARG;
-    }
-
-    pthread_mutex_lock(&monitor->lock);
-    measurement_t register_measurement = monitor->domain_measurements[asic_nr][domain_nr];
-    pthread_mutex_unlock(&monitor->lock);
-
-    measurement->time_us = register_measurement.time_us;
-    measurement->hashrate = register_measurement.hashrate;
-    return ESP_OK;
-}
 
 void ASIC_set_difficulty(GlobalState * GLOBAL_STATE, uint8_t difficulty_power)
 {
