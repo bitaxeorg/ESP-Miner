@@ -24,8 +24,11 @@ describe('I18nService', () => {
 
   it('interpolates params', () => {
     service.setLocale('en');
-    const message = service.t('messages.device_restarted_at', { uri: 'http://axeos' });
+    let message = service.t('messages.device_restarted_at', { uri: 'http://axeos' });
     expect(message).toContain('http://axeos');
+
+    message = service.t('share_rejection.Job not found.explanation');
+    expect(message).toContain('The job ID in the submission was not recognized or is no longer valid.');
   });
 
   it('returns the key when missing', () => {

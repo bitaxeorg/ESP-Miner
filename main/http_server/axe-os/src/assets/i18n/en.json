@@ -419,7 +419,7 @@
     },
     "Difficulty too low": {
       "label": "Difficulty too low",
-      "explanation": "The submitted share does not meet the minimum required difficulty."
+      "explanation": "{{share_rejection.difficulty-too-low.explanation}}"
     },
     "difficulty-too-low": {
       "label": "Difficulty too low",
@@ -476,7 +476,7 @@
     },
     "Job not found": {
       "label": "Job not found",
-      "explanation": "While this share was being submitted, the network had already found a new block, making this share invalid."
+      "explanation": "{{share_rejection.invalid-job-id.explanation}}"
     },
     "Mining Submit validation error": {
       "label": "Mining Submit validation error",
@@ -519,11 +519,11 @@
     },
     "stale": {
       "label": "Stale",
-      "explanation": "While this share was being submitted, the network had already found a new block, making this share invalid."
+      "explanation": "{{share_rejection.Stale.explanation}}"
     },
     "stale-share": {
       "label": "Stale",
-      "explanation": "While this share was being submitted, the network had already found a new block, making this share invalid."
+      "explanation": "{{share_rejection.Stale.explanation}}"
     },
     "Subscription validation error": {
       "label": "Subscription validation error",
