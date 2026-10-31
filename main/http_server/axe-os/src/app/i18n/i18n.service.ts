@@ -54,9 +54,7 @@ export class I18nService {
   }
 
   t(key: string, params?: Record<string, string | number>): string {
-    const localeValue = this.resolveKey(TRANSLATIONS[this.locale], key);
-    const fallbackValue = this.resolveKey(TRANSLATIONS.en, key);
-    const template = localeValue ?? fallbackValue;
+    const template = this.resolveTemplate(key, new Set());
 
     if (!template) {
       if (isDevMode()) {
@@ -66,6 +64,28 @@ export class I18nService {
     }
 
     return this.interpolate(template, params);
+  }
+
+  private resolveTemplate(key: string, seen: Set<string>): string | null {
+    const localeValue = this.resolveKey(TRANSLATIONS[this.locale], key);
+    const fallbackValue = this.resolveKey(TRANSLATIONS.en, key);
+    let template = localeValue ?? fallbackValue;
+
+    if (!template) {
+      return null;
+    }
+
+    // Resolve embedded {{other.translation.key}} references, with cycle protection
+    return template.replace(/\{\{([^{}]+)\}\}/g, (match, refKey: string) => {
+      const trimmed = refKey.trim();
+      if (seen.has(trimmed)) {
+        return match;
+      }
+      seen.add(trimmed);
+      const resolved = this.resolveTemplate(trimmed, seen);
+      seen.delete(trimmed);
+      return resolved ?? match;
+    });
   }
 
   private detectInitialLocale(): Locale {
