@@ -191,7 +191,7 @@ void POWER_MANAGEMENT_task(void * pvParameters)
                 
                 // Only check ASIC temps if they're valid (not using ASIC thermal diode)
                 if (asic_temp_valid) {
-                    power_management->chip_temp_avg = Thermal_get_chip_temp(GLOBAL_STATE);
+                    power_management->chip_temp_avg = Thermal_get_emc_internal_temp(GLOBAL_STATE);
                     power_management->chip_temp2_avg = Thermal_get_chip_temp2(GLOBAL_STATE);
                     ESP_LOGW(TAG, "Safe mode active (cycle %d) - VR: %.1f°C ASIC1: %.1f°C ASIC2: %.1f°C",
                              cooling_cycles, power_management->vr_temp, power_management->chip_temp_avg, power_management->chip_temp2_avg);
