@@ -21,6 +21,7 @@
 #include "bzm/transport.h"
 #include "bzm/work_registers.h"
 #include "bzm/hash.h"
+#include "bzm/hashrate.h"
 #include "bzm/platform_serial.h"
 
 static const char * TAG = "bzm";
@@ -52,6 +53,8 @@ typedef struct {
     int64_t last_temperature_us;
     atomic_uint_fast64_t
         hashrate_difficulty_one_counters[BZM_MAX_ASIC_COUNT];
+    pthread_mutex_t hashrate_lock;
+    bzm_hashrate_t hashrate[BZM_MAX_ASIC_COUNT];
     atomic_uint_fast32_t work_replacement_generation;
     uint32_t work_replacement_completed; // Protected by REACTOR_LOCK.
     uint16_t work_replacement_remaining;
@@ -103,6 +106,11 @@ bool bzm_driver_state_init(bzm_device_t *state)
         return false;
     }
     allocated->last_temperature = -1.0f;
+    if (pthread_mutex_init(&allocated->hashrate_lock, NULL) != 0) {
+        pthread_mutex_destroy(&allocated->reactor_lock);
+        bzm_free(allocated);
+        return false;
+    }
     allocated->request_work = state->request_work;
     allocated->request_work_context = state->context;
     atomic_init(&allocated->work_epoch, 0);
@@ -113,6 +121,7 @@ bool bzm_driver_state_init(bzm_device_t *state)
     }
 
     if (!bzm_job_store_init_with_memory(&allocated->job_store, true)) {
+        pthread_mutex_destroy(&allocated->hashrate_lock);
         pthread_mutex_destroy(&allocated->reactor_lock);
         bzm_free(allocated);
         return false;
@@ -368,6 +377,24 @@ bool bzm_driver_hashrate_counter_snapshot(bzm_device_t *state,
         difficulty_one_counters[i] = (uint32_t)atomic_load_explicit(
             &HASHRATE_DIFFICULTY_ONE_COUNTERS[i], memory_order_relaxed);
     }
+    return true;
+}
+
+static bool hashrate_active(const bzm_device_t *state)
+{
+    return state->initialized && !bzm_driver_has_io_fault() &&
+           (!state->can_submit || state->can_submit(state->context));
+}
+
+bool bzm_driver_get_hashrate_measurement(bzm_device_t *state, uint8_t asic_nr,
+                                         uint64_t *time_us, float *hashrate)
+{
+    if (!state || !time_us || !hashrate || !BZM_STATE ||
+        state->asic_count > BZM_MAX_ASIC_COUNT || asic_nr >= state->asic_count) return false;
+    pthread_mutex_lock(&BZM_STATE->hashrate_lock);
+    *time_us = BZM_STATE->hashrate[asic_nr].time_us;
+    *hashrate = hashrate_active(state) ? BZM_STATE->hashrate[asic_nr].rate : 0;
+    pthread_mutex_unlock(&BZM_STATE->hashrate_lock);
     return true;
 }
 
@@ -1148,6 +1175,14 @@ void bzm_driver_service(bzm_device_t *state)
     else if (bzm_control_get_safety_status(&status) == BZM_OK &&
              status.fault == BZM_CONTROL_FAULT_ASIC_TRIP)
         device_fault(state, "BZM ASIC trip");
+    bool active = hashrate_active(state);
+    uint64_t now_us = bzm_now_us();
+    pthread_mutex_lock(&BZM_STATE->hashrate_lock);
+    for (uint8_t asic = 0; asic < state->asic_count && asic < BZM_MAX_ASIC_COUNT; ++asic) {
+        uint64_t counter = atomic_load_explicit(&HASHRATE_DIFFICULTY_ONE_COUNTERS[asic], memory_order_relaxed);
+        bzm_hashrate_sample(&BZM_STATE->hashrate[asic], counter, now_us, active);
+    }
+    pthread_mutex_unlock(&BZM_STATE->hashrate_lock);
 }
 
 uint8_t bzm_driver_init(bzm_device_t *state)

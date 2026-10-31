@@ -123,6 +123,14 @@ bool BZM_hashrate_counter_snapshot(GlobalState *state, uint32_t *counters, size_
     bzm_device_t device = device_view(state);
     return bzm_driver_hashrate_counter_snapshot(&device, counters, count);
 }
+bool BZM_get_hashrate_measurement(GlobalState *state, uint8_t asic_nr,
+                                  uint64_t *time_us, float *hashrate)
+{
+    if (!state) return false;
+    bzm_device_t device = device_view(state);
+    return bzm_driver_get_hashrate_measurement(&device, asic_nr, time_us, hashrate);
+}
+
 bzm_bringup_outcome_t BZM_start(GlobalState *state, const bzm_bringup_telemetry_policy_t *policy,
                               bzm_bringup_report_t *report)
 {

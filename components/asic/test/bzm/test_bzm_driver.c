@@ -17,6 +17,7 @@
 #define bzm_driver_process_result test_driver_process_work
 #define bzm_driver_read_temperature test_driver_read_temperature
 #define bzm_driver_hashrate_counter_snapshot test_driver_hashrate_snapshot
+#define bzm_driver_get_hashrate_measurement test_driver_hashrate_measurement
 #define bzm_driver_has_io_fault test_driver_has_io_fault
 #define bzm_driver_work_replacement_snapshot test_driver_replacement_snapshot
 #define bzm_driver_get_telemetry_snapshot test_driver_telemetry_snapshot
@@ -166,6 +167,7 @@ static void fixture_init(void)
     TEST_ASSERT_NOT_NULL(BZM_STATE);
     TEST_ASSERT_TRUE(bzm_job_store_init(&BZM_STATE->job_store));
     TEST_ASSERT_EQUAL_INT(0, pthread_mutex_init(&REACTOR_LOCK, NULL));
+    TEST_ASSERT_EQUAL_INT(0, pthread_mutex_init(&BZM_STATE->hashrate_lock, NULL));
     atomic_init(&BZM_STATE->work_epoch, 0);
     atomic_init(&BZM_STATE->io_failed, false);
     atomic_init(&WORK_REPLACEMENT_GENERATION, 0);
@@ -194,6 +196,7 @@ static void fixture_destroy(void)
     bzm_serial_transport_deinit(&TRANSPORT);
     bzm_job_store_destroy(&BZM_STATE->job_store);
     TEST_ASSERT_EQUAL_INT(0, pthread_mutex_destroy(&REACTOR_LOCK));
+    TEST_ASSERT_EQUAL_INT(0, pthread_mutex_destroy(&BZM_STATE->hashrate_lock));
     free(BZM_STATE);
     BZM_STATE = NULL;
 }
@@ -201,6 +204,36 @@ static asic_job_t template(void)
 {
     return (asic_job_t){.version = 0x20000000, .ntime = 1234, .nbits = 0x1702369d,
                         .version_mask = 0x6000};
+}
+
+TEST_CASE("BZM cached measurements do not consume work or wait for the reactor and stop immediately", "[asic][bzm][hashrate]")
+{
+    fixture_init();
+    test_state.can_submit = allow_dispatch;
+    bzm_hashrate_sample(&BZM_STATE->hashrate[0], 0, 1000000, true);
+    bzm_hashrate_sample(&BZM_STATE->hashrate[0], 512, 2000000, true);
+    atomic_store(&HASHRATE_DIFFICULTY_ONE_COUNTERS[0], 512);
+    uint64_t timestamp;
+    float rate;
+    pthread_mutex_lock(&REACTOR_LOCK);
+    for (unsigned i = 0; i < 100; ++i) {
+        TEST_ASSERT_TRUE(bzm_driver_get_hashrate_measurement(&test_state, 0, &timestamp, &rate));
+        TEST_ASSERT_FLOAT_WITHIN(0.001f, 1099.5116f, rate);
+        TEST_ASSERT_TRUE((uint64_t)(2000000) == (uint64_t)(timestamp));
+    }
+    pthread_mutex_unlock(&REACTOR_LOCK);
+    TEST_ASSERT_EQUAL_UINT(2, BZM_STATE->hashrate[0].count);
+    TEST_ASSERT_TRUE((uint64_t)(512) == (uint64_t)(atomic_load(&HASHRATE_DIFFICULTY_ONE_COUNTERS[0])));
+    test_state.initialized = false;
+    TEST_ASSERT_TRUE(bzm_driver_get_hashrate_measurement(&test_state, 0, &timestamp, &rate));
+    TEST_ASSERT_EQUAL_FLOAT(0, rate);
+    test_state.initialized = true;
+    authorized = false;
+    TEST_ASSERT_TRUE(bzm_driver_get_hashrate_measurement(&test_state, 0, &timestamp, &rate));
+    TEST_ASSERT_EQUAL_FLOAT(0, rate);
+    TEST_ASSERT_FALSE(bzm_driver_get_hashrate_measurement(&test_state, 4, &timestamp, &rate));
+    TEST_ASSERT_FALSE(bzm_driver_get_hashrate_measurement(NULL, 0, &timestamp, &rate));
+    fixture_destroy();
 }
 
 typedef struct {

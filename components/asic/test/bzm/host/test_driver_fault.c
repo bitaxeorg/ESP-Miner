@@ -335,6 +335,7 @@ int main(void)
     bzm_serial_transport_deinit(&TRANSPORT);
     bzm_job_store_destroy(&BZM_STATE->job_store);
     CHECK(pthread_mutex_destroy(&REACTOR_LOCK) == 0);
+    CHECK(pthread_mutex_destroy(&BZM_STATE->hashrate_lock) == 0);
     bzm_free(BZM_STATE);
     BZM_STATE = NULL;
     return 0;
