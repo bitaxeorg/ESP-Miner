@@ -35,10 +35,6 @@ bool BZM_work_replacement_snapshot(uint32_t *generation, uint32_t *completed, bo
 
 /* Thread-safe copies of the singleton transport's telemetry. */
 bool BZM_get_telemetry_snapshot(bzm_telemetry_store_t * snapshot);
-/* Complete hardware startup under the driver lock. Dispatch stays closed
- * until the driver enables dispatch after success. */
-bzm_bringup_outcome_t BZM_start(GlobalState *state, const bzm_bringup_telemetry_policy_t *policy,
-                                 bzm_bringup_report_t *report);
 bzm_bringup_outcome_t BZM_step_frequency_domains(
     const float
         target_mhz[BZM_BRINGUP_ASIC_COUNT][BZM_BRINGUP_PLL_COUNT],

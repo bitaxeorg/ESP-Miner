@@ -19,7 +19,6 @@
 #define BZM_work_replacement_snapshot adapter_test_replacement_snapshot
 #define BZM_get_telemetry_snapshot adapter_test_telemetry_snapshot
 #define BZM_step_frequency_domains adapter_test_step_frequency_domains
-#define BZM_start adapter_test_start
 #define BZM_get_state adapter_test_get_state
 #define BZM_hold_reset adapter_test_hold_reset
 #define BZM_set_dispatch_authorizer adapter_test_dispatch_authorizer

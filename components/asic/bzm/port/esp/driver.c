@@ -134,18 +134,6 @@ bool BZM_get_hashrate_measurement(GlobalState *state, uint8_t asic_nr,
     return bzm_driver_get_hashrate_measurement(&device, asic_nr, time_us, hashrate);
 }
 
-bzm_bringup_outcome_t BZM_start(GlobalState *state, const bzm_bringup_telemetry_policy_t *policy,
-                              bzm_bringup_report_t *report)
-{
-    if (!BZM_driver_state_init(state)) {
-        if (report) *report = (bzm_bringup_report_t){.reason = BZM_BRINGUP_REASON_INVALID_ARGUMENT};
-        return BZM_BRINGUP_BAD;
-    }
-    bzm_device_t device = device_view(state);
-    bzm_bringup_outcome_t outcome = bzm_driver_start(&device, policy, report);
-    state->current_difficulty_power = device.difficulty_power;
-    return outcome;
-}
 int BZM_set_max_baud(void) { return bzm_driver_set_max_baud(); }
 bool BZM_has_io_fault(void) { return bzm_driver_has_io_fault(); }
 bool BZM_work_replacement_snapshot(uint32_t *generation, uint32_t *completed, bool *pending)
