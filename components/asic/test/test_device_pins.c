@@ -26,6 +26,8 @@ TEST_CASE("Bonanza 1004 supplies its control pin map through device configuratio
     }
     TEST_ASSERT_EQUAL_PTR(&BONANZA_1004_CONTROL_PINS, config.pins.bzm);
     TEST_ASSERT_EQUAL_PTR(&BONANZA_1004_UART_PINS, config.pins.asic_uart);
+    TEST_ASSERT_EQUAL_PTR(&BONANZA_FAN_DRIVER, config.fan_driver);
+    TEST_ASSERT_EQUAL_PTR(&BONANZA_VCORE_DRIVER, config.vcore_driver);
     TEST_ASSERT_EQUAL(GPIO_NUM_17, config.pins.asic_uart->tx);
     TEST_ASSERT_EQUAL(GPIO_NUM_18, config.pins.asic_uart->rx);
     const BzmPins *pins = config.pins.bzm;
@@ -38,7 +40,11 @@ TEST_CASE("Bonanza 1004 supplies its control pin map through device configuratio
     TEST_ASSERT_EQUAL_INT(21, pins->enable_5v);
     TEST_ASSERT_EQUAL(ESP_OK, device_pins_init(&config.pins));
     for (unsigned i = 0; i < (sizeof(default_configs) / sizeof(default_configs[0])); ++i) {
-        if (default_configs[i].family.id != BONANZA) TEST_ASSERT_NULL(default_configs[i].pins.bzm);
+        if (default_configs[i].family.id != BONANZA) {
+            TEST_ASSERT_NULL(default_configs[i].pins.bzm);
+            TEST_ASSERT_NULL(default_configs[i].fan_driver);
+            TEST_ASSERT_NULL(default_configs[i].vcore_driver);
+        }
     }
 }
 

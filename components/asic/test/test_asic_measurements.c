@@ -6,11 +6,20 @@
 
 #define ASIC_get_asic_measurement measurement_test_total
 #define ASIC_get_domain_measurement measurement_test_domain
+#define ASIC_get_temperature measurement_test_temperature
 #define BZM_get_hashrate_measurement measurement_test_bzm
+#define BZM_read_temperature measurement_test_bzm_temperature
 #include "components/asic/asic_measurement.c"
 
 static bool software_available;
 static uint8_t requested_asic;
+static unsigned temperature_reads;
+float measurement_test_bzm_temperature(GlobalState *state)
+{
+    (void)state;
+    ++temperature_reads;
+    return 72;
+}
 bool measurement_test_bzm(GlobalState *state, uint8_t asic_nr, uint64_t *time_us, float *hashrate)
 {
     (void)state;
@@ -58,5 +67,24 @@ TEST_CASE("ASIC measurement interface returns Bitmain totals and domains without
     TEST_ASSERT_EQUAL(ESP_ERR_INVALID_STATE, ASIC_get_asic_measurement(state, 0, &sample));
     TEST_ASSERT_EQUAL_FLOAT(0, sample.hashrate);
     pthread_mutex_destroy(&state->HASHRATE_MONITOR_MODULE.lock);
+    free(state);
+}
+
+TEST_CASE("ASIC native temperature requires a capability and a supported driver", "[asic][temperature]")
+{
+    GlobalState *state = calloc(1, sizeof(*state));
+    TEST_ASSERT_NOT_NULL(state);
+    temperature_reads = 0;
+    TEST_ASSERT_EQUAL_FLOAT(-1, ASIC_get_temperature(NULL));
+    state->DEVICE_CONFIG.family = FAMILY_BONANZA;
+    TEST_ASSERT_EQUAL_FLOAT(72, ASIC_get_temperature(state));
+    TEST_ASSERT_EQUAL_UINT32(1, temperature_reads);
+    state->DEVICE_CONFIG.family.asic.native_temperature = false;
+    TEST_ASSERT_EQUAL_FLOAT(-1, ASIC_get_temperature(state));
+    state->DEVICE_CONFIG.family = FAMILY_GAMMA;
+    TEST_ASSERT_EQUAL_FLOAT(-1, ASIC_get_temperature(state));
+    state->DEVICE_CONFIG.family.asic.native_temperature = true;
+    TEST_ASSERT_EQUAL_FLOAT(-1, ASIC_get_temperature(state));
+    TEST_ASSERT_EQUAL_UINT32(1, temperature_reads);
     free(state);
 }

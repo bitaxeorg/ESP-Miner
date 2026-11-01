@@ -1,4 +1,5 @@
 #include "bonanza_vcore.h"
+#include "vcore.h"
 #include <math.h>
 #include <stdio.h>
 #include <pthread.h>
@@ -151,3 +152,8 @@ esp_err_t BONANZA_VCORE_set_voltage(GlobalState *state, float volts)
     pthread_mutex_unlock(&voltage_lock);
     return err;
 }
+
+const VcoreDriver BONANZA_VCORE_DRIVER = {
+    .init = BONANZA_VCORE_init,
+    .set_voltage = BONANZA_VCORE_set_voltage,
+};

@@ -2,6 +2,17 @@
 #include "bzm/driver.h"
 #include "global_state.h"
 
+float ASIC_get_temperature(GlobalState *state)
+{
+    if (state == NULL || !state->DEVICE_CONFIG.family.asic.native_temperature) return -1;
+    switch (state->DEVICE_CONFIG.family.asic.id) {
+        case BZM:
+            return BZM_read_temperature(state);
+        default:
+            return -1;
+    }
+}
+
 static esp_err_t get_measurement(GlobalState *state, uint8_t asic_nr, uint8_t domain_nr,
                                  bool total, asic_domain_measurement_t *measurement)
 {

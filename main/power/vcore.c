@@ -13,7 +13,6 @@
 #include "global_state.h"
 #include "device_config.h"
 #include "vcore.h"
-#include "bonanza_vcore.h"
 
 #define GPIO_ASIC_ENABLE CONFIG_GPIO_ASIC_ENABLE
 #define GPIO_PLUG_SENSE CONFIG_GPIO_PLUG_SENSE
@@ -136,8 +135,9 @@ esp_err_t VCORE_init(GlobalState * GLOBAL_STATE)
     vcore_initialized = false;
     ESP_RETURN_ON_FALSE(GLOBAL_STATE->DEVICE_CONFIG.family.voltage_domains != 0, ESP_FAIL, TAG, "voltage_domains not defined");
 
-    if (GLOBAL_STATE->DEVICE_CONFIG.family.id == BONANZA) {
-        esp_err_t err = BONANZA_VCORE_init(GLOBAL_STATE, get_tps546_config(&GLOBAL_STATE->DEVICE_CONFIG.family));
+    if (GLOBAL_STATE->DEVICE_CONFIG.vcore_driver) {
+        esp_err_t err = GLOBAL_STATE->DEVICE_CONFIG.vcore_driver->init(
+            GLOBAL_STATE, get_tps546_config(&GLOBAL_STATE->DEVICE_CONFIG.family));
         vcore_initialized = err == ESP_OK;
         return err;
     }
@@ -167,8 +167,8 @@ bool VCORE_is_initialized(void)
 
 esp_err_t VCORE_set_voltage(GlobalState * GLOBAL_STATE, float core_voltage)
 {
-    if (GLOBAL_STATE->DEVICE_CONFIG.family.id == BONANZA) {
-        return BONANZA_VCORE_set_voltage(GLOBAL_STATE, core_voltage);
+    if (GLOBAL_STATE->DEVICE_CONFIG.vcore_driver) {
+        return GLOBAL_STATE->DEVICE_CONFIG.vcore_driver->set_voltage(GLOBAL_STATE, core_voltage);
     }
 
     ESP_LOGI(TAG, "Set ASIC voltage = %.3fV", core_voltage);

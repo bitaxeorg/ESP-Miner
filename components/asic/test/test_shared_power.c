@@ -203,6 +203,32 @@ TEST_CASE("BZM initialization failure leaves power off and mining uninitialized"
     TEST_ASSERT_EQUAL_UINT32(0, clock_writes);
 }
 
+TEST_CASE("Startup sequencing follows the ASIC capability independently of its ID", "[asic][power][shared]")
+{
+    AsicConfig asic = ASIC_BM1370;
+    asic.driver_managed_startup = true;
+    fixture(asic);
+    TEST_ASSERT_EQUAL_UINT8(4, shared_initialize(&state, ASIC_INIT_COLD_BOOT, 0));
+    TEST_ASSERT_EQUAL_UINT32(0, serial_calls);
+    TEST_ASSERT_EQUAL_UINT32(0, resets);
+    TEST_ASSERT_EQUAL_UINT32(1, clock_writes);
+    TEST_ASSERT_TRUE(state.ASIC_initalized);
+
+    fixture(asic);
+    fail_init = true;
+    TEST_ASSERT_EQUAL_UINT8(0, shared_initialize(&state, ASIC_INIT_COLD_BOOT, 0));
+    TEST_ASSERT_EQUAL_FLOAT(0, applied_voltage);
+    TEST_ASSERT_EQUAL_STRING("BM1370 initialization failed", state.SYSTEM_MODULE.hardware_fault_msg);
+
+    asic = ASIC_BZM;
+    asic.driver_managed_startup = false;
+    fixture(asic);
+    TEST_ASSERT_EQUAL_UINT8(4, shared_initialize(&state, ASIC_INIT_COLD_BOOT, 0));
+    TEST_ASSERT_GREATER_THAN_UINT32(0, serial_calls);
+    TEST_ASSERT_EQUAL_UINT32(1, resets);
+    TEST_ASSERT_EQUAL_UINT32(0, clock_writes);
+}
+
 TEST_CASE("Shared thermal guard ignores board input voltage when ASIC settings are at minimum", "[asic][power][shared]")
 {
     const FamilyConfig families[] = {FAMILY_BONANZA, FAMILY_GAMMA};
