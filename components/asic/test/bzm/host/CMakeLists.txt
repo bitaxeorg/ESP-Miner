@@ -8,6 +8,11 @@ find_package(Threads REQUIRED)
 enable_testing()
 
 get_filename_component(ASIC_DIR "${CMAKE_CURRENT_LIST_DIR}/../../.." ABSOLUTE)
+get_filename_component(ESP_MINER_ROOT "${ASIC_DIR}/../.." ABSOLUTE)
+set(SECP256K1_DIR "${ESP_MINER_ROOT}/components/libsecp256k1/libsecp256k1")
+if(NOT EXISTS "${SECP256K1_DIR}/src/hash_impl.h")
+    message(FATAL_ERROR "Initialize libsecp256k1: git submodule update --init components/libsecp256k1/libsecp256k1")
+endif()
 include("${ASIC_DIR}/bzm/sources.cmake")
 add_library(bzm_test_support STATIC
     ${BZM_SOURCES}
@@ -18,6 +23,8 @@ target_include_directories(bzm_test_support PUBLIC
     "${ASIC_DIR}/include"
     "${ASIC_DIR}/../mining_job/include"
     PRIVATE "${ASIC_DIR}/private_include")
+# The POSIX SHA256 callback uses internal headers from the pinned submodule.
+target_include_directories(bzm_test_support SYSTEM PRIVATE "${SECP256K1_DIR}/src")
 target_link_libraries(bzm_test_support PUBLIC Threads::Threads m)
 target_compile_options(bzm_test_support PRIVATE -Wall -Wextra -Werror -Wpedantic)
 

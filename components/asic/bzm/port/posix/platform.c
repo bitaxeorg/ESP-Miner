@@ -2,6 +2,7 @@
 #include "bzm/platform.h"
 #include "bzm/posix.h"
 #include <errno.h>
+#include <hash_impl.h>
 #include <stdio.h>
 #include <time.h>
 
@@ -26,7 +27,20 @@ static void log_message(void *ctx, char level, const char *tag, const char *form
     vfprintf(stderr, format, args);
     fputc('\n', stderr);
 }
+
+static bzm_status_t sha256(void *ctx, const uint8_t *data, size_t size, uint8_t digest[32])
+{
+    (void)ctx;
+    if (digest == NULL || (data == NULL && size != 0)) return BZM_ERR_INVALID_ARG;
+    secp256k1_sha256 hash;
+    secp256k1_sha256_initialize(&hash);
+    if (size != 0) secp256k1_sha256_write(&hash, data, size);
+    secp256k1_sha256_finalize(&hash, digest);
+    secp256k1_sha256_clear(&hash);
+    return BZM_OK;
+}
+
 void bzm_platform_posix_defaults(bzm_platform_ops_t *ops)
 {
-    *ops = (bzm_platform_ops_t){.now_us = now_us, .sleep_us = sleep_us, .log = log_message};
+    *ops = (bzm_platform_ops_t){.now_us = now_us, .sleep_us = sleep_us, .log = log_message, .sha256 = sha256};
 }

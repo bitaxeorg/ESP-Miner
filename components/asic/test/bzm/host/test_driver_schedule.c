@@ -15,6 +15,7 @@ static struct {
     unsigned sleeps, polls, requests, writes, drains, clock_steps, nonce_writes;
     bool dispatching, allowed, fail_drain, fail_nonce, retire_during_hash, hashing_nonce, weak_result;
 } fixture;
+static bzm_status_t (*platform_sha256)(void *, const uint8_t *, size_t, uint8_t[32]);
 
 static int64_t now_us(void *context) { (void)context; return fixture.now; }
 static void sleep_us(void *context, uint32_t us)
@@ -28,7 +29,7 @@ static void request_work(void *context)
 static bzm_status_t hash_bytes(void *context, const uint8_t *data, size_t size, uint8_t digest[32])
 {
     (void)context; (void)data;
-    if (size != 80 && !fixture.hashing_nonce) return BZM_ERR_NOT_SUPPORTED;
+    if (size != 80 && !fixture.hashing_nonce) return platform_sha256(context, data, size, digest);
     fixture.hashing_nonce = size == 80;
     if (fixture.retire_during_hash) {
         fixture.retire_during_hash = false;
@@ -197,6 +198,7 @@ int main(void)
 {
     bzm_platform_ops_t platform;
     bzm_platform_posix_defaults(&platform);
+    platform_sha256 = platform.sha256;
     platform.now_us = now_us;
     platform.sha256 = hash_bytes;
     platform.sleep_us = sleep_us;

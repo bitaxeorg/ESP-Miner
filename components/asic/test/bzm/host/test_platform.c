@@ -56,6 +56,11 @@ int main(void)
     bzm_platform_ops_t ops;
     bzm_platform_posix_defaults(&ops);
     CHECK(ops.now_us(NULL) > 0);
+    CHECK(ops.sha256 != NULL);
+    CHECK(bzm_platform_bind(&ops, NULL));
+    uint8_t digest[32];
+    CHECK(bzm_sha256((const uint8_t *)"abc", 3, digest));
+    CHECK(digest[0] == 0xba && digest[31] == 0xad);
     ops = (bzm_platform_ops_t){.now_us = now, .sleep_us = delay, .calloc = allocate, .free = release,
         .serial_init = init, .serial_is_initialized = ready, .serial_set_baud = baud,
         .serial_wait_tx = wait_tx, .serial_clear_rx = clear, .serial_write = write_bytes, .serial_read = read_bytes};
@@ -65,10 +70,10 @@ int main(void)
     ops.free = release;
     ops.sha256 = hash_failure;
     CHECK(bzm_platform_bind(&ops, &fixture));
-    uint8_t digest[32];
     CHECK(!bzm_double_sha256((const uint8_t *)"abc", 3, digest));
     ops.sha256 = NULL;
     CHECK(bzm_platform_bind(&ops, &fixture));
+    CHECK(!bzm_sha256((const uint8_t *)"abc", 3, digest));
     CHECK(bzm_port_serial_init() == BZM_OK && fixture.ready);
     bzm_sleep_ms(20);
     CHECK(bzm_now_us() == 20000);

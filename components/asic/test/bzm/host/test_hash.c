@@ -1,5 +1,6 @@
 #include "check.h"
 #include "bzm/hash.h"
+#include "bzm/posix.h"
 #include "bzm/job.h"
 #include "bzm/result_dedup.h"
 #include <string.h>
@@ -13,6 +14,10 @@ static void check_hex(const uint8_t digest[32], const char *expected)
 }
 int main(void)
 {
+    bzm_platform_ops_t platform;
+    bzm_platform_posix_defaults(&platform);
+    CHECK(platform.sha256 != NULL);
+    CHECK(bzm_platform_bind(&platform, NULL));
     uint8_t data[1024], hash[32];
     for (size_t i = 0; i < sizeof(data); ++i) data[i] = (uint8_t)i;
     for (size_t i = 0; i < sizeof(vectors) / sizeof(vectors[0]); ++i) {
@@ -24,6 +29,7 @@ int main(void)
     CHECK(!bzm_sha256(NULL, 1, hash));
     CHECK(!bzm_sha256(data, 1, NULL));
     CHECK(bzm_sha256(NULL, 0, hash));
+    check_hex(hash, vectors[0].single);
     uint8_t boundary[32] = {[25] = 0xf0, [26] = 0xff, [27] = 0x0f};
     CHECK(bzm_hash_meets_difficulty(boundary, 4));
     boundary[0] = 1;
