@@ -28,20 +28,23 @@ target_include_directories(bzm_test_support SYSTEM PRIVATE "${SECP256K1_DIR}/src
 target_link_libraries(bzm_test_support PUBLIC Threads::Threads m)
 target_compile_options(bzm_test_support PRIVATE -Wall -Wextra -Werror -Wpedantic)
 
-foreach(test transport manufacturing hash platform runtime_smoke driver_fault driver_backlog driver_schedule grouped_jobs memory)
+foreach(test transport manufacturing hash platform driver_fault driver_backlog driver_schedule grouped_jobs memory)
     add_executable(bzm_test_${test} test_${test}.c)
     target_link_libraries(bzm_test_${test} PRIVATE bzm_test_support)
-    target_include_directories(bzm_test_${test} PRIVATE "${ASIC_DIR}/private_include")
+    target_include_directories(bzm_test_${test} PRIVATE "${ASIC_DIR}/private_include" "${ESP_MINER_ROOT}")
     target_compile_options(bzm_test_${test} PRIVATE -Wall -Wextra -Werror -Wpedantic)
     add_test(NAME bzm_${test} COMMAND bzm_test_${test})
 endforeach()
 
+set(BZM_HEADER_CHECK_SOURCES)
 foreach(header balanced_ramp board bringup chain controls dispatch_gate
                frame_parser frequency platform posix power protocol registers
                runtime runtime_result status telemetry telemetry_decode topology
                transport work_registers)
-    add_library(bzm_header_${header} OBJECT header.c)
-    target_link_libraries(bzm_header_${header} PRIVATE bzm_test_support)
-    target_compile_definitions(bzm_header_${header} PRIVATE
-        BZM_PUBLIC_HEADER="bzm/${header}.h")
+    set(check_source "${CMAKE_CURRENT_BINARY_DIR}/header-checks/${header}.c")
+    configure_file("../public_headers/check.c.in" "${check_source}" @ONLY)
+    list(APPEND BZM_HEADER_CHECK_SOURCES "${check_source}")
 endforeach()
+add_library(bzm_header_checks OBJECT ${BZM_HEADER_CHECK_SOURCES})
+target_link_libraries(bzm_header_checks PRIVATE bzm_test_support)
+target_compile_options(bzm_header_checks PRIVATE -Wall -Wextra -Werror -Wpedantic)

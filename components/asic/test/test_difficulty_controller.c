@@ -17,7 +17,7 @@ typedef struct GlobalState {
 #define difficulty_controller_update controller_test_update
 #define ASIC_set_difficulty controller_apply
 #define esp_timer_get_time controller_time
-#include "../../../main/difficulty_controller.c"
+#include "main/difficulty_controller.c"
 
 static int64_t now_us;
 static uint8_t applied_power;

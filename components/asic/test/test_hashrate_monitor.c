@@ -11,7 +11,7 @@
 #include "esp_heap_caps.h"
 
 #define TEST_STUB_GLOBAL_STATE_H
-#include "../../../main/global_state.h"
+#include "main/global_state.h"
 
 static unsigned allocations, fail_allocation, outstanding, deletes;
 static unsigned average_scan_checks;
@@ -63,9 +63,9 @@ static void monitor_delay_until(TickType_t *wake, TickType_t ticks);
 #define update_hash_counter monitor_update_counter
 #undef isnanf
 #define isnanf monitor_isnan
-#include "../../../main/tasks/hashrate_monitor_task.c"
+#include "main/tasks/hashrate_monitor_task.c"
 #define system_api_get_full_doc monitor_full_doc
-#include "../../../main/http_server/system_api_json.c"
+#include "main/http_server/system_api_json.c"
 
 static GlobalState *state;
 static jmp_buf task_done;

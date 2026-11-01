@@ -35,7 +35,7 @@
 #define create_jobs_refresh adapter_mock_refresh
 static BaseType_t adapter_create_task(TaskFunction_t task, const char *name, void *context, TaskHandle_t *handle);
 #define xTaskCreate(task, name, stack, context, priority, handle) adapter_create_task(task, name, context, handle)
-#include "../../bzm/port/esp/driver.c"
+#include "components/asic/bzm/port/esp/driver.c"
 
 static bool platform_ok, allocation_ok, task_ok, difficulty_ok;
 static uint8_t applied_difficulty;

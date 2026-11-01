@@ -83,7 +83,7 @@ static esp_err_t gpio_test_direction(gpio_num_t pin, gpio_mode_t mode)
 #define bzm_gpio_set_core_enabled gpio_test_core
 #define bzm_gpio_set_fan_percent gpio_test_fan
 #define bzm_gpio_get_fan_rpm gpio_test_rpm
-#include "../../bzm/port/esp/gpio.c"
+#include "components/asic/bzm/port/esp/gpio.c"
 
 static void gpio_fixture_with_pins(const bzm_control_pins_t *config)
 {

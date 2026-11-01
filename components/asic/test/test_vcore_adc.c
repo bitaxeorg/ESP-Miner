@@ -60,7 +60,7 @@ static esp_err_t adc_test_voltage(adc_cali_handle_t handle, int raw, int *voltag
 #define adc_oneshot_read adc_test_read
 #define adc_cali_raw_to_voltage adc_test_voltage
 #define TAG adc_tag
-#include "../../../main/adc.c"
+#include "main/adc.c"
 #undef TAG
 
 #define VCORE_init adc_test_vcore_init
@@ -87,7 +87,7 @@ static esp_err_t adc_test_voltage(adc_cali_handle_t handle, int raw, int *voltag
 #define CONFIG_GPIO_ASIC_ENABLE 10
 #define CONFIG_GPIO_PLUG_SENSE 12
 #define TAG vcore_tag
-#include "../../../main/power/vcore.c"
+#include "main/power/vcore.c"
 #undef TAG
 
 esp_err_t adc_test_bonanza_init(GlobalState *state, TPS546_CONFIG config)

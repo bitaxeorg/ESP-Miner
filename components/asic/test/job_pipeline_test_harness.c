@@ -9,7 +9,7 @@
 #include "global_state.h"
 #include "system.h"
 
-#include "../../../main/tasks/create_jobs_task.h"
+#include "main/tasks/create_jobs_task.h"
 
 static jmp_buf harness_exit;
 static const job_pipeline_harness_event_t *harness_events;
@@ -147,7 +147,7 @@ static void stub_difficulty_controller_update(GlobalState *state)
 #define ASIC_get_asic_job_frequency_ms stub_asic_get_job_frequency
 #define SYSTEM_decode_and_apply_coinbase spy_decode_coinbase
 #define difficulty_controller_update stub_difficulty_controller_update
-#include "../../../main/tasks/create_jobs_task.c"
+#include "main/tasks/create_jobs_task.c"
 #undef difficulty_controller_update
 #undef SYSTEM_decode_and_apply_coinbase
 #undef ASIC_get_asic_job_frequency_ms

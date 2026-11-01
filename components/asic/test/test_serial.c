@@ -33,7 +33,7 @@ static esp_err_t serial_test_uart_threshold(uart_port_t port, int threshold);
 #define SERIAL_debug_rx serial_test_debug_rx
 #define SERIAL_clear_buffer serial_test_clear
 #define TAG serial_test_shared_tag
-#include "../serial.c"
+#include "components/asic/serial.c"
 #undef TAG
 #define TAG serial_test_bzm_tag
 #define BZM_SERIAL_init serial_test_bzm_init
@@ -41,7 +41,7 @@ static esp_err_t serial_test_uart_threshold(uart_port_t port, int threshold);
 #define BZM_SERIAL_set_baud serial_test_bzm_baud
 #define BZM_SERIAL_wait_tx_done serial_test_bzm_wait
 #define BZM_SERIAL_rx serial_test_bzm_rx
-#include "../bzm/port/esp/serial.c"
+#include "components/asic/bzm/port/esp/serial.c"
 #undef TAG
 
 static bool installed;

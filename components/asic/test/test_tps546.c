@@ -70,7 +70,7 @@ static TickType_t tps_ticks(void) { return ticks; }
 #define i2c_master_receive tps_receive
 #define vTaskDelay tps_delay
 #define xTaskGetTickCount tps_ticks
-#include "../../../main/power/TPS546.c"
+#include "main/power/TPS546.c"
 
 static void reset_pmbus(void)
 {

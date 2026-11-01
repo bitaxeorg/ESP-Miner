@@ -10,7 +10,7 @@
 #define bzm_bringup_reference_tdm_control test_bringup_tdm_control
 #define bzm_bringup_reason_name test_bringup_reason_name
 #define bzm_bringup_live_frequency_domains_step test_bringup_frequency_step
-#include "../../bzm/bzm_bringup.c"
+#include "components/asic/bzm/bzm_bringup.c"
 #include "bzm/frequency.h"
 #include "bzm/registers.h"
 

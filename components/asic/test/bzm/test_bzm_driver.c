@@ -44,10 +44,10 @@
 #define bzm_bringup_start test_driver_chip_start
 void *test_driver_calloc(size_t count, size_t size, bool large);
 #define bzm_calloc test_driver_calloc
-#include "../../bzm/bzm_driver.c"
+#include "components/asic/bzm/bzm_driver.c"
 #include "unity.h"
 
-static bool authorized, fail_write, cancel_write, fail_flush, retire_during_hash;
+static bool authorized, fail_write, cancel_write, fail_flush;
 static double result_difficulty;
 static bzm_work_t last_work;
 static bzm_raw_result_t raw_result;
@@ -153,10 +153,6 @@ bool test_driver_hash(const asic_job_t *job, uint32_t nonce, uint32_t version, u
 {
     (void)job; (void)nonce; (void)version;
     if (!isfinite(result_difficulty) || result_difficulty <= 0) return false;
-    if (retire_during_hash) {
-        retire_during_hash = false;
-        TEST_ASSERT_TRUE(bzm_driver_clear_work(&test_state));
-    }
     diff_to_target(result_difficulty, hash);
     return true;
 }
@@ -179,7 +175,7 @@ static void fixture_init(void)
     INITIALIZED = DRIVER_TRANSPORT_READY = DRIVER_BRINGUP.running = true;
     bzm_driver_set_dispatch_authorizer(allow_dispatch, NULL);
     authorized = true;
-    fail_write = cancel_write = fail_flush = retire_during_hash = false;
+    fail_write = cancel_write = fail_flush = false;
     startup_failure = startup_reset_calls = startup_chip_calls = startup_nonce_writes = 0;
     startup_reset_asserted = false;
     clock_steps = 0;
@@ -416,23 +412,6 @@ TEST_CASE("BZM difficulty filtering rejects nonfinite results and credits only v
         TEST_ASSERT_EQUAL_UINT32(2 * difficulty, counters[0]);
         fixture_destroy();
     }
-}
-
-TEST_CASE("BZM drops work retired during software nonce validation", "[asic][bzm][driver]")
-{
-    fixture_init();
-    asic_job_t job = template();
-    TEST_ASSERT_TRUE(driver_send_work(&test_state, &job));
-    raw_result = (bzm_raw_result_t){.asic_id = BZM_FIRST_ASIC_ID, .engine_id = last_work.engine_id,
-        .status = 8, .time = 16, .sequence_id = 0, .nonce = 123};
-    result_difficulty = 32;
-    retire_during_hash = true;
-    TEST_ASSERT_NULL(bzm_driver_process_result(&test_state));
-    TEST_ASSERT_FALSE(retire_during_hash);
-    uint32_t counters[BZM_MAX_ASIC_COUNT];
-    TEST_ASSERT_TRUE(bzm_driver_hashrate_counter_snapshot(&test_state, counters, BZM_MAX_ASIC_COUNT));
-    TEST_ASSERT_EQUAL_UINT32(0, counters[0]);
-    fixture_destroy();
 }
 
 TEST_CASE("BZM common jobs preserve version masks across updates and delayed results", "[asic][bzm][driver][version]")

@@ -4,7 +4,7 @@
 #define bzm_control_set_asic_reset fixture_reset
 #define bzm_control_pulse_asic_reset fixture_pulse
 #define bzm_bringup_start fixture_chip_start
-#include "../../../bzm/bzm_driver.c"
+#include "components/asic/bzm/bzm_driver.c"
 
 static struct {
     int64_t now;

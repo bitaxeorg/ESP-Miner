@@ -21,7 +21,7 @@ static int vcore_gpio_level(gpio_num_t pin);
 #define TPS546_set_vout vcore_tps_set
 #define TPS546_snapshot_status vcore_tps_status
 #define TPS546_log_snapshot vcore_tps_log
-#include "../../../../main/power/bonanza_vcore.c"
+#include "main/power/bonanza_vcore.c"
 
 static bool core_enabled, five_volt_enabled, asic_running, fail_pgood;
 static bool fail_reset, fail_5v_off, fail_vout_off, fail_core_off, fail_fault_clear, fail_runtime_write;

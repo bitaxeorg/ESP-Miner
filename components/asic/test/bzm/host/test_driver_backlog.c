@@ -5,7 +5,7 @@
 #define bzm_control_set_asic_reset fixture_reset
 #define bzm_control_pulse_asic_reset fixture_pulse
 #define bzm_bringup_start fixture_chip_start
-#include "../../../bzm/bzm_driver.c"
+#include "components/asic/bzm/bzm_driver.c"
 
 /* Continuous production-baud 8N1 RX; assignment checkpoints and the idle service drain it. */
 /* Parsing is instantaneous; ESP scheduling, ISR, PSRAM and allocator delays are not modeled. */

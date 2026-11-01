@@ -8,7 +8,7 @@
 #define CONFIG_GPIO_I2C_SDA 12
 #undef CONFIG_GPIO_I2C_SCL
 #define CONFIG_GPIO_I2C_SCL 13
-#include "../../../main/device_pins.c"
+#include "main/device_pins.c"
 
 TEST_CASE("Bonanza control pins cannot conflict with the configured I2C bus", "[asic][bonanza][pins]")
 {

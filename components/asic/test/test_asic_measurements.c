@@ -1,13 +1,13 @@
 #include <stdlib.h>
 #include "unity.h"
 #define TEST_STUB_GLOBAL_STATE_H
-#include "../../../main/global_state.h"
+#include "main/global_state.h"
 #include "asic.h"
 
 #define ASIC_get_asic_measurement measurement_test_total
 #define ASIC_get_domain_measurement measurement_test_domain
 #define BZM_get_hashrate_measurement measurement_test_bzm
-#include "../asic_measurement.c"
+#include "components/asic/asic_measurement.c"
 
 static bool software_available;
 static uint8_t requested_asic;

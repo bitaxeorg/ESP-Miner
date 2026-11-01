@@ -58,6 +58,8 @@ int main(void)
     CHECK(ops.now_us(NULL) > 0);
     CHECK(ops.sha256 != NULL);
     CHECK(bzm_platform_bind(&ops, NULL));
+    CHECK(bzm_driver_clear_work(NULL));
+    CHECK(bzm_driver_read_temperature(NULL) == -1.0f);
     uint8_t digest[32];
     CHECK(bzm_sha256((const uint8_t *)"abc", 3, digest));
     CHECK(digest[0] == 0xba && digest[31] == 0xad);

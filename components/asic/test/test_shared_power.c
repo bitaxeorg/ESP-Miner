@@ -43,10 +43,10 @@ static esp_err_t shared_flush(uart_port_t port);
 #define POWER_MANAGEMENT_init_frequency shared_init_frequency
 #define POWER_MANAGEMENT_task shared_power_task
 #define TAG power_tag
-#include "../../../main/tasks/power_management_task.c"
+#include "main/tasks/power_management_task.c"
 #undef TAG
 #define TAG init_tag
-#include "../../../main/power/asic_init.c"
+#include "main/power/asic_init.c"
 #undef TAG
 
 static GlobalState state;

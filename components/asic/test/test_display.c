@@ -32,9 +32,9 @@ typedef struct GlobalState {
 #undef CONFIG_GPIO_I2C_SCL
 #define CONFIG_GPIO_I2C_SCL 13
 #define TAG display_test_config_tag
-#include "../../../main/device_config.c"
+#include "main/device_config.c"
 #undef TAG
-#include "../../../main/display.c"
+#include "main/display.c"
 
 static const char *saved_display;
 static unsigned display_reads, oled_inits, color_inits, virtual_displays, lvgl_inits;

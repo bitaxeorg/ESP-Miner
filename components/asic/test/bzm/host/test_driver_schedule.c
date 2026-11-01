@@ -7,7 +7,7 @@
 #define bzm_control_pulse_asic_reset fixture_pulse
 #define bzm_bringup_start fixture_chip_start
 #define bzm_bringup_live_frequency_domains_step fixture_clock_step
-#include "../../../bzm/bzm_driver.c"
+#include "components/asic/bzm/bzm_driver.c"
 
 static struct {
     int64_t now, tx_done;

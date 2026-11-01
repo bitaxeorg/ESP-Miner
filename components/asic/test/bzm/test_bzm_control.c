@@ -16,7 +16,7 @@ esp_err_t control_test_reset_pin(gpio_num_t pin);
 #define BZM_control_set_core_enabled control_test_core
 #define bzm_gpio_init control_test_gpio_init
 #define bzm_gpio_get_safety_status control_test_gpio_status
-#include "../../bzm/port/esp/control.c"
+#include "components/asic/bzm/port/esp/control.c"
 
 static unsigned init_calls;
 static esp_err_t init_result;
