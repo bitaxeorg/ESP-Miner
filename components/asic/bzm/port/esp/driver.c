@@ -3,6 +3,7 @@
 #include "bzm/esp.h"
 #include "bzm/result.h"
 #include "bzm/serial_buffers.h"
+#include "bzm/serial.h"
 #include "global_state.h"
 #include "create_jobs_task.h"
 #include <stdio.h>
@@ -46,7 +47,9 @@ static bzm_device_t device_view(GlobalState *state)
 }
 bool BZM_driver_state_init(GlobalState *state)
 {
-    if (!state || state->DEVICE_CONFIG.family.asic.id != BZM || !bzm_platform_esp_init()) return false;
+    if (!state || state->DEVICE_CONFIG.family.asic.id != BZM ||
+        BZM_SERIAL_set_pins(state->DEVICE_CONFIG.pins.asic_uart) != ESP_OK ||
+        !bzm_platform_esp_init()) return false;
     bzm_device_t device = device_view(state);
     return bzm_driver_state_init(&device);
 }

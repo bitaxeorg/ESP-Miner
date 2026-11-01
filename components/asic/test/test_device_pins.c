@@ -25,6 +25,9 @@ TEST_CASE("Bonanza 1004 supplies its control pin map through device configuratio
         if (strcmp(default_configs[i].board_version, "1004") == 0) config = default_configs[i];
     }
     TEST_ASSERT_EQUAL_PTR(&BONANZA_1004_CONTROL_PINS, config.pins.bzm);
+    TEST_ASSERT_EQUAL_PTR(&BONANZA_1004_UART_PINS, config.pins.asic_uart);
+    TEST_ASSERT_EQUAL(GPIO_NUM_17, config.pins.asic_uart->tx);
+    TEST_ASSERT_EQUAL(GPIO_NUM_18, config.pins.asic_uart->rx);
     const bzm_control_pins_t *pins = config.pins.bzm;
     TEST_ASSERT_EQUAL_INT(1, pins->reset);
     TEST_ASSERT_EQUAL_INT(2, pins->trip);
@@ -36,5 +39,32 @@ TEST_CASE("Bonanza 1004 supplies its control pin map through device configuratio
     TEST_ASSERT_EQUAL(ESP_OK, device_pins_init(&config.pins));
     for (unsigned i = 0; i < (sizeof(default_configs) / sizeof(default_configs[0])); ++i) {
         if (default_configs[i].family.id != BONANZA) TEST_ASSERT_NULL(default_configs[i].pins.bzm);
+    }
+}
+
+TEST_CASE("Configured ASIC UART pins participate in board conflict validation", "[asic][bonanza][pins]")
+{
+    const UartPins invalid[] = {
+        {.tx = GPIO_NUM_17, .rx = CONFIG_GPIO_I2C_SDA},
+        {.tx = GPIO_NUM_17, .rx = GPIO_NUM_2},
+        {.tx = GPIO_NUM_17, .rx = GPIO_NUM_17},
+        {.tx = GPIO_NUM_NC, .rx = GPIO_NUM_18},
+        {.tx = GPIO_NUM_17, .rx = GPIO_NUM_NC},
+        {.tx = GPIO_NUM_MAX, .rx = GPIO_NUM_18},
+        {.tx = GPIO_NUM_17, .rx = GPIO_NUM_MAX},
+    };
+    for (unsigned i = 0; i < sizeof(invalid) / sizeof(invalid[0]); ++i) {
+        DevicePins config = {.i2c = &DEFAULT_I2C_PINS, .bzm = &BONANZA_1004_CONTROL_PINS, .asic_uart = &invalid[i]};
+        TEST_ASSERT_EQUAL(ESP_ERR_INVALID_STATE, device_pins_init(&config));
+    }
+}
+
+TEST_CASE("Existing Bitmain boards retain their legacy UART configuration", "[asic][pins]")
+{
+    for (unsigned i = 0; i < sizeof(default_configs) / sizeof(default_configs[0]); ++i) {
+        DeviceConfig config = default_configs[i];
+        if (config.family.asic.id == BZM) continue;
+        TEST_ASSERT_NULL(config.pins.asic_uart);
+        TEST_ASSERT_EQUAL(ESP_OK, device_pins_init(&config.pins));
     }
 }

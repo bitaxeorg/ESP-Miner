@@ -9,11 +9,21 @@ static int serial_test_uart_read(uart_port_t port, void *buf, uint32_t size, uin
 static int serial_test_uart_write(uart_port_t port, const void *data, size_t size);
 static bool serial_test_uart_ready(uart_port_t port);
 static void serial_test_hex(unsigned char *data, int size);
+static esp_err_t serial_test_uart_config(uart_port_t port, const uart_config_t *config);
+static esp_err_t serial_test_uart_pins(uart_port_t port, int tx, int rx, int rts, int cts);
+static esp_err_t serial_test_uart_install(uart_port_t port, int rx_size, int tx_size, int queue_size,
+                                          QueueHandle_t *queue, int flags);
+static esp_err_t serial_test_uart_threshold(uart_port_t port, int threshold);
 
 #define uart_read_bytes serial_test_uart_read
 #define uart_write_bytes serial_test_uart_write
 #define uart_is_driver_installed serial_test_uart_ready
 #define prettyHex serial_test_hex
+#define uart_param_config serial_test_uart_config
+#undef uart_set_pin
+#define uart_set_pin serial_test_uart_pins
+#define uart_driver_install serial_test_uart_install
+#define uart_set_rx_full_threshold serial_test_uart_threshold
 #define SERIAL_init serial_test_init
 #define SERIAL_is_initialized serial_test_ready
 #define SERIAL_set_baud serial_test_baud
@@ -27,6 +37,7 @@ static void serial_test_hex(unsigned char *data, int size);
 #undef TAG
 #define TAG serial_test_bzm_tag
 #define BZM_SERIAL_init serial_test_bzm_init
+#define BZM_SERIAL_set_pins serial_test_bzm_set_pins
 #define BZM_SERIAL_set_baud serial_test_bzm_baud
 #define BZM_SERIAL_wait_tx_done serial_test_bzm_wait
 #define BZM_SERIAL_rx serial_test_bzm_rx
@@ -39,6 +50,8 @@ static int read_result, write_result;
 static uint32_t received_ticks;
 static size_t received_size;
 static const void *received_data;
+static unsigned init_calls;
+static int configured_tx, configured_rx;
 
 static void fixture(void)
 {
@@ -48,6 +61,46 @@ static void fixture(void)
     received_ticks = 0;
     received_size = 0;
     received_data = NULL;
+    init_calls = 0;
+    configured_tx = configured_rx = -1;
+    uart_pins_bound = false;
+}
+
+static esp_err_t serial_test_uart_config(uart_port_t port, const uart_config_t *config)
+{
+    TEST_ASSERT_EQUAL(UART_NUM_1, port);
+    TEST_ASSERT_NOT_NULL(config);
+    ++init_calls;
+    return ESP_OK;
+}
+
+static esp_err_t serial_test_uart_pins(uart_port_t port, int tx, int rx, int rts, int cts)
+{
+    TEST_ASSERT_EQUAL(UART_NUM_1, port);
+    TEST_ASSERT_EQUAL(UART_PIN_NO_CHANGE, rts);
+    TEST_ASSERT_EQUAL(UART_PIN_NO_CHANGE, cts);
+    configured_tx = tx;
+    configured_rx = rx;
+    return ESP_OK;
+}
+
+static esp_err_t serial_test_uart_install(uart_port_t port, int rx_size, int tx_size, int queue_size,
+                                          QueueHandle_t *queue, int flags)
+{
+    TEST_ASSERT_EQUAL(UART_NUM_1, port);
+    TEST_ASSERT_GREATER_THAN(0, rx_size);
+    TEST_ASSERT_GREATER_THAN(0, tx_size);
+    TEST_ASSERT_EQUAL_INT(0, queue_size);
+    TEST_ASSERT_NULL(queue);
+    TEST_ASSERT_EQUAL_INT(0, flags);
+    return ESP_OK;
+}
+
+static esp_err_t serial_test_uart_threshold(uart_port_t port, int threshold)
+{
+    TEST_ASSERT_EQUAL(UART_NUM_1, port);
+    TEST_ASSERT_EQUAL_INT(BZM_SERIAL_RX_FIFO_FULL_THRESHOLD, threshold);
+    return ESP_OK;
 }
 
 static int serial_test_uart_read(uart_port_t port, void *buf, uint32_t size, uint32_t ticks)
@@ -101,6 +154,48 @@ TEST_CASE("Shared serial preserves Bitmain timeout truncation", "[asic][serial]"
         TEST_ASSERT_EQUAL_PTR(buf, received_data);
         TEST_ASSERT_EQUAL_UINT32(sizeof(buf), received_size);
     }
+}
+
+TEST_CASE("BZM UART uses a configured pin copy while Bitmain retains its original pins", "[asic][serial][bzm]")
+{
+    fixture();
+    UartPins pins = {.tx = GPIO_NUM_14, .rx = GPIO_NUM_15};
+    TEST_ASSERT_EQUAL(ESP_OK, serial_test_bzm_set_pins(&pins));
+    pins.tx = GPIO_NUM_16;
+    TEST_ASSERT_EQUAL(ESP_OK, serial_test_bzm_init());
+    TEST_ASSERT_EQUAL_INT(14, configured_tx);
+    TEST_ASSERT_EQUAL_INT(15, configured_rx);
+    TEST_ASSERT_EQUAL(ESP_OK, serial_test_init());
+    TEST_ASSERT_EQUAL_INT(17, configured_tx);
+    TEST_ASSERT_EQUAL_INT(18, configured_rx);
+}
+
+TEST_CASE("BZM UART rejects missing invalid or changed pins before initialization", "[asic][serial][bzm]")
+{
+    fixture();
+    TEST_ASSERT_EQUAL(ESP_ERR_INVALID_STATE, serial_test_bzm_init());
+    TEST_ASSERT_EQUAL(ESP_ERR_INVALID_ARG, serial_test_bzm_set_pins(NULL));
+    const UartPins invalid[] = {
+        {.tx = GPIO_NUM_NC, .rx = GPIO_NUM_18},
+        {.tx = GPIO_NUM_17, .rx = GPIO_NUM_NC},
+        {.tx = GPIO_NUM_17, .rx = GPIO_NUM_17},
+        {.tx = GPIO_NUM_MAX, .rx = GPIO_NUM_18},
+        {.tx = GPIO_NUM_17, .rx = GPIO_NUM_MAX},
+    };
+    for (unsigned i = 0; i < sizeof(invalid) / sizeof(invalid[0]); ++i) {
+        TEST_ASSERT_EQUAL(ESP_ERR_INVALID_ARG, serial_test_bzm_set_pins(&invalid[i]));
+    }
+    TEST_ASSERT_EQUAL_UINT32(0, init_calls);
+    const UartPins pins = {.tx = GPIO_NUM_17, .rx = GPIO_NUM_18};
+    const UartPins changed = {.tx = GPIO_NUM_14, .rx = GPIO_NUM_15};
+    TEST_ASSERT_EQUAL(ESP_OK, serial_test_bzm_set_pins(&pins));
+    TEST_ASSERT_EQUAL(ESP_OK, serial_test_bzm_set_pins(&pins));
+    TEST_ASSERT_EQUAL(ESP_ERR_INVALID_STATE, serial_test_bzm_set_pins(&changed));
+    TEST_ASSERT_EQUAL(ESP_OK, serial_test_bzm_init());
+    TEST_ASSERT_EQUAL_INT(17, configured_tx);
+    TEST_ASSERT_EQUAL_INT(18, configured_rx);
+    TEST_ASSERT_EQUAL(ESP_OK, serial_test_bzm_set_pins(&pins));
+    TEST_ASSERT_EQUAL(ESP_ERR_INVALID_STATE, serial_test_bzm_set_pins(&changed));
 }
 
 TEST_CASE("BZM shared serial retains a tick for short nonzero waits", "[asic][serial][bzm]")

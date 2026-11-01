@@ -14,6 +14,11 @@ const bzm_control_pins_t BONANZA_1004_CONTROL_PINS = {
     .five_volt_enable = GPIO_NUM_21,
 };
 
+const UartPins BONANZA_1004_UART_PINS = {
+    .tx = GPIO_NUM_17,
+    .rx = GPIO_NUM_18,
+};
+
 const BapPins DEFAULT_BAP_PINS = {
     .tx = GPIO_NUM_39,
     .rx = GPIO_NUM_40,
@@ -65,6 +70,15 @@ static esp_err_t device_pins_validate(const DevicePins * pins)
     if (pins->bap) {
         if (check_pin(pins->bap->tx, "BAP TX", &allocated_pins_mask) != ESP_OK) status = ESP_ERR_INVALID_STATE;
         if (check_pin(pins->bap->rx, "BAP RX", &allocated_pins_mask) != ESP_OK) status = ESP_ERR_INVALID_STATE;
+    }
+
+    if (pins->asic_uart) {
+        if (!GPIO_IS_VALID_OUTPUT_GPIO(pins->asic_uart->tx) || pins->asic_uart->rx == GPIO_NUM_NC) {
+            ESP_LOGE(TAG, "ASIC UART requires an output-capable TX and a connected RX");
+            status = ESP_ERR_INVALID_STATE;
+        }
+        if (check_pin(pins->asic_uart->tx, "ASIC UART TX", &allocated_pins_mask) != ESP_OK) status = ESP_ERR_INVALID_STATE;
+        if (check_pin(pins->asic_uart->rx, "ASIC UART RX", &allocated_pins_mask) != ESP_OK) status = ESP_ERR_INVALID_STATE;
     }
 
     if (pins->i2c) {

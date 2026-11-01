@@ -14,6 +14,11 @@ typedef struct {
 } BapPins;
 
 typedef struct {
+    gpio_num_t tx;
+    gpio_num_t rx;
+} UartPins;
+
+typedef struct {
     gpio_num_t sda;
     gpio_num_t scl;
 } I2cPins;
@@ -35,6 +40,7 @@ typedef struct {
     const I2cPins * oled; // Optional OLED connection on the shared I2C bus.
     const I80Pins * i80;
     const bzm_control_pins_t * bzm;
+    const UartPins * asic_uart; // Optional; currently consumed by the Bonanza UART adapter.
 } DevicePins;
 
 extern const BapPins DEFAULT_BAP_PINS;
@@ -42,6 +48,7 @@ extern const I2cPins DEFAULT_I2C_PINS;
 extern const I2cPins BITAXE_COLOR_I2C_PINS;
 extern const I80Pins ST7789_I80_PINS;
 extern const bzm_control_pins_t BONANZA_1004_CONTROL_PINS;
+extern const UartPins BONANZA_1004_UART_PINS;
 
 #define BITAXE_ORIGINAL_DEVICE_PINS { .bap = &DEFAULT_BAP_PINS, .i2c = &DEFAULT_I2C_PINS, .oled = &DEFAULT_I2C_PINS, .i80 = NULL }
 #define BITAXE_COLOR_DEVICE_PINS    { .bap = NULL,              .i2c = &BITAXE_COLOR_I2C_PINS, .oled = NULL, .i80 = &ST7789_I80_PINS }

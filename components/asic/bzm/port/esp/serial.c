@@ -2,6 +2,7 @@
 #include "freertos/task.h"
 
 #include "driver/uart.h"
+#include "driver/gpio.h"
 
 #include "esp_log.h"
 
@@ -9,13 +10,29 @@
 #include "serial.h"
 #include "serial_internal.h"
 
-#define ECHO_TEST_TXD (17)
-#define ECHO_TEST_RXD (18)
-
 static const char * TAG = "serial";
+static UartPins uart_pins;
+static bool uart_pins_bound;
+
+esp_err_t BZM_SERIAL_set_pins(const UartPins * pins)
+{
+    if (pins == NULL || !GPIO_IS_VALID_OUTPUT_GPIO(pins->tx) ||
+        !GPIO_IS_VALID_GPIO(pins->rx) || pins->tx == pins->rx) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    if (uart_pins_bound) {
+        return uart_pins.tx == pins->tx && uart_pins.rx == pins->rx ? ESP_OK : ESP_ERR_INVALID_STATE;
+    }
+    uart_pins = *pins;
+    uart_pins_bound = true;
+    return ESP_OK;
+}
 
 esp_err_t BZM_SERIAL_init(void)
 {
+    if (!uart_pins_bound) {
+        return ESP_ERR_INVALID_STATE;
+    }
     ESP_LOGI(TAG, "Initializing serial");
     // Configure UART1 parameters
     uart_config_t uart_config = {
@@ -31,8 +48,7 @@ esp_err_t BZM_SERIAL_init(void)
     if (err != ESP_OK) {
         return err;
     }
-    // Set UART1 pins(TX: IO17, RX: I018)
-    err = uart_set_pin(UART_NUM_1, ECHO_TEST_TXD, ECHO_TEST_RXD, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
+    err = uart_set_pin(UART_NUM_1, uart_pins.tx, uart_pins.rx, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
     if (err != ESP_OK) {
         return err;
     }

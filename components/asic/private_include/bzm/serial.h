@@ -5,6 +5,7 @@
 #include <stdint.h>
 
 #include "esp_err.h"
+#include "device_pins.h"
 #include "bzm/serial_buffers.h"
 #include "bzm/protocol.h"
 
@@ -27,6 +28,8 @@ static inline bool BZM_SERIAL_fifo_reserve_covers(uint32_t fifo_bytes,
            (uint64_t) bytes_per_second * latency_us;
 }
 
+// Bind the board map before UART initialization; repeated identical maps are allowed.
+esp_err_t BZM_SERIAL_set_pins(const UartPins * pins);
 esp_err_t BZM_SERIAL_init(void);
 int16_t BZM_SERIAL_rx(uint8_t *, uint16_t, uint16_t);
 esp_err_t BZM_SERIAL_set_baud(int baud);

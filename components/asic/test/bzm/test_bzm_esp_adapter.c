@@ -27,6 +27,7 @@
 #define BZM_poll adapter_test_poll
 
 #define bzm_platform_esp_init adapter_mock_platform_init
+#define BZM_SERIAL_set_pins adapter_mock_uart_pins
 #define bzm_driver_state_init adapter_mock_state_init
 #define bzm_driver_init adapter_mock_init
 #define bzm_driver_set_difficulty adapter_mock_set_difficulty
@@ -44,6 +45,16 @@ static unsigned task_calls, reset_calls;
 static bzm_device_t last_device;
 static bzm_result_t share;
 static GlobalState *refresh_state;
+static const UartPins *bound_uart_pins;
+static esp_err_t uart_bind_result;
+static unsigned uart_bind_calls;
+
+esp_err_t adapter_mock_uart_pins(const UartPins *pins)
+{
+    ++uart_bind_calls;
+    bound_uart_pins = pins;
+    return pins ? uart_bind_result : ESP_ERR_INVALID_ARG;
+}
 
 void adapter_mock_refresh(GlobalState *state) { refresh_state = state; }
 
@@ -75,12 +86,35 @@ static BaseType_t adapter_create_task(TaskFunction_t task, const char *name, voi
     return pdPASS;
 }
 
+TEST_CASE("BZM ESP adapter binds board UART pins and rejects configuration failures", "[asic][bzm][adapter]")
+{
+    GlobalState state = {0};
+    uart_bind_calls = 0;
+    uart_bind_result = ESP_OK;
+    platform_ok = allocation_ok = true;
+    state.DEVICE_CONFIG.family.asic.id = BM1370;
+    TEST_ASSERT_FALSE(BZM_driver_state_init(&state));
+    TEST_ASSERT_EQUAL_UINT32(0, uart_bind_calls);
+    state.DEVICE_CONFIG.family.asic.id = BZM;
+    TEST_ASSERT_FALSE(BZM_driver_state_init(&state));
+    TEST_ASSERT_NULL(bound_uart_pins);
+    const UartPins custom = {.tx = GPIO_NUM_14, .rx = GPIO_NUM_15};
+    state.DEVICE_CONFIG.pins.asic_uart = &custom;
+    uart_bind_result = ESP_ERR_INVALID_ARG;
+    TEST_ASSERT_FALSE(BZM_driver_state_init(&state));
+    uart_bind_result = ESP_OK;
+    TEST_ASSERT_TRUE(BZM_driver_state_init(&state));
+    TEST_ASSERT_EQUAL_PTR(&custom, bound_uart_pins);
+}
+
 TEST_CASE("BZM ESP adapter owns task retry, application callbacks and result conversion", "[asic][bzm][adapter]")
 {
     GlobalState state = {0};
     state.DEVICE_CONFIG.family.asic.id = BZM;
     state.DEVICE_CONFIG.family.asic.core_count = 236;
     state.DEVICE_CONFIG.family.asic_count = 4;
+    state.DEVICE_CONFIG.pins.asic_uart = &BONANZA_1004_UART_PINS;
+    uart_bind_result = ESP_OK;
     state.ASIC_initalized = true;
     TEST_ASSERT_EQUAL_UINT8(0, BZM_init(NULL));
     platform_ok = false;
@@ -98,6 +132,7 @@ TEST_CASE("BZM ESP adapter owns task retry, application callbacks and result con
     TEST_ASSERT_EQUAL_UINT32(1, reset_calls);
     task_ok = true;
     TEST_ASSERT_EQUAL_UINT8(4, BZM_init(&state));
+    TEST_ASSERT_EQUAL_PTR(state.DEVICE_CONFIG.pins.asic_uart, bound_uart_pins);
     TEST_ASSERT_EQUAL_UINT8(4, BZM_init(&state));
     TEST_ASSERT_EQUAL_UINT32(2, task_calls);
     TEST_ASSERT_EQUAL_FLOAT(800, state.POWER_MANAGEMENT_MODULE.actual_frequency);
