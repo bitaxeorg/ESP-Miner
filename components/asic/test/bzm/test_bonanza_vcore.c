@@ -30,7 +30,7 @@ static unsigned rail_starts, voltage_writes, fault_clears;
 static char operations[64];
 static unsigned operation_count;
 static GlobalState state;
-static bzm_control_pins_t configured_pins;
+static BzmPins configured_pins;
 
 static void record_operation(char operation)
 {
@@ -39,7 +39,7 @@ static void record_operation(char operation)
     operations[operation_count] = '\0';
 }
 
-esp_err_t vcore_control_init(const char *version, const bzm_control_pins_t *pins)
+esp_err_t vcore_control_init(const char *version, const BzmPins *pins)
 {
     TEST_ASSERT_EQUAL_STRING("1004", version);
     TEST_ASSERT_EQUAL_PTR(state.DEVICE_CONFIG.pins.bzm, pins);
@@ -85,7 +85,7 @@ bool vcore_hold_reset(void)
 bool vcore_asic_state(bzm_bringup_state_t *asic) { *asic = (bzm_bringup_state_t){.running = asic_running}; return true; }
 static int vcore_gpio_level(gpio_num_t pin)
 {
-    TEST_ASSERT_EQUAL_INT(configured_pins.pgood, pin);
+    TEST_ASSERT_EQUAL_INT(configured_pins.core_power_good, pin);
     return !fail_pgood && core_enabled && rail_voltage > 0;
 }
 esp_err_t vcore_tps_init(TPS546_CONFIG value) { (void)value; return ESP_OK; }
@@ -225,7 +225,7 @@ TEST_CASE("Bonanza startup cannot enable the rail when fault clearing fails", "[
 TEST_CASE("Bonanza power validation uses the configured PGOOD pin", "[asic][bonanza][vcore]")
 {
     fixture();
-    configured_pins.pgood = GPIO_NUM_12;
+    configured_pins.core_power_good = GPIO_NUM_12;
     TEST_ASSERT_EQUAL(ESP_OK, test_vcore_set_voltage(&state, 2.8f));
     asic_running = true;
     TEST_ASSERT_EQUAL(ESP_OK, test_vcore_set_voltage(&state, 2.9f));

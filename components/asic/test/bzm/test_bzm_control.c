@@ -28,7 +28,7 @@ esp_err_t control_test_reset_pin(gpio_num_t pin)
     reset_pins[pin_reset_calls++] = pin;
     return pin_reset_calls == fail_pin_reset ? ESP_FAIL : ESP_OK;
 }
-esp_err_t control_test_gpio_init(const bzm_control_pins_t *pins)
+esp_err_t control_test_gpio_init(const BzmPins *pins)
 {
     TEST_ASSERT_EQUAL_PTR(&BONANZA_1004_CONTROL_PINS, pins);
     ++init_calls;

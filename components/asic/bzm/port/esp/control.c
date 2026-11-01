@@ -6,7 +6,7 @@
 
 static bool initialized;
 
-esp_err_t BZM_control_init(const char *board_version, const bzm_control_pins_t *pins)
+esp_err_t BZM_control_init(const char *board_version, const BzmPins *pins)
 {
     if (board_version == NULL || strcmp(board_version, "1004") != 0) return ESP_ERR_NOT_SUPPORTED;
     if (initialized) return pins == NULL ? ESP_OK : bzm_gpio_init(pins);

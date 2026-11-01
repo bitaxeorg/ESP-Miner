@@ -3,7 +3,7 @@
 
 #include "bzm/control.h"
 
-esp_err_t bzm_gpio_init(const bzm_control_pins_t *pins);
+esp_err_t bzm_gpio_init(const BzmPins *pins);
 esp_err_t bzm_gpio_get_safety_status(bzm_control_status_t *status);
 esp_err_t bzm_gpio_clear_safety_fault(bzm_control_status_t *status);
 esp_err_t bzm_gpio_safe_off(bzm_control_status_t *status);

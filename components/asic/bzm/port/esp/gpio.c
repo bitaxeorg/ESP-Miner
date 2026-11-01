@@ -18,7 +18,7 @@ static const char *TAG = "bonanza_gpio";
 static portMUX_TYPE lock = portMUX_INITIALIZER_UNLOCKED;
 static pthread_mutex_t fan_lock = PTHREAD_MUTEX_INITIALIZER;
 static bool ready, pwm_ready, pins_bound;
-static bzm_control_pins_t pins;
+static BzmPins pins;
 static bzm_control_fault_t fault;
 static int64_t tach_window_start_us, tach_sample_us;
 static uint32_t tach_edges;
@@ -32,15 +32,15 @@ static esp_timer_handle_t monitor_timer;
 static void safe_outputs_locked(void)
 {
     gpio_set_level(pins.core_enable, 0);
-    gpio_set_level(pins.reset, 0);
-    gpio_set_level(pins.five_volt_enable, 0);
+    gpio_set_level(pins.asic_reset, 0);
+    gpio_set_level(pins.enable_5v, 0);
     if (pwm_ready) ledc_stop(FAN_MODE, FAN_CHANNEL, 0);
     fan_percent = 100; /* Q1 inverts: a low gate releases the fan PWM high. */
 }
 
 static void check_locked(void)
 {
-    if (gpio_get_level(pins.trip)) {
+    if (gpio_get_level(pins.asic_trip)) {
         fault = BZM_CONTROL_FAULT_ASIC_TRIP;
         safe_outputs_locked();
     }
@@ -53,7 +53,7 @@ static void trip_isr(void *arg)
     /* Power-up can produce a trip edge while the ASICs are held in reset.
      * A sustained trip still fails check_locked(), including before reset
      * release. Once released, latch even a pulse that has already ended. */
-    if (gpio_get_level(pins.reset)) {
+    if (gpio_get_level(pins.asic_reset)) {
         fault = BZM_CONTROL_FAULT_ASIC_TRIP;
         safe_outputs_locked();
     }
@@ -84,40 +84,40 @@ static void monitor(void *arg)
     portEXIT_CRITICAL(&lock);
 }
 
-esp_err_t bzm_gpio_init(const bzm_control_pins_t *pin_config)
+esp_err_t bzm_gpio_init(const BzmPins *pin_config)
 {
     if (pin_config == NULL) return ESP_ERR_INVALID_ARG;
-    const int required[] = {pin_config->reset, pin_config->trip, pin_config->fan_pwm,
-        pin_config->fan_tach, pin_config->core_enable, pin_config->pgood, pin_config->five_volt_enable};
+    const gpio_num_t required[] = {pin_config->asic_reset, pin_config->asic_trip, pin_config->fan_pwm,
+        pin_config->fan_tach, pin_config->core_enable, pin_config->core_power_good, pin_config->enable_5v};
     uint64_t allocated = 0;
     for (unsigned i = 0; i < sizeof(required) / sizeof(required[0]); ++i) {
         if (!GPIO_IS_VALID_GPIO(required[i]) || (allocated & (1ULL << required[i]))) return ESP_ERR_INVALID_ARG;
         allocated |= 1ULL << required[i];
     }
-    if (!GPIO_IS_VALID_OUTPUT_GPIO(pin_config->reset) || !GPIO_IS_VALID_OUTPUT_GPIO(pin_config->fan_pwm) ||
-        !GPIO_IS_VALID_OUTPUT_GPIO(pin_config->core_enable) || !GPIO_IS_VALID_OUTPUT_GPIO(pin_config->five_volt_enable))
+    if (!GPIO_IS_VALID_OUTPUT_GPIO(pin_config->asic_reset) || !GPIO_IS_VALID_OUTPUT_GPIO(pin_config->fan_pwm) ||
+        !GPIO_IS_VALID_OUTPUT_GPIO(pin_config->core_enable) || !GPIO_IS_VALID_OUTPUT_GPIO(pin_config->enable_5v))
         return ESP_ERR_INVALID_ARG;
-    if (pins_bound && (pins.reset != pin_config->reset || pins.trip != pin_config->trip ||
+    if (pins_bound && (pins.asic_reset != pin_config->asic_reset || pins.asic_trip != pin_config->asic_trip ||
         pins.fan_pwm != pin_config->fan_pwm || pins.fan_tach != pin_config->fan_tach ||
-        pins.core_enable != pin_config->core_enable || pins.pgood != pin_config->pgood ||
-        pins.five_volt_enable != pin_config->five_volt_enable)) return ESP_ERR_INVALID_STATE;
+        pins.core_enable != pin_config->core_enable || pins.core_power_good != pin_config->core_power_good ||
+        pins.enable_5v != pin_config->enable_5v)) return ESP_ERR_INVALID_STATE;
     if (ready) return ESP_OK;
     // Retain the map even after partial initialization; registered ISRs must not be retargeted.
     pins = *pin_config;
     pins_bound = true;
-    const uint64_t outputs = (1ULL << pins.reset) | (1ULL << pins.five_volt_enable) |
+    const uint64_t outputs = (1ULL << pins.asic_reset) | (1ULL << pins.enable_5v) |
                              (1ULL << pins.core_enable) | (1ULL << pins.fan_pwm);
-    gpio_set_level(pins.reset, 0);
-    gpio_set_level(pins.five_volt_enable, 0);
+    gpio_set_level(pins.asic_reset, 0);
+    gpio_set_level(pins.enable_5v, 0);
     gpio_set_level(pins.core_enable, 0);
     gpio_set_level(pins.fan_pwm, 0);
     gpio_config_t config = {.pin_bit_mask = outputs, .mode = GPIO_MODE_INPUT_OUTPUT};
     ESP_RETURN_ON_ERROR(gpio_config(&config), TAG, "safe output configuration failed");
-    config = (gpio_config_t){.pin_bit_mask = (1ULL << pins.trip) | (1ULL << pins.fan_tach) |
-                                           (1ULL << pins.pgood), .mode = GPIO_MODE_INPUT};
+    config = (gpio_config_t){.pin_bit_mask = (1ULL << pins.asic_trip) | (1ULL << pins.fan_tach) |
+                                           (1ULL << pins.core_power_good), .mode = GPIO_MODE_INPUT};
     ESP_RETURN_ON_ERROR(gpio_config(&config), TAG, "input configuration failed");
     /* The level shifter is high impedance while its ASIC-side rail is off. */
-    config = (gpio_config_t){.pin_bit_mask = 1ULL << pins.trip, .mode = GPIO_MODE_INPUT,
+    config = (gpio_config_t){.pin_bit_mask = 1ULL << pins.asic_trip, .mode = GPIO_MODE_INPUT,
                             .pull_down_en = GPIO_PULLDOWN_ENABLE};
     ESP_RETURN_ON_ERROR(gpio_config(&config), TAG, "trip pull-down configuration failed");
     ledc_timer_config_t timer = {.speed_mode = FAN_MODE, .timer_num = FAN_TIMER,
@@ -128,8 +128,8 @@ esp_err_t bzm_gpio_init(const bzm_control_pins_t *pin_config)
     ESP_RETURN_ON_ERROR(ledc_channel_config(&channel), TAG, "fan PWM configuration failed");
     pwm_ready = true;
     ESP_RETURN_ON_ERROR(ledc_stop(FAN_MODE, FAN_CHANNEL, 0), TAG, "full fan speed failed");
-    ESP_RETURN_ON_ERROR(gpio_set_intr_type(pins.trip, GPIO_INTR_POSEDGE), TAG, "trip interrupt failed");
-    ESP_RETURN_ON_ERROR(gpio_isr_handler_add(pins.trip, trip_isr, NULL), TAG, "trip handler failed");
+    ESP_RETURN_ON_ERROR(gpio_set_intr_type(pins.asic_trip, GPIO_INTR_POSEDGE), TAG, "trip interrupt failed");
+    ESP_RETURN_ON_ERROR(gpio_isr_handler_add(pins.asic_trip, trip_isr, NULL), TAG, "trip handler failed");
     ESP_RETURN_ON_ERROR(gpio_set_intr_type(pins.fan_tach, GPIO_INTR_NEGEDGE), TAG, "tach interrupt failed");
     ESP_RETURN_ON_ERROR(gpio_isr_handler_add(pins.fan_tach, tach_isr, NULL), TAG, "tach handler failed");
     tach_window_start_us = esp_timer_get_time();
@@ -142,9 +142,9 @@ esp_err_t bzm_gpio_init(const bzm_control_pins_t *pin_config)
 
 static void status_locked(bzm_control_status_t *status)
 {
-    bool five_volt = gpio_get_level(pins.five_volt_enable) != 0;
-    bool reset = gpio_get_level(pins.reset) == 0;
-    bool trip = gpio_get_level(pins.trip) != 0;
+    bool five_volt = gpio_get_level(pins.enable_5v) != 0;
+    bool reset = gpio_get_level(pins.asic_reset) == 0;
+    bool trip = gpio_get_level(pins.asic_trip) != 0;
     bool core_enabled = gpio_get_level(pins.core_enable) != 0;
     bool outputs_safe = !five_volt && reset && fan_percent == 100 && !core_enabled;
     *status = (bzm_control_status_t){
@@ -168,9 +168,9 @@ static esp_err_t safety_command(enum command command, bzm_control_status_t *stat
     check_locked();
     if (command == SAFE_OFF) safe_outputs_locked();
     if (command == CLEAR) {
-        if (gpio_get_level(pins.trip) || gpio_get_level(pins.core_enable) ||
-            gpio_get_level(pins.pgood) || gpio_get_level(pins.five_volt_enable) ||
-            gpio_get_level(pins.reset) || fan_percent != 100) err = ESP_ERR_INVALID_STATE;
+        if (gpio_get_level(pins.asic_trip) || gpio_get_level(pins.core_enable) ||
+            gpio_get_level(pins.core_power_good) || gpio_get_level(pins.enable_5v) ||
+            gpio_get_level(pins.asic_reset) || fan_percent != 100) err = ESP_ERR_INVALID_STATE;
         else fault = BZM_CONTROL_FAULT_NONE;
     }
     status_locked(status);
@@ -194,14 +194,14 @@ static esp_err_t set_output(gpio_num_t pin, bool enabled)
     portENTER_CRITICAL(&lock);
     check_locked();
     if (enabled && (fault != BZM_CONTROL_FAULT_NONE ||
-        (pin == pins.reset && !gpio_get_level(pins.five_volt_enable)) ||
-        (pin == pins.five_volt_enable && (gpio_get_level(pins.reset) || fan_percent != 100)))) err = ESP_ERR_INVALID_STATE;
+        (pin == pins.asic_reset && !gpio_get_level(pins.enable_5v)) ||
+        (pin == pins.enable_5v && (gpio_get_level(pins.asic_reset) || fan_percent != 100)))) err = ESP_ERR_INVALID_STATE;
     else if (pin == pins.core_enable && !enabled) {
         safe_outputs_locked();
         err = ESP_OK;
     } else {
         err = ESP_OK;
-        if (pin == pins.five_volt_enable && !enabled) err = gpio_set_level(pins.reset, 0);
+        if (pin == pins.enable_5v && !enabled) err = gpio_set_level(pins.asic_reset, 0);
         if (err == ESP_OK) err = gpio_set_level(pin, enabled);
     }
     portEXIT_CRITICAL(&lock);
@@ -215,7 +215,7 @@ static esp_err_t apply_fan_percent(uint8_t requested)
     esp_err_t err = ledc_set_duty(FAN_MODE, FAN_CHANNEL, duty);
     portENTER_CRITICAL(&lock);
     check_locked();
-    if (fault != BZM_CONTROL_FAULT_NONE || !gpio_get_level(pins.reset)) requested = 100;
+    if (fault != BZM_CONTROL_FAULT_NONE || !gpio_get_level(pins.asic_reset)) requested = 100;
     if (err == ESP_OK) {
         err = requested == 100 ? ledc_stop(FAN_MODE, FAN_CHANNEL, 0) : ledc_update_duty(FAN_MODE, FAN_CHANNEL);
         if (err == ESP_OK) fan_percent = requested;
@@ -224,13 +224,13 @@ static esp_err_t apply_fan_percent(uint8_t requested)
     return err;
 }
 
-esp_err_t bzm_gpio_set_5v_enabled(bool enabled) { return set_output(pins.five_volt_enable, enabled); }
+esp_err_t bzm_gpio_set_5v_enabled(bool enabled) { return set_output(pins.enable_5v, enabled); }
 esp_err_t bzm_gpio_set_asic_reset(bool high)
 {
     if (!ready) return ESP_ERR_INVALID_STATE;
     pthread_mutex_lock(&fan_lock);
-    esp_err_t err = gpio_set_direction(pins.reset, GPIO_MODE_INPUT_OUTPUT);
-    if (err == ESP_OK) err = set_output(pins.reset, high);
+    esp_err_t err = gpio_set_direction(pins.asic_reset, GPIO_MODE_INPUT_OUTPUT);
+    if (err == ESP_OK) err = set_output(pins.asic_reset, high);
     if (err == ESP_OK && high) {
         err = apply_fan_percent(requested_fan_percent);
         if (err != ESP_OK) {

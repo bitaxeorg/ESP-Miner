@@ -6,7 +6,7 @@
 #include "driver/ledc.h"
 #include "esp_timer.h"
 
-static bzm_control_pins_t expected_pins;
+static BzmPins expected_pins;
 static uint64_t configured_mask;
 static unsigned hardware_calls;
 static int levels[49];
@@ -38,7 +38,7 @@ static esp_err_t gpio_test_duty(ledc_mode_t mode, ledc_channel_t channel, uint32
 {
     ++hardware_calls;
     (void)mode; (void)channel;
-    if (trip_on_duty) handlers[expected_pins.trip](NULL);
+    if (trip_on_duty) handlers[expected_pins.asic_trip](NULL);
     if (duty_error != ESP_OK) return duty_error;
     pwm_duty = duty;
     return ESP_OK;
@@ -58,7 +58,7 @@ static esp_err_t gpio_test_start_timer(esp_timer_handle_t timer, uint64_t period
 { ++hardware_calls; (void)timer; TEST_ASSERT_TRUE(period == 100000); return ESP_OK; }
 
 static esp_err_t gpio_test_direction(gpio_num_t pin, gpio_mode_t mode)
-{ ++hardware_calls; TEST_ASSERT_EQUAL_INT(expected_pins.reset, pin); TEST_ASSERT_EQUAL(GPIO_MODE_INPUT_OUTPUT, mode); return ESP_OK; }
+{ ++hardware_calls; TEST_ASSERT_EQUAL_INT(expected_pins.asic_reset, pin); TEST_ASSERT_EQUAL(GPIO_MODE_INPUT_OUTPUT, mode); return ESP_OK; }
 
 #define gpio_set_direction gpio_test_direction
 #define gpio_set_level gpio_test_level
@@ -85,7 +85,7 @@ static esp_err_t gpio_test_direction(gpio_num_t pin, gpio_mode_t mode)
 #define bzm_gpio_get_fan_rpm gpio_test_rpm
 #include "components/asic/bzm/port/esp/gpio.c"
 
-static void gpio_fixture_with_pins(const bzm_control_pins_t *config)
+static void gpio_fixture_with_pins(const BzmPins *config)
 {
     memset(levels, 0, sizeof(levels));
     memset(handlers, 0, sizeof(handlers));
@@ -109,8 +109,8 @@ static void gpio_fixture(void)
 
 static void assert_safe(void)
 {
-    TEST_ASSERT_EQUAL_INT(0, levels[expected_pins.reset]);
-    TEST_ASSERT_EQUAL_INT(0, levels[expected_pins.five_volt_enable]);
+    TEST_ASSERT_EQUAL_INT(0, levels[expected_pins.asic_reset]);
+    TEST_ASSERT_EQUAL_INT(0, levels[expected_pins.enable_5v]);
     TEST_ASSERT_EQUAL_INT(0, levels[expected_pins.core_enable]);
     TEST_ASSERT_FALSE(pwm_running);
     TEST_ASSERT_EQUAL_UINT8(100, fan_percent);
@@ -145,7 +145,7 @@ TEST_CASE("Bonanza 1004 starts safe and preserves power and reset ordering witho
     TEST_ASSERT_EQUAL(ESP_OK, gpio_test_reset(true));
     TEST_ASSERT_NOT_EQUAL(ESP_OK, gpio_test_5v(true));
     TEST_ASSERT_EQUAL(ESP_OK, gpio_test_5v(false));
-    TEST_ASSERT_EQUAL_INT(0, levels[expected_pins.reset]);
+    TEST_ASSERT_EQUAL_INT(0, levels[expected_pins.asic_reset]);
     TEST_ASSERT_EQUAL(ESP_OK, gpio_test_safe_off(&status));
     assert_safe();
     TEST_ASSERT_FALSE(status.core_enabled);
@@ -243,7 +243,7 @@ TEST_CASE("Bonanza 1004 trip interrupt cuts power and latches even a brief trip"
 {
     gpio_fixture();
     enable_outputs();
-    handlers[expected_pins.trip](NULL); /* Pulse has already ended. */
+    handlers[expected_pins.asic_trip](NULL); /* Pulse has already ended. */
     assert_safe();
     bzm_control_status_t status;
     TEST_ASSERT_EQUAL(ESP_OK, gpio_test_status(&status));
@@ -253,12 +253,12 @@ TEST_CASE("Bonanza 1004 trip interrupt cuts power and latches even a brief trip"
     TEST_ASSERT_NOT_EQUAL(ESP_OK, gpio_test_reset(true));
     TEST_ASSERT_EQUAL(ESP_OK, gpio_test_fan(0.5f));
     assert_safe();
-    levels[expected_pins.trip] = 1;
+    levels[expected_pins.asic_trip] = 1;
     TEST_ASSERT_NOT_EQUAL(ESP_OK, gpio_test_clear(&status));
-    levels[expected_pins.trip] = 0;
-    levels[expected_pins.pgood] = 1;
+    levels[expected_pins.asic_trip] = 0;
+    levels[expected_pins.core_power_good] = 1;
     TEST_ASSERT_NOT_EQUAL(ESP_OK, gpio_test_clear(&status));
-    levels[expected_pins.pgood] = 0;
+    levels[expected_pins.core_power_good] = 0;
     TEST_ASSERT_EQUAL(ESP_OK, gpio_test_clear(&status));
     assert_safe();
     enable_outputs();
@@ -270,20 +270,20 @@ TEST_CASE("Bonanza 1004 tolerates reset-held power-up edges but rejects an asser
     bzm_control_status_t status;
     TEST_ASSERT_EQUAL(ESP_OK, gpio_test_core(true));
     TEST_ASSERT_EQUAL(ESP_OK, gpio_test_5v(true));
-    handlers[expected_pins.trip](NULL);
+    handlers[expected_pins.asic_trip](NULL);
     TEST_ASSERT_EQUAL(ESP_OK, gpio_test_status(&status));
     TEST_ASSERT_EQUAL(BZM_CONTROL_FAULT_NONE, status.fault);
     TEST_ASSERT_TRUE(status.five_volt_enabled);
     TEST_ASSERT_TRUE(status.asic_reset_asserted);
     TEST_ASSERT_EQUAL(ESP_OK, gpio_test_reset(true));
-    handlers[expected_pins.trip](NULL);
+    handlers[expected_pins.asic_trip](NULL);
     assert_safe();
 
     gpio_fixture();
     TEST_ASSERT_EQUAL(ESP_OK, gpio_test_core(true));
     TEST_ASSERT_EQUAL(ESP_OK, gpio_test_5v(true));
-    levels[expected_pins.trip] = 1;
-    handlers[expected_pins.trip](NULL);
+    levels[expected_pins.asic_trip] = 1;
+    handlers[expected_pins.asic_trip](NULL);
     TEST_ASSERT_NOT_EQUAL(ESP_OK, gpio_test_reset(true));
     assert_safe();
     TEST_ASSERT_EQUAL(ESP_OK, gpio_test_status(&status));
@@ -296,8 +296,8 @@ TEST_CASE("Bonanza 1004 outputs persist without host traffic until explicit safe
     enable_outputs();
     clock_us += 600000000;
     timer_callback(NULL);
-    TEST_ASSERT_EQUAL_INT(1, levels[expected_pins.reset]);
-    TEST_ASSERT_EQUAL_INT(1, levels[expected_pins.five_volt_enable]);
+    TEST_ASSERT_EQUAL_INT(1, levels[expected_pins.asic_reset]);
+    TEST_ASSERT_EQUAL_INT(1, levels[expected_pins.enable_5v]);
     TEST_ASSERT_EQUAL_INT(1, levels[expected_pins.core_enable]);
     TEST_ASSERT_TRUE(pwm_running);
     bzm_control_status_t status;
@@ -313,17 +313,17 @@ TEST_CASE("Bonanza 1004 outputs persist without host traffic until explicit safe
 
 TEST_CASE("Bonanza GPIO uses configured pins for outputs fan status and trip protection", "[asic][bonanza][gpio]")
 {
-    const bzm_control_pins_t remapped = {
-        .reset = 12, .trip = 13, .fan_pwm = 14, .fan_tach = 15,
-        .core_enable = 16, .pgood = 19, .five_volt_enable = 20,
+    const BzmPins remapped = {
+        .asic_reset = GPIO_NUM_12, .asic_trip = GPIO_NUM_13, .fan_pwm = GPIO_NUM_14, .fan_tach = GPIO_NUM_15,
+        .core_enable = GPIO_NUM_16, .core_power_good = GPIO_NUM_19, .enable_5v = GPIO_NUM_20,
     };
     gpio_fixture_with_pins(&remapped);
-    uint64_t mask = (1ULL << remapped.reset) | (1ULL << remapped.trip) |
+    uint64_t mask = (1ULL << remapped.asic_reset) | (1ULL << remapped.asic_trip) |
         (1ULL << remapped.fan_pwm) | (1ULL << remapped.fan_tach) |
-        (1ULL << remapped.core_enable) | (1ULL << remapped.pgood) |
-        (1ULL << remapped.five_volt_enable);
+        (1ULL << remapped.core_enable) | (1ULL << remapped.core_power_good) |
+        (1ULL << remapped.enable_5v);
     TEST_ASSERT_TRUE_MESSAGE(mask == configured_mask, "GPIO configuration must use only the configured control pins");
-    TEST_ASSERT_NOT_NULL(handlers[remapped.trip]);
+    TEST_ASSERT_NOT_NULL(handlers[remapped.asic_trip]);
     TEST_ASSERT_NOT_NULL(handlers[remapped.fan_tach]);
     assert_safe();
     enable_outputs();
@@ -332,11 +332,11 @@ TEST_CASE("Bonanza GPIO uses configured pins for outputs fan status and trip pro
     TEST_ASSERT_TRUE(status.core_enabled);
     TEST_ASSERT_TRUE(status.five_volt_enabled);
     TEST_ASSERT_FALSE(status.asic_reset_asserted);
-    handlers[remapped.trip](NULL);
+    handlers[remapped.asic_trip](NULL);
     assert_safe();
-    levels[remapped.pgood] = 1;
+    levels[remapped.core_power_good] = 1;
     TEST_ASSERT_EQUAL(ESP_ERR_INVALID_STATE, gpio_test_clear(&status));
-    levels[remapped.pgood] = 0;
+    levels[remapped.core_power_good] = 0;
     TEST_ASSERT_EQUAL(ESP_OK, gpio_test_clear(&status));
     for (unsigned edge = 0; edge < 40; ++edge) handlers[remapped.fan_tach](NULL);
     clock_us += 500000;
@@ -351,10 +351,10 @@ TEST_CASE("Bonanza GPIO rejects missing invalid or duplicate pins before setup",
     for (unsigned invalid = 0; invalid < 5; ++invalid) {
         ready = pwm_ready = pins_bound = false;
         hardware_calls = 0;
-        bzm_control_pins_t bad = BONANZA_1004_CONTROL_PINS;
-        if (invalid == 1) bad.trip = -1;
-        if (invalid == 2) bad.pgood = GPIO_NUM_MAX;
-        if (invalid == 3) bad.fan_tach = bad.reset;
+        BzmPins bad = BONANZA_1004_CONTROL_PINS;
+        if (invalid == 1) bad.asic_trip = GPIO_NUM_NC;
+        if (invalid == 2) bad.core_power_good = GPIO_NUM_MAX;
+        if (invalid == 3) bad.fan_tach = bad.asic_reset;
         if (invalid == 4) bad.core_enable = 22;
         TEST_ASSERT_EQUAL(ESP_ERR_INVALID_ARG, gpio_test_init(invalid == 0 ? NULL : &bad));
         TEST_ASSERT_EQUAL_UINT32(0, hardware_calls);
@@ -365,17 +365,17 @@ TEST_CASE("Bonanza GPIO rejects missing invalid or duplicate pins before setup",
 
 TEST_CASE("Bonanza GPIO retains its map and rejects retargeting after initialization", "[asic][bonanza][gpio]")
 {
-    bzm_control_pins_t config = BONANZA_1004_CONTROL_PINS;
+    BzmPins config = BONANZA_1004_CONTROL_PINS;
     gpio_fixture_with_pins(&config);
     unsigned calls = hardware_calls;
     TEST_ASSERT_EQUAL(ESP_OK, gpio_test_init(&config));
     TEST_ASSERT_EQUAL_UINT32(calls, hardware_calls);
-    config.reset = GPIO_NUM_12;
+    config.asic_reset = GPIO_NUM_12;
     TEST_ASSERT_EQUAL(ESP_ERR_INVALID_STATE, gpio_test_init(&config));
     TEST_ASSERT_EQUAL_UINT32(calls, hardware_calls);
     enable_outputs();
-    TEST_ASSERT_EQUAL_INT(1, levels[expected_pins.reset]);
-    TEST_ASSERT_EQUAL_INT(0, levels[config.reset]);
-    handlers[expected_pins.trip](NULL);
+    TEST_ASSERT_EQUAL_INT(1, levels[expected_pins.asic_reset]);
+    TEST_ASSERT_EQUAL_INT(0, levels[config.asic_reset]);
+    handlers[expected_pins.asic_trip](NULL);
     assert_safe();
 }

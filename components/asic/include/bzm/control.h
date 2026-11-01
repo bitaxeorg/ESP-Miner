@@ -4,15 +4,22 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include "esp_err.h"
+#include "soc/gpio_num.h"
 
 #include "bzm/controls.h"
 
-typedef struct bzm_control_pins {
-    int reset, trip, fan_pwm, fan_tach, core_enable, pgood, five_volt_enable;
-} bzm_control_pins_t;
+typedef struct BzmPins {
+    gpio_num_t asic_reset;
+    gpio_num_t asic_trip;
+    gpio_num_t fan_pwm;
+    gpio_num_t fan_tach;
+    gpio_num_t core_enable;
+    gpio_num_t core_power_good;
+    gpio_num_t enable_5v;
+} BzmPins;
 
 // NULL reuses controls already initialized from device configuration.
-esp_err_t BZM_control_init(const char *board_version, const bzm_control_pins_t *pins);
+esp_err_t BZM_control_init(const char *board_version, const BzmPins *pins);
 esp_err_t BZM_control_get_safety_status(bzm_control_status_t *status);
 esp_err_t BZM_control_clear_safety_fault(bzm_control_status_t *status);
 esp_err_t BZM_control_safe_off(bzm_control_status_t *status);

@@ -51,7 +51,7 @@ static esp_err_t bonanza_validate_power(void *context, float expected_vout)
 {
     GlobalState *state = context;
     if (!bzm_power_runtime_voltage_is_allowed(expected_vout) ||
-        gpio_get_level(state->DEVICE_CONFIG.pins.bzm->pgood) == 0) {
+        gpio_get_level(state->DEVICE_CONFIG.pins.bzm->core_power_good) == 0) {
         ESP_LOGE(TAG, "TPS546 PGOOD remained low");
         return ESP_FAIL;
     }
