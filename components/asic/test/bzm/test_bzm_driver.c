@@ -220,6 +220,13 @@ TEST_CASE("BZM cached measurements do not consume work or wait for the reactor a
     pthread_mutex_unlock(&REACTOR_LOCK);
     TEST_ASSERT_EQUAL_UINT(2, BZM_STATE->hashrate[0].count);
     TEST_ASSERT_TRUE((uint64_t)(512) == (uint64_t)(atomic_load(&HASHRATE_DIFFICULTY_ONE_COUNTERS[0])));
+    TEST_ASSERT_TRUE(bzm_driver_clear_work(&test_state));
+    uint32_t counters[BZM_MAX_ASIC_COUNT];
+    TEST_ASSERT_TRUE(bzm_driver_hashrate_counter_snapshot(&test_state, counters, BZM_MAX_ASIC_COUNT));
+    TEST_ASSERT_EQUAL_UINT32(512, counters[0]);
+    TEST_ASSERT_TRUE(bzm_driver_get_hashrate_measurement(&test_state, 0, &timestamp, &rate));
+    TEST_ASSERT_FLOAT_WITHIN(0.001f, 1099.5116f, rate);
+    TEST_ASSERT_EQUAL_UINT(2, BZM_STATE->hashrate[0].count);
     test_state.initialized = false;
     TEST_ASSERT_TRUE(bzm_driver_get_hashrate_measurement(&test_state, 0, &timestamp, &rate));
     TEST_ASSERT_EQUAL_FLOAT(0, rate);

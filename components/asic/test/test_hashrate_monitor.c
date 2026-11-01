@@ -339,3 +339,47 @@ TEST_CASE("Hashrate averaging allocation failures clean up and leave telemetry u
         }
     }
 }
+
+TEST_CASE("Pool reset rebaselines raw measurements without a counter spike or clearing reported history", "[asic][hashrate]")
+{
+    const FamilyConfig families[] = {FAMILY_GAMMA, FAMILY_BONANZA};
+    for (unsigned f = 0; f < sizeof(families) / sizeof(families[0]); ++f) {
+        state = calloc(1, sizeof(*state));
+        TEST_ASSERT_NOT_NULL(state);
+        state->DEVICE_CONFIG.family = families[f];
+        measurement_t totals[4], errors[4], domains[4 * 8];
+        measurement_t *domain_pointers[4];
+        memset(totals, 0xa5, sizeof(totals));
+        memset(errors, 0xa5, sizeof(errors));
+        memset(domains, 0xa5, sizeof(domains));
+        for (unsigned a = 0; a < families[f].asic_count; ++a) {
+            domain_pointers[a] = domains + a * families[f].asic.hash_domains;
+        }
+        HashrateMonitorModule *monitor = &state->HASHRATE_MONITOR_MODULE;
+        monitor->total_measurement = totals;
+        monitor->error_measurement = errors;
+        monitor->domain_measurements = domain_pointers;
+        pthread_mutex_init(&monitor->lock, NULL);
+        atomic_init(&monitor->is_initialized, true);
+        state->SYSTEM_MODULE.current_hashrate = 1234;
+        monitor_reset(state);
+        for (unsigned a = 0; a < families[f].asic_count; ++a) {
+            TEST_ASSERT_EQUAL_UINT32(0, totals[a].value);
+            TEST_ASSERT_TRUE(totals[a].time_us == 0);
+            TEST_ASSERT_EQUAL_FLOAT(0, totals[a].hashrate);
+            TEST_ASSERT_EQUAL_UINT32(0, errors[a].value);
+            for (unsigned d = 0; d < families[f].asic.hash_domains; ++d) {
+                TEST_ASSERT_EQUAL_UINT32(0, domain_pointers[a][d].value);
+                TEST_ASSERT_TRUE(domain_pointers[a][d].time_us == 0);
+            }
+        }
+        TEST_ASSERT_EQUAL_FLOAT(1234, state->SYSTEM_MODULE.current_hashrate);
+        monitor_update_counter(&totals[0], UINT32_MAX - 2, 1000000);
+        TEST_ASSERT_EQUAL_FLOAT(0, totals[0].hashrate);
+        monitor_update_counter(&totals[0], 5, 2000000);
+        TEST_ASSERT_FLOAT_WITHIN(0.001f, 8 * 4.294967296f, totals[0].hashrate);
+        pthread_mutex_destroy(&monitor->lock);
+        free(state);
+        state = NULL;
+    }
+}
