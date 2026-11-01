@@ -25,6 +25,7 @@ asicmodel,data,string,BZM
 devicemodel,data,string,bonanza
 boardversion,data,string,1004
 rotation,data,u16,0
+display,data,string,NONE
 autofanspeed,data,u16,1
 fanspeed,data,u16,100
 selftest,data,u16,0
