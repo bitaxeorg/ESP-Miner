@@ -168,7 +168,7 @@ void ASIC_set_nonce_space(GlobalState * GLOBAL_STATE)
     ESP_LOGE(TAG, "Unknown ASIC id %d — cannot set nonce space", GLOBAL_STATE->DEVICE_CONFIG.family.asic.id);
 }
 
-double ASIC_get_asic_job_frequency_ms(GlobalState * GLOBAL_STATE)
+float ASIC_get_asic_job_frequency_ms(GlobalState * GLOBAL_STATE)
 {
     float freq = GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value;
     int cores = GLOBAL_STATE->DEVICE_CONFIG.family.asic.core_count;

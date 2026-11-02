@@ -187,6 +187,9 @@ void stratum_task(void *pvParameters)
                 ESP_LOGI(TAG, "Pool %u reachable, resuming mining", first_idx);
                 GLOBAL_STATE->SYSTEM_MODULE.pools_unavailable = false;
                 GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback = (first_idx == sec_idx);
+                if (first_idx == prim_idx) {
+                    GLOBAL_STATE->SYSTEM_MODULE.primary_pool_error[0] = '\0';
+                }
                 consecutive_pool_failures = 0;
                 retry_attempts = 0;
                 GLOBAL_STATE->SYSTEM_MODULE.work_received = 0;
@@ -195,6 +198,9 @@ void stratum_task(void *pvParameters)
                 ESP_LOGI(TAG, "Pool %u reachable, resuming mining", second_idx);
                 GLOBAL_STATE->SYSTEM_MODULE.pools_unavailable = false;
                 GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback = (second_idx == sec_idx);
+                if (second_idx == prim_idx) {
+                    GLOBAL_STATE->SYSTEM_MODULE.primary_pool_error[0] = '\0';
+                }
                 consecutive_pool_failures = 0;
                 retry_attempts = 0;
                 GLOBAL_STATE->SYSTEM_MODULE.work_received = 0;
