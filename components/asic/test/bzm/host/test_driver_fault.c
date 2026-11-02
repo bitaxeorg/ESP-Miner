@@ -318,6 +318,74 @@ static void test_latched_fault_blocks_later_writes(void)
     puts("persistent fault guards: 7 paths blocked after a failed read and a successful raw retry");
 }
 
+static void temperature_sample(unsigned asic, float celsius, bool valid)
+{
+    TRANSPORT.io.telemetry.samples[asic] = (bzm_telemetry_sample_t){
+        .asic_id = bzm_asic_wire_ids[asic], .received = true, .thermal_valid = valid,
+        .temperature_c = celsius, .timestamp_us = (uint64_t)fixture.now,
+    };
+}
+
+static void temperature_poll(float celsius, bool valid)
+{
+    fixture.now += 2000000;
+    for (unsigned asic = 0; asic < BZM_MAX_ASIC_COUNT; ++asic)
+        temperature_sample(asic, celsius, valid);
+}
+
+static void test_temperature_filter(void)
+{
+    start_driver();
+    CHECK(bzm_driver_read_temperature(&device) == -1);
+    temperature_poll(50, true);
+    CHECK(bzm_driver_read_temperature(&device) == 50);
+    for (unsigned invalid = 1; invalid <= 3; ++invalid) {
+        temperature_poll(-1, false);
+        for (unsigned read = 0; read < 1000; ++read)
+            CHECK(bzm_driver_read_temperature(&device) == 50);
+        CHECK(BZM_STATE->temperature_filters[0].invalid_samples == invalid);
+        CHECK(!TRANSPORT.io.telemetry.samples[0].thermal_valid);
+        CHECK(TRANSPORT.io.telemetry.samples[0].temperature_c == -1);
+    }
+    temperature_poll(-1, false);
+    CHECK(bzm_driver_read_temperature(&device) == -1);
+    bzm_driver_service(&device);
+    CHECK(fixture.faults == 0 && !bzm_driver_has_io_fault());
+
+    temperature_poll(55, true);
+    CHECK(bzm_driver_read_temperature(&device) == 55);
+    CHECK(BZM_STATE->temperature_filters[0].invalid_samples == 0);
+    for (unsigned invalid = 0; invalid < 4; ++invalid) {
+        temperature_poll(50, true);
+        temperature_sample(0, -1, false);
+        temperature_sample(1, 100, true);
+        CHECK(bzm_driver_read_temperature(&device) == 100);
+    }
+    CHECK(!BZM_STATE->temperature_filters[0].received);
+
+    // A hot chip's own brief gap retains its last good reading too.
+    for (unsigned invalid = 0; invalid < 3; ++invalid) {
+        temperature_poll(50, true);
+        temperature_sample(1, -1, false);
+        CHECK(bzm_driver_read_temperature(&device) == 100);
+    }
+    temperature_poll(50, true);
+    temperature_sample(1, -1, false);
+    CHECK(bzm_driver_read_temperature(&device) == 50);
+    temperature_poll(40, true);
+    CHECK(bzm_driver_read_temperature(&device) == 40);
+    CHECK(BZM_STATE->temperature_filters[1].invalid_samples == 0);
+
+    CHECK(bzm_driver_hold_reset());
+    CHECK(bzm_driver_read_temperature(&device) == -1);
+    const bzm_bringup_telemetry_policy_t policy = {0};
+    bzm_bringup_report_t report;
+    CHECK(bzm_driver_start(&device, &policy, &report) == BZM_BRINGUP_GOOD);
+    CHECK(bzm_driver_read_temperature(&device) == -1);
+    CHECK(!BZM_STATE->temperature_filters[0].received);
+    puts("temperature filter: three bad polls ignored, persistent failure returned, hot peers preserved, recovery and reset passed");
+}
+
 int main(void)
 {
     const bzm_platform_ops_t platform = {
@@ -332,6 +400,7 @@ int main(void)
     test_stopped_receiver_waits_for_shared_stop();
     test_startup_read_error_stops_activation();
     test_latched_fault_blocks_later_writes();
+    test_temperature_filter();
     bzm_serial_transport_deinit(&TRANSPORT);
     bzm_job_store_destroy(&BZM_STATE->job_store);
     CHECK(pthread_mutex_destroy(&REACTOR_LOCK) == 0);

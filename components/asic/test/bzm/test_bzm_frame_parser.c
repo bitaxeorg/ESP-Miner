@@ -631,20 +631,28 @@ TEST_CASE("BZM temperature aggregation reports the hottest fresh ASIC",
     TEST_ASSERT_FLOAT_WITHIN(0.001f, 55.0f, hottest_c);
 
     store.samples[1].received = false;
-    TEST_ASSERT_FALSE(
+    TEST_ASSERT_TRUE(
         bzm_telemetry_max_temperature(&store, 1000, 100, &hottest_c));
     store.samples[1].received = true;
     store.samples[1].timestamp_us = 899;
-    TEST_ASSERT_FALSE(
+    TEST_ASSERT_TRUE(
         bzm_telemetry_max_temperature(&store, 1000, 100, &hottest_c));
     store.samples[1].timestamp_us = 901;
     store.samples[1].thermal_valid = false;
-    TEST_ASSERT_FALSE(
+    TEST_ASSERT_TRUE(
         bzm_telemetry_max_temperature(&store, 1000, 100, &hottest_c));
     store.samples[1].thermal_valid = true;
     store.samples[1].temperature_c = NAN;
-    TEST_ASSERT_FALSE(
+    TEST_ASSERT_TRUE(
         bzm_telemetry_max_temperature(&store, 1000, 100, &hottest_c));
+    TEST_ASSERT_EQUAL_FLOAT(55, hottest_c);
+    store.samples[1].temperature_c = -1;
+    TEST_ASSERT_TRUE(bzm_telemetry_max_temperature(&store, 1000, 100, &hottest_c));
+    TEST_ASSERT_EQUAL_FLOAT(55, hottest_c);
+    store.samples[3].timestamp_us = 899;
+    TEST_ASSERT_TRUE(bzm_telemetry_max_temperature(&store, 1000, 100, &hottest_c));
+    TEST_ASSERT_EQUAL_FLOAT(50, hottest_c);
+    TEST_ASSERT_FALSE(bzm_telemetry_max_temperature(&store, 1101, 100, &hottest_c));
     TEST_ASSERT_FALSE(
         bzm_telemetry_max_temperature(NULL, 1000, 100, &hottest_c));
     TEST_ASSERT_FALSE(

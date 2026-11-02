@@ -66,18 +66,19 @@ bool bzm_telemetry_max_temperature(const bzm_telemetry_store_t *store,
     for (size_t index = 0; index < BZM_MAX_ASIC_COUNT; ++index) {
         const bzm_telemetry_sample_t *sample = &store->samples[index];
         if (sample->asic_id != bzm_asic_wire_ids[index] ||
-            !sample->thermal_valid || !isfinite(sample->temperature_c) ||
+            !sample->thermal_valid || !isfinite(sample->temperature_c) || sample->temperature_c == -1.0f ||
             !bzm_telemetry_sample_is_fresh(
                 sample, now_us, max_age_us)) {
-            return false;
+            continue;
         }
         if (sample->temperature_c > hottest_c) {
             hottest_c = sample->temperature_c;
         }
     }
 
+    if (!isfinite(hottest_c)) return false;
     *max_temperature_c = hottest_c;
-    return isfinite(*max_temperature_c);
+    return true;
 }
 
 void bzm_telemetry_store_init(bzm_telemetry_store_t * store)

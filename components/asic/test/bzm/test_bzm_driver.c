@@ -637,3 +637,18 @@ TEST_CASE("BZM temperature accepts telemetry received while waiting for the driv
     TEST_ASSERT_EQUAL_FLOAT(48.0f, bzm_driver_read_temperature(&test_state));
     fixture_destroy();
 }
+
+TEST_CASE("BZM temperature reader keeps a hot chip actionable when another reading is unavailable",
+          "[asic][bzm][driver]")
+{
+    fixture_init();
+    TEST_ASSERT_TRUE(bzm_serial_transport_init(&TRANSPORT, &bzm_platform_serial_ops, NULL));
+    TRANSPORT.asic_count = BZM_MAX_ASIC_COUNT;
+    TRANSPORT.io.telemetry.samples[1] = (bzm_telemetry_sample_t){
+        .asic_id = bzm_asic_wire_ids[1], .received = true, .thermal_valid = true,
+        .temperature_c = 100, .timestamp_us = (uint64_t)esp_timer_get_time(),
+    };
+    TEST_ASSERT_EQUAL_FLOAT(100, bzm_driver_read_temperature(&test_state));
+    TEST_ASSERT_FALSE(reported_fault);
+    fixture_destroy();
+}

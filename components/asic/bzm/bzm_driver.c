@@ -31,6 +31,13 @@ static const char * TAG = "bzm";
 /* Bootstrap at D16 until the application controller selects its filter. */
 #define BZM_INITIAL_LEAD_ZEROS 36U
 #define BZM_CANCEL_CHECK_INTERVAL_MS 250U
+#define BZM_TEMPERATURE_INVALID_GRACE 3U
+
+typedef struct {
+    float value;
+    uint8_t invalid_samples;
+    bool received;
+} bzm_temperature_filter_t;
 
 typedef struct {
     bzm_job_store_t job_store;
@@ -51,6 +58,7 @@ typedef struct {
     bzm_dispatch_gate_t driver_dispatch_gate;
     float last_temperature;
     int64_t last_temperature_us;
+    bzm_temperature_filter_t temperature_filters[BZM_MAX_ASIC_COUNT];
     atomic_uint_fast64_t
         hashrate_difficulty_one_counters[BZM_MAX_ASIC_COUNT];
     pthread_mutex_t hashrate_lock;
@@ -413,32 +421,56 @@ bool bzm_driver_work_replacement_snapshot(uint32_t *generation, uint32_t *comple
 float bzm_driver_read_temperature(bzm_device_t * state)
 {
     (void) state;
-    if (BZM_STATE == NULL || !INITIALIZED || TRANSPORT.asic_count == 0)
+    if (BZM_STATE == NULL) return -1.0f;
+    pthread_mutex_lock(&REACTOR_LOCK);
+    if (!INITIALIZED || TRANSPORT.asic_count == 0) {
+        pthread_mutex_unlock(&REACTOR_LOCK);
         return -1.0f;
+    }
 
     int64_t now = bzm_now_us();
     if (LAST_TEMPERATURE_US != 0 && now - LAST_TEMPERATURE_US < 2000000) {
-        return LAST_TEMPERATURE;
+        float cached = LAST_TEMPERATURE;
+        pthread_mutex_unlock(&REACTOR_LOCK);
+        return cached;
     }
 
-    bzm_telemetry_store_t snapshot;
-    pthread_mutex_lock(&REACTOR_LOCK);
-    const bool available =
-        bzm_serial_get_telemetry_snapshot(&TRANSPORT, &snapshot);
-    pthread_mutex_unlock(&REACTOR_LOCK);
+    bzm_telemetry_store_t snapshot = {0};
+    (void)bzm_serial_get_telemetry_snapshot(&TRANSPORT, &snapshot);
 
     now = bzm_now_us();
+    for (size_t asic = 0; asic < BZM_MAX_ASIC_COUNT; ++asic) {
+        bzm_telemetry_sample_t *sample = &snapshot.samples[asic];
+        bzm_temperature_filter_t *filter = &BZM_STATE->temperature_filters[asic];
+        bool valid = sample->asic_id == bzm_asic_wire_ids[asic] && sample->thermal_valid &&
+                     isfinite(sample->temperature_c) && sample->temperature_c != -1.0f &&
+                     bzm_telemetry_sample_is_fresh(sample, (uint64_t)now, BZM_TELEMETRY_MAX_AGE_US);
+        if (valid) {
+            *filter = (bzm_temperature_filter_t){.value = sample->temperature_c, .received = true};
+        } else if (filter->invalid_samples < BZM_TEMPERATURE_INVALID_GRACE) {
+            ++filter->invalid_samples;
+        } else {
+            filter->received = false;
+        }
+        // Only the driver view retains readings; raw telemetry stays unchanged.
+        *sample = (bzm_telemetry_sample_t){
+            .asic_id = bzm_asic_wire_ids[asic], .received = filter->received,
+            .thermal_valid = filter->received, .temperature_c = filter->value,
+            .timestamp_us = (uint64_t)now,
+        };
+    }
     float hottest_c = -1.0f;
     LAST_TEMPERATURE = -1.0f;
-    if (available &&
-        bzm_telemetry_max_temperature(
+    if (bzm_telemetry_max_temperature(
             &snapshot, (uint64_t)now,
             BZM_TELEMETRY_MAX_AGE_US,
             &hottest_c)) {
         LAST_TEMPERATURE = hottest_c;
     }
     LAST_TEMPERATURE_US = now;
-    return LAST_TEMPERATURE;
+    float temperature = LAST_TEMPERATURE;
+    pthread_mutex_unlock(&REACTOR_LOCK);
+    return temperature;
 }
 
 bool bzm_driver_get_telemetry_snapshot(bzm_telemetry_store_t * snapshot)
@@ -958,6 +990,7 @@ bzm_bringup_outcome_t bzm_driver_start(bzm_device_t *state, const bzm_bringup_te
     INITIALIZED = false;
     LAST_TEMPERATURE = -1.0f;
     LAST_TEMPERATURE_US = 0;
+    memset(BZM_STATE->temperature_filters, 0, sizeof(BZM_STATE->temperature_filters));
     DRIVER_TRANSPORT_READY = false;
     DRIVER_IO_OK = true;
     atomic_store_explicit(&BZM_STATE->io_failed, false, memory_order_release);
