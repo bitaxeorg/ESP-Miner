@@ -108,6 +108,7 @@ typedef struct SystemModule
     uint32_t lastClockSync;
     bool is_screen_active;
     bool is_firmware_update;
+    uint8_t firmware_update_percent;
     char firmware_update_filename[20];
     char firmware_update_status[20];
     bool hardware_fault;

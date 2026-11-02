@@ -102,6 +102,9 @@ static void system_api_add_telemetry(yyjson_mut_doc *doc, yyjson_mut_val *root, 
     yyjson_mut_obj_add_float(doc, root, "cpuUsage", g->SYSTEM_MODULE.cpu_usage);
     yyjson_mut_obj_add_bool(doc, root, "miningPaused", g->SYSTEM_MODULE.mining_paused);
     yyjson_mut_obj_add_int(doc, root, "overheat_mode", g->SYSTEM_MODULE.overheat_mode ? 1 : 0);
+    yyjson_mut_obj_add_int(doc, root, "isFirmwareUpdate", g->SYSTEM_MODULE.is_firmware_update ? 1 : 0);
+    yyjson_mut_obj_add_int(doc, root, "firmwareUpdatePercent", g->SYSTEM_MODULE.firmware_update_percent);
+    yyjson_mut_obj_add_strcpy(doc, root, "firmwareUpdateStatus", g->SYSTEM_MODULE.firmware_update_status);
     yyjson_mut_obj_add_strcpy(doc, root, "wifiStatus", g->SYSTEM_MODULE.wifi_status);
 
     int8_t rssi = -90;
