@@ -229,10 +229,10 @@ TEST_CASE("Startup sequencing follows the ASIC capability independently of its I
     TEST_ASSERT_EQUAL_UINT32(0, clock_writes);
 }
 
-TEST_CASE("Shared thermal guard ignores board input voltage when ASIC settings are at minimum", "[asic][power][shared]")
+TEST_CASE("Shared thermal guard retains the board input threshold at minimum ASIC frequency", "[asic][power][shared]")
 {
     const FamilyConfig families[] = {FAMILY_BONANZA, FAMILY_GAMMA};
-    const float board_inputs[] = {5000, 12000};
+    const float board_inputs[] = {1000, 1001, 5000, 12000};
     for (unsigned a = 0; a < sizeof(families) / sizeof(families[0]); ++a) {
         for (unsigned b = 0; b < sizeof(board_inputs) / sizeof(board_inputs[0]); ++b) {
             fixture(families[a].asic);
@@ -243,29 +243,32 @@ TEST_CASE("Shared thermal guard ignores board input voltage when ASIC settings a
             board_input_mv = board_inputs[b];
             chip_temp = 80;
             shared_power_task(&state);
-            TEST_ASSERT_EQUAL_UINT32(0, cooling_delays);
-            TEST_ASSERT_EQUAL_UINT32(0, resets);
-            TEST_ASSERT_EQUAL_UINT32(0, chip_inits);
+            bool recovered = board_inputs[b] > 1000;
+            TEST_ASSERT_EQUAL_UINT32(recovered ? 6 : 0, cooling_delays);
+            TEST_ASSERT_EQUAL(recovered, resets > 0);
+            TEST_ASSERT_EQUAL_UINT32(recovered ? 1 : 0, chip_inits);
             TEST_ASSERT_EQUAL_UINT16(shared_min_voltage(&state), saved_voltage);
         }
     }
 }
 
-TEST_CASE("Shared thermal guard permits voltage reduction at minimum ASIC frequency", "[asic][power][shared]")
+TEST_CASE("Shared thermal guard uses the configured frequency floor when board input is low", "[asic][power][shared]")
 {
     const FamilyConfig families[] = {FAMILY_BONANZA, FAMILY_GAMMA};
     for (unsigned a = 0; a < sizeof(families) / sizeof(families[0]); ++a) {
-        fixture(families[a].asic);
-        state.DEVICE_CONFIG.family = families[a];
-        saved_frequency = shared_min_frequency(&state);
-        saved_voltage = shared_min_voltage(&state) + 50;
-        applied_voltage = saved_voltage / 1000.0f;
-        board_input_mv = 0; // Missing board-input telemetry must not mask the ASIC voltage.
-        chip_temp = 80;
-        shared_power_task(&state);
-        TEST_ASSERT_EQUAL_UINT32(6, cooling_delays);
-        TEST_ASSERT_GREATER_THAN_UINT32(0, resets);
-        TEST_ASSERT_EQUAL_UINT32(1, chip_inits);
-        TEST_ASSERT_EQUAL_UINT16(shared_min_voltage(&state), saved_voltage);
+        for (unsigned above_minimum = 0; above_minimum < 2; ++above_minimum) {
+            fixture(families[a].asic);
+            state.DEVICE_CONFIG.family = families[a];
+            saved_frequency = shared_min_frequency(&state) + above_minimum * 25;
+            saved_voltage = shared_min_voltage(&state) + 50;
+            applied_voltage = saved_voltage / 1000.0f;
+            board_input_mv = 0;
+            chip_temp = 80;
+            shared_power_task(&state);
+            TEST_ASSERT_EQUAL_UINT32(above_minimum ? 6 : 0, cooling_delays);
+            TEST_ASSERT_EQUAL(above_minimum != 0, resets > 0);
+            TEST_ASSERT_EQUAL_UINT32(above_minimum ? 1 : 0, chip_inits);
+            TEST_ASSERT_EQUAL_UINT16(shared_min_voltage(&state) + (above_minimum ? 0 : 50), saved_voltage);
+        }
     }
 }
