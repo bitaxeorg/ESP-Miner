@@ -16,6 +16,8 @@ typedef struct BzmPins {
     gpio_num_t core_enable;
     gpio_num_t core_power_good;
     gpio_num_t enable_5v;
+    gpio_num_t bridge_swclk;
+    gpio_num_t bridge_swdio;
 } BzmPins;
 
 // NULL reuses controls already initialized from device configuration.
@@ -28,5 +30,6 @@ esp_err_t BZM_control_set_asic_reset(bool high);
 esp_err_t BZM_control_set_fan_percent(float percent);
 esp_err_t BZM_control_get_fan_rpm(uint16_t *rpm);
 esp_err_t BZM_control_set_core_enabled(bool enabled);
+esp_err_t BZM_control_reset_bridge(void);
 
 #endif

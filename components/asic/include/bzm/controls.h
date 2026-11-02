@@ -41,6 +41,8 @@ typedef struct {
     bzm_status_t (*set_fan_percent)(void *context, float percent);
     bzm_status_t (*get_fan_rpm)(void *context, uint16_t * rpm);
     bzm_status_t (*set_core_enabled)(void *context, bool enabled);
+    // Optional; the caller holds ASIC reset and drains the data transmitter.
+    bzm_status_t (*reset_bridge)(void *context);
 } bzm_control_ops_t;
 
 /* Bind before driver startup; the platform owns pins, rails and fault latching. */
@@ -57,5 +59,6 @@ bzm_status_t bzm_control_pulse_asic_reset(void);
 bzm_status_t bzm_control_set_fan_percent(float percent);
 bzm_status_t bzm_control_get_fan_rpm(uint16_t *rpm);
 bzm_status_t bzm_control_set_core_enabled(bool enabled);
+bzm_status_t bzm_control_reset_bridge(void);
 
 #endif

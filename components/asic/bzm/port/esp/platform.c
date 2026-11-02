@@ -76,6 +76,7 @@ static bzm_status_t control_set_fan_percent(void *ctx, float percent) { (void)ct
 static bzm_status_t control_get_fan_rpm(void *ctx, uint16_t * rpm) { (void)ctx; return BZM_control_get_fan_rpm(rpm); }
 
 static bzm_status_t control_set_core_enabled(void *ctx, bool enabled) { (void)ctx; return BZM_control_set_core_enabled(enabled); }
+static bzm_status_t control_reset_bridge(void *ctx) { (void)ctx; return BZM_control_reset_bridge(); }
 
 bool bzm_platform_esp_init(void)
 {
@@ -98,6 +99,7 @@ bool bzm_platform_esp_init(void)
         .set_fan_percent = control_set_fan_percent,
         .get_fan_rpm = control_get_fan_rpm,
         .set_core_enabled = control_set_core_enabled,
+        .reset_bridge = control_reset_bridge,
     };
     initialized = bzm_platform_bind(&platform, NULL) && bzm_control_bind(&controls, NULL);
     return initialized;

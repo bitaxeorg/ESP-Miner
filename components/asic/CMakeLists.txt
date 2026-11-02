@@ -7,6 +7,7 @@ SRCS
     "bzm/port/esp/platform.c"
     "bzm/port/esp/result.c"
     "bzm/port/esp/control.c"
+    "bzm/port/esp/bridge_reset.c"
     "bzm/port/esp/gpio.c"
     "bzm/port/esp/serial.c"
 

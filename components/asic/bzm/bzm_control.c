@@ -84,3 +84,14 @@ bzm_status_t bzm_control_pulse_asic_reset(void)
     bzm_sleep_ms(100);
     return BZM_OK;
 }
+
+bzm_status_t bzm_control_reset_bridge(void)
+{
+    if (control.reset_bridge == NULL) return BZM_ERR_NOT_SUPPORTED;
+    bzm_control_status_t status;
+    if (bzm_control_get_safety_status(&status) != BZM_OK || !status.valid ||
+        status.fault != BZM_CONTROL_FAULT_NONE || status.trip_input_asserted ||
+        !status.asic_reset_asserted) return BZM_ERR_INVALID_STATE;
+    bzm_status_t err = bzm_serial_wait_tx(100);
+    return err == BZM_OK ? control.reset_bridge(control_context) : err;
+}

@@ -1236,7 +1236,17 @@ uint8_t bzm_driver_init(bzm_device_t *state)
     if (bzm_driver_start(state, &policy, &report) != BZM_BRINGUP_GOOD) {
         BZM_LOGE(TAG, "Startup failed: %s ASIC=0x%02x reg=0x%02x",
                  bzm_bringup_reason_name(report.reason), report.asic_id, report.register_offset);
-        return 0;
+        if (report.reason != BZM_BRINGUP_REASON_CHAIN_MISSING || bzm_driver_has_io_fault()) return 0;
+        pthread_mutex_lock(&REACTOR_LOCK);
+        bzm_status_t recovered = bzm_control_reset_bridge();
+        pthread_mutex_unlock(&REACTOR_LOCK);
+        if (recovered != BZM_OK) return 0;
+        BZM_LOGW(TAG, "Bridge reset after missing ASIC; retrying startup once");
+        if (bzm_driver_start(state, &policy, &report) != BZM_BRINGUP_GOOD) {
+            BZM_LOGE(TAG, "Startup after bridge reset failed: %s ASIC=0x%02x reg=0x%02x",
+                     bzm_bringup_reason_name(report.reason), report.asic_id, report.register_offset);
+            return 0;
+        }
     }
     bzm_device_record_frequency(state, BZM_FREQUENCY_POWER_ON_MHZ);
     bzm_driver_set_dispatch_authorizer(device_io_allowed, NULL);

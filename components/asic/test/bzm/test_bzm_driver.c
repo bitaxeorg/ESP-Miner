@@ -39,6 +39,7 @@
 #define bzm_bringup_live_frequency_domains_step test_driver_clock_step
 #define bzm_control_set_asic_reset test_driver_reset
 #define bzm_control_pulse_asic_reset test_driver_pulse
+#define bzm_control_reset_bridge test_driver_bridge_reset
 #define bzm_port_serial_prepare_session test_driver_serial_prepare
 #define bzm_port_serial_wait_tx_done test_driver_wait_tx
 #define bzm_bringup_start test_driver_chip_start
@@ -56,6 +57,8 @@ static bool reported_fault;
 static void report_fault(void *context, const char *reason) { (void)context; (void)reason; reported_fault = true; }
 static unsigned startup_failure, startup_reset_calls, startup_chip_calls, startup_nonce_writes;
 static bool startup_reset_asserted;
+static unsigned missing_starts, bridge_reset_calls;
+static bzm_status_t bridge_reset_result;
 static unsigned telemetry_polls, clock_steps;
 static bool fail_clock, fresh_on_copy;
 static bool telemetry_missing;
@@ -120,6 +123,11 @@ bzm_bringup_outcome_t test_driver_chip_start(bzm_bringup_state_t *state, const b
     (void)ops; (void)context; (void)policy;
     ++startup_chip_calls;
     TEST_ASSERT_FALSE(bzm_dispatch_gate_is_authorized(&DRIVER_DISPATCH_GATE));
+    if (missing_starts) {
+        --missing_starts;
+        *report = (bzm_bringup_report_t){.reason = BZM_BRINGUP_REASON_CHAIN_MISSING};
+        return BZM_BRINGUP_BAD;
+    }
     if (startup_failure == 5) {
         DRIVER_BALANCED_RAMP = (bzm_balanced_ramp_report_t){
             .failure = BZM_BALANCED_RAMP_FAILURE_CONFIG_READBACK, .failure_asic_id = 0x14,
@@ -178,6 +186,8 @@ static void fixture_init(void)
     fail_write = cancel_write = fail_flush = false;
     startup_failure = startup_reset_calls = startup_chip_calls = startup_nonce_writes = 0;
     startup_reset_asserted = false;
+    missing_starts = bridge_reset_calls = 0;
+    bridge_reset_result = BZM_OK;
     clock_steps = 0;
     reported_fault = false;
     fail_clock = fresh_on_copy = false;
@@ -575,6 +585,54 @@ TEST_CASE("BZM portable init starts at 800 MHz and can resume without owning a t
     TEST_ASSERT_EQUAL_UINT8(4, bzm_driver_init(&test_state));
     bzm_driver_service(&test_state);
     TEST_ASSERT_FALSE(reported_fault);
+    fixture_destroy();
+}
+
+bzm_status_t test_driver_bridge_reset(void)
+{
+    TEST_ASSERT_TRUE(startup_reset_asserted);
+    TEST_ASSERT_FALSE(INITIALIZED);
+    TEST_ASSERT_FALSE(DRIVER_BRINGUP.running);
+    TEST_ASSERT_NOT_EQUAL(0, pthread_mutex_trylock(&REACTOR_LOCK));
+    ++bridge_reset_calls;
+    return bridge_reset_result;
+}
+
+TEST_CASE("BZM init retries a missing ASIC once after bridge reset", "[asic][bzm][driver][startup]")
+{
+    fixture_init();
+    missing_starts = 1;
+    TEST_ASSERT_EQUAL_UINT8(4, bzm_driver_init(&test_state));
+    TEST_ASSERT_EQUAL_UINT32(1, bridge_reset_calls);
+    TEST_ASSERT_EQUAL_UINT32(2, startup_chip_calls);
+    TEST_ASSERT_TRUE(INITIALIZED);
+    TEST_ASSERT_FALSE(startup_reset_asserted);
+    fixture_destroy();
+}
+
+TEST_CASE("BZM init leaves reset asserted after a failed bridge recovery", "[asic][bzm][driver][startup]")
+{
+    for (unsigned failure = 0; failure < 3; ++failure) {
+        fixture_init();
+        missing_starts = 2;
+        bridge_reset_result = failure == 0 ? BZM_OK :
+            failure == 1 ? BZM_ERR_IO : BZM_ERR_NOT_SUPPORTED;
+        TEST_ASSERT_EQUAL_UINT8(0, bzm_driver_init(&test_state));
+        TEST_ASSERT_EQUAL_UINT32(1, bridge_reset_calls);
+        TEST_ASSERT_EQUAL_UINT32(failure == 0 ? 2 : 1, startup_chip_calls);
+        TEST_ASSERT_TRUE(startup_reset_asserted);
+        TEST_ASSERT_FALSE(INITIALIZED);
+        fixture_destroy();
+    }
+}
+
+TEST_CASE("BZM init does not reset the bridge after other startup failures", "[asic][bzm][driver][startup]")
+{
+    fixture_init();
+    startup_failure = 5;
+    TEST_ASSERT_EQUAL_UINT8(0, bzm_driver_init(&test_state));
+    TEST_ASSERT_EQUAL_UINT32(0, bridge_reset_calls);
+    TEST_ASSERT_TRUE(startup_reset_asserted);
     fixture_destroy();
 }
 

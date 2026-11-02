@@ -15,7 +15,9 @@ static struct {
     uint32_t wait_ms;
     uint16_t read_size, read_ms;
     int16_t read_result;
-    bzm_status_t init_status, baud_status, clear_status;
+    bzm_status_t init_status, baud_status, clear_status, wait_status, reset_status;
+    bzm_control_status_t safety;
+    unsigned bridge_resets;
 } fixture;
 static int64_t now(void *ctx) { CHECK(ctx == &fixture); return fixture.time; }
 static void delay(void *ctx, uint32_t us) { CHECK(ctx == &fixture); fixture.time += us; }
@@ -27,7 +29,7 @@ static bzm_status_t init(void *ctx)
 static bool ready(void *ctx) { CHECK(ctx == &fixture); return fixture.ready; }
 static bzm_status_t baud(void *ctx, int rate)
 { CHECK(ctx == &fixture); fixture.baud = rate; return rate > 0 ? fixture.baud_status : BZM_ERR_INVALID_ARG; }
-static bzm_status_t wait_tx(void *ctx, uint32_t ms) { CHECK(ctx == &fixture); fixture.wait_ms = ms; return BZM_OK; }
+static bzm_status_t wait_tx(void *ctx, uint32_t ms) { CHECK(ctx == &fixture); fixture.wait_ms = ms; return fixture.wait_status; }
 static bzm_status_t clear(void *ctx)
 { CHECK(ctx == &fixture); ++fixture.clears; return fixture.clear_status; }
 static int write_bytes(void *ctx, const uint8_t *bytes, size_t size)
@@ -47,6 +49,51 @@ static int16_t read_bytes(void *ctx, uint8_t *bytes, uint16_t size, uint16_t ms)
 }
 static bzm_status_t hash_failure(void *ctx, const uint8_t *data, size_t size, uint8_t digest[32])
 { CHECK(ctx == &fixture); (void)data; (void)size; memset(digest, 0, 32); return BZM_ERR_IO; }
+static bzm_status_t control_init(void *ctx, const char *board) { (void)ctx; (void)board; return BZM_OK; }
+static bzm_status_t status(void *ctx, bzm_control_status_t *out) { (void)ctx; *out = fixture.safety; return BZM_OK; }
+static bzm_status_t set_bool(void *ctx, bool value) { (void)ctx; (void)value; return BZM_OK; }
+static bzm_status_t set_fan(void *ctx, float value) { (void)ctx; (void)value; return BZM_OK; }
+static bzm_status_t rpm(void *ctx, uint16_t *out) { (void)ctx; *out = 3000; return BZM_OK; }
+static bzm_status_t reset_bridge(void *ctx)
+{
+    CHECK(ctx == &fixture);
+    CHECK(fixture.wait_ms == 100);
+    ++fixture.bridge_resets;
+    return fixture.reset_status;
+}
+static void test_bridge_reset_interlocks(void)
+{
+    bzm_control_ops_t controls = {
+        .init = control_init, .get_safety_status = status, .clear_safety_fault = status, .safe_off = status,
+        .set_5v_enabled = set_bool, .set_asic_reset = set_bool, .set_fan_percent = set_fan,
+        .get_fan_rpm = rpm, .set_core_enabled = set_bool,
+    };
+    CHECK(bzm_control_bind(&controls, &fixture));
+    CHECK(bzm_control_reset_bridge() == BZM_ERR_NOT_SUPPORTED);
+    controls.reset_bridge = reset_bridge;
+    CHECK(bzm_control_bind(&controls, &fixture));
+    fixture.safety = (bzm_control_status_t){.valid = true};
+    CHECK(bzm_control_reset_bridge() == BZM_ERR_INVALID_STATE);
+    fixture.safety.asic_reset_asserted = true;
+    fixture.safety.trip_input_asserted = true;
+    CHECK(bzm_control_reset_bridge() == BZM_ERR_INVALID_STATE);
+    fixture.safety.trip_input_asserted = false;
+    fixture.safety.fault = BZM_CONTROL_FAULT_ASIC_TRIP;
+    CHECK(bzm_control_reset_bridge() == BZM_ERR_INVALID_STATE);
+    fixture.safety.fault = BZM_CONTROL_FAULT_NONE;
+    fixture.safety.valid = false;
+    CHECK(bzm_control_reset_bridge() == BZM_ERR_INVALID_STATE);
+    fixture.safety.valid = true;
+    fixture.wait_status = BZM_ERR_TIMEOUT;
+    CHECK(bzm_control_reset_bridge() == BZM_ERR_TIMEOUT);
+    CHECK(fixture.bridge_resets == 0);
+    fixture.wait_status = BZM_OK;
+    CHECK(bzm_control_reset_bridge() == BZM_OK);
+    CHECK(fixture.bridge_resets == 1);
+    fixture.reset_status = BZM_ERR_IO;
+    CHECK(bzm_control_reset_bridge() == BZM_ERR_IO);
+    CHECK(fixture.bridge_resets == 2);
+}
 int main(void)
 {
     CHECK(bzm_port_serial_init() != BZM_OK);
@@ -125,6 +172,7 @@ int main(void)
     CHECK(!bzm_job_store_init(&store));
     bzm_device_t bzm = {.asic_count = 4, .core_count = 236};
     CHECK(!bzm_driver_state_init(&bzm));
+    test_bridge_reset_interlocks();
     puts("BZM portable callbacks, stale jobs and allocation failure passed");
     return 0;
 }

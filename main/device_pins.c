@@ -12,6 +12,7 @@ const BzmPins BONANZA_1004_CONTROL_PINS = {
     .fan_pwm = GPIO_NUM_8, .fan_tach = GPIO_NUM_9,
     .core_enable = GPIO_NUM_10, .core_power_good = GPIO_NUM_11,
     .enable_5v = GPIO_NUM_21,
+    .bridge_swclk = GPIO_NUM_14, .bridge_swdio = GPIO_NUM_15,
 };
 
 const UartPins BONANZA_1004_UART_PINS = {
@@ -107,6 +108,8 @@ static esp_err_t device_pins_validate(const DevicePins * pins)
         if (check_pin(pins->bzm->core_enable, "Core enable", &allocated_pins_mask) != ESP_OK) status = ESP_ERR_INVALID_STATE;
         if (check_pin(pins->bzm->core_power_good, "Core PGOOD", &allocated_pins_mask) != ESP_OK) status = ESP_ERR_INVALID_STATE;
         if (check_pin(pins->bzm->enable_5v, "5 V enable", &allocated_pins_mask) != ESP_OK) status = ESP_ERR_INVALID_STATE;
+        if (check_pin(pins->bzm->bridge_swclk, "Bridge SWCLK", &allocated_pins_mask) != ESP_OK) status = ESP_ERR_INVALID_STATE;
+        if (check_pin(pins->bzm->bridge_swdio, "Bridge SWDIO", &allocated_pins_mask) != ESP_OK) status = ESP_ERR_INVALID_STATE;
     }
 
     return status;
