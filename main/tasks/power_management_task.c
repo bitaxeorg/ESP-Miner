@@ -1,4 +1,5 @@
 #include "esp_log.h"
+#include <stdio.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "global_state.h"
@@ -14,6 +15,8 @@
 #include "driver/uart.h"
 
 #define POLL_RATE 100
+#define MAX_RESUME_ATTEMPTS 3
+#define RESUME_RETRY_BACKOFF_MS 5000
 #define MAX_TEMP 90.0
 #define THROTTLE_TEMP 75.0
 #define SAFE_TEMP 45.0
@@ -125,6 +128,8 @@ void POWER_MANAGEMENT_task(void * pvParameters)
     uint16_t last_known_asic_voltage = 0;
     float last_known_asic_frequency = 0.0;
     bool is_paused = false;
+    uint8_t resume_attempts = 0;
+    TickType_t last_resume_failure_tick = 0;
 
     while (1) {
         if (GLOBAL_STATE->SELF_TEST_MODULE.is_finished) {
@@ -143,12 +148,29 @@ void POWER_MANAGEMENT_task(void * pvParameters)
         power_management->vr_temp = Power_get_vreg_temp(GLOBAL_STATE);
         // User pause, hardware fault, or all pools unreachable
         bool wants_stop = sys_module->mining_paused || sys_module->hardware_fault || sys_module->pools_unavailable;
-        if (wants_stop && !is_paused) {
-            mining_stop(GLOBAL_STATE);
-            is_paused = true;
-        } else if (!wants_stop && is_paused) {
-            mining_start(GLOBAL_STATE);
-            is_paused = false;
+        if (wants_stop) {
+            // An explicit stop resets the resume retry episode.
+            resume_attempts = 0;
+            if (!is_paused) {
+                mining_stop(GLOBAL_STATE);
+                is_paused = true;
+            }
+        } else if (is_paused &&
+                   (resume_attempts == 0 ||
+                    (TickType_t)(xTaskGetTickCount() - last_resume_failure_tick) >= pdMS_TO_TICKS(RESUME_RETRY_BACKOFF_MS))) {
+            if (mining_start(GLOBAL_STATE) > 0) {
+                is_paused = false;
+                resume_attempts = 0;
+            } else {
+                // Keep the ASIC powered down between limited attempts.
+                mining_stop(GLOBAL_STATE);
+                last_resume_failure_tick = xTaskGetTickCount();
+                if (++resume_attempts >= MAX_RESUME_ATTEMPTS && !sys_module->hardware_fault) {
+                    sys_module->hardware_fault = true;
+                    snprintf(sys_module->hardware_fault_msg, sizeof(sys_module->hardware_fault_msg),
+                             "ASIC resume failed after %u attempts", (unsigned)resume_attempts);
+                }
+            }
         }
 
         // If we've paused or have a hardware fault, skip doing anything else
