@@ -298,7 +298,7 @@
     "hashes_help": "Approximate number of your total accumulated hashes (personal mining effort).",
     "hashes_total_tooltip": "{count} total hashes",
     "work_received": "Work Received",
-    "pool_response_batched": "(batched ×{count})",
+    "pool_response_batched": "batched ×{count}",
     "pool_response_batched_help": "The pool acknowledged {count} shares in one batch; the time reflects the most recent share, so it may include the pool's batching window",
     "coinbase_value": "Value",
     "coinbase_value_help": "Total value of transaction outputs in BTC. For non-bitcoin chains, disable 'Decode Coinbase Tx' in Advanced Pool Options.",
@@ -518,11 +518,11 @@
       "explanation": "Mientras se enviaba este Share, la red ya había encontrado un nuevo bloque, por lo que el Share es inválido."
     },
     "stale": {
-      "label": "Stale",
+      "label": "{{share_rejection.Stale.label}}",
       "explanation": "{{share_rejection.Stale.explanation}}"
     },
     "stale-share": {
-      "label": "Stale",
+      "label": "{{share_rejection.Stale.label}}",
       "explanation": "{{share_rejection.Stale.explanation}}"
     },
     "Subscription validation error": {

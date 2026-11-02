@@ -298,7 +298,7 @@
     "hashes_help": "Approximate number of your total accumulated hashes (personal mining effort).",
     "hashes_total_tooltip": "{count} total hashes",
     "work_received": "Work Received",
-    "pool_response_batched": "(batched ×{count})",
+    "pool_response_batched": "batched ×{count}",
     "pool_response_batched_help": "The pool acknowledged {count} shares in one batch; the time reflects the most recent share, so it may include the pool's batching window",
     "coinbase_value": "Value",
     "coinbase_value_help": "Total value of transaction outputs in BTC. For non-bitcoin chains, disable 'Decode Coinbase Tx' in Advanced Pool Options.",
@@ -431,7 +431,7 @@
     },
     "Duplicate share": {
       "label": "Duplicate share",
-      "explanation": "This share has already been submitted."
+      "explanation": "{{share_rejection.Duplicate.explanation}}"
     },
     "Invalid array size": {
       "label": "Invalid array size",
@@ -448,7 +448,7 @@
     },
     "Invalid JobID": {
       "label": "Invalid JobID",
-      "explanation": "The job ID in the submission was not recognized or is no longer valid."
+      "explanation": "{{share_rejection.invalid-job-id.explanation}}"
     },
     "Invalid mining submit message": {
       "explanation": "The mining.submit request was malformed."
@@ -518,11 +518,11 @@
       "explanation": "While this share was being submitted, the network had already found a new block, making this share invalid."
     },
     "stale": {
-      "label": "Stale",
+      "label": "{{share_rejection.Stale.label}}",
       "explanation": "{{share_rejection.Stale.explanation}}"
     },
     "stale-share": {
-      "label": "Stale",
+      "label": "{{share_rejection.Stale.label}}",
       "explanation": "{{share_rejection.Stale.explanation}}"
     },
     "Subscription validation error": {
