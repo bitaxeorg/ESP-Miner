@@ -49,6 +49,17 @@ static void clear_active_job_ids(char active_job_ids[][MAX_JOB_ID_LEN], int *cou
     *count = 0;
 }
 
+static bool is_active_job_id(char active_job_ids[][MAX_JOB_ID_LEN], int count, const char *job_id)
+{
+    if (!job_id) return false;
+    for (int i = 0; i < count; i++) {
+        if (strncmp(active_job_ids[i], job_id, MAX_JOB_ID_LEN) == 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
 static int stratum_get_next_uid(sv1_conn_t *conn)
 {
     pthread_mutex_lock(&s_v1_conn_mutex);
@@ -74,6 +85,12 @@ int stratum_v1_submit_share(GlobalState *GLOBAL_STATE, const asic_job_t *active_
     sv1_conn_t *conn = s_v1_conns[active_job->pool_id];
     if (conn == NULL || conn->transport == NULL) {
         pthread_mutex_unlock(&s_v1_conn_mutex);
+        return -1;
+    }
+
+    if (!is_active_job_id(conn->active_job_ids, conn->active_job_ids_count, active_job->job_id)) {
+        pthread_mutex_unlock(&s_v1_conn_mutex);
+        ESP_LOGW(TAG, "Dropping stale share for job %s (not in active jobs)", active_job->job_id[0] ? active_job->job_id : "null");
         return -1;
     }
 

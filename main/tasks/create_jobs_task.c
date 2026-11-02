@@ -64,6 +64,7 @@ void create_jobs_task(void *pvParameters)
             miner_job_t *new_work = miner_job_get_slot((size_t)slot_notify);
             ESP_LOGI(TAG, "New Work Activated %s (type %d)", new_work->job_id, new_work->type);
             current_work = new_work;
+            GLOBAL_STATE->has_work = true;
             GLOBAL_STATE->active_job_slot_idx = (uint8_t)(slot_notify % MINER_JOB_POOL_SIZE);
             current_work_sent = false;
             current_version = new_work->version;
@@ -85,7 +86,9 @@ void create_jobs_task(void *pvParameters)
                 continue;
             }
         } else {
-            if (current_work == NULL) {
+            if (current_work == NULL || !GLOBAL_STATE->has_work) {
+                current_work = NULL;
+                current_work_sent = false;
                 vTaskDelay(100 / portTICK_PERIOD_MS);
                 continue;
             }
