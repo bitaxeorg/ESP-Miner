@@ -11,6 +11,8 @@ static i2c_master_dev_handle_t EMC2103_dev_handle;
 
 static int temp_offset;
 static int flip;
+static float external_temp_scale[2] = {1.0f, 1.0f};
+static float external_temp_offset[2] = {0.0f, 0.0f};
 
 /**
  * @brief Initialize the EMC2103 sensor.
@@ -19,7 +21,7 @@ static int flip;
  *
  * @return esp_err_t ESP_OK on success, or an error code on failure.
  */
-esp_err_t EMC2103_init(int temp_offset_param, bool flip_param)
+esp_err_t EMC2103_init(int temp_offset_param, bool flip_param, bool direct_pwm)
 {
     ESP_LOGI(TAG, "Initializing EMC2103 (Temperature offset: %d° C)", temp_offset_param);
     
@@ -35,7 +37,15 @@ esp_err_t EMC2103_init(int temp_offset_param, bool flip_param)
 
     // Configure the fan setting
     ESP_RETURN_ON_ERROR(i2c_bitaxe_register_write_byte(EMC2103_dev_handle, EMC2103_CONFIGURATION1, 0), TAG, "Failed to configure EMC2103");
-    ESP_RETURN_ON_ERROR(i2c_bitaxe_register_write_byte(EMC2103_dev_handle, EMC2103_PWM_CONFIG, 0x00), TAG, "Failed to configure PWM");
+    if (direct_pwm) {
+        ESP_RETURN_ON_ERROR(i2c_bitaxe_register_write_byte(EMC2103_dev_handle, EMC2103_LUT_CONFIG1, EMC2103_LUT_CONFIG1_DISABLED), TAG, "Failed to disable fan LUT");
+        ESP_RETURN_ON_ERROR(i2c_bitaxe_register_write_byte(EMC2103_dev_handle, EMC2103_FAN_CONFIG1, EMC2103_FAN_CONFIG1_DIRECT_PWM), TAG, "Failed to configure direct PWM mode");
+        ESP_RETURN_ON_ERROR(i2c_bitaxe_register_write_byte(EMC2103_dev_handle, EMC2103_PWM_CONFIG, EMC2103_PWM_CONFIG_PUSH_PULL_NORMAL), TAG, "Failed to configure PWM output");
+        ESP_RETURN_ON_ERROR(i2c_bitaxe_register_write_byte(EMC2103_dev_handle, EMC2103_PWM_BASE_FREQ, EMC2103_PWM_BASE_FREQ_26KHZ), TAG, "Failed to configure PWM base frequency");
+        ESP_RETURN_ON_ERROR(i2c_bitaxe_register_write_byte(EMC2103_dev_handle, EMC2103_PWM_DIVIDE, EMC2103_PWM_DIVIDE_BY_1), TAG, "Failed to configure PWM divisor");
+    } else {
+        ESP_RETURN_ON_ERROR(i2c_bitaxe_register_write_byte(EMC2103_dev_handle, EMC2103_PWM_CONFIG, 0x00), TAG, "Failed to configure PWM");
+    }
 
     return ESP_OK;
 
@@ -146,7 +156,18 @@ static float get_external_temp(int i, uint8_t msb_register, uint8_t lsb_register
     // Convert the signed reading to temperature in Celsius
     float result = (float)signed_reading / 8.0f;
 
-    return result + temp_offset;
+    return result * external_temp_scale[i - 1] + external_temp_offset[i - 1] + temp_offset;
+}
+
+esp_err_t EMC2103_set_external_temp_calibration(uint8_t diode, float scale, float offset_c)
+{
+    if ((diode != 1 && diode != 2) || scale <= 0.0f) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    external_temp_scale[diode - 1] = scale;
+    external_temp_offset[diode - 1] = offset_c;
+    return ESP_OK;
 }
 
 /**

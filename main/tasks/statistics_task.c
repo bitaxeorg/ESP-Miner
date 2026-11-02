@@ -1,6 +1,7 @@
 #include <stdint.h>
+#include <inttypes.h>
+#include <stdio.h>
 #include <pthread.h>
-#include <math.h>
 #include <string.h>
 #include "esp_log.h"
 #include "esp_timer.h"
@@ -15,6 +16,28 @@
 #define DEFAULT_POLL_RATE 1000
 
 static const char * TAG = "statistics_task";
+
+const char * const STATS_LABELS[SRC_NONE] = {
+    [SRC_HASHRATE] = "hashrate",
+    [SRC_HASHRATE_1m] = "hashrate_1m",
+    [SRC_HASHRATE_10m] = "hashrate_10m",
+    [SRC_HASHRATE_1h] = "hashrate_1h",
+    [SRC_ERROR_PERCENTAGE] = "errorPercentage",
+    [SRC_ASIC_TEMP] = "asicTemp",
+    [SRC_ASIC_TEMP2] = "asicTemp2",
+    [SRC_VR_TEMP] = "vrTemp",
+    [SRC_ASIC_VOLTAGE] = "asicVoltage",
+    [SRC_VOLTAGE] = "voltage",
+    [SRC_POWER] = "power",
+    [SRC_CURRENT] = "current",
+    [SRC_FAN_SPEED] = "fanSpeed",
+    [SRC_FAN_RPM] = "fanRpm",
+    [SRC_FAN2_RPM] = "fan2Rpm",
+    [SRC_WIFI_RSSI] = "wifiRssi",
+    [SRC_FREE_HEAP] = "freeHeap",
+    [SRC_RESPONSE_TIME_MIN] = "responseTimeMin",
+    [SRC_RESPONSE_TIME_MAX] = "responseTimeMax",
+};
 
 static StatisticsDataPtr statisticsBuffer;
 static uint16_t statisticsDataSize;
@@ -51,6 +74,22 @@ void removeStatisticsBuffer()
         }
 
         pthread_mutex_unlock(&statisticsDataLock);
+    }
+}
+
+static inline void merge_min_positive(float *target, char *token, float val)
+{
+    if (val > 0.0f && (*target <= 0.0f || val < *target)) {
+        *target = val;
+        snprintf(token, STATS_TOKEN_LEN, "%.2f", val);
+    }
+}
+
+static inline void merge_max_positive(float *target, char *token, float val)
+{
+    if (val > 0.0f && (*target <= 0.0f || val > *target)) {
+        *target = val;
+        snprintf(token, STATS_TOKEN_LEN, "%.2f", val);
     }
 }
 
@@ -113,9 +152,18 @@ bool addStatisticData(StatisticsDataPtr data, uint16_t statsFrequency)
                 indexToRemove = low;
             }
 
+            struct StatisticsData *toRemove = &statisticsBuffer[indexToRemove];
+            struct StatisticsData *successor = &statisticsBuffer[indexToRemove + 1];
+
+            // Merge into successor before removing indexToRemove
+            if (indexToRemove > 0) {
+                merge_min_positive(&successor->responseTimeMin, successor->tokens[SRC_RESPONSE_TIME_MIN], toRemove->responseTimeMin);
+                merge_max_positive(&successor->responseTimeMax, successor->tokens[SRC_RESPONSE_TIME_MAX], toRemove->responseTimeMax);
+            }
+
             // Shift and append (Standard linear array shift)
             if (indexToRemove < maxDataCount - 1) {
-                memmove(&statisticsBuffer[indexToRemove], &statisticsBuffer[indexToRemove + 1], (maxDataCount - indexToRemove - 1) * sizeof(struct StatisticsData));
+                memmove(toRemove, successor, (maxDataCount - indexToRemove - 1) * sizeof(struct StatisticsData));
             }
             statisticsBuffer[maxDataCount - 1] = *data;
             result = true;
@@ -127,24 +175,17 @@ bool addStatisticData(StatisticsDataPtr data, uint16_t statsFrequency)
     return result;
 }
 
-bool getStatisticData(uint16_t index, StatisticsDataPtr dataOut)
+void withStatisticsData(StatisticsReaderCallback cb, void *user_ctx)
 {
-    bool result = false;
-
-    if ((NULL == statisticsBuffer) || (NULL == dataOut) || (maxDataCount <= index)) {
-        return result;
+    if (!cb) {
+        return;
     }
 
     pthread_mutex_lock(&statisticsDataLock);
 
-    if ((NULL != statisticsBuffer) && (index < statisticsDataSize)) {
-        *dataOut = statisticsBuffer[index];
-        result = true;
-    }
+    cb(statisticsBuffer, (statisticsBuffer != NULL) ? statisticsDataSize : 0, user_ctx);
 
     pthread_mutex_unlock(&statisticsDataLock);
-
-    return result;
 }
 
 void statistics_task(void * pvParameters)
@@ -155,6 +196,7 @@ void statistics_task(void * pvParameters)
     SystemModule * sys_module = &GLOBAL_STATE->SYSTEM_MODULE;
     PowerManagementModule * power_management = &GLOBAL_STATE->POWER_MANAGEMENT_MODULE;
     struct StatisticsData statsData = {};
+    uint64_t last_shares_count = sys_module->shares_accepted + sys_module->shares_rejected;
 
     TickType_t taskWakeTime = xTaskGetTickCount();
 
@@ -169,24 +211,43 @@ void statistics_task(void * pvParameters)
                 get_wifi_current_rssi(&wifiRSSI);
 
                 statsData.timestamp = currentTime;
-                statsData.hashrate = sys_module->current_hashrate;
-                statsData.hashrate_1m = sys_module->hashrate_1m;
-                statsData.hashrate_10m = sys_module->hashrate_10m;
-                statsData.hashrate_1h = sys_module->hashrate_1h;
-                statsData.errorPercentage = sys_module->error_percentage;
-                statsData.chipTemperature = power_management->chip_temp_avg;
-                statsData.chipTemperature2 = power_management->chip_temp2_avg;
-                statsData.vrTemperature = power_management->vr_temp;
-                statsData.power = power_management->power;
-                statsData.voltage = power_management->voltage;
-                statsData.current = power_management->current;
-                statsData.coreVoltageActual = power_management->core_voltage;
-                statsData.fanSpeed = power_management->fan_perc;
-                statsData.fanRPM = power_management->fan_rpm;
-                statsData.fan2RPM = power_management->fan2_rpm;
-                statsData.wifiRSSI = wifiRSSI;
-                statsData.freeHeap = esp_get_free_heap_size();
-                statsData.responseTime = sys_module->response_time;
+                snprintf(statsData.tokens[SRC_HASHRATE], STATS_TOKEN_LEN, "%.2f", sys_module->current_hashrate);
+                snprintf(statsData.tokens[SRC_HASHRATE_1m], STATS_TOKEN_LEN, "%.2f", sys_module->hashrate_1m);
+                snprintf(statsData.tokens[SRC_HASHRATE_10m], STATS_TOKEN_LEN, "%.2f", sys_module->hashrate_10m);
+                snprintf(statsData.tokens[SRC_HASHRATE_1h], STATS_TOKEN_LEN, "%.2f", sys_module->hashrate_1h);
+                snprintf(statsData.tokens[SRC_ERROR_PERCENTAGE], STATS_TOKEN_LEN, "%.2f", sys_module->error_percentage);
+                snprintf(statsData.tokens[SRC_ASIC_TEMP], STATS_TOKEN_LEN, "%.2f", power_management->chip_temp_avg);
+                snprintf(statsData.tokens[SRC_ASIC_TEMP2], STATS_TOKEN_LEN, "%.2f", power_management->chip_temp2_avg);
+                snprintf(statsData.tokens[SRC_VR_TEMP], STATS_TOKEN_LEN, "%.2f", power_management->vr_temp);
+                snprintf(statsData.tokens[SRC_ASIC_VOLTAGE], STATS_TOKEN_LEN, "%d", (int)power_management->core_voltage);
+                snprintf(statsData.tokens[SRC_VOLTAGE], STATS_TOKEN_LEN, "%.2f", power_management->voltage);
+                snprintf(statsData.tokens[SRC_POWER], STATS_TOKEN_LEN, "%.2f", power_management->power);
+                snprintf(statsData.tokens[SRC_CURRENT], STATS_TOKEN_LEN, "%.2f", power_management->current);
+                snprintf(statsData.tokens[SRC_FAN_SPEED], STATS_TOKEN_LEN, "%.2f", power_management->fan_perc);
+                snprintf(statsData.tokens[SRC_FAN_RPM], STATS_TOKEN_LEN, "%u", (unsigned int)power_management->fan_rpm);
+                snprintf(statsData.tokens[SRC_FAN2_RPM], STATS_TOKEN_LEN, "%u", (unsigned int)power_management->fan2_rpm);
+                snprintf(statsData.tokens[SRC_WIFI_RSSI], STATS_TOKEN_LEN, "%d", (int)wifiRSSI);
+                snprintf(statsData.tokens[SRC_FREE_HEAP], STATS_TOKEN_LEN, "%" PRIu32, esp_get_free_heap_size());
+
+                uint64_t current_shares = sys_module->shares_accepted + sys_module->shares_rejected;
+                if (current_shares != last_shares_count && sys_module->response_time > 0.0f) {
+                    statsData.responseTimeMin = sys_module->response_time_min > 0.0f ? sys_module->response_time_min : sys_module->response_time;
+                    statsData.responseTimeMax = sys_module->response_time_max > 0.0f ? sys_module->response_time_max : sys_module->response_time;
+                    sys_module->last_response_time_min = statsData.responseTimeMin;
+                    sys_module->last_response_time_max = statsData.responseTimeMax;
+                    snprintf(statsData.tokens[SRC_RESPONSE_TIME_MIN], STATS_TOKEN_LEN, "%.2f", statsData.responseTimeMin);
+                    snprintf(statsData.tokens[SRC_RESPONSE_TIME_MAX], STATS_TOKEN_LEN, "%.2f", statsData.responseTimeMax);
+                } else {
+                    statsData.responseTimeMin = 0.0f;
+                    statsData.responseTimeMax = 0.0f;
+                    sys_module->last_response_time_min = 0.0f;
+                    sys_module->last_response_time_max = 0.0f;
+                    strcpy(statsData.tokens[SRC_RESPONSE_TIME_MIN], "null");
+                    strcpy(statsData.tokens[SRC_RESPONSE_TIME_MAX], "null");
+                }
+                last_shares_count = current_shares;
+                sys_module->response_time_min = 0.0f;
+                sys_module->response_time_max = 0.0f;
 
                 addStatisticData(&statsData, configStatsFrequency);
             }

@@ -8,7 +8,17 @@ static const char * TAG = "filesystem";
 
 esp_err_t filesystem_init(GlobalState * GLOBAL_STATE)
 {
-    esp_vfs_spiffs_conf_t conf = {.base_path = "", .partition_label = NULL, .max_files = 5, .format_if_mount_failed = false};
+    // A factory image may contain an erased SPIFFS partition because AxeOS is
+    // embedded in the application. Format that partition on first boot so the
+    // factory self-test validates usable flash instead of failing on an empty
+    // filesystem. Never auto-format during a manual self-test, where SPIFFS may
+    // contain a user's custom AxeOS files.
+    esp_vfs_spiffs_conf_t conf = {
+        .base_path = "",
+        .partition_label = NULL,
+        .max_files = 5,
+        .format_if_mount_failed = GLOBAL_STATE->SELF_TEST_MODULE.is_factory,
+    };
     esp_err_t ret = esp_vfs_spiffs_register(&conf);
 
     if (ret != ESP_OK) {

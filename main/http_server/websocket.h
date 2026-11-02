@@ -27,7 +27,8 @@ void websocket_send_to_client(int fd, httpd_ws_frame_t *pkt);
 int websocket_get_active_client_count(WebSocketClientType type);
 void websocket_init(httpd_handle_t server);
 esp_err_t websocket_pre_handshake(httpd_req_t *req);
-esp_err_t websocket_post_handshake(httpd_req_t *req);
+esp_err_t websocket_post_handshake_logs(httpd_req_t *req);
+esp_err_t websocket_post_handshake_api(httpd_req_t *req);
 esp_err_t websocket_handler(httpd_req_t *req);
 
 void websocket_close_fn(httpd_handle_t hd, int sockfd);

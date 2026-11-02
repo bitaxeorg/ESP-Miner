@@ -27,26 +27,34 @@ menu "Bitaxe Configuration"
                 GPIO pin for DC barrel (PLUG_SENSE), sense pin of DC power jack socket.
 
         config GPIO_I2C_SDA
-            int "I2C SDA Pin"
-            default 47
+            int "I2C SDA Pin Override (-1 to use board default)"
+            default -1
             help
-                GPIO pin for I2C clock line (SDA).
+                GPIO pin override for I2C SDA line. Set to -1 to use board default.
             
         config GPIO_I2C_SCL
-            int "I2C SCL Pin"
-            default 48
+            int "I2C SCL Pin Override (-1 to use board default)"
+            default -1
             help
-                GPIO pin for I2C clock line (SCL).
+                GPIO pin override for I2C SCL line. Set to -1 to use board default.
+
+        config ENABLE_BAP
+            bool "Enable BAP (Bitaxe Accessory Protocol)"
+            default y
+            help
+                Enable or disable Bitaxe Accessory Protocol (BAP) UART communication.
+
         config GPIO_BAP_RX
-            int "I2C BAP Pin"
-            default 40
+            int "BAP RX Pin Override (-1 to use board default)"
+            default -1
             help
-                GPIO pin for BAP receiving line.
+                GPIO pin override for BAP receiving line. Set to -1 to use board default.
+
         config GPIO_BAP_TX
-            int "I2C BAP Pin"
-            default 39
+            int "BAP TX Pin Override (-1 to use board default)"
+            default -1
             help
-                GPIO pin for BAP transmitting line.
+                GPIO pin override for BAP transmitting line. Set to -1 to use board default.
             
     endmenu
     

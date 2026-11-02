@@ -11,7 +11,6 @@ import { ActivatedRoute } from '@angular/router';
 import { DateAgoPipe } from 'src/app/pipes/date-ago.pipe';
 import { DropdownComponent } from '../dropdown/dropdown.component';
 import { SelectOption } from '../../models/select-option.model';
-import { CommonModule } from '@angular/common';
 import { TooltipDirective } from '../../directives/tooltip.directive';
 import { CheckboxComponent } from '../checkbox/checkbox.component';
 import { SliderComponent } from '../slider/slider.component';
@@ -24,7 +23,6 @@ const STATS_FREQUENCY_STEPS = [0, 1, 2, 5, 10, 30, 60, 60 * 2, 60 * 6, 60 * 14, 
     templateUrl: './edit.component.html',
     standalone: true,
     imports: [
-        CommonModule,
         ReactiveFormsModule,
         CheckboxComponent,
         DropdownComponent,
@@ -183,7 +181,7 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
           coreVoltage: [info.coreVoltage, [Validators.required]],
           frequency: [info.frequency, [Validators.required]],
           autofanspeed: [info.autofanspeed == 1, [Validators.required]],
-          minfanspeed: [info.minFanSpeed, [Validators.required]],
+          minFanSpeed: [info.minFanSpeed, [Validators.required]],
           manualFanSpeed: [info.manualFanSpeed, [Validators.required]],
           temptarget: [info.temptarget, [Validators.required]],
           overheat_mode: [info.overheat_mode, [Validators.required]],
@@ -322,6 +320,10 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
     return this.displays.map(display => ({ name: display, value: display }));
   }
 
+  get isDisplayConfigurable(): boolean {
+    return this.displays.includes(this.form?.controls['display'].value);
+  }
+
   get rotationOptions(): SelectOption[] {
     return this.rotations.map(rotation => ({ name: `${rotation}°`, value: rotation }));
   }
@@ -377,6 +379,7 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
       'coreVoltage',
       'frequency',
       'autofanspeed',
+      'minFanSpeed',
       'manualFanSpeed',
       'temptarget',
       'overheat_mode',

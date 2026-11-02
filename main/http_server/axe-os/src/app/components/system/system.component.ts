@@ -9,6 +9,9 @@ import { LoadingService } from 'src/app/services/loading.service';
 import { DateAgoPipe } from 'src/app/pipes/date-ago.pipe';
 import { ByteSuffixPipe } from 'src/app/pipes/byte-suffix.pipe';
 import { SystemInfo as ISystemInfo, SystemAsic as ISystemASIC, GenericResponse, } from 'src/app/generated/models';
+import { AsyncPipe, formatNumber } from '@angular/common';
+import { TooltipDirective } from '../../directives/tooltip.directive';
+
 
 type TableRow = {
   label: string;
@@ -26,9 +29,9 @@ type CombinedData = {
 };
 
 @Component({
-    selector: 'app-system',
-    templateUrl: './system.component.html',
-    standalone: false
+  selector: 'app-system',
+  templateUrl: './system.component.html',
+  imports: [TooltipDirective, AsyncPipe]
 })
 export class SystemComponent implements OnInit, OnDestroy {
   public systemRows$: Observable<TableRow[]>;
@@ -95,6 +98,9 @@ export class SystemComponent implements OnInit, OnDestroy {
       { label: 'Board Version', value: data.info.boardVersion },
       { label: 'ASIC Type', value: (data.asic.asicCount > 1 ? data.asic.asicCount + 'x ' : ' ') + data.asic.ASICModel, class: 'pb-6' },
       { label: 'Uptime', value: DateAgoPipe.transform(data.info.uptimeSeconds) },
+      { label: 'Total Uptime', value: DateAgoPipe.transform(data.info.totalUptimeSeconds || 0) },
+      { label: 'Total Log2 Work', value: (data.info.totalLog2Work || 0).toFixed(6) },
+      { label: 'Total Hashes', value: formatNumber(data.info.totalHashes || 0, 'en-us')},
       { label: 'Reset Reason', value: data.info.resetReason, class: 'pb-6' },
       { label: 'Wi-Fi SSID', value: data.info.ssid, isSensitiveData: true },
       { label: 'Wi-Fi Status', value: data.info.wifiStatus },

@@ -1,9 +1,12 @@
 #include <string.h>
+#include <stdlib.h>
 #include <stdbool.h>
-#include <math.h>
 #include <stdio.h>
-
+#include <arpa/inet.h>
 #include "asic_common.h"
+#include "bm_job_packet.h"
+#include "bm1397.h"
+#include "mining.h"
 #include "serial.h"
 #include "esp_log.h"
 #include "crc.h"
@@ -79,7 +82,7 @@ int _next_power_of_two(int num)
     return power;
 }
 
-int count_asic_chips(uint16_t asic_count, uint16_t chip_id, int chip_id_response_length)
+int count_asic_chips_with_id_alias(uint16_t asic_count, uint16_t chip_id, uint16_t chip_id_alias, int chip_id_response_length)
 {
     uint8_t buffer[11] = {0};
 
@@ -109,8 +112,12 @@ int count_asic_chips(uint16_t asic_count, uint16_t chip_id, int chip_id_response
         }
 
         uint16_t received_chip_id = (buffer[2] << 8) | buffer[3];
-        if (received_chip_id != chip_id) {
-            ESP_LOGW(TAG, "CHIP_ID response mismatch: expected 0x%04x, got 0x%04x", chip_id, received_chip_id);
+        if (received_chip_id != chip_id && received_chip_id != chip_id_alias) {
+            if (chip_id == chip_id_alias) {
+                ESP_LOGW(TAG, "CHIP_ID response mismatch: expected 0x%04x, got 0x%04x", chip_id, received_chip_id);
+            } else {
+                ESP_LOGW(TAG, "CHIP_ID response mismatch: expected 0x%04x or 0x%04x, got 0x%04x", chip_id, chip_id_alias, received_chip_id);
+            }
             ESP_LOG_BUFFER_HEX(TAG, buffer, received);
             continue;
         }
@@ -143,6 +150,11 @@ int count_asic_chips(uint16_t asic_count, uint16_t chip_id, int chip_id_response
     }
 
     return chip_counter;
+}
+
+int count_asic_chips(uint16_t asic_count, uint16_t chip_id, int chip_id_response_length)
+{
+    return count_asic_chips_with_id_alias(asic_count, chip_id, chip_id, chip_id_response_length);
 }
 
 esp_err_t receive_work(uint8_t * buffer, int buffer_size, uint64_t *out_timestamp_us)
@@ -187,33 +199,48 @@ esp_err_t receive_work(uint8_t * buffer, int buffer_size, uint64_t *out_timestam
     return ESP_OK;
 }
 
-void get_difficulty_mask(double difficulty, uint8_t *job_difficulty_mask)
+void get_difficulty_mask(uint8_t difficulty_power, uint8_t *job_difficulty_mask)
 {
-    // The mask must be a power of 2 so there are no holes
-    // Correct:   {0b00000000, 0b00000000, 0b11111111, 0b11111111}
-    // Incorrect: {0b00000000, 0b00000000, 0b11100111, 0b11111111}
-
-    // Round up to ensure we don't make difficulty harder than requested, then convert to int
-    uint32_t diff_int = (uint32_t)ceil(difficulty);
-
-    // Calculate largest power of 2 <= diff_int (inline of former _largest_power_of_two)
-    int power = 0;
-    while (diff_int > 1) {
-        diff_int = diff_int >> 1;
-        power++;
-    }
-    uint32_t mask = (1 << power) - 1;
+    // Register 0x14 (TICKET_MASK) filters candidate nonces by requiring `difficulty_power` leading zero bits.
+    // The mask is a contiguous bitmask (1 << power) - 1, representing difficulty 2^power.
+    uint32_t mask = (difficulty_power >= 32) ? 0xFFFFFFFFU : ((1U << difficulty_power) - 1);
 
     job_difficulty_mask[0] = 0x00;
     job_difficulty_mask[1] = 0x14; // TICKET_MASK
 
-    // convert difficulty into char array
-    // Ex: 256 = {0b00000000, 0b00000000, 0b00000000, 0b11111111}, {0x00, 0x00, 0x00, 0xff}
-    // Ex: 512 = {0b00000000, 0b00000000, 0b00000001, 0b11111111}, {0x00, 0x00, 0x01, 0xff}
     job_difficulty_mask[2] = _reverse_bits((mask >> 24) & 0xFF);
     job_difficulty_mask[3] = _reverse_bits((mask >> 16) & 0xFF);
     job_difficulty_mask[4] = _reverse_bits((mask >>  8) & 0xFF);
     job_difficulty_mask[5] = _reverse_bits( mask        & 0xFF);
+}
+
+uint8_t calculate_effective_asic_difficulty(double expected_ghs, double interval_s, double pool_difficulty)
+{
+    if (interval_s <= 0.0) {
+        interval_s = DEFAULT_SHARE_INTERVAL_S;
+    }
+
+    uint8_t power = MIN_ASIC_DIFFICULTY_POWER;
+    if (expected_ghs > 0.0) {
+        double raw_diff = expected_ghs * 1e9 * interval_s / NONCE_SPACE;
+        if (raw_diff > (double)(1U << MIN_ASIC_DIFFICULTY_POWER)) {
+            int p = MIN_ASIC_DIFFICULTY_POWER;
+            while ((p < 31) && ((double)(1U << (p + 1)) <= raw_diff + 1e-6)) {
+                p++;
+            }
+            double lower = (double)(1U << p);
+            double upper = (double)(1U << (p + 1));
+            power = ((raw_diff - lower) > (upper - raw_diff)) ? (uint8_t)(p + 1) : (uint8_t)p;
+        }
+    }
+
+    if (pool_difficulty > 0.0) {
+        while (power > MIN_ASIC_DIFFICULTY_POWER && ((double)(1U << power) > pool_difficulty + 1e-6)) {
+            power--;
+        }
+    }
+
+    return power;
 }
 
 double calculate_bm_timeout_ms(float frequency_mhz, size_t asic_count, size_t small_cores, size_t cores, size_t version_size, float timeout_percent, double default_time_ms)
@@ -242,4 +269,107 @@ double calculate_bm_timeout_ms(float frequency_mhz, size_t asic_count, size_t sm
         return default_time_ms;
 
     return (double)timeout_percent * fullspace_timeout_ms;
+}
+
+bool bm13xx_decode_job_result(asic_job_store_t *store,
+                              uint8_t small_core_bits,
+                              uint16_t address_interval,
+                              uint32_t wire_nonce,
+                              uint8_t wire_chip_slot,
+                              uint16_t wire_version,
+                              task_result *result)
+{
+    if (address_interval == 0 || result == NULL) {
+        return false;
+    }
+
+    uint8_t slot = bm_decode_wire_job_slot(wire_chip_slot, small_core_bits);
+    uint8_t small_core_id = bm_decode_wire_sub_id(wire_chip_slot, small_core_bits);
+
+    if (!asic_job_store_lookup(store, slot, &result->job)) {
+        return false;
+    }
+
+    uint32_t nonce_h = ntohl(wire_nonce);
+    uint8_t asic_nr = (uint8_t)(((nonce_h >> 17) & 0xff) / address_interval);
+    uint8_t core_id = (uint8_t)((nonce_h >> 25) & 0x7f);
+    uint32_t version_bits = ((uint32_t)ntohs(wire_version) << 13);
+
+    result->rolled_version = result->job.version | version_bits;
+    result->nonce = wire_nonce;
+    result->asic_nr = asic_nr;
+    result->core_id = core_id;
+    result->small_core_id = small_core_id;
+
+    return true;
+}
+
+bool bm1397_decode_job_result(asic_job_store_t *store,
+                              uint16_t address_interval,
+                              uint32_t wire_nonce,
+                              uint8_t wire_chip_slot,
+                              task_result *result)
+{
+    if (address_interval == 0 || result == NULL) {
+        return false;
+    }
+
+    uint8_t slot = bm_decode_wire_job_slot(wire_chip_slot, BM1397_MIDSTATE_BITS);
+    uint8_t rx_midstate_index = bm_decode_wire_sub_id(wire_chip_slot, BM1397_MIDSTATE_BITS);
+
+    if (!asic_job_store_lookup(store, slot, &result->job)) {
+        return false;
+    }
+
+    uint32_t rolled_version = result->job.version;
+    for (int i = 0; i < rx_midstate_index; i++) {
+        rolled_version = increment_bitmask(rolled_version, result->job.version_mask);
+    }
+
+    uint32_t nonce_h = ntohl(wire_nonce);
+    uint8_t asic_nr = (uint8_t)(((nonce_h >> 17) & 0xff) / address_interval);
+    uint8_t core_id = (uint8_t)((nonce_h >> 25) & 0x7f);
+
+    result->rolled_version = rolled_version;
+    result->nonce = wire_nonce;
+    result->asic_nr = asic_nr;
+    result->core_id = core_id;
+    result->small_core_id = (uint8_t)(wire_chip_slot & 0x0f);
+
+    return true;
+}
+
+void bm13xx_clear_work(asic_job_store_t *store)
+{
+    if (store) {
+        asic_job_store_invalidate_all(store);
+    }
+}
+
+void bm13xx_init_job_slots(asic_job_store_t *store, uint16_t capacity)
+{
+    if (!store || capacity == 0) {
+        return;
+    }
+    if (store->entries != NULL) {
+        bm13xx_destroy_job_slots(store);
+    }
+    asic_job_slot_entry_t *entries = (asic_job_slot_entry_t *)calloc(capacity, sizeof(asic_job_slot_entry_t));
+    if (entries == NULL) {
+        ESP_LOGE(TAG, "Failed to allocate %u Bitmain job slots", capacity);
+        return;
+    }
+    asic_job_store_init(store, entries, capacity);
+}
+
+void bm13xx_destroy_job_slots(asic_job_store_t *store)
+{
+    if (!store) {
+        return;
+    }
+    asic_job_store_destroy(store);
+    if (store->entries != NULL) {
+        free(store->entries);
+        store->entries = NULL;
+    }
 }

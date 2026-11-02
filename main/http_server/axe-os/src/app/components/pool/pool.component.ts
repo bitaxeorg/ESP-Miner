@@ -1,12 +1,17 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { getHttpErrorMessage } from 'src/app/utils/error-handler';
 import { Component, Input, OnInit } from '@angular/core';
-import { FormBuilder, FormGroup, FormArray, Validators, ValidatorFn, ValidationErrors, AbstractControl } from '@angular/forms';
+import { FormBuilder, FormGroup, FormArray, Validators, ValidatorFn, ValidationErrors, AbstractControl, FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { ToastrService } from 'ngx-toastr';
 import { LoadingService } from 'src/app/services/loading.service';
 import { SystemApiService } from 'src/app/services/system.service';
 import { LiveDataService } from 'src/app/services/live-data.service';
 import { first } from 'rxjs';
+import { DropdownComponent } from '../dropdown/dropdown.component';
+import { TooltipDirective } from '../../directives/tooltip.directive';
+import { TooltipTextIconComponent } from '../tooltip-text-icon/tooltip-text-icon.component';
+import { RadioButtonComponent } from '../radio-button/radio-button.component';
+import { CheckboxComponent } from '../checkbox/checkbox.component';
 
 interface ITlsOption {
   value: number;
@@ -29,13 +34,12 @@ interface IPoolDropdownOption {
 }
 
 @Component({
-    selector: 'app-pool',
-    templateUrl: './pool.component.html',
-    standalone: false
+  selector: 'app-pool',
+  templateUrl: './pool.component.html',
+  imports: [FormsModule, ReactiveFormsModule, DropdownComponent, TooltipDirective, TooltipTextIconComponent, RadioButtonComponent, CheckboxComponent]
 })
 export class PoolComponent implements OnInit {
   public form!: FormGroup;
-  public savedChanges: boolean = false;
 
   private previousPrim: number = 0;
   private previousSec: number = 1;
@@ -97,8 +101,10 @@ export class PoolComponent implements OnInit {
             stratumTLS: 0,
             stratumCert: '',
             stratumDecodeCoinbase: true,
+            stratumShareWarning: true,
             stratumV2ChannelType: 'extended',
-            stratumV2AuthorityPubkey: ''
+            stratumV2AuthorityPubkey: '',
+            stratumV2RequireAuth: false
           });
         }
         
@@ -116,8 +122,10 @@ export class PoolComponent implements OnInit {
             stratumTLS: 0,
             stratumCert: '',
             stratumDecodeCoinbase: true,
+            stratumShareWarning: true,
             stratumV2ChannelType: 'extended',
-            stratumV2AuthorityPubkey: ''
+            stratumV2AuthorityPubkey: '',
+            stratumV2RequireAuth: false
           });
         }
 
@@ -148,8 +156,10 @@ export class PoolComponent implements OnInit {
             stratumTLS: [pool.stratumTLS || 0],
             stratumCert: [pool.stratumCert || ''],
             stratumDecodeCoinbase: [pool.stratumDecodeCoinbase == true, [Validators.required]],
+            stratumShareWarning: [pool.stratumShareWarning == true, [Validators.required]],
             stratumV2ChannelType: [pool.stratumV2ChannelType || 'extended'],
-            stratumV2AuthorityPubkey: [pool.stratumV2AuthorityPubkey || '', [this.base58Validator()]]
+            stratumV2AuthorityPubkey: [pool.stratumV2AuthorityPubkey || '', [this.base58Validator()]],
+            stratumV2RequireAuth: [pool.stratumV2RequireAuth == true]
           });
         });
 
@@ -175,6 +185,7 @@ export class PoolComponent implements OnInit {
           const secVal = this.form.get('secondaryPoolIndex')?.value;
           if (primVal === secVal) {
             this.form.get('secondaryPoolIndex')?.setValue(this.previousPrim, { emitEvent: false });
+            this.form.get('secondaryPoolIndex')?.markAsDirty();
             this.previousSec = this.previousPrim;
           }
           this.previousPrim = primVal;
@@ -184,7 +195,8 @@ export class PoolComponent implements OnInit {
           const primVal = this.form.get('primaryPoolIndex')?.value;
           if (secVal === primVal) {
             this.form.get('primaryPoolIndex')?.setValue(this.previousSec, { emitEvent: false });
-            this.previousSec = secVal;
+            this.form.get('primaryPoolIndex')?.markAsDirty();
+            this.previousPrim = this.previousSec;
           }
           this.previousSec = secVal;
         });
@@ -272,8 +284,10 @@ export class PoolComponent implements OnInit {
         stratumTLS: [0],
         stratumCert: [''],
         stratumDecodeCoinbase: [true, [Validators.required]],
+        stratumShareWarning: [true, [Validators.required]],
         stratumV2ChannelType: ['extended'],
-        stratumV2AuthorityPubkey: ['', [this.base58Validator()]]
+        stratumV2AuthorityPubkey: ['', [this.base58Validator()]],
+        stratumV2RequireAuth: [false]
       });
 
       this.poolsArray.push(poolGroup);
@@ -321,8 +335,6 @@ export class PoolComponent implements OnInit {
   public updateSystem() {
     const form = this.form.getRawValue();
 
-    const restartAlreadyPending = this.savedChanges;
-
     this.systemService.updateSystem(this.uri, form)
       .pipe(this.loadingService.lockUIUntilComplete())
       .subscribe({
@@ -348,33 +360,17 @@ export class PoolComponent implements OnInit {
         },
         error: (err: HttpErrorResponse) => {
           this.toastr.error(`Could not save pool settings. ${getHttpErrorMessage(err, this.uri)}`);
-          this.savedChanges = restartAlreadyPending;
         }
       });
   }
 
   private onSaveSuccess() {
     const successMessage = this.uri ? `Saved pool settings for ${this.uri}` : 'Saved pool settings';
-    this.toastr.warning('You must restart this device after saving for changes to take effect.');
     this.toastr.success(successMessage);
-    this.savedChanges = true;
     this.pendingDeletePoolIds = [];
     this.form.markAsPristine();
-  }
-
-  public restart() {
-    this.systemService.restart(this.uri)
-      .pipe(this.loadingService.lockUIUntilComplete())
-      .subscribe({
-        next: () => {
-          const successMessage = this.uri ? `Device at ${this.uri} restarted` : 'Device restarted';
-          this.toastr.success(successMessage);
-          this.savedChanges = false;
-        },
-        error: (err: HttpErrorResponse) => {
-          this.toastr.error(`Failed to restart device. ${getHttpErrorMessage(err, this.uri)}`);
-        }
-      });
+    this.previousPrim = this.form.get('primaryPoolIndex')?.value ?? 0;
+    this.previousSec = this.form.get('secondaryPoolIndex')?.value ?? 1;
   }
 
   private extractPort(url: string): { cleanUrl: string, port?: number } {
@@ -404,11 +400,10 @@ export class PoolComponent implements OnInit {
       { prefix: 'stratum+ssl://', tlsMode: true }
     ] as const;
 
-    let isTlsMode = 0;
     const matched = prefixes.find(({ prefix }) => urlValue.startsWith(prefix));
     if (matched) {
       urlValue = urlValue.slice(matched.prefix.length);
-      isTlsMode = +matched.tlsMode;
+      tlsControl.setValue(+matched.tlsMode);
     }
 
     const { cleanUrl, port } = this.extractPort(urlValue);
@@ -417,7 +412,6 @@ export class PoolComponent implements OnInit {
       portControl.setValue(port);
     }
     urlControl.setValue(cleanUrl);
-    tlsControl.setValue(isTlsMode);
     urlControl.markAsDirty();
   }
 
@@ -505,10 +499,6 @@ export class PoolComponent implements OnInit {
     if (!this.isPoolV2Enabled(index)) return false;
     const poolGroup = this.poolsArray.at(index);
     return poolGroup?.get('stratumV2ChannelType')?.value === 'extended';
-  }
-
-  isStandardChannelDisabled(): boolean {
-    return this.asicModel === 'BM1397';
   }
 
   getProtocolLabel(value: string): string {

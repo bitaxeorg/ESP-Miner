@@ -82,6 +82,9 @@ components:
         stratumDecodeCoinbase:
           type: boolean
           description: Enable pool coinbase transaction decoding
+        stratumShareWarning:
+          type: boolean
+          description: Warn on the dashboard when the payout share of the coinbase reward is low. Disable for pools that pay miners directly through many coinbase outputs.
         stratumV2ChannelType:
           type: string
           enum: [standard, extended]
@@ -90,6 +93,9 @@ components:
           type: string
           description: SV2 authority public key for certificate verification (base58-encoded)
           pattern: "^[123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz]*$"
+        stratumV2RequireAuth:
+          type: boolean
+          description: Refuse to connect unless the SV2 server certificate is verified against the authority pubkey
         id:
           type: integer
           description: Pool NVS slot index (0 to 7)
@@ -213,6 +219,27 @@ components:
           nullable: true
           description: Partition space usage percentage (0-100)
 
+    FirmwareChecksum:
+      type: object
+      required:
+        - partition
+        - version
+        - size
+        - sha256
+      properties:
+        partition:
+          type: string
+          description: Label of the running partition (e.g., ota_0, ota_1, factory)
+        version:
+          type: string
+          description: Firmware version of the running image
+        size:
+          type: integer
+          description: Size of the running image in bytes
+        sha256:
+          type: string
+          description: Lowercase hex SHA-256 of the running image, comparable to the release esp-miner.bin checksum
+
     SystemInfo:
       type: object
       required:
@@ -234,6 +261,7 @@ components:
         - fallbackStratumTLS
         - fallbackStratumCert
         - fallbackStratumDecodeCoinbase
+        - fallbackStratumShareWarning
         - fanrpm
         - fan2rpm
         - fanspeed
@@ -267,12 +295,17 @@ components:
         - overclockEnabled
         - primaryPoolIndex
         - secondaryPoolIndex
+        - useFallbackStratum
         - pools
         - poolConnectionInfo
+        - primaryPoolError
+        - poolBanner
         - poolDifficulty
         - power
         - resetReason
         - responseTime
+        - responseTimeMin
+        - responseTimeMax
         - runningPartition
         - sharesAccepted
         - sharesRejected
@@ -291,9 +324,11 @@ components:
         - stratumTLS
         - stratumCert
         - stratumDecodeCoinbase
+        - stratumShareWarning
         - temp
         - temp2
         - uptimeSeconds
+        - useNTP
         - version
         - axeOSVersion
         - voltage
@@ -307,10 +342,11 @@ components:
         - networkDifficulty
         - blockSignals
         - blockFound
-        - coinbaseOutputs
         - coinbaseValueTotalSatoshis
         - coinbaseValueUserSatoshis
-        - hashrateMonitor
+        - coinbaseOthersCount
+        - coinbaseOthersValueSatoshis
+        - coinbasePayoutStatus
         - miningPaused
         - statsLimit
         - partitions
@@ -370,6 +406,9 @@ components:
         fallbackStratumDecodeCoinbase:
           type: boolean
           description: Enable fallback pool coinbase transaction decoding
+        fallbackStratumShareWarning:
+          type: boolean
+          description: Warn on the dashboard when the payout share of the coinbase reward is low, while mining on the fallback pool
         fallbackStratumProtocol:
           type: string
           enum: [SV1, SV2]
@@ -396,6 +435,12 @@ components:
         responseTime:
           type: number
           description: Pool response time in ms
+        responseTimeMin:
+          type: number
+          description: Minimum pool response time in ms for current tick
+        responseTimeMax:
+          type: number
+          description: Maximum pool response time in ms for current tick
         responseShareBatch:
           type: number
           description: Number of shares acknowledged in the batch that produced responseTime (SV2; 1 = single share, >1 = batched ack)
@@ -504,6 +549,12 @@ components:
         poolConnectionInfo:
           type: string
           description: Current pool address family
+        primaryPoolError:
+          type: string
+          description: Last error encountered by primary pool causing failover
+        poolBanner:
+          type: string
+          description: Banner or message provided by the active pool
         poolDifficulty:
           type: number
           description: Current pool difficulty
@@ -528,6 +579,15 @@ components:
         sharesRejected:
           type: number
           description: Number of rejected shares
+        totalUptimeSeconds:
+          type: number
+          description: Total uptime in seconds
+        totalHashes:
+          type: number
+          description: Total hashes done by the device
+        totalLog2Work:
+          type: number
+          description: Log2 of total hashes
         sharesPending:
           type: number
           description: Shares submitted but not yet resolved by the pool (SV2; 0 for SV1). Rises while the pool batches/buffers acks, drops to 0 once it catches up.
@@ -583,6 +643,9 @@ components:
         stratumDecodeCoinbase:
           type: boolean
           description: Enable primary pool coinbase transaction decoding
+        stratumShareWarning:
+          type: boolean
+          description: Warn on the dashboard when the payout share of the coinbase reward is low, while mining on the primary pool
         temp:
           type: number
           description: Average chip temperature
@@ -592,6 +655,9 @@ components:
         uptimeSeconds:
           type: number
           description: System uptime in seconds
+        useFallbackStratum:
+          type: integer
+          description: Whether fallback stratum is selected as primary preference (0=no, 1=yes)
         version:
           type: string
           description: Firmware version
@@ -652,12 +718,29 @@ components:
               address:
                 type: string
                 description: Output address
+              isUserOutput:
+                type: integer
+                description: Whether this output belongs to the user (0=no, 1=yes)
         coinbaseValueTotalSatoshis:
           type: integer
           description: Total value of coinbase transaction in satoshis
         coinbaseValueUserSatoshis:
           type: integer
           description: User's portion of coinbase value in satoshis
+        coinbaseOthersCount:
+          type: integer
+          description: Number of payout outputs that did not fit in coinbaseOutputs
+        coinbaseOthersValueSatoshis:
+          type: integer
+          description: Summed value in satoshis of the outputs counted in coinbaseOthersCount
+        coinbasePayoutStatus:
+          type: string
+          description: Verification status of user payout address against coinbase transaction
+          enum:
+            - verified
+            - not_found
+            - not_applicable
+            - unknown
         hashrateMonitor:
           type: object
           required:
@@ -682,7 +765,9 @@ components:
           description: List of available app partitions and their firmware versions
           items:
             $ref: '#/components/schemas/SystemPartition'
-
+        useNTP:
+          type: boolean
+          description: Whether NTP time sync is enabled
     SystemASIC:
       type: object
       required:
@@ -702,6 +787,7 @@ components:
             - BM1366
             - BM1368
             - BM1370
+            - BM1373
             - BM1397
           examples:
             - "BM1366"
@@ -766,6 +852,7 @@ components:
             description: Statistics data values(s)
             items:
               type: number
+              nullable: true
 
     SystemScoreboardEntry:
       type: object
@@ -973,7 +1060,7 @@ components:
           enum: [0, 1]
           examples:
             - 1
-        fanspeed:
+        manualFanSpeed:
           type: integer
           description: Manual fan speed percentage when autofanspeed is disabled
           minimum: 0
@@ -1110,7 +1197,7 @@ paths:
             type: array
             items:
               type: string
-            example: [hashrate,hashrate_1m,hashrate_10m,hashrate_1h,asicTemp,vrTemp,asicVoltage,voltage,power,current,fanSpeed,fanRpm,fan2Rpm,wifiRssi,freeHeap,responseTime]
+            example: [hashrate,hashrate_1m,hashrate_10m,hashrate_1h,asicTemp,vrTemp,asicVoltage,voltage,power,current,fanSpeed,fanRpm,fan2Rpm,wifiRssi,freeHeap,responseTimeMin,responseTimeMax]
           description: List of labels for which data should be retrieved
       tags:
         - system
@@ -1209,6 +1296,25 @@ paths:
                 $ref: '#/components/schemas/GenericResponse'
         '400':
           description: Invalid partition label
+        '401':
+          description: Unauthorized - Client not in allowed network range
+        '500':
+          description: Internal server error
+
+  /api/system/firmware/checksum:
+    get:
+      summary: Get running firmware checksum
+      description: Returns the SHA-256 of the running firmware image, matching sha256sum of the flashed esp-miner.bin
+      operationId: getFirmwareChecksum
+      tags:
+        - system
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FirmwareChecksum'
         '401':
           description: Unauthorized - Client not in allowed network range
         '500':

@@ -5,11 +5,13 @@
 #include <stddef.h>
 #include <stdbool.h>
 #include "esp_err.h"
-
-typedef struct mining_notify mining_notify;
+#include "miner_job.h"
 
 #define MAX_ADDRESS_STRING_LEN 128
 #define MAX_COINBASE_TX_OUTPUTS 6
+#define MAX_SCRIPTSIG_STRING_LEN 100
+#define MAX_SCRIPTPUBKEY_LEN 34
+#define MAX_USER_ADDRESSES 4
 
 // Bitcoin Script Opcodes
 #define OP_0            0x00
@@ -24,13 +26,41 @@ typedef struct mining_notify mining_notify;
 #define OP_CHECKSIG     0xac
 
 /**
+ * @brief Convert user address string (address, address.worker, or hex script)
+ *        into canonical binary scriptPubKey bytes.
+ * 
+ * @param user User string from pool config (e.g. "bc1q...axe1", "1A1z..._w1", "0014...")
+ * @param script_out Buffer to store binary scriptPubKey (min MAX_SCRIPTPUBKEY_LEN bytes)
+ * @param max_out Maximum capacity of script_out
+ * @return size_t Length of parsed scriptPubKey in bytes, or 0 if user is not a valid address/script
+ */
+size_t coinbase_address_to_scriptpubkey(const char *user, uint8_t *script_out, size_t max_out);
+
+/**
+ * @brief Parse user configuration string (which may contain up to MAX_USER_ADDRESSES
+ *        comma- or semicolon-separated addresses, each with optional worker suffix)
+ *        into canonical binary scriptPubKeys.
+ *
+ * @param user User string from pool config (e.g. "addr1.w1,addr2.w2" or "addr1")
+ * @param scripts_out 2D array [MAX_USER_ADDRESSES][MAX_SCRIPTPUBKEY_LEN]
+ * @param script_lens Array to store lengths of parsed scripts [MAX_USER_ADDRESSES]
+ * @param max_scripts Maximum number of scripts to parse (up to MAX_USER_ADDRESSES)
+ * @return int Number of successfully parsed scripts (0 to max_scripts)
+ */
+int coinbase_parse_user_scriptpubkeys(const char *user,
+                                      uint8_t scripts_out[][MAX_SCRIPTPUBKEY_LEN],
+                                      size_t script_lens[],
+                                      int max_scripts);
+
+/**
  * @brief Decode Bitcoin varint from binary data
  * 
  * @param data Binary data containing the varint
+ * @param data_len Total length of data buffer
  * @param offset Pointer to current offset, will be updated after reading
  * @return Decoded varint value
  */
-uint64_t coinbase_decode_varint(const uint8_t *data, int *offset);
+uint64_t coinbase_decode_varint(const uint8_t *data, size_t data_len, int *offset);
 
 /**
  * @brief Decode Bitcoin address from scriptPubKey
@@ -50,6 +80,21 @@ void coinbase_decode_address_from_scriptpubkey(const uint8_t *script, size_t scr
                                                 const char *bech32_hrp, bool is_testnet);
 
 /**
+ * @brief Aggregate payout address verification status against coinbase transaction
+ */
+typedef enum {
+    COINBASE_PAYOUT_UNKNOWN = 0,
+    COINBASE_PAYOUT_NOT_APPLICABLE,
+    COINBASE_PAYOUT_NOT_FOUND,
+    COINBASE_PAYOUT_VERIFIED,
+} coinbase_payout_status_t;
+
+/**
+ * @brief Convert coinbase_payout_status_t enum to string representation
+ */
+const char *coinbase_payout_status_to_string(coinbase_payout_status_t status);
+
+/**
  * @brief Structure representing a decoded coinbase transaction output
  */
 typedef struct {
@@ -62,34 +107,32 @@ typedef struct {
  * @brief Result structure for full mining notification processing
  */
 typedef struct {
-    double network_difficulty;
     uint32_t block_height;
-    char *scriptsig; // Allocated, must be freed by caller
+    char scriptsig[MAX_SCRIPTSIG_STRING_LEN];
     coinbase_output_t outputs[MAX_COINBASE_TX_OUTPUTS];
     int output_count;
+    int others_count;               // outputs that did not fit in `outputs[]`
+    uint64_t others_value_satoshis; // summed value of those outputs
     uint64_t total_value_satoshis;
     uint64_t user_value_satoshis;
+    coinbase_payout_status_t payout_status;
     bool decode_coinbase_tx;
     bool bip54_signaling;  // BIP-54: nLockTime = height - 1 && nSequence != 0xffffffff
     bool bip110_signaling; // BIP-110: signaling via version bit 4 (0x00000010)
 } mining_notification_result_t;
 
 /**
- * @brief Process a mining notification to extract all relevant data
+ * @brief Process a miner job (V1 or V2) to extract coinbase and block data
  * 
- * @param notification Pointer to the mining notification
- * @param extranonce1 Hex string of extranonce1
- * @param extranonce2_len Length of extranonce2 in bytes
+ * @param job Pointer to the polymorphic miner_job_t
  * @param user_address Payout address of the user
  * @param decode_coinbase_tx Enable coinbase tx decoding
  * @param result Pointer to store the results
  * @return esp_err_t
  */
-esp_err_t coinbase_process_notification(const mining_notify *notification,
-                                 const char *extranonce1,
-                                 int extranonce2_len,
-                                 const char *user_address,
-                                 bool decode_coinbase_tx,
-                                 mining_notification_result_t *result);
+esp_err_t coinbase_process_miner_job(const miner_job_t *job,
+                                     const char *user_address,
+                                     bool decode_coinbase_tx,
+                                     mining_notification_result_t *result);
 
 #endif // COINBASE_DECODER_H

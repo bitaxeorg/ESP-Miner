@@ -23,6 +23,7 @@
 #define LV_USE_FLOAT 1
 
 #define LV_FONT_MONTSERRAT_14 0
+#define LV_FONT_UNSCII_16     1
 
 #define LV_FONT_CUSTOM_DECLARE LV_FONT_DECLARE(lv_font_portfolio_6x8)
 #define LV_FONT_DEFAULT        &lv_font_portfolio_6x8

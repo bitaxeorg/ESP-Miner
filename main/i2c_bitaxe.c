@@ -7,9 +7,6 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
-#define GPIO_I2C_SDA CONFIG_GPIO_I2C_SDA
-#define GPIO_I2C_SCL CONFIG_GPIO_I2C_SCL
-
 #define I2C_MASTER_FREQ_HZ 100000
 
 #define I2C_MASTER_NUM 0
@@ -18,6 +15,7 @@
 #define I2C_RETRY_DELAY_MS 10
 
 static i2c_master_bus_handle_t i2c_bus_handle;
+static SemaphoreHandle_t s_i2c_mutex = NULL;
 
 static const char * TAG = "i2c_bitaxe";
 
@@ -38,13 +36,23 @@ static esp_err_t i2c_transfer_with_retries(i2c_master_dev_handle_t dev_handle,
     esp_err_t err = ESP_FAIL;
 
     for (int i = 0; i < I2C_RETRY_COUNT; i++) {
+        if (s_i2c_mutex) {
+            xSemaphoreTake(s_i2c_mutex, portMAX_DELAY);
+        }
+
         if (read_buf && read_len > 0) {
             err = i2c_master_transmit_receive(dev_handle, write_buf, write_len, read_buf, read_len, I2C_MASTER_TIMEOUT_MS);
         } else {
             err = i2c_master_transmit(dev_handle, write_buf, write_len, I2C_MASTER_TIMEOUT_MS);
         }
 
-        if (err == ESP_OK) return ESP_OK;
+        if (s_i2c_mutex) {
+            xSemaphoreGive(s_i2c_mutex);
+        }
+
+        if (err == ESP_OK) {
+            return ESP_OK;
+        }
 
         vTaskDelay(pdMS_TO_TICKS(I2C_RETRY_DELAY_MS));
     }
@@ -63,16 +71,22 @@ static esp_err_t i2c_transfer_with_retries(i2c_master_dev_handle_t dev_handle,
 /**
  * @brief i2c master initialization
  */
-esp_err_t i2c_bitaxe_init(void)
+esp_err_t i2c_bitaxe_init(gpio_num_t sda_gpio, gpio_num_t scl_gpio)
 {
+    if (!s_i2c_mutex) {
+        s_i2c_mutex = xSemaphoreCreateMutex();
+    }
+
     i2c_master_bus_config_t i2c_bus_config = {
         .clk_source = I2C_CLK_SRC_DEFAULT,
         .i2c_port = I2C_MASTER_NUM,
-        .scl_io_num = GPIO_I2C_SCL,
-        .sda_io_num = GPIO_I2C_SDA,
+        .scl_io_num = scl_gpio,
+        .sda_io_num = sda_gpio,
         .glitch_ignore_cnt = 7,
         .flags.enable_internal_pullup = true,
     };
+
+    ESP_LOGI(TAG, "Initializing I2C bus on SDA=%d SCL=%d", sda_gpio, scl_gpio);
 
     return i2c_new_master_bus(&i2c_bus_config, &i2c_bus_handle);
 }

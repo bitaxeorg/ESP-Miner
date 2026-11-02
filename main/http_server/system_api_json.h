@@ -1,23 +1,19 @@
 #ifndef SYSTEM_API_JSON_H_
 #define SYSTEM_API_JSON_H_
 
-#include "cJSON.h"
+#include "yyjson.h"
 
 typedef struct GlobalState GlobalState;
 
 /**
- * @brief Generates a full system information JSON object.
+ * @brief Generates a full system information JSON document.
  * 
- * This is the single source of truth for both the REST API and the WebSocket initial handshake.
+ * This is the single source of truth for both the REST API and the WebSocket updates.
  * 
  * @param GLOBAL_STATE Pointer to the GlobalState structure.
- * @return cJSON* The root JSON object. Caller is responsible for cJSON_Delete().
+ * @param alc Custom memory allocator (e.g. yyjson_psram_alc()) or NULL for default.
+ * @return yyjson_mut_doc* The JSON document. Caller is responsible for yyjson_mut_doc_free().
  */
-cJSON* system_api_get_full_json(GlobalState * GLOBAL_STATE);
-
-/**
- * @brief Custom helper to create a JSON number from a float with fixed decimal precision.
- */
-cJSON* cJSON_CreateFloat(float number);
+yyjson_mut_doc* system_api_get_full_doc(GlobalState * GLOBAL_STATE, const yyjson_alc *alc);
 
 #endif /* SYSTEM_API_JSON_H_ */

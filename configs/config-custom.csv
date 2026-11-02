@@ -1,0 +1,121 @@
+key,type,encoding,value
+main,namespace,,
+hostname,data,string,bitaxe
+wifissid,data,string,
+wifipass,data,string,
+stratumurl,data,string,public-pool.io
+stratumport,data,u16,21496
+stratumuser,data,string,bc1qnp980s5fpp8l94p5cvttmtdqy8rvrq74qly2yrfmzkdsntqzlc5qkc4rkq.bitaxe
+stratumpass,data,string,x
+stratumdiff,data,u16,1000
+stratumxnsub,data,u16,0
+fbstratumurl,data,string,solo.ckpool.org
+fbstratumport,data,u16,3333
+fbstratumuser,data,string,bc1qnp980s5fpp8l94p5cvttmtdqy8rvrq74qly2yrfmzkdsntqzlc5qkc4rkq.bitaxe
+fbstratumpass,data,string,x
+fbstratumdiff,data,u16,1000
+fbstratumxnsum,data,u16,0
+asicfrequency,data,u16,485
+asicvoltage,data,u16,1200
+rotation,data,u16,0
+autofanspeed,data,u16,1
+fanspeed,data,u16,100
+selftest,data,u16,1
+overheat_mode,data,u16,0
+# Custom Firmware Board overrides
+# Custom board version
+boardversion,data,string,207
+# Family (Max, Ultra, Supra, Gamma, Gamma_Turbo)
+devicemodel,data,string,ultra
+# ASIC (BM1397, BM1366, BM1368, BM1370)
+asicmodel,data,string,BM1366
+# PLUG_SENSE (0,1)
+plug_sense,data,u16,0
+# ASIC_ENABLE (0,1)
+asic_enable,data,u16,0
+# EMC2101 (0,1)
+EMC2101,data,u16,1
+# EMC2103 (0,1)
+EMC2103,data,u16,0
+# EMC2302 (0,1)
+EMC2302,data,u16,0
+# EMC Internal Temperature Sensor (0,1)
+emc_int_temp,data,u16,0
+# EMC Ideality Factor (0,8-55, See EMC2102.h)
+emc_ideality_f,data,u16,0
+# EMC Beta Compensation (0-8, See EMC2102.h)
+emc_beta_comp,data,u16,0
+# Temperature Offset
+temp_offset,data,i32,0
+# DS4432U (0,1)
+DS4432U,data,u16,0
+# INA260 (0,1)
+INA260,data,u16,0
+# TPS546 (0,1)
+TPS546,data,u16,1
+# TPS546 Regulator configuration overrides
+# tps546_phase (0=single, 255=multi)
+#tps546_phase,data,u16,0
+# tps546_vin_on (Volts)
+#tps546_vin_on,data,string,4.8
+# tps546_vin_off (Volts)
+#tps546_vin_off,data,string,4.5
+# tps546_vin_uvw (Volts)
+#tps546_vin_uvw,data,string,0.0
+# tps546_vin_ovf (Volts)
+#tps546_vin_ovf,data,string,6.5
+# tps546_scale (Voltage scale loop factor)
+#tps546_scale,data,string,0.25
+# tps546_vout_min (Volts)
+#tps546_vout_min,data,string,1.0
+# tps546_vout_max (Volts)
+#tps546_vout_max,data,string,2.0
+# tps546_vout_cmd (Volts)
+#tps546_vout_cmd,data,string,1.2
+# tps546_oc_warn (Amps)
+#tps546_oc_warn,data,string,25.0
+# tps546_oc_fault (Amps)
+#tps546_oc_fault,data,string,30.0
+# tps546_stack (Stack config)
+#tps546_stack,data,u16,0
+# tps546_sync (Sync config)
+#tps546_sync,data,u16,16
+# tps546_freq (Switching frequency in kHz)
+#tps546_freq,data,u16,650
+# TMP1075 (0,1)
+TMP1075,data,u16,1
+# Self-test Power Consumption Target (> 0)
+power_cons_tgt,data,u16,12
+# Nominal board voltage override (Volts)
+#nominal_voltage,data,u16,5
+# Self-test Target Temperature
+selftest_temp,data,u16,65
+# Self-test Warmup Temperature
+selftest_warm,data,u16,55
+# Self-test Max Temperature
+selftest_max,data,u16,70
+selftest_fan,data,u16,1000
+# Display overrides
+# Display model: NONE, SSD1306 (128x32), SSD1309 (128x64), SH1107 (64x128), SH1107 (128x128), ST7789 (320x170)
+#display,data,string,SSD1306 (128x32)
+# Invert screen colors (0,1)
+#invertscreen,data,u16,0
+# Screen timeout in seconds (-1 to disable)
+#displayTimeout,data,i32,-1
+# SH1107 OLED Display Row Offset override (0-127, e.g. 0, 32, 96)
+#displayOffset,data,u16,0
+# Fan & Thermal Target overrides
+# Minimum fan speed percentage (0-99)
+#minfanspeed,data,u16,25
+# Target temperature in Celsius (35-66)
+#temptarget,data,u16,60
+# System & Feature overrides
+# NTP time synchronization (0,1)
+#usentp,data,u16,0
+# Overclock enabled (0,1)
+#oc_enabled,data,u16,0
+# Telemetry stats frequency in seconds (0 to disable)
+#statsFrequency,data,u16,0
+# Custom Web UI hosted on SD/SPIFFS (0,1)
+#use_custom_www,data,u16,0
+

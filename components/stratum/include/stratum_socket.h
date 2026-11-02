@@ -7,6 +7,8 @@
 #include <lwip/sockets.h>
 #include <lwip/netdb.h>
 
+#define TRANSPORT_TIMEOUT_MS 5000
+
 // Resolved pool address, including the textual host_ip (with IPv6 zone id when
 // applicable) used for connecting and logging.
 typedef struct {
@@ -26,5 +28,10 @@ esp_err_t stratum_socket_resolve(const char *hostname, uint16_t port, stratum_co
 // Apply the common pool-socket options (timeouts, TCP_NODELAY, keepalive) used
 // by both the SV1 and SV2 stratum tasks.
 void stratum_socket_set_options(esp_transport_handle_t transport);
+
+// Write the whole buffer, looping over partial writes. Shared by the SV1 and
+// SV2 send paths. Returns len on success, -1 on error or if the peer stopped
+// accepting data.
+int stratum_socket_send_all(esp_transport_handle_t transport, const void *buf, int len);
 
 #endif /* STRATUM_SOCKET_H_ */

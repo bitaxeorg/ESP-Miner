@@ -10,6 +10,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
 #include "freertos/semphr.h"
+#include "freertos/task.h"
 
 #include "log_buffer.h"
 #include "websocket.h"
@@ -38,6 +39,9 @@ static EXT_RAM_NOINIT_ATTR log_buffer_header_t s_header;
 static EXT_RAM_NOINIT_ATTR char s_buffer[LOG_BUFFER_SIZE];
 
 static SemaphoreHandle_t s_log_mutex = NULL;
+static SemaphoreHandle_t s_stdout_sem = NULL;
+static uint64_t s_stdout_pos = 0;
+static uint64_t s_stdout_dropped_bytes = 0;
 static char s_vprintf_buffer[2048];
 
 static void ring_write(const char *data, size_t len)
@@ -62,6 +66,62 @@ static void ring_write(const char *data, size_t len)
     // Update header checksum and flush header
     s_header.checksum = calculate_header_checksum(&s_header);
     esp_cache_msync(&s_header, sizeof(s_header), ESP_CACHE_MSYNC_FLAG_DIR_C2M | ESP_CACHE_MSYNC_FLAG_UNALIGNED);
+}
+
+static void stdout_flush_task(void *arg)
+{
+    char flush_buf[512];
+
+    while (1) {
+        while (1) {
+            size_t read_bytes = 0;
+            uint64_t dropped_now = 0;
+
+            if (s_log_mutex && xSemaphoreTakeRecursive(s_log_mutex, portMAX_DELAY) == pdTRUE) {
+                uint64_t total = s_header.total_written;
+                if (s_stdout_pos > total) {
+                    s_stdout_pos = total;
+                }
+                if (total >= LOG_BUFFER_SIZE && s_stdout_pos < total - LOG_BUFFER_SIZE) {
+                    dropped_now = (total - LOG_BUFFER_SIZE) - s_stdout_pos;
+                    s_stdout_dropped_bytes += dropped_now;
+                    s_stdout_pos = total - LOG_BUFFER_SIZE;
+                }
+                size_t available = (size_t)(total - s_stdout_pos);
+                read_bytes = (available < sizeof(flush_buf)) ? available : sizeof(flush_buf);
+                if (read_bytes > 0) {
+                    size_t read_offset = s_stdout_pos % LOG_BUFFER_SIZE;
+                    size_t till_end = LOG_BUFFER_SIZE - read_offset;
+                    if (read_bytes <= till_end) {
+                        memcpy(flush_buf, &s_buffer[read_offset], read_bytes);
+                    } else {
+                        memcpy(flush_buf, &s_buffer[read_offset], till_end);
+                        memcpy(flush_buf + till_end, s_buffer, read_bytes - till_end);
+                    }
+                    s_stdout_pos += read_bytes;
+                }
+                xSemaphoreGiveRecursive(s_log_mutex);
+            }
+
+            if (dropped_now > 0) {
+                char drop_msg[64];
+                int drop_len = snprintf(drop_msg, sizeof(drop_msg),
+                                        "\n--- [UART LOG DROPPED %" PRIu64 " BYTES] ---\n", dropped_now);
+                if (drop_len > 0) {
+                    fwrite(drop_msg, 1, drop_len, stdout);
+                }
+            }
+
+            if (read_bytes == 0) {
+                break;
+            }
+
+            fwrite(flush_buf, 1, read_bytes, stdout);
+        }
+        fflush(stdout);
+
+        xSemaphoreTake(s_stdout_sem, pdMS_TO_TICKS(100));
+    }
 }
 
 static int log_buffer_vprintf(const char *format, va_list args)
@@ -107,7 +167,9 @@ static int log_buffer_vprintf(const char *format, va_list args)
     if (output) {
         ring_write(output, needed);
         websocket_log_notify();
-        fputs(output, stdout);
+        if (s_stdout_sem) {
+            xSemaphoreGive(s_stdout_sem);
+        }
         
         if (output != s_vprintf_buffer) {
             free(output);
@@ -129,6 +191,14 @@ void log_buffer_init(void)
         return;
     }
 
+    s_stdout_sem = xSemaphoreCreateBinary();
+    if (s_stdout_sem == NULL) {
+        ESP_LOGW(TAG, "Failed to create stdout flush semaphore");
+        vSemaphoreDelete(s_log_mutex);
+        s_log_mutex = NULL;
+        return;
+    }
+
     uint32_t expected_checksum = calculate_header_checksum(&s_header);
 
     if (s_header.magic != LOG_BUFFER_MAGIC || s_header.checksum != expected_checksum) {
@@ -140,12 +210,25 @@ void log_buffer_init(void)
         s_header.checksum = calculate_header_checksum(&s_header);
         esp_cache_msync(&s_header, sizeof(s_header), ESP_CACHE_MSYNC_FLAG_DIR_C2M | ESP_CACHE_MSYNC_FLAG_UNALIGNED);
 
+        s_stdout_pos = 0;
+
         ESP_LOGI(TAG, "Cold boot or corrupted header, buffer initialized (%d KB)\n", LOG_BUFFER_SIZE / 1024);
     } else {
-        ESP_LOGI(TAG, "Soft reboot detected, %" PRIu64 " bytes of logs preserved", s_header.total_written);
-
         const char * reboot_msg = "\n--- SYSTEM RESTART ---\n";
-        ring_write(reboot_msg, strlen(reboot_msg));        
+        ring_write(reboot_msg, strlen(reboot_msg));
+
+        s_stdout_pos = s_header.total_written;
+        ESP_LOGI(TAG, "Soft reboot detected, %" PRIu64 " bytes of logs preserved", s_header.total_written);
+    }
+
+    BaseType_t ret = xTaskCreate(stdout_flush_task, "stdout_flush", 4096, NULL, 1, NULL);
+    if (ret != pdPASS) {
+        ESP_LOGW(TAG, "Failed to create stdout flush task");
+        vSemaphoreDelete(s_stdout_sem);
+        s_stdout_sem = NULL;
+        vSemaphoreDelete(s_log_mutex);
+        s_log_mutex = NULL;
+        return;
     }
 
     esp_log_set_vprintf(log_buffer_vprintf);
@@ -155,6 +238,16 @@ uint64_t log_buffer_get_total_written(void)
 {
     if (s_log_mutex && xSemaphoreTakeRecursive(s_log_mutex, portMAX_DELAY) == pdTRUE) {
         uint64_t val = s_header.total_written;
+        xSemaphoreGiveRecursive(s_log_mutex);
+        return val;
+    }
+    return 0;
+}
+
+uint64_t log_buffer_get_stdout_dropped_bytes(void)
+{
+    if (s_log_mutex && xSemaphoreTakeRecursive(s_log_mutex, portMAX_DELAY) == pdTRUE) {
+        uint64_t val = s_stdout_dropped_bytes;
         xSemaphoreGiveRecursive(s_log_mutex);
         return val;
     }

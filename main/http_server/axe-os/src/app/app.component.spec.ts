@@ -11,8 +11,7 @@ import { DialogListComponent } from './services/dialog.service';
 
 describe('AppComponent', () => {
   beforeEach(() => TestBed.configureTestingModule({
-    imports: [RouterModule],
-    declarations: [AppComponent, SnowflakesComponent, DialogListComponent],
+    imports: [AppComponent, RouterModule, SnowflakesComponent, DialogListComponent],
     providers: [
       provideRouter([]),
       LayoutService,

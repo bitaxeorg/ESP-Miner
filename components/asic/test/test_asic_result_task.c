@@ -1,0 +1,285 @@
+#include "asic_job.h"
+#include "result_task_test_bindings.h"
+
+#include "asic.h"
+#include "asic_common.h"
+#include "global_state.h"
+#include "hashrate_monitor_task.h"
+#include "scoreboard.h"
+#include "self_test.h"
+#include "stratum_task.h"
+#include "system.h"
+#include "utils.h"
+#include "unity.h"
+
+#include <float.h>
+#include <setjmp.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+typedef struct {
+    bool paused;
+    bool no_share;
+    bool self_test;
+    bool hash_failure;
+    unsigned repeated_results;
+    double pool_diff;
+    int submit_result;
+    uint64_t sent_time;
+    miner_job_type_t protocol;
+} result_case_t;
+
+static jmp_buf fixture_done;
+static GlobalState fixture_state;
+static task_result fixture_events[2];
+static size_t fixture_event_index;
+static result_case_t fixture_case;
+static unsigned fixture_delays;
+static unsigned fixture_submissions;
+static unsigned fixture_scores;
+static unsigned fixture_notifications;
+static unsigned fixture_self_tests;
+static unsigned fixture_registers;
+static char fixture_scored_id[32];
+static char fixture_submitted_id[32];
+
+void result_task_spy_delay(TickType_t ticks)
+{
+    TEST_ASSERT_EQUAL_UINT32(pdMS_TO_TICKS(100), ticks);
+    fixture_delays++;
+    fixture_state.ASIC_initalized = true;
+}
+
+bool result_task_fake_mining_nonce_hash(const asic_job_t *job, uint32_t nonce,
+                                        uint32_t rolled_version, uint8_t hash[32])
+{
+    if (fixture_case.hash_failure) {
+        memset(hash, 0xff, 32);
+        return false;
+    }
+    uint8_t header[80];
+    asic_job_header(job, nonce, rolled_version, header);
+    return double_sha256_bin(header, sizeof(header), hash);
+}
+
+task_result *result_task_fake_process_work(GlobalState *state)
+{
+    TEST_ASSERT_EQUAL_PTR(&fixture_state, state);
+    if (fixture_event_index++ == 0) {
+        return NULL;
+    }
+    if (fixture_event_index == 2) {
+        return &fixture_events[0];
+    }
+    if (fixture_event_index <= 3 + fixture_case.repeated_results) {
+        return fixture_case.no_share ? NULL : &fixture_events[1];
+    }
+    longjmp(fixture_done, 1);
+}
+
+int result_task_fake_submit_share(GlobalState *state, const asic_job_t *job,
+                                  uint32_t nonce, uint32_t version,
+                                  uint64_t *sent_time)
+{
+    TEST_ASSERT_EQUAL_PTR(&fixture_state, state);
+    TEST_ASSERT_EQUAL_HEX32(7, nonce);
+    TEST_ASSERT_EQUAL_HEX32(0x20002004, version);
+    TEST_ASSERT_EQUAL_HEX32(0x20000004, job->version);
+    TEST_ASSERT_EQUAL_HEX32(0x1fffe000, job->version_mask);
+    TEST_ASSERT_EQUAL_HEX32(0x1705dd01, job->nbits);
+    TEST_ASSERT_EQUAL_UINT32(123, job->ntime);
+    TEST_ASSERT_EQUAL(fixture_case.protocol, job->source_type);
+    TEST_ASSERT_EQUAL_UINT8(UINT8_MAX, job->pool_id);
+    TEST_ASSERT_FLOAT_WITHIN(1e-4, fixture_case.pool_diff, target_to_diff(job->pool_target));
+    TEST_ASSERT_EQUAL_STRING("42", job->job_id);
+    TEST_ASSERT_EQUAL_STRING("aabb", job->extranonce2);
+    snprintf(fixture_submitted_id, sizeof(fixture_submitted_id), "%s",
+             job->job_id);
+
+    fixture_submissions++;
+    *sent_time = fixture_case.sent_time;
+    return fixture_case.submit_result;
+}
+
+void result_task_spy_record_nonce(GlobalState *state, const uint8_t hash[32])
+{
+    TEST_ASSERT_EQUAL_PTR(&fixture_state, state);
+    TEST_ASSERT_NOT_NULL(hash);
+    fixture_self_tests++;
+}
+
+void result_task_spy_notify_found_nonce(GlobalState *state, double difficulty,
+                                        bool is_block)
+{
+    TEST_ASSERT_EQUAL_PTR(&fixture_state, state);
+    TEST_ASSERT_TRUE(difficulty > 0);
+    TEST_ASSERT_FALSE(is_block);
+    fixture_notifications++;
+}
+
+esp_err_t result_task_spy_scoreboard_add(
+    Scoreboard *scoreboard, double difficulty, const char *job_id,
+    const char *extranonce, uint32_t ntime, uint32_t nonce,
+    uint32_t version_bits)
+{
+    TEST_ASSERT_EQUAL_PTR(&fixture_state.SYSTEM_MODULE.scoreboard, scoreboard);
+    TEST_ASSERT_TRUE(difficulty > 0);
+    TEST_ASSERT_EQUAL_UINT32(123, ntime);
+    TEST_ASSERT_EQUAL_UINT32(7, nonce);
+    TEST_ASSERT_EQUAL_HEX32(0x00002000, version_bits);
+    TEST_ASSERT_EQUAL_STRING("aabb", extranonce);
+    snprintf(fixture_scored_id, sizeof(fixture_scored_id), "%s", job_id);
+    fixture_scores++;
+    return ESP_OK;
+}
+
+void result_task_spy_register_read(void *state, register_type_t type,
+                                   uint8_t asic_nr, uint32_t value,
+                                   uint64_t timestamp)
+{
+    TEST_ASSERT_EQUAL_PTR(&fixture_state, state);
+    TEST_ASSERT_EQUAL(REGISTER_TOTAL_COUNT, type);
+    TEST_ASSERT_EQUAL_UINT8(2, asic_nr);
+    TEST_ASSERT_EQUAL_UINT32(55, value);
+    TEST_ASSERT_TRUE(timestamp == UINT64_C(1000));
+    fixture_registers++;
+}
+
+static void run_result_case(result_case_t test_case)
+{
+    fixture_case = test_case;
+    memset(&fixture_state, 0, sizeof(fixture_state));
+    memset(fixture_events, 0, sizeof(fixture_events));
+    fixture_state.ASIC_initalized = !fixture_case.paused;
+    fixture_state.SELF_TEST_MODULE.is_active = fixture_case.self_test;
+    // Results carry all required context; this consumer has no active-job store.
+
+    fixture_events[0] = (task_result) {
+        .register_type = REGISTER_TOTAL_COUNT,
+        .asic_nr = 2,
+        .value = 55,
+        .timestamp_us = 1000,
+    };
+    fixture_events[1] = (task_result) {
+        .job = {
+            .version = 0x20000004,
+            .version_mask = 0x1fffe000,
+            .ntime = 123,
+            .nbits = 0x1705dd01,
+            .pool_id = UINT8_MAX,
+            .source_type = fixture_case.protocol,
+            .job_id = "42",
+            .extranonce2 = "aabb",
+        },
+        .nonce = 7,
+        .rolled_version = 0x20002004,
+        .timestamp_us = 1000,
+    };
+    diff_to_target(fixture_case.pool_diff, fixture_events[1].job.pool_target);
+    fixture_event_index = 0;
+    fixture_delays = 0;
+    fixture_submissions = 0;
+    fixture_scores = 0;
+    fixture_notifications = 0;
+    fixture_self_tests = 0;
+    fixture_registers = 0;
+    fixture_scored_id[0] = '\0';
+    fixture_submitted_id[0] = '\0';
+
+    if (setjmp(fixture_done) == 0) {
+        ASIC_result_task(&fixture_state);
+    }
+
+    TEST_ASSERT_EQUAL_UINT32(1, fixture_registers);
+    TEST_ASSERT_EQUAL_UINT32(fixture_case.paused ? 1 : 0, fixture_delays);
+}
+
+TEST_CASE("result task submits embedded job snapshots without a job store for every protocol",
+          "[asic][result][ownership][characterization]")
+{
+    for (int type = JOB_TYPE_V1; type <= JOB_TYPE_SV2_EXTENDED; ++type) {
+        run_result_case((result_case_t) {
+            .paused = true,
+            .pool_diff = 1e-30,
+            .protocol = (miner_job_type_t)type,
+            .sent_time = 2000,
+        });
+        TEST_ASSERT_EQUAL_UINT32(1, fixture_submissions);
+        TEST_ASSERT_EQUAL_UINT32(1, fixture_scores);
+        TEST_ASSERT_EQUAL_UINT32(1, fixture_notifications);
+        TEST_ASSERT_EQUAL_UINT32(0, fixture_self_tests);
+        TEST_ASSERT_EQUAL_STRING("42", fixture_submitted_id);
+        TEST_ASSERT_EQUAL_STRING("42", fixture_scored_id);
+        TEST_ASSERT_EQUAL_FLOAT(1.0f,
+                                fixture_state.SYSTEM_MODULE.process_time);
+    }
+}
+
+TEST_CASE("result task separates registers and empty ASIC responses",
+          "[asic][result][characterization]")
+{
+    run_result_case((result_case_t) {.no_share = true});
+    TEST_ASSERT_EQUAL_UINT32(
+        0, fixture_submissions + fixture_scores + fixture_notifications +
+               fixture_self_tests);
+}
+
+TEST_CASE("result task preserves thresholds self test and repeated delivery",
+          "[asic][result][characterization]")
+{
+    run_result_case((result_case_t) {.self_test = true});
+    TEST_ASSERT_EQUAL_UINT32(1, fixture_self_tests);
+    TEST_ASSERT_EQUAL_UINT32(
+        0, fixture_submissions + fixture_scores + fixture_notifications);
+
+    const double difficulties[] = {0, DBL_MAX};
+    for (size_t index = 0;
+         index < sizeof(difficulties) / sizeof(difficulties[0]); ++index) {
+        run_result_case(
+            (result_case_t) {.pool_diff = difficulties[index]});
+        TEST_ASSERT_EQUAL_UINT32(0, fixture_submissions);
+        TEST_ASSERT_EQUAL_UINT32(1, fixture_scores);
+        TEST_ASSERT_EQUAL_UINT32(1, fixture_notifications);
+    }
+
+    run_result_case((result_case_t) {
+        .pool_diff = 1e-30,
+        .submit_result = -1,
+        .sent_time = 2000,
+    });
+    TEST_ASSERT_EQUAL_UINT32(1, fixture_submissions);
+    TEST_ASSERT_EQUAL_UINT32(1, fixture_scores);
+    TEST_ASSERT_EQUAL_UINT32(1, fixture_notifications);
+    TEST_ASSERT_EQUAL_FLOAT(0, fixture_state.SYSTEM_MODULE.process_time);
+
+    run_result_case((result_case_t) {
+        .pool_diff = 1e-30,
+        .repeated_results = 1,
+    });
+    TEST_ASSERT_EQUAL_UINT32(2, fixture_submissions);
+    TEST_ASSERT_EQUAL_UINT32(2, fixture_scores);
+    TEST_ASSERT_EQUAL_UINT32(2, fixture_notifications);
+}
+
+TEST_CASE("result task discards results when nonce hashing fails",
+          "[asic][result][characterization]")
+{
+    run_result_case((result_case_t) {
+        .pool_diff = 1e-30,
+        .hash_failure = true,
+    });
+    TEST_ASSERT_EQUAL_UINT32(0, fixture_submissions);
+    TEST_ASSERT_EQUAL_UINT32(0, fixture_scores);
+    TEST_ASSERT_EQUAL_UINT32(0, fixture_notifications);
+    TEST_ASSERT_EQUAL_UINT32(0, fixture_self_tests);
+
+    run_result_case((result_case_t) {
+        .self_test = true,
+        .hash_failure = true,
+    });
+    TEST_ASSERT_EQUAL_UINT32(0, fixture_submissions);
+    TEST_ASSERT_EQUAL_UINT32(0, fixture_scores);
+    TEST_ASSERT_EQUAL_UINT32(0, fixture_notifications);
+    TEST_ASSERT_EQUAL_UINT32(0, fixture_self_tests);
+}

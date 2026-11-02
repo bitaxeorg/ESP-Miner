@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { BehaviorSubject, Observable, Subject, EMPTY, timer, merge, fromEvent } from 'rxjs';
-import { catchError, retry, share, tap, switchMap, startWith, scan, shareReplay, map, timeout, bufferTime, filter, distinctUntilChanged } from 'rxjs/operators';
+import { catchError, retry, share, tap, switchMap, startWith, scan, shareReplay, map, timeout, bufferTime, filter, distinctUntilChanged, exhaustMap } from 'rxjs/operators';
 import { webSocket, WebSocketSubject } from 'rxjs/webSocket';
 import { SystemInfo as ISystemInfo } from 'src/app/generated/models';
 import { SystemApiService } from './system.service';
@@ -24,6 +24,9 @@ export class LiveDataService {
   private connectedSubject = new BehaviorSubject<boolean>(false);
   public connected$ = this.connectedSubject.asObservable();
 
+  // Persistent rolling sparkline history across tabs (last 30 samples per domain)
+  public domainHistory: number[][][] = [];
+
   constructor(
     private systemService: SystemApiService
   ) {
@@ -38,12 +41,19 @@ export class LiveDataService {
     // Periodic polling fallback (adjust frequency based on visibility)
     const fallbackPolling$ = visibility$.pipe(
       switchMap(state => {
-        const interval = state === 'visible' ? 5000 : 60000; // 5s when visible, 60s when hidden
-        return timer(interval, interval).pipe(
-          switchMap(() => {
+        const interval = state === 'visible' ? 3000 : 60000; // 3s when visible, 60s when hidden
+        return timer(0, interval).pipe(
+          exhaustMap(() => {
             // Only poll if not connected OR if backgrounded (to keep data fresh)
             if (this.connectedSubject.value && state === 'visible') return EMPTY;
-            return this.systemService.getInfo();
+            return this.systemService.getInfo().pipe(
+              tap(() => {
+                if (!this.connectedSubject.value) {
+                  this.connectedSubject.next(true);
+                }
+              }),
+              catchError(() => EMPTY)
+            );
           })
         );
       }),
@@ -53,8 +63,8 @@ export class LiveDataService {
     const updates$ = merge(
       this.connect().pipe(switchMap(() => EMPTY), catchError(() => EMPTY)),
       this.updates$.pipe(
-        // Buffer updates to handle bursts when tab is resumed
-        bufferTime(500),
+        // Buffer updates to handle bursts when tab is resumed (1000ms = 1Hz UI refresh)
+        bufferTime(1000),
         filter(msgs => msgs.length > 0),
         map(msgs => msgs.reduce((acc, curr) => ({ ...acc, ...curr }), {} as Partial<ISystemInfo>))
       ),
@@ -72,8 +82,32 @@ export class LiveDataService {
       scan((acc: ISystemInfo, curr: Partial<ISystemInfo>) => ({ ...acc, ...curr } as ISystemInfo), {} as ISystemInfo),
       // Ensure we have at least once received a message with a recognizable field before emitting
       filter(info => !!info.version || !!info.uptimeSeconds),
+      tap(info => this.recordDomainHistory(info)),
       shareReplay(1)
     );
+  }
+
+  public recordDomainHistory(info: ISystemInfo): void {
+    const asics = info.hashrateMonitor?.asics;
+    if (!asics || !asics.length) {
+      return;
+    }
+    const maxSamples = 30;
+    for (let a = 0; a < asics.length; a++) {
+      if (!this.domainHistory[a]) {
+        this.domainHistory[a] = [];
+      }
+      const domains = asics[a].domains || [];
+      for (let d = 0; d < domains.length; d++) {
+        if (!this.domainHistory[a][d]) {
+          this.domainHistory[a][d] = [];
+        }
+        this.domainHistory[a][d].push(domains[d] ?? 0);
+        if (this.domainHistory[a][d].length > maxSamples) {
+          this.domainHistory[a][d].shift();
+        }
+      }
+    }
   }
 
   private connect(): Observable<any> {
@@ -109,7 +143,7 @@ export class LiveDataService {
     });
 
     return this.socket$.pipe(
-      timeout(30000),
+      timeout(10000),
       tap(msg => {
         this.lastMessageAt = Date.now();
         if (msg.event === 'update' && msg.data) {

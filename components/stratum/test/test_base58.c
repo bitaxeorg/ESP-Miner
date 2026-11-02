@@ -6,8 +6,7 @@
 
 // Wrapper for SHA256 to match libbase58's expected signature
 static bool my_sha256(void *digest, const void *data, size_t datasz) {
-    sha256_bin(data, datasz, digest);
-    return true;
+    return sha256_bin(data, datasz, digest);
 }
 
 void setUp(void) {

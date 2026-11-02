@@ -1,5 +1,5 @@
 # This file was generated using idf.py save-defconfig. It can be edited manually.
-# Espressif IoT Development Framework (ESP-IDF) 6.0.2 Project Minimal Configuration
+# Espressif IoT Development Framework (ESP-IDF) 6.0.3 Project Minimal Configuration
 #
 CONFIG_IDF_TARGET="esp32s3"
 CONFIG_BOOTLOADER_COMPILER_OPTIMIZATION_PERF=y
@@ -34,6 +34,9 @@ CONFIG_LOG_COLORS=y
 CONFIG_LWIP_MAX_SOCKETS=26
 CONFIG_LWIP_IPV6=y
 CONFIG_LWIP_IPV6_AUTOCONFIG=y
+CONFIG_LWIP_DHCP_GET_NTP_SRV=y
+CONFIG_LWIP_DHCP_MAX_NTP_SERVERS=3
+CONFIG_LWIP_SNTP_MAX_SERVERS=3
 CONFIG_LWIP_USE_ESP_GETADDRINFO=y
 CONFIG_SPIFFS_OBJ_NAME_LEN=64
 CONFIG_LV_CONF_SKIP=n

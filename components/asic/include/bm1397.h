@@ -2,36 +2,23 @@
 #define BM1397_H_
 
 #include "asic_common.h"
+#include "asic_job.h"
 
 typedef struct GlobalState GlobalState;
-typedef struct bm_job bm_job;
+
+#define BM1397_MIDSTATE_BITS 2
 
 #define BM1397_SERIALTX_DEBUG false
 #define BM1397_SERIALRX_DEBUG false
 #define BM1397_DEBUG_WORK false //causes insane amount of debug output
-#define BM1397_DEBUG_JOBS false //causes insane amount of debug output
-
-typedef struct __attribute__((__packed__))
-{
-    uint8_t job_id;
-    uint8_t num_midstates;
-    uint8_t starting_nonce[4];
-    uint8_t nbits[4];
-    uint8_t ntime[4];
-    uint8_t merkle4[4];
-    uint8_t midstate[32];
-    uint8_t midstate1[32];
-    uint8_t midstate2[32];
-    uint8_t midstate3[32];
-} job_packet;
 
 uint8_t BM1397_init(GlobalState * GLOBAL_STATE);
-void BM1397_send_work(GlobalState * GLOBAL_STATE, bm_job * next_bm_job);
+void BM1397_send_work(GlobalState * GLOBAL_STATE, const asic_job_t * next_job);
 void BM1397_set_version_mask(uint32_t version_mask);
 int BM1397_set_max_baud(void);
-int BM1397_set_default_baud(void);
 float BM1397_send_hash_frequency(float frequency);
 task_result * BM1397_process_work(GlobalState * GLOBAL_STATE);
-void BM1397_read_registers(void);
+void BM1397_read_registers(GlobalState * GLOBAL_STATE);
+void BM1397_set_difficulty(uint8_t difficulty_power);
 
 #endif /* BM1397_H_ */

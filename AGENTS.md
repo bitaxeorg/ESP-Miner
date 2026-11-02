@@ -15,7 +15,7 @@ ESP-Miner is the firmware powering the Bitaxe open-source Bitcoin ASIC miners. I
 ├── main/                       # Main application source code
 │   └── http_server/            # C-based HTTP server logic
 │       └── axe-os/             # Axe-OS Angular Frontend
-├── config-*.cvs                # Hardware-specific configuration files
+├── configs/                    # Hardware-specific NVS configuration files
 ├── partitions.csv              # Flash partition layout
 └── sdkconfig                   # Project-wide ESP-IDF configuration
 ```
@@ -23,16 +23,16 @@ ESP-Miner is the firmware powering the Bitaxe open-source Bitcoin ASIC miners. I
 ## Build Instructions
 
 ### 1. Firmware (Main Project)
-The project uses the standard ESP-IDF build system. Ensure you are using ESP-IDF v6.0.2.
+The project uses the standard ESP-IDF build system. Ensure you are using ESP-IDF v6.0.3.
 
 **Prerequisites:**
-- ESP-IDF v6.0.2 environment sourced.
+- ESP-IDF v6.0.3 environment sourced.
 - Node.js (v22+) and npm for the frontend bundle.
 
 **Commands:**
 ```bash
 # Source the environment
-. ~/esp/v6.0.2/esp-idf/export.sh
+. ~/esp/v6.0.3/esp-idf/export.sh
 
 # Build the project (automatically builds Axe-OS and generates binaries)
 idf.py build
@@ -59,11 +59,14 @@ npm run start
 
 ## Testing
 
-### Internal C Components
-Firmware unit tests are located in the `test/` directory.
+### Internal C Components (Unity & QEMU)
+Backend firmware unit tests use the Unity test framework and run under QEMU emulation (`esp32s3` machine target) in CI.
+
+**Execution:**
 ```bash
-idf.py build test
+bash tools/run_qemu_tests.sh
 ```
+*Note: Test cases tagged with `[not-on-qemu]` (such as hardware-specific ASIC nonce tests) are automatically skipped in QEMU emulation.*
 
 ### Axe-OS Frontend
 Angular unit tests use Karma and Jasmine. We use a specific CI command for CI environments which ensures consistent reporting and uses a headless browser.
@@ -95,3 +98,6 @@ We use GitHub Actions for automated testing and releases.
 - **PSRAM**: Bitaxe heavily relies on PSRAM. Always check `esp_psram_is_initialized()` before allocating large buffers in the backend.
 - **Mock Data Parity**: When updating `openapi.yaml` and regenerating the API, you **must** update the mock data in `main/http_server/axe-os/src/app/services/system.service.ts`. The TypeScript compiler will fail if properties are missing from the `of()` calls used for development.
 - **API Type Safety**: The `SystemInfo` API uses a numeric 0/1 pattern for many boolean-like status fields (e.g., `overclockEnabled`, `overheat_mode`). In the backend, use `cJSON_AddNumberToObject(root, "key", val ? 1 : 0)` to maintain parity with the `integer` types in OpenAPI and support strict equality checks (`=== 1`) in the Angular frontend.
+- **Reduce Verbosity**: Use one paragraph to describe changes. No headings, no "What this changes", no multi-line comments.
+- **Reuse Existing Code**: Avoid refactoring and making large changes on your own. If a large change or refactor is required, refuse to make any further changes and alert your operator.
+- **Minimize Scope**: If it's a contained feature, go for a PR and isolate the changes to that feature, minimizing the scope of the PR. If you have a restructuring of refactoring in mind, open an issue first to align it with ongoing changes.

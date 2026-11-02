@@ -38,7 +38,22 @@ jobs:
              unzip -d "$name" "$name.zip"
            done
 
+      - name: Check report inputs
+        id: report-inputs
+        shell: bash
+        run: |
+          if [[ ! -f artifacts/event-file/event.json ]]; then
+            echo "::notice::No event artifact was produced; test result publishing is skipped."
+            echo "No event artifact is available. See the triggering Unit Test run for its outcome; this does not indicate passing tests." >> "$GITHUB_STEP_SUMMARY"
+          elif [[ -z "$(find artifacts -type f -name '*.xml' -print -quit)" ]]; then
+            echo "::notice::No test reports were produced; test result publishing is skipped."
+            echo "No test reports are available. See the triggering Unit Test run for its outcome; this does not indicate passing tests." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Publish Test Results
+        if: steps.report-inputs.outputs.ready == 'true'
         uses: EnricoMi/publish-unit-test-result-action@v2
         with:
           commit: ${{ github.event.workflow_run.head_sha }}

@@ -5,7 +5,7 @@
 
 #define I2C_BUS_SPEED_HZ 400000   /*!< I2C master clock frequency */
 
-esp_err_t i2c_bitaxe_init(void);
+esp_err_t i2c_bitaxe_init(gpio_num_t sda_gpio, gpio_num_t scl_gpio);
 esp_err_t i2c_bitaxe_add_device(uint8_t device_address, i2c_master_dev_handle_t * dev_handle, const char *device_tag);
 esp_err_t i2c_bitaxe_get_master_bus_handle(i2c_master_bus_handle_t * dev_handle);
 

@@ -153,9 +153,11 @@ Device: $BAP,STA,status,restarting*5E\r\n
 
 ## Configuration
 
-BAP uses the following GPIO pins for UART communication:
-- **RX**: Configurable via `CONFIG_GPIO_BAP_RX`
-- **TX**: Configurable via `CONFIG_GPIO_BAP_TX`
+BAP UART pin assignments are defined per board revision in `DeviceConfig.pins.bap`:
+- **Default Pins**: RX (GPIO 40), TX (GPIO 39)
+- **Kconfig Enable/Disable**: Configurable via `CONFIG_ENABLE_BAP` (default `y`). Setting to `n` disables BAP.
+- **Kconfig Pin Overrides**: Optionally configurable via `CONFIG_GPIO_BAP_RX` and `CONFIG_GPIO_BAP_TX` (set to `-1` to use board defaults).
+- **Board Support**: If `pins.bap` is set to `NULL` for a board configuration or via `CONFIG_ENABLE_BAP=n`, BAP UART is automatically disabled.
 
 UART settings:
 - Baud rate: 115200

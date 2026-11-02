@@ -1,2 +1,6 @@
 CONFIG_ESP_INT_WDT=n
 CONFIG_ESP_TASK_WDT=n
+# Unity runs job fixtures and production hashing on the main task; use the
+# same stack budget as the firmware's job and result tasks.
+CONFIG_ESP_MAIN_TASK_STACK_SIZE=8192
+CONFIG_FREERTOS_WATCHPOINT_END_OF_STACK=y

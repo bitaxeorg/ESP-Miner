@@ -1,7 +1,7 @@
 import 'chartjs-adapter-moment';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { HomeComponent } from './home.component';
-import { provideHttpClient } from '@angular/common/http';
+import { HttpErrorResponse, provideHttpClient } from '@angular/common/http';
 import { provideToastr } from 'ngx-toastr';
 import { ReactiveFormsModule, FormsModule } from '@angular/forms';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
@@ -10,7 +10,8 @@ import { provideRouter } from '@angular/router';
 import { AppChartComponent } from 'src/app/components/chart/app-chart.component';
 import { TooltipDirective } from 'src/app/directives/tooltip.directive';
 import { DropdownComponent } from 'src/app/components/dropdown/dropdown.component';
-import { BehaviorSubject, of } from 'rxjs';
+import { ProgressbarComponent } from 'src/app/components/progressbar/progressbar.component';
+import { BehaviorSubject, of, Subject } from 'rxjs';
 
 import { HashSuffixPipe } from 'src/app/pipes/hash-suffix.pipe';
 import { DiffSuffixPipe } from 'src/app/pipes/diff-suffix.pipe';
@@ -36,6 +37,52 @@ import { LayoutService } from 'src/app/layout/service/app.layout.service';
 import { SystemInfo as ISystemInfo, SystemStatistics as ISystemStatistics } from 'src/app/generated/models';
 
 const mockSystemInfo: ISystemInfo = {
+  ASICModel: 'BM1370',
+  apEnabled: 0,
+  autofanspeed: 1,
+  blockSignals: [],
+  coinbaseValueUserSatoshis: 0,
+  coinbasePayoutStatus: 'unknown',
+  display: 'SSD1306',
+  displayTimeout: 0,
+  errorPercentage: 0,
+  expectedHashrate: 500,
+  frequency: 600,
+  hostname: 'bitaxe',
+  invertscreen: 0,
+  isPSRAMAvailable: 1,
+  manualFanSpeed: 80,
+  minFanSpeed: 20,
+  miningPaused: false,
+  overclockEnabled: 0,
+  overheat_mode: 0,
+  partitions: [],
+  pools: [],
+  primaryPoolIndex: 0,
+  resetReason: 'Power on',
+  rotation: 0,
+  runningPartition: 'ota_0',
+  secondaryPoolIndex: 1,
+  sharesRejectedReasons: [],
+  smallCoreCount: 1,
+  statsFrequency: 5,
+  statsLimit: 720,
+  stratumCert: '',
+  stratumDecodeCoinbase: true,
+  stratumShareWarning: true,
+  stratumExtranonceSubscribe: false,
+  stratumSuggestedDifficulty: 1000,
+  stratumTLS: false,
+  stratumV2AuthorityPubkey: '',
+  fallbackStratumCert: '',
+  fallbackStratumDecodeCoinbase: true,
+  fallbackStratumShareWarning: true,
+  fallbackStratumExtranonceSubscribe: false,
+  fallbackStratumSuggestedDifficulty: 1000,
+  fallbackStratumTLS: false,
+  temptarget: 60,
+  useCustomWWW: 0,
+  useNTP: false,
   power_fault: '',
   blockFound: 0,
   sharesAccepted: 100,
@@ -62,13 +109,19 @@ const mockSystemInfo: ISystemInfo = {
   coreVoltage: 0,
   maxPower: 20,
   poolConnectionInfo: 'Connected',
+  primaryPoolError: '',
+  poolBanner: '',
   responseTime: 45,
+  responseTimeMin: 45,
+  responseTimeMax: 45,
   responseShareBatch: 1,
   poolDifficulty: 1000,
   blockHeight: 800000,
   networkDifficulty: 5000000,
   scriptsig: 'test-scriptsig',
   coinbaseOutputs: [],
+  coinbaseOthersCount: 0,
+  coinbaseOthersValueSatoshis: 0,
   coinbaseValueTotalSatoshis: 625000000,
   hashrateMonitor: {
     asics: [
@@ -104,8 +157,9 @@ const mockSystemInfo: ISystemInfo = {
   fallbackStratumUser: 'worker.fallback',
   fallbackStratumPort: 3333,
   fallbackStratumProtocol: 'SV1',
-  isUsingFallbackStratum: false
-} as any;
+  isUsingFallbackStratum: 0,
+  useFallbackStratum: 0
+};
 
 const mockSystemStatistics: ISystemStatistics = {
   labels: ['timestamp', 'hashrate', 'power'],
@@ -114,16 +168,18 @@ const mockSystemStatistics: ISystemStatistics = {
     [Date.now(), 500, 15]
   ],
   currentTimestamp: Date.now()
-} as any;
+};
 
 const mockLiveDataService = {
   info$: new BehaviorSubject<ISystemInfo>(mockSystemInfo),
-  connected$: of(true)
+  connected$: of(true),
+  domainHistory: []
 };
 
 const mockSystemApiService = {
+  getAsicSettings: () => of({ frequencyOptions: [100, 200, 300] }),
   getStatistics: () => of(mockSystemStatistics),
-  updateSystem: () => of(null),
+  updateSystem: (_uri: string, _update: Pick<ISystemInfo, 'useFallbackStratum'>) => of(null),
   restart: () => of(null),
   dismissBlockFound: () => of(null)
 };
@@ -146,27 +202,27 @@ describe('HomeComponent', () => {
   let fixture: ComponentFixture<HomeComponent>;
 
   beforeEach(() => {
+    mockLiveDataService.info$ = new BehaviorSubject<ISystemInfo>(structuredClone(mockSystemInfo));
     TestBed.configureTestingModule({
-      declarations: [
-        HomeComponent,
-        TooltipTextIconComponent,
-        TooltipIconComponent,
-        ConfettiComponent,
-        SnowflakesComponent
-      ],
       imports: [
         ReactiveFormsModule,
         FormsModule,
         NoopAnimationsModule,
         AppChartComponent,
         DropdownComponent,
+        ProgressbarComponent,
         TooltipDirective,
         HashSuffixPipe,
         DiffSuffixPipe,
         DateAgoPipe,
         AddressPipe,
         SatsPipe,
-        ByteSuffixPipe
+        ByteSuffixPipe,
+        HomeComponent,
+        TooltipTextIconComponent,
+        TooltipIconComponent,
+        ConfettiComponent,
+        SnowflakesComponent
       ],
       providers: [
         provideRouter([]),
@@ -193,11 +249,284 @@ describe('HomeComponent', () => {
     expect(component).toBeTruthy();
   });
 
+  it('uses the device presets for frequency messages', () => {
+    const info = { ...mockSystemInfo, frequency: 100 };
+    const error = { duration: 0, startTime: null };
+    component.handleSystemMessages(info, error, [100, 200, 300]);
+    expect(component.messages.some(message => message.type === 'FREQUENCY_LOW')).toBeFalse();
+    component.handleSystemMessages({ ...info, frequency: 99 }, error, [100, 200, 300]);
+    expect(component.messages.some(message => message.type === 'FREQUENCY_LOW')).toBeTrue();
+    component.handleSystemMessages(info, error, [100, 200, 300]);
+    expect(component.messages.some(message => message.type === 'FREQUENCY_LOW')).toBeFalse();
+  });
+
+  it('handles mining reward messages using coinbasePayoutStatus', () => {
+    const error = { duration: 0, startTime: null };
+    const baseInfo: ISystemInfo = {
+      ...mockSystemInfo,
+      coinbaseOutputs: [{ address: 'bc1qother', value: 50000 }],
+      coinbaseValueTotalSatoshis: 50000,
+      coinbaseValueUserSatoshis: 0,
+    };
+
+    // When payout status is not_found and share warning is enabled, alert NO_MINING_REWARD
+    component.activePoolShareWarning = true;
+    component.handleSystemMessages({ ...baseInfo, coinbasePayoutStatus: 'not_found' }, error);
+    expect(component.messages.some(message => message.type === 'NO_MINING_REWARD')).toBeTrue();
+
+    // When payout status is not_applicable (account pool), NO_MINING_REWARD is not shown
+    component.handleSystemMessages({ ...baseInfo, coinbasePayoutStatus: 'not_applicable' }, error);
+    expect(component.messages.some(message => message.type === 'NO_MINING_REWARD')).toBeFalse();
+
+    // When payout status is verified, NO_MINING_REWARD is not shown
+    component.handleSystemMessages({
+      ...baseInfo,
+      coinbaseValueUserSatoshis: 50000,
+      coinbasePayoutStatus: 'verified'
+    }, error);
+    expect(component.messages.some(message => message.type === 'NO_MINING_REWARD')).toBeFalse();
+  });
+
+  it('orders coinbase outputs strictly using isUserOutput without fallback to username substring', () => {
+    component.activePoolUser = 'bc1qother.worker1';
+    const outputs = [
+      { address: 'bc1qother', value: 10000, isUserOutput: 0 },
+      { address: 'bc1quser', value: 40000, isUserOutput: 1 },
+    ];
+    const ordered = component.getOrderedCoinbaseOutputs({ coinbaseOutputs: outputs } as any);
+    expect(ordered?.[0]?.address).toBe('bc1quser');
+    expect(ordered?.[0]?.isUserOutput).toBe(1);
+    expect(ordered?.[1]?.address).toBe('bc1qother');
+    expect(ordered?.[1]?.isUserOutput).toBe(0);
+  });
+
+  it('keeps telemetry and messages live while settings load and after settings fail', () => {
+    fixture.destroy();
+    const settings = new Subject<{ frequencyOptions: number[] }>();
+    spyOn(mockSystemApiService, 'getAsicSettings').and.returnValue(settings);
+    mockLiveDataService.info$.next({ ...mockSystemInfo, frequency: 100 });
+    fixture = TestBed.createComponent(HomeComponent);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+
+    expect(component.messages.some(message => message.type === 'FREQUENCY_LOW')).toBeFalse();
+    expect(component['latestInfo']?.frequency).toBe(100);
+    settings.next({ frequencyOptions: [100, 200, 300] });
+    mockLiveDataService.info$.next({ ...mockSystemInfo, frequency: 99 });
+    expect(component.messages.some(message => message.type === 'FREQUENCY_LOW')).toBeTrue();
+
+    settings.error(new Error('Settings unavailable'));
+    expect(component.messages.some(message => message.type === 'FREQUENCY_LOW')).toBeFalse();
+    mockLiveDataService.info$.next({ ...mockSystemInfo, frequency: 0 });
+    expect(component.messages.some(message => message.type === 'FREQUENCY_LOW')).toBeTrue();
+  });
+
   it('should render the dashboard widgets and dropdowns when info is loaded', () => {
     fixture.detectChanges();
     const element = fixture.nativeElement;
-    // Verify that the dropdowns inside *ngIf are rendered
+    // Verify that the dropdowns inside the @if block are rendered
     expect(element.querySelector('app-dropdown')).toBeTruthy();
+  });
+
+  describe('pool selection', () => {
+    function emitPoolInfo(changes: Partial<ISystemInfo>): void {
+      mockLiveDataService.info$.next({ ...mockLiveDataService.info$.value, ...changes });
+    }
+
+    async function expectSelectedPool(label: 'Primary' | 'Fallback'): Promise<void> {
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+      const selectedLabel = fixture.nativeElement.querySelector('[gs-id="pool"] app-dropdown span');
+      expect(selectedLabel.textContent.trim()).toBe(label);
+    }
+
+    async function selectPool(label: 'Primary' | 'Fallback'): Promise<void> {
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+      const dropdown: HTMLElement = fixture.nativeElement.querySelector('[gs-id="pool"] app-dropdown');
+      dropdown.querySelector<HTMLElement>('[tabindex]')!.click();
+      fixture.detectChanges();
+      const option = Array.from(dropdown.querySelectorAll('li'))
+        .find(item => item.textContent?.trim() === label)!;
+      option.click();
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+    }
+
+    it('should follow automatic failover and recovery while primary remains preferred', async () => {
+      const updateSpy = spyOn(mockSystemApiService, 'updateSystem').and.callThrough();
+      await expectSelectedPool('Primary');
+
+      emitPoolInfo({ useFallbackStratum: 0, isUsingFallbackStratum: 1, fallbackStratumTLS: true });
+      await expectSelectedPool('Fallback');
+      expect(component.activePoolURL).toBe(mockSystemInfo.fallbackStratumURL);
+      expect(component.activePoolUser).toBe(mockSystemInfo.fallbackStratumUser);
+      expect(component.activePoolTLS).toBe(true);
+
+      emitPoolInfo({ useFallbackStratum: 0, isUsingFallbackStratum: 0, stratumTLS: false });
+      await expectSelectedPool('Primary');
+      expect(component.activePoolURL).toBe(mockSystemInfo.stratumURL);
+      expect(component.activePoolUser).toBe(mockSystemInfo.stratumUser);
+      expect(component.activePoolTLS).toBe(false);
+      expect(updateSpy).not.toHaveBeenCalled();
+    });
+
+    it('should show primary when fallback is preferred but primary is active', async () => {
+      emitPoolInfo({ useFallbackStratum: 1, isUsingFallbackStratum: 0 });
+
+      await expectSelectedPool('Primary');
+      expect(component.activePoolURL).toBe(mockSystemInfo.stratumURL);
+    });
+
+    it('should display pool message in pool card when poolBanner is present', () => {
+      emitPoolInfo({ poolBanner: 'Welcome to Public-Pool!' });
+      fixture.detectChanges();
+      const compiled = fixture.nativeElement as HTMLElement;
+      expect(compiled.textContent).toContain('Welcome to Public-Pool!');
+    });
+
+    it('should format bitcoin addresses and display account usernames naturally in DOM', () => {
+      const getUserHtml = () => fixture.debugElement.nativeElement.querySelector('[sensitive-data] span')?.innerHTML ?? '';
+
+      // 1. Account username (not an address) - displayed cleanly without address formatting or font-mono
+      emitPoolInfo({ stratumUser: 'satoshi.worker1' });
+      fixture.detectChanges();
+      expect(getUserHtml()).toBe('satoshi.worker1');
+
+      // 2. Bitcoin address (single) - address is formatted with font-mono, worker suffix preserved
+      emitPoolInfo({
+        stratumUser: 'bc1q42aueh0wluqpzg3ng32kvaugnx4thnxa7y625x.worker1',
+        coinbaseOutputs: [
+          { address: 'bc1q42aueh0wluqpzg3ng32kvaugnx4thnxa7y625x', value: 50000 }
+        ]
+      });
+      fixture.detectChanges();
+      expect(getUserHtml()).toContain('<span class="font-mono">');
+      expect(getUserHtml()).toContain('bc1q');
+      expect(getUserHtml()).toContain('...');
+      expect(getUserHtml()).toContain('</span>.worker1');
+
+      // 3. Bitcoin address (multiple addresses) - both formatted, separator preserved
+      emitPoolInfo({
+        stratumUser: 'bc1q42aueh0wluqpzg3ng32kvaugnx4thnxa7y625x, 1DYwPTnC4NgEmoqbLbcRqoSzVeH3ehmGbV.worker1',
+        coinbaseOutputs: [
+          { address: 'bc1q42aueh0wluqpzg3ng32kvaugnx4thnxa7y625x', value: 25000 },
+          { address: '1DYwPTnC4NgEmoqbLbcRqoSzVeH3ehmGbV', value: 25000 }
+        ]
+      });
+      fixture.detectChanges();
+      expect(getUserHtml()).toContain('<span class="font-mono">');
+      expect(getUserHtml()).toContain(', <span class="font-mono">');
+      expect(getUserHtml()).toContain('</span>.worker1');
+
+      // 4. SRI solo pattern - prefix and worker suffix preserved, address formatted and wrapped in font-mono
+      emitPoolInfo({
+        stratumUser: 'sri/solo/bc1q42aueh0wluqpzg3ng32kvaugnx4thnxa7y625x/worker1',
+        coinbaseOutputs: [
+          { address: 'bc1q42aueh0wluqpzg3ng32kvaugnx4thnxa7y625x', value: 50000 }
+        ]
+      });
+      fixture.detectChanges();
+      expect(getUserHtml()).toContain('sri/solo/<span class="font-mono">');
+      expect(getUserHtml()).toContain('...');
+      expect(getUserHtml()).toContain('</span>/worker1');
+
+      // 5. SRI donate pattern - donation prefix preserved, address formatted and wrapped in font-mono
+      emitPoolInfo({
+        stratumUser: 'sri/donate/10/bc1q42aueh0wluqpzg3ng32kvaugnx4thnxa7y625x/worker1',
+        coinbaseOutputs: [
+          { address: 'bc1q42aueh0wluqpzg3ng32kvaugnx4thnxa7y625x', value: 45000 }
+        ]
+      });
+      fixture.detectChanges();
+      expect(getUserHtml()).toContain('sri/donate/10/<span class="font-mono">');
+      expect(getUserHtml()).toContain('...');
+      expect(getUserHtml()).toContain('</span>/worker1');
+
+      // 6. Full donation / pool worker (no address) - displayed as-is
+      emitPoolInfo({
+        stratumUser: 'sri/donate/worker1',
+        coinbaseOutputs: [
+          { address: 'bc1qpool', value: 50000 }
+        ]
+      });
+      fixture.detectChanges();
+      expect(getUserHtml()).toBe('sri/donate/worker1');
+    });
+
+    it('should reflect reset pool fields (responseTime, poolDifficulty, coinbaseOutputs) on failover', async () => {
+      await expectSelectedPool('Primary');
+
+      emitPoolInfo({
+        useFallbackStratum: 0,
+        isUsingFallbackStratum: 1,
+        responseTime: 0,
+        responseShareBatch: 0,
+        poolDifficulty: 0,
+        coinbaseOutputs: [],
+        coinbaseValueTotalSatoshis: 0,
+        coinbaseValueUserSatoshis: 0
+      });
+
+      await expectSelectedPool('Fallback');
+      expect(component.responseTime).toBe(0);
+      expect(component.payoutPercentage).toBe(-1);
+      expect(component.orderedCoinbaseOutputs).toEqual([]);
+    });
+
+    for (const target of ['Primary', 'Fallback'] as const) {
+      it(`should preserve a pending manual switch to ${target} until the preference is acknowledged`, async () => {
+        const targetFallback = Number(target === 'Fallback');
+        const initialFallback = 1 - targetFallback;
+        emitPoolInfo({ useFallbackStratum: initialFallback, isUsingFallbackStratum: initialFallback });
+        const response = new Subject<null>();
+        const updateSpy = spyOn(mockSystemApiService, 'updateSystem').and.returnValue(response);
+        const restartSpy = spyOn(mockSystemApiService, 'restart').and.callThrough();
+
+        await selectPool(target);
+        expect(updateSpy.calls.mostRecent().args).toEqual(['', { useFallbackStratum: targetFallback }]);
+        emitPoolInfo({ useFallbackStratum: initialFallback, isUsingFallbackStratum: initialFallback });
+        await expectSelectedPool(target);
+
+        response.next(null);
+        response.complete();
+        emitPoolInfo({ useFallbackStratum: targetFallback, isUsingFallbackStratum: targetFallback });
+        await expectSelectedPool(target);
+
+        // Once acknowledged, subsequent status changes must follow the active pool again.
+        emitPoolInfo({ isUsingFallbackStratum: initialFallback });
+        await expectSelectedPool(target === 'Fallback' ? 'Primary' : 'Fallback');
+        expect(updateSpy).toHaveBeenCalledTimes(1);
+        expect(restartSpy).not.toHaveBeenCalled();
+      });
+    }
+
+    it('should show the active pool if the saved manual preference has not become active', async () => {
+      spyOn(mockSystemApiService, 'updateSystem').and.returnValue(of(null));
+      await selectPool('Fallback');
+
+      emitPoolInfo({ useFallbackStratum: 1, isUsingFallbackStratum: 0 });
+
+      await expectSelectedPool('Primary');
+      expect(component.activePoolURL).toBe(mockSystemInfo.stratumURL);
+    });
+
+    it('should release a failed manual selection and follow subsequent pool status', async () => {
+      const response = new Subject<null>();
+      spyOn(mockSystemApiService, 'updateSystem').and.returnValue(response);
+      await selectPool('Fallback');
+      await expectSelectedPool('Fallback');
+
+      response.error(new HttpErrorResponse({ status: 500, statusText: 'Pool update failed' }));
+      emitPoolInfo({ useFallbackStratum: 0, isUsingFallbackStratum: 0 });
+      await expectSelectedPool('Primary');
+
+      emitPoolInfo({ isUsingFallbackStratum: 1 });
+      await expectSelectedPool('Fallback');
+    });
   });
 
   describe('stale data and visibility state', () => {
@@ -235,6 +564,207 @@ describe('HomeComponent', () => {
       expect(component.systemInfoError$.value.duration).toBe(0);
       expect(component.systemInfoError$.value.startTime).toBeNull();
       expect(component['lastMessageTime']).toBeGreaterThan(initialTime);
+    });
+
+    it('should call loadPreviousData and not prematurely updateChart when awayTime exceeds threshold', () => {
+      spyOnProperty(document, 'visibilityState', 'get').and.returnValue('visible');
+      const loadSpy = spyOn<any>(component, 'loadPreviousData');
+      const updateChartSpy = spyOn<any>(component, 'updateChart');
+
+      component.dataLabel = [Date.now() - 30000];
+      component['lastHiddenTime'] = Date.now() - 30000;
+      component['lastStatsFrequency'] = 10;
+
+      component.onVisibilityChange();
+
+      expect(loadSpy).toHaveBeenCalledWith(false);
+      expect(updateChartSpy).not.toHaveBeenCalled();
+      expect(component['lastHiddenTime']).toBe(0);
+    });
+
+    it('should call updateChart immediately when awayTime is below threshold', () => {
+      spyOnProperty(document, 'visibilityState', 'get').and.returnValue('visible');
+      const loadSpy = spyOn<any>(component, 'loadPreviousData');
+      const updateChartSpy = spyOn<any>(component, 'updateChart');
+
+      component.dataLabel = [Date.now() - 1000];
+      component['lastHiddenTime'] = Date.now() - 2000;
+      component['lastStatsFrequency'] = 10;
+
+      component.onVisibilityChange();
+
+      expect(loadSpy).not.toHaveBeenCalled();
+      expect(updateChartSpy).toHaveBeenCalledWith(undefined, true);
+      expect(component['lastHiddenTime']).toBe(0);
+    });
+
+    it('should not update chartData reference when hidden in limitDataPoints', () => {
+      spyOnProperty(document, 'visibilityState', 'get').and.returnValue('hidden');
+      component['statsLimit'] = 2;
+      component.dataLabel = [1000, 2000, 3000];
+      component.hashrateData = [100, 100, 100];
+      component.powerData = [10, 10, 10];
+      component.chartDatasets = {};
+      const originalChartData = { labels: [], datasets: [] };
+      component.chartData = originalChartData;
+
+      component.limitDataPoints(30);
+
+      expect(component.chartData).toBe(originalChartData);
+      expect(component.dataLabel.length).toBe(2);
+    });
+
+    it('should update chartData reference when visible in limitDataPoints', () => {
+      spyOnProperty(document, 'visibilityState', 'get').and.returnValue('visible');
+      component['statsLimit'] = 2;
+      component.dataLabel = [1000, 2000, 3000];
+      component.hashrateData = [100, 100, 100];
+      component.powerData = [10, 10, 10];
+      component.chartDatasets = {};
+      const originalChartData = { labels: [], datasets: [] };
+      component.chartData = originalChartData;
+
+      component.limitDataPoints(30);
+
+      expect(component.chartData).not.toBe(originalChartData);
+      expect(component.dataLabel.length).toBe(2);
+    });
+
+    it('should merge response time into closest neighbor when removed point has data in limitDataPoints', () => {
+      component['statsLimit'] = 3;
+      component.dataLabel = [1000, 2000, 2050, 4000];
+      component.hashrateData = [100, 100, 100, 100];
+      component.powerData = [10, 10, 10, 10];
+      component.chartDatasets = {
+        responseTimeMin: [null, 35.5, null, null],
+        responseTimeMax: [null, 55.5, null, null]
+      };
+
+      component.limitDataPoints(0);
+
+      expect(component.dataLabel.length).toBe(3);
+      expect(component.dataLabel).not.toContain(2000);
+      expect(component.dataLabel).toContain(2050);
+      const idx2050 = component.dataLabel.indexOf(2050);
+      expect(component.chartDatasets['responseTimeMin'][idx2050]).toBe(35.5);
+      expect(component.chartDatasets['responseTimeMax'][idx2050]).toBe(55.5);
+    });
+
+    it('should merge min and max of either points when thinning in limitDataPoints', () => {
+      component['statsLimit'] = 3;
+      component.dataLabel = [1000, 2000, 2050, 4000];
+      component.hashrateData = [100, 100, 100, 100];
+      component.powerData = [10, 10, 10, 10];
+      component.chartDatasets = {
+        responseTimeMin: [null, 35.5, 25.0, null],
+        responseTimeMax: [null, 45.5, 60.0, null]
+      };
+
+      component.limitDataPoints(0);
+
+      expect(component.dataLabel.length).toBe(3);
+      expect(component.dataLabel).toContain(2050);
+      expect(component.dataLabel).not.toContain(2000);
+      const idx2050 = component.dataLabel.indexOf(2050);
+      expect(component.chartDatasets['responseTimeMin'][idx2050]).toBe(25.0);
+      expect(component.chartDatasets['responseTimeMax'][idx2050]).toBe(60.0);
+    });
+
+    it('should clear flash timeouts on destroy', () => {
+      component['shareAcceptedTimeout'] = setTimeout(() => {}, 10000) as any;
+      component['shareRejectedTimeout'] = setTimeout(() => {}, 10000) as any;
+      component['workReceivedTimeout'] = setTimeout(() => {}, 10000) as any;
+
+      spyOn(window, 'clearTimeout').and.callThrough();
+
+      component.ngOnDestroy();
+
+      expect(clearTimeout).toHaveBeenCalledWith(component['shareAcceptedTimeout']);
+      expect(clearTimeout).toHaveBeenCalledWith(component['shareRejectedTimeout']);
+      expect(clearTimeout).toHaveBeenCalledWith(component['workReceivedTimeout']);
+    });
+
+    describe('FALLBACK_STRATUM messages', () => {
+      const error = { duration: 0, startTime: null };
+
+      it('should show info banner when operating on fallback pool by user preference', () => {
+        component.handleSystemMessages({
+          ...mockSystemInfo,
+          isUsingFallbackStratum: 1,
+          useFallbackStratum: 1,
+        }, error);
+
+        const msg = component.messages.find(m => m.type === 'FALLBACK_STRATUM');
+        expect(msg).toBeDefined();
+        expect(msg?.severity).toBe('info');
+        expect(msg?.text).toBe('Mining on fallback pool by user preference.');
+      });
+
+      it('should show warn banner with primaryPoolError when primary fails over to fallback', () => {
+        component.handleSystemMessages({
+          ...mockSystemInfo,
+          isUsingFallbackStratum: 1,
+          useFallbackStratum: 0,
+          primaryPoolError: 'Pool unreachable',
+        }, error);
+
+        const msg = component.messages.find(m => m.type === 'FALLBACK_STRATUM');
+        expect(msg).toBeDefined();
+        expect(msg?.severity).toBe('warn');
+        expect(msg?.text).toBe('Primary pool (stratum.pool.com:3333): Pool unreachable - mining on fallback pool.');
+      });
+
+      it('should show default warn banner when failover occurs without primaryPoolError', () => {
+        component.handleSystemMessages({
+          ...mockSystemInfo,
+          isUsingFallbackStratum: 1,
+          useFallbackStratum: 0,
+          primaryPoolError: '',
+        }, error);
+
+        const msg = component.messages.find(m => m.type === 'FALLBACK_STRATUM');
+        expect(msg).toBeDefined();
+        expect(msg?.severity).toBe('warn');
+        expect(msg?.text).toBe('Primary pool (stratum.pool.com:3333): Pool unreachable - mining on fallback pool.');
+      });
+
+      it('should show warn banner when user requested fallback but operating on primary', () => {
+        component.handleSystemMessages({
+          ...mockSystemInfo,
+          isUsingFallbackStratum: 0,
+          useFallbackStratum: 1,
+        }, error);
+
+        const msg = component.messages.find(m => m.type === 'FALLBACK_STRATUM');
+        expect(msg).toBeDefined();
+        expect(msg?.severity).toBe('warn');
+        expect(msg?.text).toBe('Fallback pool (fallback.pool.com:3333): Pool unreachable - mining on primary pool.');
+      });
+
+      it('should dismiss banner when operating normally on primary pool', () => {
+        component.messages = [{
+          type: 'FALLBACK_STRATUM',
+          severity: 'warn',
+          text: 'Primary pool (stratum.pool.com:3333): Pool unreachable - mining on fallback pool.',
+        }];
+
+        component.handleSystemMessages({
+          ...mockSystemInfo,
+          isUsingFallbackStratum: 0,
+          useFallbackStratum: 0,
+        }, error);
+
+        const msg = component.messages.find(m => m.type === 'FALLBACK_STRATUM');
+        expect(msg).toBeUndefined();
+      });
+    });
+
+    it('should return 0 for response time min/max and undefined for others in getMinForLabel', () => {
+      expect(component.getMinForLabel('responseTimeMin')).toBe(0);
+      expect(component.getMinForLabel('responseTimeMax')).toBe(0);
+      expect(component.getMinForLabel('hashrate')).toBeUndefined();
+      expect(component.getMinForLabel('none')).toBeUndefined();
+      expect(component.getMinForLabel(undefined)).toBeUndefined();
     });
   });
 });

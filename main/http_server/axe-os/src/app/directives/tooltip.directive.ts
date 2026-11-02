@@ -3,7 +3,9 @@ import {
   ElementRef, 
   Input, 
   HostListener, 
+  OnChanges,
   OnDestroy, 
+  SimpleChanges,
   Component, 
   ComponentRef, 
   ViewContainerRef, 
@@ -15,7 +17,7 @@ import {
   standalone: true,
   template: `{{ text }}`,
   host: {
-    'class': 'fixed z-[99999] bg-[#2b2b2b] text-[#ffffff] app-tooltip-text px-2.5 py-1.5 rounded shadow-xl pointer-events-none border border-neutral-700 max-w-[250px] whitespace-normal text-center'
+    'class': 'fixed z-[99999] bg-[#2b2b2b] text-[#ffffff] app-tooltip-text px-2.5 py-1.5 rounded shadow-xl pointer-events-none border border-neutral-700 max-w-[250px] whitespace-pre-line text-center'
   }
 })
 export class TooltipContentComponent {
@@ -26,11 +28,19 @@ export class TooltipContentComponent {
   selector: '[appTooltip]',
   standalone: true
 })
-export class TooltipDirective implements OnDestroy {
+export class TooltipDirective implements OnChanges, OnDestroy {
   @Input('appTooltip') tooltipText = '';
   @Input() tooltipPosition: 'top' | 'bottom' | 'left' | 'right' = 'top';
 
   private componentRef: ComponentRef<TooltipContentComponent> | null = null;
+
+  ngOnChanges(changes: SimpleChanges) {
+    if (changes['tooltipText'] && this.componentRef) {
+      this.componentRef.instance.text = this.tooltipText;
+      this.componentRef.changeDetectorRef.detectChanges();
+      this.positionTooltip();
+    }
+  }
 
   constructor(
     private el: ElementRef, 

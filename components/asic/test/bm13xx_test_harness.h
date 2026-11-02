@@ -1,0 +1,48 @@
+#ifndef BM13XX_TEST_HARNESS_H
+#define BM13XX_TEST_HARNESS_H
+
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
+#include "asic_job.h"
+#include "asic_common.h"
+
+typedef struct GlobalState GlobalState;
+
+enum { BM13XX_HARNESS_DRIVER_COUNT = 4, BM13XX_HARNESS_RESPONSE_SIZE = 11 };
+
+typedef struct {
+    const char *name;
+    uint8_t (*init)(GlobalState *state);
+    void (*send_work)(GlobalState *state, const asic_job_t *job);
+    void (*set_version_mask)(uint32_t mask);
+    task_result *(*process_work)(GlobalState *state);
+    uint8_t response_job_id;
+    uint8_t init_mask_count;
+    uint8_t small_core_bits;
+} bm13xx_harness_driver_t;
+
+typedef struct {
+    uint8_t bytes[128];
+    size_t length;
+} bm13xx_harness_packet_t;
+
+extern const bm13xx_harness_driver_t
+    bm13xx_harness_drivers[BM13XX_HARNESS_DRIVER_COUNT];
+
+GlobalState *bm13xx_harness_begin(const bm13xx_harness_driver_t *driver);
+void bm13xx_harness_end(void);
+void bm13xx_harness_clear_packets(void);
+size_t bm13xx_harness_packet_count(void);
+const bm13xx_harness_packet_t *bm13xx_harness_packet(size_t index);
+asic_job_t *bm13xx_harness_active_job(uint8_t slot);
+bool bm13xx_harness_slot_valid(uint8_t slot);
+void bm13xx_harness_install_job(uint8_t slot, const asic_job_t *job);
+void bm13xx_harness_fail_writes(unsigned count);
+unsigned bm13xx_harness_delay_count(void);
+void bm13xx_harness_set_job(uint32_t version, bool valid, bool present);
+/* Supply bytes after receive_work's framing/CRC check; NULL means timeout. */
+void bm13xx_harness_queue_response(
+    const uint8_t response[BM13XX_HARNESS_RESPONSE_SIZE]);
+
+#endif

@@ -143,6 +143,12 @@
               "src/styles.scss"
             ],
             "scripts": [],
+            "fileReplacements": [
+              {
+                "replace": "src/environments/environment.ts",
+                "with": "src/environments/environment.mock.ts"
+              }
+            ],
             "stylePreprocessorOptions": {
               "includePaths": [
                 "src",

@@ -15,10 +15,16 @@ jobs:
         with:
           submodules: 'recursive'
 
+      - name: Upload event file
+        uses: actions/upload-artifact@v4
+        with:
+          name: event-file
+          path: ${{ github.event_path }}
+
       - name: esp-idf build
         uses: espressif/esp-idf-ci-action@v1
         with:
-          esp_idf_version: v6.0.2
+          esp_idf_version: v6.0.3
           target: esp32s3
           command: GITHUB_ACTIONS="true" idf.py build
           path: 'test-ci'
@@ -27,12 +33,6 @@ jobs:
         uses: bitaxeorg/esp32-qemu-test-action@v6
         with:
           path: 'test-ci'
-
-      - name: Upload event file
-        uses: actions/upload-artifact@v4
-        with:
-          name: event-file
-          path: ${{ github.event_path }}
 
       - name: Upload test results
         if: always()

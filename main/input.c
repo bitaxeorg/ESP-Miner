@@ -59,7 +59,12 @@ esp_err_t input_init(void (*button_short_clicked_cb)(void), void (*button_long_p
     if (lvgl_port_lock(0)) {
         lv_group_t * group = lv_group_create();
         lv_group_set_default(group);
-        lv_group_add_obj(group, lv_obj_create(NULL)); // dummy screen for event handling, in case no display is attached
+        lv_obj_t * active_screen = lv_screen_active();
+        if (active_screen) {
+            lv_obj_t * dummy_obj = lv_obj_create(active_screen);
+            lv_obj_add_flag(dummy_obj, LV_OBJ_FLAG_HIDDEN);
+            lv_group_add_obj(group, dummy_obj);
+        }
 
         // Create input device
         lv_indev_t * indev = lv_indev_create();

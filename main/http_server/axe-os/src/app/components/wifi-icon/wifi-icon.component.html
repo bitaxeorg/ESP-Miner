@@ -1,9 +1,13 @@
-<figure class="wifi-icon"
-    [ngClass]="{
-        'wifi-icon--excellent': rssi > -50,
-        'wifi-icon--good': rssi <= -50 && rssi > -60,
-        'wifi-icon--fair': rssi <= -60 && rssi > -70,
-        'wifi-icon--weak': rssi <= -70
-    }">
-    <i *ngFor="let item of [1, 2, 3, 4]"></i>
-</figure>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="wifi-icon">
+  <!-- Signal Level 1 (Dot) -->
+  <circle cx="12" cy="19" r="2" class="wifi-bar" [class.active]="bars >= 1" fill="currentColor" />
+
+  <!-- Signal Level 2 (Inner Arc) -->
+  <path d="M8.5 15a5 5 0 0 1 7 0" class="wifi-bar" [class.active]="bars >= 2" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" />
+
+  <!-- Signal Level 3 (Middle Arc) -->
+  <path d="M5.2 11a9.6 9.6 0 0 1 13.6 0" class="wifi-bar" [class.active]="bars >= 3" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" />
+
+  <!-- Signal Level 4 (Outer Arc) -->
+  <path d="M2 7a14.1 14.1 0 0 1 20 0" class="wifi-bar" [class.active]="bars >= 4" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" />
+</svg>

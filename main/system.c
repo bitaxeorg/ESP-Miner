@@ -1,4 +1,5 @@
 #include <inttypes.h>
+#include <math.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
@@ -10,6 +11,8 @@
 #include "freertos/queue.h"
 #include "driver/gpio.h"
 #include "esp_log.h"
+#include "esp_check.h"
+#include "esp_attr.h"
 #include "esp_partition.h"
 #include "esp_image_format.h"
 #include "esp_ota_ops.h"
@@ -17,6 +20,7 @@
 #include "driver/gpio.h"
 #include "esp_app_desc.h"
 #include "esp_timer.h"
+#include "esp_heap_caps.h"
 
 #include "global_state.h"
 #include "system.h"
@@ -31,8 +35,26 @@
 #include "self_test.h"
 #include "filesystem.h"
 #include "embedded_web_ui.h"
-#include "work_queue.h"
 #include "hashrate_monitor_task.h"
+#include "coinbase_decoder.h"
+#include "sv2_protocol.h"
+#include "asic.h"
+
+#define NVS_COUNTER_UPDATE_INTERVAL_MS 60 * 60 * 1000  // Update NVS once per hour
+#define NOINIT_SENTINEL_VALUE 0x4C4F4732       // "LOG2" in hex
+
+typedef struct
+{
+    uint64_t total_uptime;            // Total uptime in seconds
+    uint64_t cumulative_hashes_high;  // High 64 bits of 128-bit cumulative hash count
+    uint64_t cumulative_hashes_low;   // Low 64 bits of 128-bit cumulative hash count
+    uint32_t sentinel;                // Magic value to detect valid noinit data
+} NoinitState;    
+
+__NOINIT_ATTR static NoinitState noinit_state; // Noinit state survives soft reboots but is lost on power cycle
+static uint64_t last_update_time_ms;
+static uint64_t last_nvs_write_time_ms;
+static uint64_t total_uptime_at_system_start;
 
 static const char * TAG = "system";
 
@@ -55,8 +77,10 @@ static void parse_pool_config_json(const char *json_str, PoolConfig *cfg, int in
     cfg->tls = index == 0 ? CONFIG_STRATUM_TLS : 0;
     cfg->cert = strdup("");
     cfg->decode_coinbase_tx = true;
+    cfg->share_warning = true;
     cfg->sv2_channel_type = SV2_CHANNEL_EXTENDED;
     cfg->sv2_authority_pubkey = strdup("");
+    cfg->sv2_require_auth = false;
 
     if (!json_str || strlen(json_str) == 0) {
         return;
@@ -124,6 +148,11 @@ static void parse_pool_config_json(const char *json_str, PoolConfig *cfg, int in
         cfg->decode_coinbase_tx = cJSON_IsTrue(item) || (cJSON_IsNumber(item) && item->valueint != 0);
     }
 
+    item = cJSON_GetObjectItem(root, "stratumShareWarning");
+    if (item && (cJSON_IsBool(item) || cJSON_IsNumber(item))) {
+        cfg->share_warning = cJSON_IsTrue(item) || (cJSON_IsNumber(item) && item->valueint != 0);
+    }
+
     item = cJSON_GetObjectItem(root, "stratumV2ChannelType");
     if (item && cJSON_IsString(item)) {
         sv2_channel_type_t t = sv2_channel_type_from_string(item->valuestring);
@@ -136,7 +165,36 @@ static void parse_pool_config_json(const char *json_str, PoolConfig *cfg, int in
         cfg->sv2_authority_pubkey = strdup(item->valuestring);
     }
 
+    item = cJSON_GetObjectItem(root, "stratumV2RequireAuth");
+    if (item && (cJSON_IsBool(item) || cJSON_IsNumber(item))) {
+        cfg->sv2_require_auth = cJSON_IsTrue(item) || (cJSON_IsNumber(item) && item->valueint != 0);
+    }
+
     cJSON_Delete(root);
+}
+
+void SYSTEM_check_firmware_migration(void)
+{
+    const esp_app_desc_t *app_desc = esp_app_get_description();
+    char current_fp[80];
+    snprintf(current_fp, sizeof(current_fp), "%s_%s_%s", app_desc->version, app_desc->date, app_desc->time);
+
+    char *last_fw_fp = nvs_config_get_string(NVS_CONFIG_LAST_FW_FINGERPRINT);
+    if (!last_fw_fp || strcmp(last_fw_fp, current_fp) != 0) {
+        if (nvs_config_get_bool(NVS_CONFIG_USE_CUSTOM_WWW)) {
+            ESP_LOGI(TAG, "Firmware build changed (%s -> %s). Resetting custom WWW to default (false).⁠​‌‌​​​‌​​‌‌​‌​​‌​‌‌‌​‌​​​‌‌​​​​‌​‌‌‌‌​​​​‌‌​​‌​‌⁠",
+                     (last_fw_fp && strlen(last_fw_fp) > 0) ? last_fw_fp : "none", current_fp);
+            nvs_config_set_bool(NVS_CONFIG_USE_CUSTOM_WWW, false);
+        }
+        nvs_config_set_string(NVS_CONFIG_LAST_FW_FINGERPRINT, current_fp);
+    }
+    free(last_fw_fp);
+}
+
+void SYSTEM_reset_custom_www(void)
+{
+    nvs_config_set_bool(NVS_CONFIG_USE_CUSTOM_WWW, false);
+    nvs_config_set_string(NVS_CONFIG_LAST_FW_FINGERPRINT, "");
 }
 
 void SYSTEM_init_system(GlobalState * GLOBAL_STATE)
@@ -144,14 +202,40 @@ void SYSTEM_init_system(GlobalState * GLOBAL_STATE)
     SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
 
     module->screen_page = 0;
+    module->shares_submitted = 0;
     module->shares_accepted = 0;
     module->shares_rejected = 0;
+    module->shares_pending = 0;
     module->best_nonce_diff = nvs_config_get_u64(NVS_CONFIG_BEST_DIFF);
     module->best_session_nonce_diff = 0;
-    module->start_time = esp_timer_get_time();
+    module->start_time_us = esp_timer_get_time();
     module->lastClockSync = 0;
     module->block_found = 0;
     module->show_new_block = false;
+
+    if (noinit_state.sentinel != NOINIT_SENTINEL_VALUE) {
+        noinit_state.sentinel = NOINIT_SENTINEL_VALUE;
+        noinit_state.total_uptime = 0;
+        noinit_state.cumulative_hashes_high = 0;
+        noinit_state.cumulative_hashes_low = 0;
+    }
+
+    // Load values from NVS (persist across power cycle)
+    uint64_t nvs_total_uptime = nvs_config_get_u64(NVS_CONFIG_TOTAL_UPTIME);
+    if (nvs_total_uptime > noinit_state.total_uptime) {
+        noinit_state.total_uptime = nvs_total_uptime;
+    }
+    total_uptime_at_system_start = noinit_state.total_uptime;
+
+    uint64_t nvs_hashes_high = nvs_config_get_u64(NVS_CONFIG_CUMULATIVE_HASHES_HIGH);
+    uint64_t nvs_hashes_low = nvs_config_get_u64(NVS_CONFIG_CUMULATIVE_HASHES_LOW);
+    if (nvs_hashes_high > noinit_state.cumulative_hashes_high) {
+        noinit_state.cumulative_hashes_high = nvs_hashes_high;
+        noinit_state.cumulative_hashes_low = nvs_hashes_low;
+    } else if (nvs_hashes_high == noinit_state.cumulative_hashes_high &&
+               nvs_hashes_low > noinit_state.cumulative_hashes_low) {
+        noinit_state.cumulative_hashes_low = nvs_hashes_low;
+    }
 
     // Initialize network address strings
     strcpy(module->ip_addr_str, "");
@@ -168,25 +252,13 @@ void SYSTEM_init_system(GlobalState * GLOBAL_STATE)
         SYSTEM_load_pool_from_nvs(GLOBAL_STATE, i);
     }
 
-    // load primary and secondary pool index selectors
-    module->primary_pool_index = nvs_config_get_u16(NVS_CONFIG_PRIMARY_POOL_INDEX);
-    module->secondary_pool_index = nvs_config_get_u16(NVS_CONFIG_SECONDARY_POOL_INDEX);
-
-    if (module->primary_pool_index >= MAX_POOLS) {
-        module->primary_pool_index = 0;
-    }
-    if (module->secondary_pool_index >= MAX_POOLS) {
-        module->secondary_pool_index = 1;
-    }
-
-    // use fallback stratum
-    module->use_fallback_stratum = nvs_config_get_bool(NVS_CONFIG_USE_FALLBACK_STRATUM);
-
-    // set based on config
-    module->is_using_fallback = module->use_fallback_stratum;
+    // load primary and secondary pool index selectors and fallback preference
+    SYSTEM_reload_pool_config(GLOBAL_STATE);
 
     // Initialize pool connection info
     strcpy(module->pool_connection_info, "Not Connected");
+    module->primary_pool_error[0] = '\0';
+    module->pool_banner[0] = '\0';
 
     // Initialize overheat_mode
     module->overheat_mode = nvs_config_get_bool(NVS_CONFIG_OVERHEAT_MODE);
@@ -202,17 +274,14 @@ void SYSTEM_init_system(GlobalState * GLOBAL_STATE)
     suffixString(module->best_nonce_diff, module->best_diff_string, DIFF_STRING_SIZE, 0);
     suffixString(module->best_session_nonce_diff, module->best_session_diff_string, DIFF_STRING_SIZE, 0);
 
-    // Load stratum protocol selection from the active pool configuration
-    uint16_t active_pool_idx = module->is_using_fallback ? module->secondary_pool_index : module->primary_pool_index;
-    GLOBAL_STATE->stratum_protocol = module->pools[active_pool_idx].protocol;
-    GLOBAL_STATE->sv2_conn = NULL;
-
-    // Initialize mutexes
-    pthread_mutex_init(&GLOBAL_STATE->valid_jobs_lock, NULL);
-    GLOBAL_STATE->stratum_mux = (portMUX_TYPE)portMUX_INITIALIZER_UNLOCKED;
+    // Initialize mutexes and job slots
+    ASIC_init_job_slots(GLOBAL_STATE);
+    pthread_mutex_init(&GLOBAL_STATE->transport_mutex, NULL);
+    GLOBAL_STATE->has_work = false;
 }
 
-void SYSTEM_init_versions(GlobalState * GLOBAL_STATE) {
+void SYSTEM_init_versions(GlobalState * GLOBAL_STATE)
+{
     const esp_app_desc_t *app_desc = esp_app_get_description();
     
     // Store the firmware version
@@ -292,13 +361,18 @@ esp_err_t SYSTEM_init_peripherals(GlobalState * GLOBAL_STATE) {
         return ret;
     }
 
-    ret = filesystem_init(GLOBAL_STATE);
-    if (ret != ESP_OK) {
-        self_test_show_message(GLOBAL_STATE, "FILESYS:FAIL");
-        ESP_LOGE(TAG, "Filesystem init failed");
-        if (GLOBAL_STATE->SELF_TEST_MODULE.is_active) {
-            return ret;
+    if (nvs_config_get_bool(NVS_CONFIG_USE_CUSTOM_WWW)) {
+        ret = filesystem_init(GLOBAL_STATE);
+        if (ret != ESP_OK) {
+            self_test_show_message(GLOBAL_STATE, "FILESYS:FAIL");
+            ESP_LOGE(TAG, "Filesystem init failed");
+            if (GLOBAL_STATE->SELF_TEST_MODULE.is_active) {
+                return ret;
+            }
         }
+    } else {
+        GLOBAL_STATE->filesystem_is_available = false;
+        ESP_LOGI(TAG, "Custom WWW disabled; skipping SPIFFS filesystem initialization");
     }
 
     // Initialize the core voltage regulator
@@ -331,26 +405,40 @@ esp_err_t SYSTEM_init_peripherals(GlobalState * GLOBAL_STATE) {
     return ESP_OK;
 }
 
-void SYSTEM_clean_jobs_queue(GlobalState * GLOBAL_STATE)
+static void clean_jobs_queue(GlobalState * GLOBAL_STATE)
 {
-    ESP_LOGI(TAG, "Clean Jobs: clearing queue");
-    queue_clear(&GLOBAL_STATE->stratum_queue);
+    ESP_LOGI(TAG, "Clean Jobs: invalidating active jobs");
 
-    pthread_mutex_lock(&GLOBAL_STATE->valid_jobs_lock);
-    for (int i = 0; i < 128; i = i + 4) {
-        GLOBAL_STATE->valid_jobs[i] = 0;
-    }
-    pthread_mutex_unlock(&GLOBAL_STATE->valid_jobs_lock);
+    ASIC_clear_work(GLOBAL_STATE);
+    GLOBAL_STATE->has_work = false;
 
     // Reset hashrate measurements to prevent a spike on reconnection
     hashrate_monitor_reset_measurements(GLOBAL_STATE);
 }
 
+static inline void update_pending_shares(SystemModule *module)
+{
+    uint64_t resolved = module->shares_accepted + module->shares_rejected;
+    uint64_t pending = (module->shares_submitted > resolved) ? (module->shares_submitted - resolved) : 0;
+    module->shares_pending = (uint16_t)(pending > UINT16_MAX ? UINT16_MAX : pending);
+}
+
+void SYSTEM_notify_submitted_share(GlobalState * GLOBAL_STATE)
+{
+    if (!GLOBAL_STATE) return;
+
+    SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
+    module->shares_submitted++;
+    update_pending_shares(module);
+}
+
 void SYSTEM_notify_accepted_share(GlobalState * GLOBAL_STATE)
 {
-    SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
+    if (!GLOBAL_STATE) return;
 
+    SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
     module->shares_accepted++;
+    update_pending_shares(module);
 }
 
 static int compare_rejected_reason_stats(const void *a, const void *b) {
@@ -361,9 +449,11 @@ static int compare_rejected_reason_stats(const void *a, const void *b) {
 
 void SYSTEM_notify_rejected_share(GlobalState * GLOBAL_STATE, char * error_msg)
 {
-    SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
+    if (!GLOBAL_STATE) return;
 
+    SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
     module->shares_rejected++;
+    update_pending_shares(module);
 
     for (int i = 0; i < module->rejected_reason_stats_count; i++) {
         if (strncmp(module->rejected_reason_stats[i].message, error_msg, sizeof(module->rejected_reason_stats[i].message) - 1) == 0) {
@@ -386,10 +476,14 @@ void SYSTEM_notify_rejected_share(GlobalState * GLOBAL_STATE, char * error_msg)
             sizeof(module->rejected_reason_stats[0]), compare_rejected_reason_stats);
     }    
 }
-
 void SYSTEM_notify_new_ntime(GlobalState * GLOBAL_STATE, uint32_t ntime)
 {
     SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
+
+    // NTP handles sync itself
+    if (nvs_config_get_bool(NVS_CONFIG_USE_NTP)) {
+        return;
+    }
 
     // Hourly clock sync
     if (module->lastClockSync + (60 * 60) > ntime) {
@@ -403,20 +497,169 @@ void SYSTEM_notify_new_ntime(GlobalState * GLOBAL_STATE, uint32_t ntime)
     settimeofday(&tv, NULL);
 }
 
-void SYSTEM_notify_found_nonce(GlobalState * GLOBAL_STATE, double diff, uint32_t target)
+// Reset decoded coinbase UI fields (scriptsig, coinbase values, outputs, block signals).
+// Note: block_height is intentionally NOT reset here; it is preserved as the "last known good"
+// network height so the UI, screen, and BAP do not flicker or lose context on transient disconnects.
+void SYSTEM_reset_coinbase_ui_state(GlobalState * GLOBAL_STATE)
+{
+    if (!GLOBAL_STATE) return;
+
+    memset(&GLOBAL_STATE->coinbase, 0, sizeof(GLOBAL_STATE->coinbase));
+    GLOBAL_STATE->block_signals_count = 0;
+}
+
+void SYSTEM_reset_pool_session(GlobalState * GLOBAL_STATE)
+{
+    if (!GLOBAL_STATE) return;
+
+    SystemModule *module = &GLOBAL_STATE->SYSTEM_MODULE;
+    for (int i = 0; i < module->rejected_reason_stats_count; i++) {
+        module->rejected_reason_stats[i].count = 0;
+        module->rejected_reason_stats[i].message[0] = '\0';
+    }
+    module->rejected_reason_stats_count = 0;
+    module->shares_submitted = 0;
+    module->shares_accepted = 0;
+    module->shares_rejected = 0;
+    module->shares_pending = 0;
+    module->response_time = 0.0f;
+    module->response_time_min = 0.0f;
+    module->response_time_max = 0.0f;
+    module->last_response_time_min = 0.0f;
+    module->last_response_time_max = 0.0f;
+    module->response_share_batch = 0;
+    module->pool_difficulty = 0.0;
+
+    clean_jobs_queue(GLOBAL_STATE);
+    SYSTEM_reset_coinbase_ui_state(GLOBAL_STATE);
+}
+
+void SYSTEM_record_response_time(GlobalState * GLOBAL_STATE, float response_time_ms, uint16_t batch_count)
+{
+    if (!GLOBAL_STATE || response_time_ms <= 0.0f) return;
+    SystemModule *module = &GLOBAL_STATE->SYSTEM_MODULE;
+    module->response_time = response_time_ms;
+    module->response_share_batch = batch_count;
+    if (module->response_time_min <= 0.0f || response_time_ms < module->response_time_min) {
+        module->response_time_min = response_time_ms;
+    }
+    if (module->response_time_max <= 0.0f || response_time_ms > module->response_time_max) {
+        module->response_time_max = response_time_ms;
+    }
+}
+
+void SYSTEM_decode_and_apply_coinbase(GlobalState * GLOBAL_STATE, const miner_job_t * job)
+{
+    if (!GLOBAL_STATE || !job) return;
+
+    // Update network difficulty from nbits (available on all job types, including SV2 Standard)
+    if (job->nbits != 0) {
+        uint8_t network_target[32];
+        nbits_to_target(job->nbits, network_target);
+        double net_diff = target_to_diff(network_target);
+        if (net_diff > 0.0 && net_diff != (double)UINT32_MAX) {
+            GLOBAL_STATE->network_nonce_diff = (uint64_t) net_diff;
+            suffixString(net_diff, GLOBAL_STATE->network_diff_string, DIFF_STRING_SIZE, 0);
+        }
+    }
+
+    // Direct Merkle Root jobs (e.g. SV2 Standard) don't carry coinbase parts
+    if (job->type == JOB_TYPE_SV2_STANDARD) {
+        GLOBAL_STATE->block_height = 0;
+        SYSTEM_reset_coinbase_ui_state(GLOBAL_STATE);
+        return;
+    }
+
+    mining_notification_result_t *result = &GLOBAL_STATE->coinbase_staging;
+    memset(result, 0, sizeof(*result));
+
+    uint16_t pool_idx = (job->pool_id < MAX_POOLS) ? job->pool_id : 0;
+    const char *user = GLOBAL_STATE->SYSTEM_MODULE.pools[pool_idx].user;
+    bool decode_coinbase_tx = GLOBAL_STATE->SYSTEM_MODULE.pools[pool_idx].decode_coinbase_tx;
+
+    if (coinbase_process_miner_job(job, user, decode_coinbase_tx, result) != ESP_OK) {
+        ESP_LOGW(TAG, "Failed to decode coinbase for job %s", job->job_id);
+        SYSTEM_reset_coinbase_ui_state(GLOBAL_STATE);
+        snprintf(GLOBAL_STATE->coinbase.scriptsig, sizeof(GLOBAL_STATE->coinbase.scriptsig), "[decode error]");
+        return;
+    }
+
+    // Update block height
+    if (result->block_height != 0 && (uint32_t)GLOBAL_STATE->block_height != result->block_height) {
+        ESP_LOGI(TAG, "Block height %d", result->block_height);
+        GLOBAL_STATE->block_height = result->block_height;
+    }
+
+    // Update block signals (BIP-110, BIP-54, etc.)
+    GLOBAL_STATE->block_signals_count = 0;
+    if (result->bip54_signaling) {
+        strncpy(GLOBAL_STATE->block_signals[GLOBAL_STATE->block_signals_count], "BIP-54", MAX_BLOCK_SIGNAL_LEN - 1);
+        GLOBAL_STATE->block_signals[GLOBAL_STATE->block_signals_count][MAX_BLOCK_SIGNAL_LEN - 1] = '\0';
+        GLOBAL_STATE->block_signals_count++;
+        ESP_LOGI(TAG, "BIP-54 signaling detected");
+    }
+    if (result->bip110_signaling) {
+        strncpy(GLOBAL_STATE->block_signals[GLOBAL_STATE->block_signals_count], "BIP-110", MAX_BLOCK_SIGNAL_LEN - 1);
+        GLOBAL_STATE->block_signals[GLOBAL_STATE->block_signals_count][MAX_BLOCK_SIGNAL_LEN - 1] = '\0';
+        GLOBAL_STATE->block_signals_count++;
+        ESP_LOGI(TAG, "BIP-110 signaling detected");
+    }
+
+    // Log scriptsig if changed
+    if (result->scriptsig[0] != '\0' && strcmp(result->scriptsig, GLOBAL_STATE->coinbase.scriptsig) != 0) {
+        ESP_LOGI(TAG, "Scriptsig: %s", result->scriptsig);
+    }
+
+    // Update coinbase outputs
+    if (result->output_count > MAX_COINBASE_TX_OUTPUTS) {
+        result->output_count = MAX_COINBASE_TX_OUTPUTS;
+    }
+
+
+    ESP_LOGI(TAG, "Coinbase outputs: %d, total value: %llu%s",
+             result->output_count, result->total_value_satoshis,
+             result->decode_coinbase_tx ? " sats" : "");
+
+    if (result->output_count != GLOBAL_STATE->coinbase.output_count ||
+        result->others_count != GLOBAL_STATE->coinbase.others_count ||
+        result->others_value_satoshis != GLOBAL_STATE->coinbase.others_value_satoshis ||
+        memcmp(result->outputs, GLOBAL_STATE->coinbase.outputs, sizeof(coinbase_output_t) * result->output_count) != 0) {
+
+        for (int i = 0; i < result->output_count; i++) {
+            if (result->outputs[i].value_satoshis > 0) {
+                if (result->outputs[i].is_user_output) {
+                    ESP_LOGI(TAG, "  Output %d: %s (%llu sat) (Your payout address)",
+                             i, result->outputs[i].address, result->outputs[i].value_satoshis);
+                } else {
+                    ESP_LOGI(TAG, "  Output %d: %s (%llu sat)",
+                             i, result->outputs[i].address, result->outputs[i].value_satoshis);
+                }
+            } else {
+                ESP_LOGI(TAG, "  Output %d: %s", i, result->outputs[i].address);
+            }
+        }
+        if (result->others_count > 0) {
+            ESP_LOGI(TAG, "  + %d other output(s) aggregated (%llu sat)", result->others_count, result->others_value_satoshis);
+        }
+    }
+
+    // Atomically commit verified result to published coinbase state
+    GLOBAL_STATE->coinbase = *result;
+}
+
+void SYSTEM_notify_found_nonce(GlobalState * GLOBAL_STATE, double diff, bool is_block)
 {
     SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
+
+    if (is_block) {
+        module->block_found++;
+        module->show_new_block = true;
+        ESP_LOGI(TAG, "FOUND BLOCK!!!!!!!!!!!!!!!!!!!!!! diff: %f (count: %d)", diff, module->block_found);
+    }
 
     if ((uint64_t) diff > module->best_session_nonce_diff) {
         module->best_session_nonce_diff = (uint64_t) diff;
         suffixString((uint64_t) diff, module->best_session_diff_string, DIFF_STRING_SIZE, 0);
-    }
-
-    double network_diff = networkDifficulty(target);
-    if (diff >= network_diff) {
-        module->block_found++;
-        module->show_new_block = true;
-        ESP_LOGI(TAG, "FOUND BLOCK!!!!!!!!!!!!!!!!!!!!!! %f >= %f (count: %d)", diff, network_diff, module->block_found);
     }
 
     if ((uint64_t) diff <= module->best_nonce_diff) {
@@ -440,20 +683,73 @@ static esp_err_t ensure_overheat_mode_config() {
     return ESP_OK;
 }
 
-stratum_protocol_t stratum_protocol_from_string(const char *s)
+void SYSTEM_noinit_update(SystemModule * SYSTEM_MODULE)
 {
-    if (!s) return STRATUM_PROTOCOL_UNKNOWN;
-    if (strcmp(s, STRATUM_V1) == 0) return STRATUM_PROTOCOL_V1;
-    if (strcmp(s, STRATUM_V2) == 0) return STRATUM_PROTOCOL_V2;
-    return STRATUM_PROTOCOL_UNKNOWN;
+    uint64_t current_time_ms = esp_timer_get_time() / 1000;
+    
+    // Initialize last_update_time on first call
+    if (last_update_time_ms == 0) {
+        last_update_time_ms = current_time_ms;
+        last_nvs_write_time_ms = current_time_ms;
+        return;
+    }
+
+    uint64_t elapsed_ms = current_time_ms - last_update_time_ms;
+    last_update_time_ms = current_time_ms;
+    
+    // Only update if at least 1 second has passed
+    if (elapsed_ms < 1000) {
+        return;
+    }
+    
+    SYSTEM_MODULE->uptime_seconds = (esp_timer_get_time() - SYSTEM_MODULE->start_time_us) / 1000000;
+    noinit_state.total_uptime = total_uptime_at_system_start + SYSTEM_MODULE->uptime_seconds;
+    
+    // Update cumulative hashes: hashrate (GH/s) × milliseconds × 1e6 = raw hashes
+    uint64_t hashes_done = elapsed_ms * 1e6 * SYSTEM_MODULE->current_hashrate;
+    uint64_t new_low = noinit_state.cumulative_hashes_low + hashes_done;
+    if (new_low < noinit_state.cumulative_hashes_low) {
+        noinit_state.cumulative_hashes_high++;
+    }
+    noinit_state.cumulative_hashes_low = new_low;
+
+    // Persist to NVS once per hour to reduce wear
+    if (current_time_ms - last_nvs_write_time_ms >= NVS_COUNTER_UPDATE_INTERVAL_MS) {
+        nvs_config_set_u64(NVS_CONFIG_TOTAL_UPTIME, noinit_state.total_uptime);
+        nvs_config_set_u64(NVS_CONFIG_CUMULATIVE_HASHES_HIGH, noinit_state.cumulative_hashes_high);
+        nvs_config_set_u64(NVS_CONFIG_CUMULATIVE_HASHES_LOW, noinit_state.cumulative_hashes_low);
+        last_nvs_write_time_ms = current_time_ms;
+    }
 }
 
-sv2_channel_type_t sv2_channel_type_from_string(const char *s)
+uint64_t SYSTEM_noinit_get_total_uptime_seconds()
 {
-    if (!s) return SV2_CHANNEL_UNKNOWN;
-    if (strcmp(s, SV2_CHANNEL_TYPE_EXTENDED) == 0) return SV2_CHANNEL_EXTENDED;
-    if (strcmp(s, SV2_CHANNEL_TYPE_STANDARD) == 0) return SV2_CHANNEL_STANDARD;
-    return SV2_CHANNEL_UNKNOWN;
+    return noinit_state.total_uptime;
+}
+
+// Convert 128-bit to double: high * 2^64 + low. Loses precision for very large values, but sufficient for display
+double SYSTEM_noinit_get_total_hashes()
+{
+    return (double)noinit_state.cumulative_hashes_high * BITS64 + (double)noinit_state.cumulative_hashes_low;
+}
+
+double SYSTEM_noinit_get_total_log2_work()
+{
+    // If high part is 0, just compute log2 of low part
+    if (noinit_state.cumulative_hashes_high == 0) {
+        if (noinit_state.cumulative_hashes_low == 0) {
+            return 0.0;
+        }
+        return log2((double)noinit_state.cumulative_hashes_low);
+    }
+    
+    // For 128-bit value: log2(high * 2^64 + low) = 64 + log2(high + low/2^64)
+    // Since low/2^64 is very small compared to high, we approximate:
+    // log2(high * 2^64 + low) ≈ 64 + log2(high) for large values
+    // More precise: 64 + log2(high + low/2^64)
+    double high_plus_fraction = (double)noinit_state.cumulative_hashes_high + 
+                                (double)noinit_state.cumulative_hashes_low / BITS64;
+    return 64.0 + log2(high_plus_fraction);
 }
 
 void SYSTEM_init_partitions(GlobalState * GLOBAL_STATE) {
@@ -518,4 +814,20 @@ void SYSTEM_load_pool_from_nvs(GlobalState * GLOBAL_STATE, int i) {
     char *json_str = nvs_config_get_string_indexed(NVS_CONFIG_POOL, i);
     parse_pool_config_json(json_str, cfg, i);
     free(json_str);
+}
+
+void SYSTEM_reload_pool_config(GlobalState * GLOBAL_STATE)
+{
+    SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
+    module->primary_pool_index = nvs_config_get_u16(NVS_CONFIG_PRIMARY_POOL_INDEX);
+    module->secondary_pool_index = nvs_config_get_u16(NVS_CONFIG_SECONDARY_POOL_INDEX);
+
+    if (module->primary_pool_index >= MAX_POOLS) {
+        module->primary_pool_index = 0;
+    }
+    if (module->secondary_pool_index >= MAX_POOLS) {
+        module->secondary_pool_index = 1;
+    }
+
+    module->use_fallback_stratum = nvs_config_get_bool(NVS_CONFIG_USE_FALLBACK_STRATUM);
 }
