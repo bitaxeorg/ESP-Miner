@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <stddef.h>
+#include "esp_transport.h"
 #include "miner_job.h"
 
 // Frame header size (extension_type[2] + msg_type[1] + msg_length[3])
@@ -89,6 +90,7 @@ struct sv2_noise_ctx;
 
 // SV2 connection state
 typedef struct sv2_conn {
+    esp_transport_handle_t transport;
     struct sv2_noise_ctx *noise_ctx;
     uint32_t channel_id;
     uint32_t group_channel_id;
@@ -97,7 +99,6 @@ typedef struct sv2_conn {
     uint32_t sequence_number;       // also the count of shares submitted
     uint32_t resolved_shares;       // shares the pool has accepted or rejected
     uint8_t target[32]; // U256 LE target
-    uint8_t pool_idx;
     bool channel_opened;
 
     // Bitmask of valid job template slots in s_job_pool

@@ -6,6 +6,7 @@
 #include "system.h"
 #include "global_state.h"
 #include "stratum_v2_client.h"
+#include "stratum_driver.h"
 #include "stratum_task.h"
 #include "stratum_socket.h"
 #include "connect.h"
@@ -15,18 +16,15 @@
 #include "libbase58.h"
 #include "device_config.h"
 #include "esp_heap_caps.h"
-#include "stratum_timing.h"
 #include "difficulty_controller.h"
 
 #include <string.h>
 #include <stdlib.h>
 
-#define SV2_PROBE_BUFFER_SIZE   1024
-
 static const char *TAG = "stratum_v2";
 
-static sv2_conn_t *s_v2_conn = NULL;
-static stratum_timing_tracker_t s_v2_timing = {0};
+static sv2_conn_t *s_v2_conns[MAX_POOLS] = {0};
+static pthread_mutex_t s_v2_conn_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 static bool add_active_job_id(uint32_t *active_job_ids, int *count, uint32_t job_id)
 {
@@ -94,41 +92,49 @@ static bool stratum_v2_load_authority_pubkey(uint8_t out[SV2_AUTHORITY_PUBKEY_SI
     return true;
 }
 
-void stratum_v2_close_connection(GlobalState *GLOBAL_STATE)
+void stratum_v2_abort_connection(uint16_t pool_idx)
 {
-    pthread_mutex_lock(&GLOBAL_STATE->transport_mutex);
-    esp_transport_handle_t transport = GLOBAL_STATE->transport;
-    GLOBAL_STATE->transport = NULL;
-    sv2_conn_t *conn = s_v2_conn;
-    s_v2_conn = NULL;
+    if (pool_idx >= MAX_POOLS) return;
+    pthread_mutex_lock(&s_v2_conn_mutex);
+    sv2_conn_t *conn = s_v2_conns[pool_idx];
+    if (conn != NULL && conn->transport != NULL) {
+        int sock = esp_transport_get_socket(conn->transport);
+        if (sock >= 0) {
+            shutdown(sock, SHUT_RDWR);
+        }
+    }
+    pthread_mutex_unlock(&s_v2_conn_mutex);
+}
 
-    SYSTEM_reset_pool_session(GLOBAL_STATE);
-    stratum_timing_reset(&s_v2_timing);
-    pthread_mutex_unlock(&GLOBAL_STATE->transport_mutex);
+void stratum_v2_close_connection(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
+{
+    if (pool_idx >= MAX_POOLS) return;
+    pthread_mutex_lock(&s_v2_conn_mutex);
+    sv2_conn_t *conn = s_v2_conns[pool_idx];
+    s_v2_conns[pool_idx] = NULL;
+    pthread_mutex_unlock(&s_v2_conn_mutex);
+
+    POOL_reset_session(GLOBAL_STATE, pool_idx);
 
     if (conn && conn->noise_ctx) {
         sv2_noise_destroy(conn->noise_ctx);
         conn->noise_ctx = NULL;
     }
-    if (transport != NULL) {
-        esp_transport_close(transport);
-        esp_transport_destroy(transport);
-    }
     if (conn != NULL) {
+        if (conn->transport != NULL) {
+            esp_transport_close(conn->transport);
+            esp_transport_destroy(conn->transport);
+            conn->transport = NULL;
+        }
         clear_active_job_ids(conn->active_job_ids, &conn->active_job_ids_count);
         free(conn);
     }
 }
 
-static void stratum_v2_track_submit(uint32_t sequence_number)
-{
-    stratum_timing_record(&s_v2_timing, sequence_number, esp_timer_get_time());
-}
-
 int stratum_v2_submit_share(GlobalState *GLOBAL_STATE, const asic_job_t *active_job,
                             uint32_t nonce, uint32_t rolled_version, uint64_t *sent_time_us)
 {
-    if (!GLOBAL_STATE || !active_job) {
+    if (!GLOBAL_STATE || !active_job || active_job->pool_id >= MAX_POOLS) {
         return -1;
     }
 
@@ -141,18 +147,17 @@ int stratum_v2_submit_share(GlobalState *GLOBAL_STATE, const asic_job_t *active_
         hex2bin(active_job->extranonce2, extranonce_2, en2_len);
     }
 
-    pthread_mutex_lock(&GLOBAL_STATE->transport_mutex);
-    esp_transport_handle_t transport = GLOBAL_STATE->transport;
-    sv2_conn_t *conn = s_v2_conn;
+    pthread_mutex_lock(&s_v2_conn_mutex);
+    sv2_conn_t *conn = s_v2_conns[active_job->pool_id];
 
-    if (!transport || !conn || !conn->noise_ctx) {
-        pthread_mutex_unlock(&GLOBAL_STATE->transport_mutex);
+    if (!conn || !conn->transport || !conn->noise_ctx) {
+        pthread_mutex_unlock(&s_v2_conn_mutex);
         return -1;
     }
 
     uint32_t sv2_job_id = (uint32_t)strtoul(active_job->job_id, NULL, 10);
     if (!is_active_job_id(conn->active_job_ids, conn->active_job_ids_count, sv2_job_id)) {
-        pthread_mutex_unlock(&GLOBAL_STATE->transport_mutex);
+        pthread_mutex_unlock(&s_v2_conn_mutex);
         ESP_LOGW(TAG, "Dropping stale share for job %lu (not in active jobs)", (unsigned long)sv2_job_id);
         return -1;
     }
@@ -165,23 +170,23 @@ int stratum_v2_submit_share(GlobalState *GLOBAL_STATE, const asic_job_t *active_
                                       sv2_job_id, nonce, active_job->ntime, rolled_version,
                                       en2_len > 0 ? extranonce_2 : NULL, en2_len);
     if (len < 0) {
-        pthread_mutex_unlock(&GLOBAL_STATE->transport_mutex);
+        pthread_mutex_unlock(&s_v2_conn_mutex);
         return -1;
     }
 
-    int ret = sv2_noise_send(conn->noise_ctx, transport, buf, len);
+    int ret = sv2_noise_send(conn->noise_ctx, conn->transport, buf, len);
     if (ret >= 0) {
-        stratum_v2_track_submit(sequence_number);
+        POOL_timing_record(GLOBAL_STATE, active_job->pool_id, sequence_number, esp_timer_get_time());
         if (sent_time_us) {
             *sent_time_us = esp_timer_get_time();
         }
-        SYSTEM_notify_submitted_share(GLOBAL_STATE);
+        POOL_notify_submitted_share(GLOBAL_STATE, active_job->pool_id);
     }
-    pthread_mutex_unlock(&GLOBAL_STATE->transport_mutex);
+    pthread_mutex_unlock(&s_v2_conn_mutex);
     return ret;
 }
 
-static void stratum_v2_handle_new_extended_mining_job(GlobalState *GLOBAL_STATE, sv2_conn_t *conn,
+static void stratum_v2_handle_new_extended_mining_job(GlobalState *GLOBAL_STATE, uint16_t pool_idx, sv2_conn_t *conn,
                                                        const uint8_t *payload, uint32_t len)
 {
     if (len < 8) {
@@ -210,7 +215,7 @@ static void stratum_v2_handle_new_extended_mining_job(GlobalState *GLOBAL_STATE,
         return;
     }
 
-    job->pool_id = conn->pool_idx;
+    job->pool_id = (uint8_t)pool_idx;
     memcpy(job->pool_target, conn->target, 32);
     job->version_mask = version_rolling_allowed ? conn->version_mask : 0;
     job->extranonce1_len = conn->extranonce_prefix_len;
@@ -231,7 +236,8 @@ static void stratum_v2_handle_new_extended_mining_job(GlobalState *GLOBAL_STATE,
         job->nbits = conn->prev_hash_nbits;
         job->clean_jobs = false;
 
-        GLOBAL_STATE->SYSTEM_MODULE.work_received++;
+        POOL_notify_work_received(GLOBAL_STATE, pool_idx);
+        stratum_check_primary_handover(GLOBAL_STATE, pool_idx);
         SYSTEM_notify_new_ntime(GLOBAL_STATE, job->ntime);
         if (GLOBAL_STATE->create_jobs_task_handle) {
             xTaskNotify(GLOBAL_STATE->create_jobs_task_handle, slot, eSetValueWithOverwrite);
@@ -239,7 +245,7 @@ static void stratum_v2_handle_new_extended_mining_job(GlobalState *GLOBAL_STATE,
     }
 }
 
-static void stratum_v2_handle_new_mining_job(GlobalState *GLOBAL_STATE, sv2_conn_t *conn,
+static void stratum_v2_handle_new_mining_job(GlobalState *GLOBAL_STATE, uint16_t pool_idx, sv2_conn_t *conn,
                                              const uint8_t *payload, uint32_t len)
 {
     uint32_t channel_id, job_id, version, min_ntime;
@@ -271,7 +277,7 @@ static void stratum_v2_handle_new_mining_job(GlobalState *GLOBAL_STATE, sv2_conn
     snprintf(job->job_id, sizeof(job->job_id), "%lu", (unsigned long)job_id);
     job->version = version;
     memcpy(job->merkle_root, merkle_root, 32);
-    job->pool_id = conn->pool_idx;
+    job->pool_id = (uint8_t)pool_idx;
     memcpy(job->pool_target, conn->target, 32);
     job->version_mask = conn->version_mask;
     conn->pending_jobs_valid |= (1U << slot);
@@ -286,7 +292,8 @@ static void stratum_v2_handle_new_mining_job(GlobalState *GLOBAL_STATE, sv2_conn
         job->nbits = conn->prev_hash_nbits;
         job->clean_jobs = false;
 
-        GLOBAL_STATE->SYSTEM_MODULE.work_received++;
+        POOL_notify_work_received(GLOBAL_STATE, pool_idx);
+        stratum_check_primary_handover(GLOBAL_STATE, pool_idx);
         SYSTEM_notify_new_ntime(GLOBAL_STATE, job->ntime);
         if (GLOBAL_STATE->create_jobs_task_handle) {
             xTaskNotify(GLOBAL_STATE->create_jobs_task_handle, slot, eSetValueWithOverwrite);
@@ -294,7 +301,7 @@ static void stratum_v2_handle_new_mining_job(GlobalState *GLOBAL_STATE, sv2_conn
     }
 }
 
-static void stratum_v2_handle_set_new_prev_hash(GlobalState *GLOBAL_STATE, sv2_conn_t *conn,
+static void stratum_v2_handle_set_new_prev_hash(GlobalState *GLOBAL_STATE, uint16_t pool_idx, sv2_conn_t *conn,
                                                 const uint8_t *payload, uint32_t len)
 {
     uint32_t channel_id, job_id, min_ntime, nbits;
@@ -334,7 +341,7 @@ static void stratum_v2_handle_set_new_prev_hash(GlobalState *GLOBAL_STATE, sv2_c
         job->ntime = min_ntime;
         job->nbits = nbits;
         job->clean_jobs = true;
-        job->pool_id = conn->pool_idx;
+        job->pool_id = (uint8_t)pool_idx;
         memcpy(job->pool_target, conn->target, 32);
         if (job->type == JOB_TYPE_SV2_STANDARD) {
             job->version_mask = conn->version_mask;
@@ -347,7 +354,8 @@ static void stratum_v2_handle_set_new_prev_hash(GlobalState *GLOBAL_STATE, sv2_c
             job->extranonce2_len = conn->extranonce_size;
         }
 
-        GLOBAL_STATE->SYSTEM_MODULE.work_received++;
+        POOL_notify_work_received(GLOBAL_STATE, pool_idx);
+        stratum_check_primary_handover(GLOBAL_STATE, pool_idx);
         SYSTEM_notify_new_ntime(GLOBAL_STATE, job->ntime);
         if (GLOBAL_STATE->create_jobs_task_handle) {
             xTaskNotify(GLOBAL_STATE->create_jobs_task_handle, slot, eSetValueWithOverwrite);
@@ -357,7 +365,7 @@ static void stratum_v2_handle_set_new_prev_hash(GlobalState *GLOBAL_STATE, sv2_c
     }
 }
 
-static void stratum_v2_handle_set_target(GlobalState *GLOBAL_STATE, sv2_conn_t *conn,
+static void stratum_v2_handle_set_target(GlobalState *GLOBAL_STATE, uint16_t pool_idx, sv2_conn_t *conn,
                                          const uint8_t *payload, uint32_t len)
 {
     uint32_t channel_id;
@@ -381,7 +389,7 @@ static void stratum_v2_handle_set_target(GlobalState *GLOBAL_STATE, sv2_conn_t *
     }
 
     memcpy(conn->target, max_target, 32);
-    GLOBAL_STATE->SYSTEM_MODULE.pool_difficulty = pdiff;
+    POOL_set_difficulty(GLOBAL_STATE, pool_idx, pdiff);
 
     ESP_LOGI(TAG, "Set pool difficulty: %g", pdiff);
     difficulty_controller_update(GLOBAL_STATE);
@@ -411,8 +419,8 @@ esp_err_t stratum_v2_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
         return ESP_ERR_INVALID_ARG;
     }
 
-    if (s_v2_conn != NULL) {
-        stratum_v2_close_connection(GLOBAL_STATE);
+    if (s_v2_conns[pool_idx] != NULL) {
+        stratum_v2_close_connection(GLOBAL_STATE, pool_idx);
     }
 
     sv2_conn_t *conn = calloc(1, sizeof(sv2_conn_t));
@@ -420,9 +428,11 @@ esp_err_t stratum_v2_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
         ESP_LOGE(TAG, "Failed to allocate sv2_conn");
         return ESP_ERR_NO_MEM;
     }
-    conn->pool_idx = (uint8_t)pool_idx;
     conn->version_mask = BIP320_VERSION_ROLLING_MASK;
-    s_v2_conn = conn;
+
+    pthread_mutex_lock(&s_v2_conn_mutex);
+    s_v2_conns[pool_idx] = conn;
+    pthread_mutex_unlock(&s_v2_conn_mutex);
 
     uint8_t *frame_buf = heap_caps_malloc(SV2_MAX_FRAME_SIZE, MALLOC_CAP_SPIRAM);
     uint8_t *recv_buf = heap_caps_malloc(SV2_MAX_FRAME_SIZE, MALLOC_CAP_SPIRAM);
@@ -431,35 +441,28 @@ esp_err_t stratum_v2_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
         ESP_LOGE(TAG, "Failed to allocate frame buffers");
         free(frame_buf);
         free(recv_buf);
-        stratum_v2_close_connection(GLOBAL_STATE);
+        stratum_v2_close_connection(GLOBAL_STATE, pool_idx);
         return ESP_ERR_NO_MEM;
     }
 
-    GLOBAL_STATE->SYSTEM_MODULE.pool_banner[0] = '\0';
+    esp_err_t run_result = ESP_FAIL;
+
     ESP_LOGI(TAG, "Connecting to stratum2+tcp://%s:%d", stratum_url, port);
 
     esp_transport_handle_t transport = esp_transport_tcp_init();
     if (!transport) {
         ESP_LOGE(TAG, "Failed to init TCP transport");
-        snprintf(GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info,
-                 sizeof(GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info), "Internal error");
-        free(frame_buf);
-        free(recv_buf);
-        stratum_v2_close_connection(GLOBAL_STATE);
-        return ESP_FAIL;
+        stratum_set_pool_error(GLOBAL_STATE, pool_idx, "Internal error");
+        goto cleanup;
     }
 
     stratum_connection_info_t conn_info;
     if (stratum_socket_resolve(stratum_url, port, &conn_info) != ESP_OK) {
         ESP_LOGE(TAG, "Address resolution failed for %s", stratum_url);
-        snprintf(GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info,
-                 sizeof(GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info), "Pool unreachable");
+        stratum_set_pool_error(GLOBAL_STATE, pool_idx, "Pool unreachable");
         esp_transport_close(transport);
         esp_transport_destroy(transport);
-        free(frame_buf);
-        free(recv_buf);
-        stratum_v2_close_connection(GLOBAL_STATE);
-        return ESP_FAIL;
+        goto cleanup;
     }
 
     int64_t connect_start_us = esp_timer_get_time();
@@ -467,33 +470,25 @@ esp_err_t stratum_v2_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
     esp_err_t ret = esp_transport_connect(transport, conn_info.host_ip, port, TRANSPORT_TIMEOUT_MS);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "TCP connect failed to %s:%d (%s) (err %d)", stratum_url, port, conn_info.host_ip, ret);
-        snprintf(GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info,
-                 sizeof(GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info), "Pool unreachable");
+        stratum_set_pool_error(GLOBAL_STATE, pool_idx, "Pool unreachable");
         esp_transport_close(transport);
         esp_transport_destroy(transport);
-        free(frame_buf);
-        free(recv_buf);
-        stratum_v2_close_connection(GLOBAL_STATE);
-        return ESP_FAIL;
+        goto cleanup;
     }
 
     ESP_LOGI(TAG, "TCP connected to %s:%d (%s)", stratum_url, port, conn_info.host_ip);
 
-    pthread_mutex_lock(&GLOBAL_STATE->transport_mutex);
-    GLOBAL_STATE->transport = transport;
-    pthread_mutex_unlock(&GLOBAL_STATE->transport_mutex);
+    pthread_mutex_lock(&s_v2_conn_mutex);
+    conn->transport = transport;
+    pthread_mutex_unlock(&s_v2_conn_mutex);
 
     stratum_socket_set_options(transport);
 
     sv2_noise_ctx_t *noise_ctx = sv2_noise_create();
     if (!noise_ctx) {
         ESP_LOGE(TAG, "Failed to create noise context");
-        snprintf(GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info,
-                 sizeof(GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info), "Internal error");
-        stratum_v2_close_connection(GLOBAL_STATE);
-        free(frame_buf);
-        free(recv_buf);
-        return ESP_FAIL;
+        stratum_set_pool_error(GLOBAL_STATE, pool_idx, "Internal error");
+        goto cleanup;
     }
     conn->noise_ctx = noise_ctx;
 
@@ -502,12 +497,8 @@ esp_err_t stratum_v2_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
 
     if (require_auth && !has_auth) {
         ESP_LOGE(TAG, "SV2 authentication required but no authority pubkey configured, refusing to connect");
-        snprintf(GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info,
-                 sizeof(GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info), "Auth required - no key");
-        stratum_v2_close_connection(GLOBAL_STATE);
-        free(frame_buf);
-        free(recv_buf);
-        return ESP_FAIL;
+        stratum_set_pool_error(GLOBAL_STATE, pool_idx, "Auth required - no key");
+        goto cleanup;
     }
 
     if (has_auth) {
@@ -518,17 +509,12 @@ esp_err_t stratum_v2_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
 
     if (sv2_noise_handshake(noise_ctx, transport, has_auth ? auth_key : NULL) != 0) {
         ESP_LOGE(TAG, "Noise handshake failed, reconnecting...");
-        snprintf(GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info,
-                 sizeof(GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info), "Auth failed - check key");
-        stratum_v2_close_connection(GLOBAL_STATE);
-        free(frame_buf);
-        free(recv_buf);
-        return ESP_FAIL;
+        stratum_set_pool_error(GLOBAL_STATE, pool_idx, "Auth failed - check key");
+        goto cleanup;
     }
 
     const char *ip_protocol = (conn_info.addr_family == AF_INET6) ? "IPv6" : "IPv4";
-    snprintf(GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info,
-             sizeof(GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info), "%s", ip_protocol);
+    POOL_set_connection_info(GLOBAL_STATE, pool_idx, ip_protocol);
 
     ESP_LOGI(TAG, "Encrypted channel established (ChaCha20-Poly1305)");
 
@@ -551,12 +537,8 @@ esp_err_t stratum_v2_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
                                                    "", "", setup_flags);
         if (frame_len < 0 || sv2_noise_send(noise_ctx, transport, frame_buf, frame_len) != 0) {
             ESP_LOGE(TAG, "Failed to send SetupConnection");
-            snprintf(GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info,
-                     sizeof(GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info), "Connection lost");
-            stratum_v2_close_connection(GLOBAL_STATE);
-            free(frame_buf);
-            free(recv_buf);
-            return ESP_FAIL;
+            stratum_set_pool_error(GLOBAL_STATE, pool_idx, "Connection lost");
+            goto cleanup;
         }
     }
 
@@ -565,45 +547,29 @@ esp_err_t stratum_v2_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
         if (sv2_noise_recv(noise_ctx, transport, hdr_buf, recv_buf,
                            SV2_MAX_FRAME_SIZE, &payload_len) != 0) {
             ESP_LOGE(TAG, "Failed to receive SetupConnectionSuccess");
-            snprintf(GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info,
-                     sizeof(GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info), "Pool not responding");
-            stratum_v2_close_connection(GLOBAL_STATE);
-            free(frame_buf);
-            free(recv_buf);
-            return ESP_FAIL;
+            stratum_set_pool_error(GLOBAL_STATE, pool_idx, "Pool not responding");
+            goto cleanup;
         }
         sv2_parse_frame_header(hdr_buf, &hdr);
 
         if (hdr.msg_type != SV2_MSG_SETUP_CONNECTION_SUCCESS) {
             ESP_LOGE(TAG, "SetupConnection rejected by pool (msg_type=0x%02x)", hdr.msg_type);
-            snprintf(GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info,
-                     sizeof(GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info), "Pool rejected config");
-            stratum_v2_close_connection(GLOBAL_STATE);
-            free(frame_buf);
-            free(recv_buf);
-            return ESP_FAIL;
+            stratum_set_pool_error(GLOBAL_STATE, pool_idx, "Pool rejected config");
+            goto cleanup;
         }
 
         uint16_t used_version;
         uint32_t flags;
         if (sv2_parse_setup_connection_success(recv_buf, payload_len, &used_version, &flags) != 0) {
             ESP_LOGE(TAG, "Failed to parse SetupConnectionSuccess");
-            snprintf(GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info,
-                     sizeof(GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info), "Protocol parse error");
-            stratum_v2_close_connection(GLOBAL_STATE);
-            free(frame_buf);
-            free(recv_buf);
-            return ESP_FAIL;
+            stratum_set_pool_error(GLOBAL_STATE, pool_idx, "Protocol parse error");
+            goto cleanup;
         }
 
         if (!sv2_setup_success_allows_version_rolling(flags)) {
             ESP_LOGE(TAG, "Pool requires fixed version, but miner hardware requires version rolling");
-            snprintf(GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info,
-                     sizeof(GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info), "Fixed version unsupported");
-            stratum_v2_close_connection(GLOBAL_STATE);
-            free(frame_buf);
-            free(recv_buf);
-            return ESP_FAIL;
+            stratum_set_pool_error(GLOBAL_STATE, pool_idx, "Fixed version unsupported");
+            goto cleanup;
         }
 
         ESP_LOGI(TAG, "Pool accepted connection: SV2 version=%d, flags=0x%08lx", used_version, flags);
@@ -627,12 +593,8 @@ esp_err_t stratum_v2_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
 
         if (frame_len < 0 || sv2_noise_send(noise_ctx, transport, frame_buf, frame_len) != 0) {
             ESP_LOGE(TAG, "Failed to send OpenMiningChannel");
-            snprintf(GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info,
-                     sizeof(GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info), "Connection lost");
-            stratum_v2_close_connection(GLOBAL_STATE);
-            free(frame_buf);
-            free(recv_buf);
-            return ESP_FAIL;
+            stratum_set_pool_error(GLOBAL_STATE, pool_idx, "Connection lost");
+            goto cleanup;
         }
     }
 
@@ -641,12 +603,8 @@ esp_err_t stratum_v2_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
         if (sv2_noise_recv(noise_ctx, transport, hdr_buf, recv_buf,
                            SV2_MAX_FRAME_SIZE, &payload_len) != 0) {
             ESP_LOGE(TAG, "Failed to receive OpenChannelSuccess");
-            snprintf(GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info,
-                     sizeof(GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info), "Pool not responding");
-            stratum_v2_close_connection(GLOBAL_STATE);
-            free(frame_buf);
-            free(recv_buf);
-            return ESP_FAIL;
+            stratum_set_pool_error(GLOBAL_STATE, pool_idx, "Pool not responding");
+            goto cleanup;
         }
         sv2_parse_frame_header(hdr_buf, &hdr);
 
@@ -657,12 +615,8 @@ esp_err_t stratum_v2_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
         if (hdr.msg_type != expected_msg) {
             ESP_LOGE(TAG, "OpenChannel rejected by pool (msg_type=0x%02x, expected=0x%02x)",
                      hdr.msg_type, expected_msg);
-            snprintf(GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info,
-                     sizeof(GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info), "Pool rejected miner");
-            stratum_v2_close_connection(GLOBAL_STATE);
-            free(frame_buf);
-            free(recv_buf);
-            return ESP_FAIL;
+            stratum_set_pool_error(GLOBAL_STATE, pool_idx, "Pool rejected miner");
+            goto cleanup;
         }
 
         uint32_t request_id, channel_id, group_channel_id;
@@ -679,12 +633,8 @@ esp_err_t stratum_v2_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
                                                         extranonce_prefix, &extranonce_prefix_len,
                                                         &group_channel_id) != 0) {
                 ESP_LOGE(TAG, "Failed to parse OpenExtendedChannelSuccess");
-                snprintf(GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info,
-                         sizeof(GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info), "Protocol parse error");
-                stratum_v2_close_connection(GLOBAL_STATE);
-                free(frame_buf);
-                free(recv_buf);
-                return ESP_FAIL;
+                stratum_set_pool_error(GLOBAL_STATE, pool_idx, "Protocol parse error");
+                goto cleanup;
             }
 
             conn->extranonce_size = (uint8_t)extranonce_size;
@@ -702,12 +652,8 @@ esp_err_t stratum_v2_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
                                                 extranonce_prefix, &extranonce_prefix_len,
                                                 &group_channel_id) != 0) {
                 ESP_LOGE(TAG, "Failed to parse OpenChannelSuccess");
-                snprintf(GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info,
-                         sizeof(GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info), "Protocol parse error");
-                stratum_v2_close_connection(GLOBAL_STATE);
-                free(frame_buf);
-                free(recv_buf);
-                return ESP_FAIL;
+                stratum_set_pool_error(GLOBAL_STATE, pool_idx, "Protocol parse error");
+                goto cleanup;
             }
         }
 
@@ -718,7 +664,7 @@ esp_err_t stratum_v2_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
         memcpy(conn->target, target, 32);
 
         double pdiff = target_to_diff(target);
-        GLOBAL_STATE->SYSTEM_MODULE.pool_difficulty = pdiff;
+        POOL_set_difficulty(GLOBAL_STATE, pool_idx, pdiff);
 
         ESP_LOGI(TAG, "Mining channel opened: channel_id=%lu, group=%lu, type=%s",
                  channel_id, group_channel_id,
@@ -733,7 +679,7 @@ esp_err_t stratum_v2_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
                  elapsed_ms, stratum_url, port);
     }
 
-    esp_err_t run_result = ESP_OK;
+    run_result = ESP_OK;
 
     while (1) {
         if (stratum_reconnect_requested()) {
@@ -755,8 +701,7 @@ esp_err_t stratum_v2_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
                 run_result = ESP_OK;
             } else {
                 ESP_LOGE(TAG, "Failed to receive frame, reconnecting...");
-                snprintf(GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info,
-                         sizeof(GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info), "Connection lost");
+                stratum_set_pool_error(GLOBAL_STATE, pool_idx, "Connection lost");
                 run_result = ESP_FAIL;
             }
             break;
@@ -773,7 +718,7 @@ esp_err_t stratum_v2_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
                     ESP_LOGW(TAG, "Ignoring NewMiningJob received on an extended channel");
                     break;
                 }
-                stratum_v2_handle_new_mining_job(GLOBAL_STATE, conn, recv_buf, hdr.msg_length);
+                stratum_v2_handle_new_mining_job(GLOBAL_STATE, pool_idx, conn, recv_buf, hdr.msg_length);
                 break;
 
             case SV2_MSG_NEW_EXTENDED_MINING_JOB:
@@ -781,15 +726,15 @@ esp_err_t stratum_v2_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
                     ESP_LOGW(TAG, "Ignoring NewExtendedMiningJob received on a standard channel");
                     break;
                 }
-                stratum_v2_handle_new_extended_mining_job(GLOBAL_STATE, conn, recv_buf, hdr.msg_length);
+                stratum_v2_handle_new_extended_mining_job(GLOBAL_STATE, pool_idx, conn, recv_buf, hdr.msg_length);
                 break;
 
             case SV2_MSG_SET_NEW_PREV_HASH:
-                stratum_v2_handle_set_new_prev_hash(GLOBAL_STATE, conn, recv_buf, hdr.msg_length);
+                stratum_v2_handle_set_new_prev_hash(GLOBAL_STATE, pool_idx, conn, recv_buf, hdr.msg_length);
                 break;
 
             case SV2_MSG_SET_TARGET:
-                stratum_v2_handle_set_target(GLOBAL_STATE, conn, recv_buf, hdr.msg_length);
+                stratum_v2_handle_set_target(GLOBAL_STATE, pool_idx, conn, recv_buf, hdr.msg_length);
                 break;
 
             case SV2_MSG_SUBMIT_SHARES_SUCCESS: {
@@ -808,15 +753,15 @@ esp_err_t stratum_v2_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
                                  (unsigned long)accepted_count, (unsigned long)pending);
                         accepted_count = pending;
                     }
-                    float response_time_ms = stratum_timing_calculate_ms(&s_v2_timing, last_sequence_number, esp_timer_get_time());
+                    float response_time_ms = POOL_timing_calculate_ms(GLOBAL_STATE, pool_idx, last_sequence_number, esp_timer_get_time());
                     if (response_time_ms >= 0) {
                         ESP_LOGI(TAG, "Shares accepted: %lu (%.1f ms)", accepted_count, response_time_ms);
-                        SYSTEM_record_response_time(GLOBAL_STATE, response_time_ms, (uint16_t)accepted_count);
+                        POOL_record_response_time(GLOBAL_STATE, pool_idx, response_time_ms, (uint16_t)accepted_count);
                     } else {
                         ESP_LOGI(TAG, "Shares accepted: %lu", accepted_count);
                     }
                     for (uint32_t i = 0; i < accepted_count; i++) {
-                        SYSTEM_notify_accepted_share(GLOBAL_STATE);
+                        POOL_notify_accepted_share(GLOBAL_STATE, pool_idx);
                     }
                     uint32_t resolved = last_sequence_number + 1;
                     if (resolved > conn->resolved_shares) {
@@ -838,7 +783,7 @@ esp_err_t stratum_v2_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
                         break;
                     }
                     ESP_LOGW(TAG, "Share rejected: %s", error_code);
-                    SYSTEM_notify_rejected_share(GLOBAL_STATE, error_code);
+                    POOL_notify_rejected_share(GLOBAL_STATE, pool_idx, error_code);
                     uint32_t resolved = seq_num + 1;
                     if (resolved > conn->resolved_shares) {
                         conn->resolved_shares = resolved;
@@ -853,114 +798,18 @@ esp_err_t stratum_v2_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
         }
     }
 
-    stratum_v2_close_connection(GLOBAL_STATE);
+cleanup:
+    stratum_v2_close_connection(GLOBAL_STATE, pool_idx);
     free(frame_buf);
     free(recv_buf);
     return run_result;
 }
 
-bool stratum_v2_probe_pool(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
-{
-    if (!GLOBAL_STATE || pool_idx >= MAX_POOLS) return false;
-
-    PoolConfig *pool = &GLOBAL_STATE->SYSTEM_MODULE.pools[pool_idx];
-    char url[256] = {0};
-    char auth_pubkey[128] = {0};
-
-    if (pool->url) strlcpy(url, pool->url, sizeof(url));
-    if (pool->sv2_authority_pubkey) strlcpy(auth_pubkey, pool->sv2_authority_pubkey, sizeof(auth_pubkey));
-
-    uint16_t port = pool->port;
-    sv2_channel_type_t channel_type = pool->sv2_channel_type;
-    bool require_auth = pool->sv2_require_auth;
-
-    if (url[0] == '\0' || port == 0) return false;
-
-    stratum_connection_info_t conn_info;
-    if (stratum_socket_resolve(url, port, &conn_info) != ESP_OK) {
-        return false;
-    }
-
-    esp_transport_handle_t transport = esp_transport_tcp_init();
-    if (!transport) return false;
-
-    esp_err_t ret = esp_transport_connect(transport, conn_info.host_ip, port, TRANSPORT_TIMEOUT_MS);
-    if (ret != ESP_OK) {
-        esp_transport_close(transport);
-        esp_transport_destroy(transport);
-        return false;
-    }
-
-    stratum_socket_set_options(transport);
-
-    sv2_noise_ctx_t *noise_ctx = sv2_noise_create();
-    if (!noise_ctx) {
-        esp_transport_close(transport);
-        esp_transport_destroy(transport);
-        return false;
-    }
-
-    uint8_t auth_key[SV2_AUTHORITY_PUBKEY_SIZE];
-    bool has_auth = stratum_v2_load_authority_pubkey(auth_key, auth_pubkey[0] ? auth_pubkey : NULL);
-
-    if (require_auth && !has_auth) {
-        sv2_noise_destroy(noise_ctx);
-        esp_transport_close(transport);
-        esp_transport_destroy(transport);
-        return false;
-    }
-
-    if (sv2_noise_handshake(noise_ctx, transport, has_auth ? auth_key : NULL) != 0) {
-        sv2_noise_destroy(noise_ctx);
-        esp_transport_close(transport);
-        esp_transport_destroy(transport);
-        return false;
-    }
-
-    uint8_t *frame_buf = heap_caps_malloc(SV2_PROBE_BUFFER_SIZE, MALLOC_CAP_SPIRAM);
-    if (!frame_buf) frame_buf = malloc(SV2_PROBE_BUFFER_SIZE);
-    uint8_t *recv_buf = heap_caps_malloc(SV2_PROBE_BUFFER_SIZE, MALLOC_CAP_SPIRAM);
-    if (!recv_buf) recv_buf = malloc(SV2_PROBE_BUFFER_SIZE);
-
-    if (!frame_buf || !recv_buf) {
-        free(frame_buf);
-        free(recv_buf);
-        sv2_noise_destroy(noise_ctx);
-        esp_transport_close(transport);
-        esp_transport_destroy(transport);
-        return false;
-    }
-
-    uint32_t setup_flags = sv2_setup_flags_for_channel(channel_type);
-
-    const char *device_model = GLOBAL_STATE->DEVICE_CONFIG.family.asic.name;
-    int frame_len = sv2_build_setup_connection(frame_buf, SV2_PROBE_BUFFER_SIZE,
-                                               url, port,
-                                               "bitaxe", device_model ? device_model : "",
-                                               "", "", setup_flags);
-
-    bool success = false;
-    if (frame_len > 0 && sv2_noise_send(noise_ctx, transport, frame_buf, frame_len) == 0) {
-        uint8_t hdr_buf[6];
-        int payload_len = 0;
-        if (sv2_noise_recv(noise_ctx, transport, hdr_buf, recv_buf, SV2_PROBE_BUFFER_SIZE, &payload_len) == 0) {
-            sv2_frame_header_t hdr;
-            if (sv2_parse_frame_header(hdr_buf, &hdr) == 0 && hdr.msg_type == SV2_MSG_SETUP_CONNECTION_SUCCESS) {
-                uint16_t used_version;
-                uint32_t flags;
-                if (sv2_parse_setup_connection_success(recv_buf, payload_len, &used_version, &flags) == 0) {
-                    if (sv2_setup_success_allows_version_rolling(flags)) {
-                        success = true;
-                    }
-                }
-            }
-        }
-    }
-
-    free(frame_buf);
-    free(recv_buf);
-    sv2_noise_destroy(noise_ctx);
-    esp_transport_close(transport);
-    esp_transport_destroy(transport);
-    return success;
-}
+const stratum_driver_t g_stratum_v2_driver = {
+    .protocol = STRATUM_PROTOCOL_V2,
+    .name = "Stratum V2",
+    .run = stratum_v2_run,
+    .close_connection = stratum_v2_close_connection,
+    .abort_connection = stratum_v2_abort_connection,
+    .submit_share = stratum_v2_submit_share,
+};

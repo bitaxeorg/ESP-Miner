@@ -64,20 +64,21 @@ static void system_api_add_telemetry(yyjson_mut_doc *doc, yyjson_mut_val *root, 
     yyjson_mut_obj_add_float(doc, root, "hashRate_10m", g->SYSTEM_MODULE.hashrate_10m);
     yyjson_mut_obj_add_float(doc, root, "hashRate_1h", g->SYSTEM_MODULE.hashrate_1h);
     yyjson_mut_obj_add_float(doc, root, "errorPercentage", g->SYSTEM_MODULE.error_percentage);
-    yyjson_mut_obj_add_uint(doc, root, "sharesAccepted", g->SYSTEM_MODULE.shares_accepted);
-    yyjson_mut_obj_add_uint(doc, root, "sharesRejected", g->SYSTEM_MODULE.shares_rejected);
-    yyjson_mut_obj_add_uint(doc, root, "sharesPending", g->SYSTEM_MODULE.shares_pending);
+    PoolSession *session = POOL_get_active_session(g);
+    yyjson_mut_obj_add_uint(doc, root, "sharesAccepted", session ? session->shares_accepted : 0);
+    yyjson_mut_obj_add_uint(doc, root, "sharesRejected", session ? session->shares_rejected : 0);
+    yyjson_mut_obj_add_uint(doc, root, "sharesPending", session ? session->shares_pending : 0);
     yyjson_mut_obj_add_uint(doc, root, "bestDiff", g->SYSTEM_MODULE.best_nonce_diff);
     yyjson_mut_obj_add_uint(doc, root, "bestSessionDiff", g->SYSTEM_MODULE.best_session_nonce_diff);
-    yyjson_mut_obj_add_double(doc, root, "poolDifficulty", g->SYSTEM_MODULE.pool_difficulty);
-    yyjson_mut_obj_add_float(doc, root, "responseTime", g->SYSTEM_MODULE.response_time);
-    float rt_min = g->SYSTEM_MODULE.response_time_min > 0.0f ? g->SYSTEM_MODULE.response_time_min : g->SYSTEM_MODULE.last_response_time_min;
-    float rt_max = g->SYSTEM_MODULE.response_time_max > 0.0f ? g->SYSTEM_MODULE.response_time_max : g->SYSTEM_MODULE.last_response_time_max;
-    yyjson_mut_obj_add_float(doc, root, "responseTimeMin", rt_min > 0.0f ? rt_min : g->SYSTEM_MODULE.response_time);
-    yyjson_mut_obj_add_float(doc, root, "responseTimeMax", rt_max > 0.0f ? rt_max : g->SYSTEM_MODULE.response_time);
-    yyjson_mut_obj_add_uint(doc, root, "responseShareBatch", g->SYSTEM_MODULE.response_share_batch);
+    yyjson_mut_obj_add_double(doc, root, "poolDifficulty", session ? session->pool_difficulty : 0.0);
+    yyjson_mut_obj_add_float(doc, root, "responseTime", session ? session->response_time : 0.0f);
+    float rt_min = (session && session->response_time_min > 0.0f) ? session->response_time_min : (session ? session->last_response_time_min : 0.0f);
+    float rt_max = (session && session->response_time_max > 0.0f) ? session->response_time_max : (session ? session->last_response_time_max : 0.0f);
+    yyjson_mut_obj_add_float(doc, root, "responseTimeMin", rt_min > 0.0f ? rt_min : (session ? session->response_time : 0.0f));
+    yyjson_mut_obj_add_float(doc, root, "responseTimeMax", rt_max > 0.0f ? rt_max : (session ? session->response_time : 0.0f));
+    yyjson_mut_obj_add_uint(doc, root, "responseShareBatch", session ? session->response_share_batch : 0);
     yyjson_mut_obj_add_float(doc, root, "processTime", g->SYSTEM_MODULE.process_time);
-    yyjson_mut_obj_add_uint(doc, root, "workReceived", g->SYSTEM_MODULE.work_received);
+    yyjson_mut_obj_add_uint(doc, root, "workReceived", session ? session->work_received : 0);
 
     // Dynamic Block Info
     yyjson_mut_obj_add_uint(doc, root, "blockFound", g->SYSTEM_MODULE.block_found);
@@ -161,16 +162,24 @@ static void system_api_add_config(yyjson_mut_doc *doc, yyjson_mut_val *root, Glo
     yyjson_mut_obj_add_int(doc, root, "useNTP", nvs_config_get_bool(NVS_CONFIG_USE_NTP) ? 1 : 0);
 
     // Pool Configuration
-    yyjson_mut_obj_add_strcpy(doc, root, "poolConnectionInfo", g->SYSTEM_MODULE.pool_connection_info);
-    yyjson_mut_obj_add_strcpy(doc, root, "primaryPoolError", g->SYSTEM_MODULE.primary_pool_error);
-    yyjson_mut_obj_add_strcpy(doc, root, "poolBanner", g->SYSTEM_MODULE.pool_banner);
-    yyjson_mut_obj_add_int(doc, root, "isUsingFallbackStratum", g->SYSTEM_MODULE.is_using_fallback ? 1 : 0);
-    
+    PoolSession *session = POOL_get_active_session(g);
+    const char *conn_info = (session && session->pool_connection_info[0] != '\0') 
+        ? session->pool_connection_info 
+        : "Not Connected";
+    yyjson_mut_obj_add_strcpy(doc, root, "poolConnectionInfo", conn_info);
+
     uint16_t prim_idx = g->SYSTEM_MODULE.primary_pool_index;
     uint16_t sec_idx = g->SYSTEM_MODULE.secondary_pool_index;
     if (prim_idx >= MAX_POOLS) prim_idx = 0;
     if (sec_idx >= MAX_POOLS) sec_idx = 0;
 
+    const char *prim_err = g->SYSTEM_MODULE.is_using_fallback 
+        ? g->SYSTEM_MODULE.pool_sessions[prim_idx].pool_error 
+        : "";
+    yyjson_mut_obj_add_strcpy(doc, root, "primaryPoolError", prim_err);
+    yyjson_mut_obj_add_strcpy(doc, root, "poolBanner", session ? session->pool_banner : "");
+    yyjson_mut_obj_add_int(doc, root, "isUsingFallbackStratum", g->SYSTEM_MODULE.is_using_fallback ? 1 : 0);
+    
     yyjson_mut_obj_add_uint(doc, root, "primaryPoolIndex", prim_idx);
     yyjson_mut_obj_add_uint(doc, root, "secondaryPoolIndex", sec_idx);
     yyjson_mut_obj_add_int(doc, root, "useFallbackStratum", g->SYSTEM_MODULE.use_fallback_stratum ? 1 : 0);
@@ -272,10 +281,12 @@ static void system_api_add_hashrate_monitor(yyjson_mut_doc *doc, yyjson_mut_val 
 static void system_api_add_rejected_reasons(yyjson_mut_doc *doc, yyjson_mut_val *root, GlobalState *g) {
     if (!doc || !root || !g) return;
     yyjson_mut_val *rejected_reasons = yyjson_mut_obj_add_arr(doc, root, "sharesRejectedReasons");
-    for (int i = 0; i < g->SYSTEM_MODULE.rejected_reason_stats_count; i++) {
+    PoolSession *session = POOL_get_active_session(g);
+    if (!session) return;
+    for (int i = 0; i < session->rejected_reason_stats_count; i++) {
         yyjson_mut_val *obj = yyjson_mut_arr_add_obj(doc, rejected_reasons);
-        yyjson_mut_obj_add_strcpy(doc, obj, "message", g->SYSTEM_MODULE.rejected_reason_stats[i].message);
-        yyjson_mut_obj_add_uint(doc, obj, "count", g->SYSTEM_MODULE.rejected_reason_stats[i].count);
+        yyjson_mut_obj_add_strcpy(doc, obj, "message", session->rejected_reason_stats[i].message);
+        yyjson_mut_obj_add_uint(doc, obj, "count", session->rejected_reason_stats[i].count);
     }
 }
 
