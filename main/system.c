@@ -207,6 +207,8 @@ void SYSTEM_init_system(GlobalState * GLOBAL_STATE)
     module->shares_rejected = 0;
     module->shares_pending = 0;
     module->best_nonce_diff = nvs_config_get_u64(NVS_CONFIG_BEST_DIFF);
+    module->difficulty = 0.0;
+    module->last_difficulty = 0.0;
     module->best_session_nonce_diff = 0;
     module->start_time_us = esp_timer_get_time();
     module->lastClockSync = 0;
@@ -655,6 +657,12 @@ void SYSTEM_notify_found_nonce(GlobalState * GLOBAL_STATE, double diff, bool is_
         module->block_found++;
         module->show_new_block = true;
         ESP_LOGI(TAG, "FOUND BLOCK!!!!!!!!!!!!!!!!!!!!!! diff: %f (count: %d)", diff, module->block_found);
+    }
+
+    if (diff >= module->pool_difficulty) {
+        if (diff > module->difficulty) {
+            module->difficulty = diff;
+        }
     }
 
     if ((uint64_t) diff > module->best_session_nonce_diff) {

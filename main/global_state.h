@@ -95,6 +95,8 @@ typedef struct SystemModule
     float last_response_time_min;
     float last_response_time_max;
     uint16_t response_share_batch;
+    double difficulty;
+    double last_difficulty;
     float process_time;
     float cpu_usage;
     double pool_difficulty;

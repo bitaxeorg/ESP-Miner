@@ -114,6 +114,7 @@ const mockSystemInfo: ISystemInfo = {
   responseTime: 45,
   responseTimeMin: 45,
   responseTimeMax: 45,
+  difficulty: 5000000,
   responseShareBatch: 1,
   poolDifficulty: 1000,
   blockHeight: 800000,
@@ -657,7 +658,8 @@ describe('HomeComponent', () => {
       component.powerData = [10, 10, 10, 10];
       component.chartDatasets = {
         responseTimeMin: [null, 35.5, 25.0, null],
-        responseTimeMax: [null, 45.5, 60.0, null]
+        responseTimeMax: [null, 45.5, 60.0, null],
+        difficulty: [null, 5000, 10000, null]
       };
 
       component.limitDataPoints(0);
@@ -668,6 +670,7 @@ describe('HomeComponent', () => {
       const idx2050 = component.dataLabel.indexOf(2050);
       expect(component.chartDatasets['responseTimeMin'][idx2050]).toBe(25.0);
       expect(component.chartDatasets['responseTimeMax'][idx2050]).toBe(60.0);
+      expect(component.chartDatasets['difficulty'][idx2050]).toBe(10000);
     });
 
     it('should clear flash timeouts on destroy', () => {
@@ -762,6 +765,7 @@ describe('HomeComponent', () => {
     it('should return 0 for response time min/max and undefined for others in getMinForLabel', () => {
       expect(component.getMinForLabel('responseTimeMin')).toBe(0);
       expect(component.getMinForLabel('responseTimeMax')).toBe(0);
+      expect(component.getMinForLabel('difficulty')).toBeUndefined();
       expect(component.getMinForLabel('hashrate')).toBeUndefined();
       expect(component.getMinForLabel('none')).toBeUndefined();
       expect(component.getMinForLabel(undefined)).toBeUndefined();

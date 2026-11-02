@@ -1103,6 +1103,8 @@ export class HomeComponent implements OnInit, OnDestroy {
             } else if (labelKey === 'responseTimeMax') {
               const maxVal = info.responseTimeMax && info.responseTimeMax > 0 ? info.responseTimeMax : info.responseTime;
               val = (hasNewShare && maxVal > 0) ? maxVal : null;
+            } else if (labelKey === 'difficulty') {
+              val = (hasNewShare && info.difficulty && info.difficulty > 0) ? info.difficulty : null;
             } else {
               val = HomeComponent.getDataForLabel(labelKey, info);
             }
@@ -1529,6 +1531,9 @@ export class HomeComponent implements OnInit, OnDestroy {
         const y1Label = y1Labels.length > 0 ? y1Labels[0] : 'none';
         const y2Label = y2Labels.length > 0 ? y2Labels[0] : 'none';
 
+        this.chartOptions.scales.y.type = (y1Unit === 'difficulty') ? 'logarithmic' : 'linear';
+        this.chartOptions.scales.y2.type = (y2Unit === 'difficulty') ? 'logarithmic' : 'linear';
+
         this.chartOptions.scales.y.min = this.getMinForLabel(y1Label);
         this.chartOptions.scales.y2.min = this.getMinForLabel(y2Label);
 
@@ -1597,8 +1602,10 @@ export class HomeComponent implements OnInit, OnDestroy {
       
       const rMin = this.chartDatasets['responseTimeMin'];
       const rMax = this.chartDatasets['responseTimeMax'];
+      const diff = this.chartDatasets['difficulty'];
       const removedMin = rMin?.[low];
       const removedMax = rMax?.[low];
+      const removedDiff = diff?.[low];
 
       // Remove point at index 'low'.
       this.dataLabel.splice(low, 1);
@@ -1619,6 +1626,12 @@ export class HomeComponent implements OnInit, OnDestroy {
         const currentMax = rMax[low];
         if (currentMax == null || removedMax > currentMax) {
           rMax[low] = removedMax;
+        }
+      }
+      if (diff && removedDiff != null) {
+        const currentDiff = diff[low];
+        if (currentDiff == null || removedDiff > currentDiff) {
+          diff[low] = removedDiff;
         }
       }
     }
@@ -1650,6 +1663,7 @@ export class HomeComponent implements OnInit, OnDestroy {
     switch (metric) {
       case 'responseTimeMin':
       case 'responseTimeMax':  return 0;
+      case 'difficulty':       return undefined;
       default:                 return undefined;
     }
   }
@@ -1675,6 +1689,7 @@ export class HomeComponent implements OnInit, OnDestroy {
       case 'fan2Rpm':          return 7000;
       case 'responseTimeMin':
       case 'responseTimeMax':  return 50;
+      case 'difficulty':       return 10000;
       default:                 return 0;
     }
   }
@@ -1702,6 +1717,7 @@ export class HomeComponent implements OnInit, OnDestroy {
       case 'freeHeap':           return info.freeHeap;
       case 'responseTimeMin':    return info.responseTimeMin ?? info.responseTime;
       case 'responseTimeMax':    return info.responseTimeMax ?? info.responseTime;
+      case 'difficulty':         return info.difficulty && info.difficulty > 0 ? info.difficulty : 0;
       default:                   return 0.0;
     }
   }
@@ -1728,8 +1744,8 @@ export class HomeComponent implements OnInit, OnDestroy {
       case 'freeHeap':         return {suffix: ' B', precision: 0};
       case 'responseTimeMin':
       case 'responseTimeMax':  return {suffix: ' ms', precision: 1};
+      case 'difficulty':       return {suffix: ' diff', precision: 0};
       default:                 return {suffix: '', precision: 0};
-
     }
   }
 
@@ -1744,6 +1760,16 @@ export class HomeComponent implements OnInit, OnDestroy {
         return HashSuffixPipe.transform(value, args);
       case 'freeHeap':
         return ByteSuffixPipe.transform(value, args);
+      case 'difficulty':
+        if (args?.tickmark) {
+          if (value <= 0) return '';
+          const log = Math.log10(value);
+          if (Math.abs(log - Math.round(log)) > 1e-9) {
+            return '';
+          }
+          return DiffSuffixPipe.transform(value).replace(/\.00(?=\s|$)/, '');
+        }
+        return DiffSuffixPipe.transform(value);
       default:
         const settings = HomeComponent.getSettingsForLabel(metric);
         return value.toLocaleString(undefined, { useGrouping: false, maximumFractionDigits: args?.tickmark ? undefined : settings.precision }) + settings.suffix;

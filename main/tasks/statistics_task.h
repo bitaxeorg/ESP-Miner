@@ -28,6 +28,7 @@ typedef enum
     SRC_FREE_HEAP,
     SRC_RESPONSE_TIME_MIN,
     SRC_RESPONSE_TIME_MAX,
+    SRC_DIFFICULTY,
     SRC_NONE // last
 } DataSource;
 
@@ -41,6 +42,7 @@ struct StatisticsData
     char tokens[SRC_NONE][STATS_TOKEN_LEN];
     float responseTimeMin;
     float responseTimeMax;
+    double difficulty;
 };
 
 typedef void (*StatisticsReaderCallback)(const struct StatisticsData *rows, uint16_t count, void *user_ctx);

@@ -75,6 +75,8 @@ static void system_api_add_telemetry(yyjson_mut_doc *doc, yyjson_mut_val *root, 
     float rt_max = g->SYSTEM_MODULE.response_time_max > 0.0f ? g->SYSTEM_MODULE.response_time_max : g->SYSTEM_MODULE.last_response_time_max;
     yyjson_mut_obj_add_float(doc, root, "responseTimeMin", rt_min > 0.0f ? rt_min : g->SYSTEM_MODULE.response_time);
     yyjson_mut_obj_add_float(doc, root, "responseTimeMax", rt_max > 0.0f ? rt_max : g->SYSTEM_MODULE.response_time);
+    double diff = g->SYSTEM_MODULE.difficulty > 0.0 ? g->SYSTEM_MODULE.difficulty : g->SYSTEM_MODULE.last_difficulty;
+    yyjson_mut_obj_add_double(doc, root, "difficulty", diff);
     yyjson_mut_obj_add_uint(doc, root, "responseShareBatch", g->SYSTEM_MODULE.response_share_batch);
     yyjson_mut_obj_add_float(doc, root, "processTime", g->SYSTEM_MODULE.process_time);
     yyjson_mut_obj_add_uint(doc, root, "workReceived", g->SYSTEM_MODULE.work_received);
