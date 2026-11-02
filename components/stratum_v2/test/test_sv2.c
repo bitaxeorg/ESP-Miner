@@ -199,3 +199,44 @@ TEST_CASE("SV2 accepts direct and group channel broadcasts", "[sv2]")
     TEST_ASSERT_TRUE(sv2_channel_or_group_matches(7, 7, 0));
     TEST_ASSERT_FALSE(sv2_channel_or_group_matches(0, 7, 0));
 }
+
+
+TEST_CASE("SV2 parse CloseChannel reason and framing", "[sv2]")
+{
+    uint8_t payload[5 + 255] = {0};
+    uint32_t channel_id = 0;
+    char reason[16];
+
+    payload[0] = 0x78;
+    payload[1] = 0x56;
+    payload[2] = 0x34;
+    payload[3] = 0x12;
+    payload[4] = 6;
+    memcpy(payload + 5, "closed", 6);
+    TEST_ASSERT_EQUAL(0, sv2_parse_close_channel(payload, 11,
+                                                  &channel_id, reason, sizeof(reason)));
+    TEST_ASSERT_EQUAL_HEX32(0x12345678, channel_id);
+    TEST_ASSERT_EQUAL_STRING("closed", reason);
+
+    payload[4] = 0;
+    TEST_ASSERT_EQUAL(0, sv2_parse_close_channel(payload, 5,
+                                                  &channel_id, reason, sizeof(reason)));
+    TEST_ASSERT_EQUAL_STRING("", reason);
+
+    payload[4] = 255;
+    memset(payload + 5, 'R', 255);
+    char small_reason[8];
+    TEST_ASSERT_EQUAL(0, sv2_parse_close_channel(payload, sizeof(payload),
+                                                  &channel_id, small_reason, sizeof(small_reason)));
+    TEST_ASSERT_EQUAL_STRING("RRRRRRR", small_reason);
+    TEST_ASSERT_EQUAL_UINT8(0, small_reason[sizeof(small_reason) - 1]);
+
+    TEST_ASSERT_EQUAL(-1, sv2_parse_close_channel(payload, 4,
+                                                   &channel_id, reason, sizeof(reason)));
+    TEST_ASSERT_EQUAL(-1, sv2_parse_close_channel(payload, sizeof(payload) - 1,
+                                                   &channel_id, reason, sizeof(reason)));
+    TEST_ASSERT_EQUAL(-1, sv2_parse_close_channel(NULL, sizeof(payload),
+                                                   &channel_id, reason, sizeof(reason)));
+    TEST_ASSERT_EQUAL(-1, sv2_parse_close_channel(payload, sizeof(payload),
+                                                   &channel_id, reason, 0));
+}

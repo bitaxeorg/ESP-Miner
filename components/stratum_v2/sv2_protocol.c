@@ -308,6 +308,19 @@ int sv2_parse_set_new_prev_hash(const uint8_t *payload, uint32_t len,
     return 0;
 }
 
+int sv2_parse_close_channel(const uint8_t *payload, uint32_t len,
+                            uint32_t *channel_id, char *reason_code,
+                            size_t reason_code_size)
+{
+    // CloseChannel: channel_id(4) + reason_code STR0_255 (1 + N).
+    if (!payload || !channel_id || !reason_code || reason_code_size == 0 || len < 5) return -1;
+
+    uint32_t parsed_channel_id = read_u32_le(payload);
+    if (read_str0255(payload + 4, len - 4, reason_code, reason_code_size) < 0) return -1;
+    *channel_id = parsed_channel_id;
+    return 0;
+}
+
 int sv2_parse_set_target(const uint8_t *payload, uint32_t len,
                          uint32_t *channel_id, uint8_t max_target[32])
 {
