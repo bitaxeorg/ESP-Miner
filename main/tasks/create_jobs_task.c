@@ -10,6 +10,7 @@
 #include "esp_timer.h"
 
 #include "asic.h"
+#include "create_jobs_task.h"
 #include "difficulty_controller.h"
 #include "system.h"
 #include "utils.h"
@@ -67,13 +68,20 @@ void create_jobs_task(void *pvParameters)
         }
 
         if (notified == pdTRUE) {
+            if (slot_notify == CREATE_JOBS_NOTIFY_CLEAR_WORK) {
+                ESP_LOGI(TAG, "Work Cleared");
+                current_work = NULL;
+                current_work_sent = false;
+                current_work_decoded = false;
+                continue;
+            }
+
             miner_job_t *new_work = POOL_resolve_notified_job(GLOBAL_STATE, slot_notify);
             if (!new_work) {
                 continue;
             }
             ESP_LOGI(TAG, "New Work Activated %s (type %d)", new_work->job_id, new_work->type);
             current_work = new_work;
-            GLOBAL_STATE->has_work = true;
             GLOBAL_STATE->active_job_slot_idx = (uint8_t)(slot_notify % MINER_JOB_POOL_SIZE);
             current_work_sent = false;
             current_work_decoded = false;
@@ -96,10 +104,7 @@ void create_jobs_task(void *pvParameters)
                 continue;
             }
         } else {
-            if (current_work == NULL || !GLOBAL_STATE->has_work) {
-                current_work = NULL;
-                current_work_sent = false;
-                current_work_decoded = false;
+            if (current_work == NULL) {
                 vTaskDelay(100 / portTICK_PERIOD_MS);
                 continue;
             }
