@@ -277,3 +277,25 @@ TEST_CASE("BIP-110 signaling expired", "[coinbase_decoder]")
     TEST_ASSERT_EQUAL(965664, result.block_height);
     TEST_ASSERT_FALSE(result.bip110_signaling);
 }
+
+// Testnet 4 block 1 (0000000012982b6d5f621229286b880e909984df669c2afabb102ce311b13f28),
+// its coinbase scriptSig is 09 5100062f4077697a2f, so the height is OP_1.
+TEST_CASE("BIP 34 opcode height, testnet 4 block 1", "[coinbase_decoder]")
+{
+    mining_notify notify = { 0 };
+    notify.version = 0x20000000;
+    notify.job_id = "test_job";
+    notify.coinbase_1 = "01000000010000000000000000000000000000000000000000000000000000000000000000ffffffff0951";
+    notify.coinbase_2 = "00062f4077697a2fffffffff0200f2052a010000001976a9140a59837ccd4df25adc31cdad39be6a8d97557ed688ac0000000000000000266a24aa21a9ede2f61c3f71d1defd3fa999dfa36953755c690689799962b48bebd836974e8cf900000000";
+
+    mining_notification_result_t result = { 0 };
+    // This pool's scriptSig holds no extranonce, so coinb1 ends at the height.
+    esp_err_t err = coinbase_process_notification(&notify, "", 0, "", true, &result);
+    TEST_ASSERT_EQUAL(ESP_OK, err);
+    TEST_ASSERT_EQUAL(1, result.block_height);
+    TEST_ASSERT_EQUAL_INT(2, result.output_count);
+    // 50 BTC to a P2PKH and the witness commitment. The miner tag is binary
+    // (00 06 2f 40 77 69 7a 2f) and comes back with non-printables as dots, so
+    // this pins where the tag starts and how long it is, not just the height.
+    TEST_ASSERT_EQUAL_STRING("../@wiz/", result.scriptsig);
+}
