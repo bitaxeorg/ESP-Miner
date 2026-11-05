@@ -12,12 +12,21 @@ esp_err_t device_config_init(GlobalState * GLOBAL_STATE)
     // TODO: Read board version from eFuse
 
     char * board_version = nvs_config_get_string(NVS_CONFIG_BOARD_VERSION);
+    char * board_model = nvs_config_get_string(NVS_CONFIG_BOARD_MODEL);
+    if (board_model[0] == '\0') {
+        free(board_model);
+        board_model = strdup(board_version);
+    }
     bool found_default = false;
+    // boardversion is the display name; use the model when it is unset
+    const char * board_name = strcmp(board_version, "000") != 0 ? board_version : board_model;
 
     for (int i = 0 ; i < ARRAY_SIZE(default_configs); i++) {
-        if (strcmp(default_configs[i].board_version, board_version) == 0) {
+        if (strcmp(default_configs[i].board_model, board_model) == 0) {
             GLOBAL_STATE->DEVICE_CONFIG = default_configs[i];
+            GLOBAL_STATE->DEVICE_CONFIG.board_version = strdup(board_name);
 
+            ESP_LOGI(TAG, "Board Model: %s", GLOBAL_STATE->DEVICE_CONFIG.board_model);
             ESP_LOGI(TAG, "Device Model: %s", GLOBAL_STATE->DEVICE_CONFIG.family.name);
             ESP_LOGI(TAG, "Board Version: %s", GLOBAL_STATE->DEVICE_CONFIG.board_version);
             ESP_LOGI(TAG, "ASIC: %dx %s (%d cores)", GLOBAL_STATE->DEVICE_CONFIG.family.asic_count, GLOBAL_STATE->DEVICE_CONFIG.family.asic.name, GLOBAL_STATE->DEVICE_CONFIG.family.asic.core_count);
@@ -28,8 +37,12 @@ esp_err_t device_config_init(GlobalState * GLOBAL_STATE)
     }
 
     if (!found_default) {
+        if (strcmp(board_model, board_version) != 0) {
+            ESP_LOGW(TAG, "Unknown board model '%s', using custom board config", board_model);
+        }
         ESP_LOGI(TAG, "Custom Board Version: %s", board_version);
 
+        GLOBAL_STATE->DEVICE_CONFIG.board_model = strdup(board_model);
         GLOBAL_STATE->DEVICE_CONFIG.board_version = strdup(board_version);
 
         char * device_model = nvs_config_get_string(NVS_CONFIG_DEVICE_MODEL);
@@ -107,6 +120,7 @@ esp_err_t device_config_init(GlobalState * GLOBAL_STATE)
     }
 
     free(board_version);
+    free(board_model);
 
     return device_pins_init(&GLOBAL_STATE->DEVICE_CONFIG.pins);
 }
