@@ -1,41 +1,41 @@
 #include "esp_log.h"
 #include "esp_heap_caps.h"
-#include "esp_transport.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "global_state.h"
 #include "stratum_task.h"
+#include "stratum_driver.h"
 #include "stratum_v1_client.h"
 #include "stratum_v2_client.h"
-#include "stratum_api.h"
 #include "connect.h"
 #include "system.h"
-#include <sys/socket.h>
 #include <string.h>
 
 #define TAG "stratum_task"
 #define MAX_RETRY_ATTEMPTS 3
-#define HEARTBEAT_INTERVAL_MS 60000
-#define INITIAL_HEARTBEAT_DELAY_MS 10000
 #define RECOVERY_PROBE_INTERVAL_MS 30000
 
-static GlobalState *s_global_state = NULL;
+static TaskHandle_t s_primary_task_handle = NULL;
+static TaskHandle_t s_fallback_task_handle = NULL;
 static volatile bool s_should_reconnect = false;
-static TaskHandle_t s_heartbeat_task_handle = NULL;
 
-void stratum_request_reconnect(void)
+void stratum_abort_pool(uint16_t pool_idx)
+{
+    if (pool_idx >= MAX_POOLS) return;
+    const stratum_driver_t *v1 = stratum_get_driver(STRATUM_PROTOCOL_V1);
+    const stratum_driver_t *v2 = stratum_get_driver(STRATUM_PROTOCOL_V2);
+    if (v1 && v1->abort_connection) v1->abort_connection(pool_idx);
+    if (v2 && v2->abort_connection) v2->abort_connection(pool_idx);
+    if (s_fallback_task_handle) {
+        xTaskNotifyGive(s_fallback_task_handle);
+    }
+}
+
+void stratum_abort_connection(void)
 {
     s_should_reconnect = true;
-    if (s_global_state) {
-        pthread_mutex_lock(&s_global_state->transport_mutex);
-        esp_transport_handle_t transport = s_global_state->transport;
-        if (transport) {
-            int sock = esp_transport_get_socket(transport);
-            if (sock >= 0) {
-                shutdown(sock, SHUT_RDWR);
-            }
-        }
-        pthread_mutex_unlock(&s_global_state->transport_mutex);
+    for (uint16_t i = 0; i < MAX_POOLS; i++) {
+        stratum_abort_pool(i);
     }
 }
 
@@ -44,67 +44,87 @@ bool stratum_reconnect_requested(void)
     return s_should_reconnect;
 }
 
-bool stratum_probe_pool(GlobalState *gs, uint16_t pool_idx)
+void stratum_set_pool_error(GlobalState *gs, uint16_t pool_idx, const char *err_msg)
 {
-    if (!gs || pool_idx >= MAX_POOLS) return false;
-    const PoolConfig *pool = &gs->SYSTEM_MODULE.pools[pool_idx];
-    if (!pool->url || pool->url[0] == '\0' || pool->port == 0) return false;
-
-    if (pool->protocol == STRATUM_PROTOCOL_V2) {
-        return stratum_v2_probe_pool(gs, pool_idx);
+    if (!gs) return;
+    if (gs->SYSTEM_MODULE.is_using_fallback &&
+        pool_idx == gs->SYSTEM_MODULE.primary_pool_index) {
+        strlcpy(gs->SYSTEM_MODULE.primary_pool_error, err_msg,
+                sizeof(gs->SYSTEM_MODULE.primary_pool_error));
+    } else {
+        strlcpy(gs->SYSTEM_MODULE.pool_connection_info, err_msg,
+                sizeof(gs->SYSTEM_MODULE.pool_connection_info));
     }
-    return stratum_v1_probe_pool(gs, pool_idx);
 }
 
-static void stratum_heartbeat_task(void *pvParameters)
+void stratum_check_primary_handover(GlobalState *gs, uint16_t pool_idx)
 {
-    GlobalState *gs = (GlobalState *)pvParameters;
+    if (!gs) return;
+    if (pool_idx == gs->SYSTEM_MODULE.primary_pool_index &&
+        gs->SYSTEM_MODULE.is_using_fallback &&
+        !gs->SYSTEM_MODULE.use_fallback_stratum) {
+        ESP_LOGI(TAG, "Primary pool %u received work! Switching from fallback.", pool_idx);
+        gs->SYSTEM_MODULE.is_using_fallback = false;
+        gs->SYSTEM_MODULE.primary_pool_error[0] = '\0';
+        uint16_t sec_idx = gs->SYSTEM_MODULE.secondary_pool_index;
+        stratum_abort_pool(sec_idx);
+    }
+}
 
-    while (1) {
-        // Wait for periodic heartbeat or immediate wake-up via stratum_trigger_heartbeat_check()
-        ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(HEARTBEAT_INTERVAL_MS));
+static esp_err_t run_pool_session(GlobalState *gs, uint16_t pool_idx)
+{
+    if (!gs || pool_idx >= MAX_POOLS) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    const PoolConfig *pool = &gs->SYSTEM_MODULE.pools[pool_idx];
+    if (!pool->url || pool->url[0] == '\0' || pool->port == 0) {
+        return ESP_ERR_INVALID_ARG;
+    }
 
-        if (!gs) continue;
+    const stratum_driver_t *driver = stratum_get_driver(pool->protocol);
+    if (!driver || !driver->run) {
+        ESP_LOGE(TAG, "No driver found for protocol %d", pool->protocol);
+        return ESP_ERR_NOT_FOUND;
+    }
 
-        if (gs->SYSTEM_MODULE.is_using_fallback &&
-            !gs->SYSTEM_MODULE.use_fallback_stratum &&
-            wifi_is_connected()) {
+    s_should_reconnect = false;
+    return driver->run(gs, pool_idx);
+}
 
-            uint16_t prim_idx = gs->SYSTEM_MODULE.primary_pool_index;
-            const char *url = gs->SYSTEM_MODULE.pools[prim_idx].url;
-            ESP_LOGI(TAG, "Heartbeat: probing primary pool %u (%s)...", prim_idx, url ? url : "unknown");
-            if (stratum_probe_pool(gs, prim_idx)) {
-                ESP_LOGI(TAG, "Primary pool %u is back online! Switching from fallback.", prim_idx);
-                gs->SYSTEM_MODULE.is_using_fallback = false;
-                stratum_request_reconnect();
-            } else {
-                ESP_LOGI(TAG, "Heartbeat: primary pool %u is still offline", prim_idx);
-            }
+static void start_fallback_if_needed(GlobalState *gs)
+{
+    uint16_t sec_idx = gs->SYSTEM_MODULE.secondary_pool_index;
+    const PoolConfig *pool = &gs->SYSTEM_MODULE.pools[sec_idx];
+    bool has_fallback = (pool->url != NULL && pool->url[0] != '\0' && pool->port != 0);
+
+    if (!has_fallback) {
+        gs->SYSTEM_MODULE.pools_unavailable = true;
+        return;
+    }
+
+    if (s_fallback_task_handle == NULL) {
+        ESP_LOGI(TAG, "Starting stratum_task for fallback pool %u (%s)", sec_idx, pool->url);
+        if (xTaskCreateWithCaps(stratum_task, "stratum_fb", 16384, (void *)gs, 16, &s_fallback_task_handle, MALLOC_CAP_SPIRAM) != pdPASS) {
+            ESP_LOGE(TAG, "Failed to start fallback stratum task");
         }
     }
 }
 
-void stratum_trigger_heartbeat_check(void)
-{
-    if (s_heartbeat_task_handle) {
-        xTaskNotifyGive(s_heartbeat_task_handle);
-    }
-}
-
-static uint16_t s_running_pool_idx = 0;
-
 void stratum_notify_pool_modified(GlobalState *gs, uint16_t pool_idx)
 {
-    if (!gs) return;
+    if (!gs || pool_idx >= MAX_POOLS) return;
 
     gs->SYSTEM_MODULE.primary_pool_error[0] = '\0';
     gs->SYSTEM_MODULE.pool_banner[0] = '\0';
-    uint16_t prim_idx = gs->SYSTEM_MODULE.primary_pool_index;
 
-    if (pool_idx == s_running_pool_idx) {
-        stratum_request_reconnect();
-    } else if (pool_idx == prim_idx && gs->SYSTEM_MODULE.is_using_fallback && !gs->SYSTEM_MODULE.use_fallback_stratum) {
-        stratum_trigger_heartbeat_check();
+    stratum_abort_pool(pool_idx);
+
+    if (pool_idx == gs->SYSTEM_MODULE.primary_pool_index &&
+        gs->SYSTEM_MODULE.is_using_fallback &&
+        !gs->SYSTEM_MODULE.use_fallback_stratum) {
+        if (s_primary_task_handle) {
+            xTaskNotifyGive(s_primary_task_handle);
+        }
     }
 }
 
@@ -114,175 +134,144 @@ void stratum_notify_pool_selection_changed(GlobalState *gs)
 
     gs->SYSTEM_MODULE.primary_pool_error[0] = '\0';
     gs->SYSTEM_MODULE.pool_banner[0] = '\0';
-    uint16_t prim_idx = gs->SYSTEM_MODULE.primary_pool_index;
-    uint16_t sec_idx = gs->SYSTEM_MODULE.secondary_pool_index;
-    uint16_t target_idx = gs->SYSTEM_MODULE.is_using_fallback ? sec_idx : prim_idx;
 
-    if (target_idx != s_running_pool_idx) {
-        stratum_request_reconnect();
-    } else if (gs->SYSTEM_MODULE.is_using_fallback && !gs->SYSTEM_MODULE.use_fallback_stratum) {
-        stratum_trigger_heartbeat_check();
+    stratum_abort_connection();
+    if (s_primary_task_handle) {
+        xTaskNotifyGive(s_primary_task_handle);
     }
 }
 
 void stratum_task(void *pvParameters)
 {
     GlobalState *GLOBAL_STATE = (GlobalState *)pvParameters;
-    s_global_state = GLOBAL_STATE;
+    bool is_primary;
 
-    int consecutive_pool_failures = 0;
-    int retry_attempts = 0;
-
-    ESP_LOGI(TAG, "Starting");
-
-    // Periodic heartbeat task to probe primary pool while running fallback
-    if (xTaskCreateWithCaps(stratum_heartbeat_task, "stratum_hb", 8192, (void *)GLOBAL_STATE, 2, &s_heartbeat_task_handle, MALLOC_CAP_SPIRAM) != pdPASS) {
-        ESP_LOGE(TAG, "Failed to create stratum heartbeat task");
+    if (s_primary_task_handle == NULL || xTaskGetCurrentTaskHandle() == s_primary_task_handle) {
+        s_primary_task_handle = xTaskGetCurrentTaskHandle();
+        is_primary = true;
+        ESP_LOGI(TAG, "Primary stratum task started");
+    } else {
+        s_fallback_task_handle = xTaskGetCurrentTaskHandle();
+        is_primary = false;
+        ESP_LOGI(TAG, "Fallback stratum task started");
     }
 
+    int retry_attempts = 0;
+
     while (1) {
+        // Fallback task exits when primary has recovered and fallback is not forced
+        if (!is_primary && !GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback && !GLOBAL_STATE->SYSTEM_MODULE.use_fallback_stratum) {
+            break;
+        }
+
         if (GLOBAL_STATE->SYSTEM_MODULE.mining_paused || GLOBAL_STATE->SYSTEM_MODULE.hardware_fault) {
-            vTaskDelay(1000 / portTICK_PERIOD_MS);
+            vTaskDelay(pdMS_TO_TICKS(1000));
             continue;
         }
 
         if (!wifi_is_connected()) {
             ESP_LOGI(TAG, "WiFi disconnected, waiting...");
-            vTaskDelay(5000 / portTICK_PERIOD_MS);
+            vTaskDelay(pdMS_TO_TICKS(5000));
             continue;
         }
 
-        uint16_t prim_idx = GLOBAL_STATE->SYSTEM_MODULE.primary_pool_index;
-        uint16_t sec_idx = GLOBAL_STATE->SYSTEM_MODULE.secondary_pool_index;
-        bool has_fallback = (GLOBAL_STATE->SYSTEM_MODULE.pools[sec_idx].url != NULL &&
-                             GLOBAL_STATE->SYSTEM_MODULE.pools[sec_idx].url[0] != '\0');
-
-        int threshold = has_fallback ? 2 : 1;
-
-        if (s_should_reconnect) {
-            consecutive_pool_failures = 0;
-            retry_attempts = 0;
-            s_should_reconnect = false;
+        // If force fallback is toggled on, Primary steps down and sleeps
+        if (is_primary && GLOBAL_STATE->SYSTEM_MODULE.use_fallback_stratum) {
+            stratum_abort_pool(GLOBAL_STATE->SYSTEM_MODULE.primary_pool_index);
+            GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback = true;
+            start_fallback_if_needed(GLOBAL_STATE);
+            ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(5000));
+            continue;
         }
 
-        if (consecutive_pool_failures == 0) {
-            if (GLOBAL_STATE->SYSTEM_MODULE.use_fallback_stratum) {
-                GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback = has_fallback;
-            }
-        }
+        uint16_t pool_idx = is_primary ? GLOBAL_STATE->SYSTEM_MODULE.primary_pool_index
+                                       : GLOBAL_STATE->SYSTEM_MODULE.secondary_pool_index;
 
-        // Paused state when all configured pools have exhausted retries
-        if (consecutive_pool_failures >= threshold) {
+        const PoolConfig *pool = &GLOBAL_STATE->SYSTEM_MODULE.pools[pool_idx];
+        if (!pool->url || pool->url[0] == '\0' || pool->port == 0) {
+            ESP_LOGW(TAG, "%s pool %u not configured", is_primary ? "Primary" : "Fallback", pool_idx);
             GLOBAL_STATE->SYSTEM_MODULE.pools_unavailable = true;
-            ESP_LOGW(TAG, "All configured pools unreachable, pausing mining to conserve power.");
-            vTaskDelay(pdMS_TO_TICKS(RECOVERY_PROBE_INTERVAL_MS));
-
-            if (!wifi_is_connected()) continue;
-
-            bool prefer_fallback = GLOBAL_STATE->SYSTEM_MODULE.use_fallback_stratum && has_fallback;
-            uint16_t first_idx = prefer_fallback ? sec_idx : prim_idx;
-            uint16_t second_idx = prefer_fallback ? prim_idx : sec_idx;
-
-            if (stratum_probe_pool(GLOBAL_STATE, first_idx)) {
-                ESP_LOGI(TAG, "Pool %u reachable, resuming mining", first_idx);
-                GLOBAL_STATE->SYSTEM_MODULE.pools_unavailable = false;
-                GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback = (first_idx == sec_idx);
-                consecutive_pool_failures = 0;
-                retry_attempts = 0;
-                GLOBAL_STATE->SYSTEM_MODULE.work_received = 0;
-                SYSTEM_reset_pool_session(GLOBAL_STATE);
-            } else if (has_fallback && stratum_probe_pool(GLOBAL_STATE, second_idx)) {
-                ESP_LOGI(TAG, "Pool %u reachable, resuming mining", second_idx);
-                GLOBAL_STATE->SYSTEM_MODULE.pools_unavailable = false;
-                GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback = (second_idx == sec_idx);
-                consecutive_pool_failures = 0;
-                retry_attempts = 0;
-                GLOBAL_STATE->SYSTEM_MODULE.work_received = 0;
-                SYSTEM_reset_pool_session(GLOBAL_STATE);
-            }
+            if (!is_primary) break;
+            vTaskDelay(pdMS_TO_TICKS(5000));
             continue;
         }
 
-        uint16_t active_idx = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback ? sec_idx : prim_idx;
-        stratum_protocol_t protocol = GLOBAL_STATE->SYSTEM_MODULE.pools[active_idx].protocol;
+        ESP_LOGI(TAG, "%s worker running pool %u (%s)", is_primary ? "Primary" : "Fallback", pool_idx, pool->url);
+        esp_err_t err = run_pool_session(GLOBAL_STATE, pool_idx);
 
-        s_running_pool_idx = active_idx;
-        s_should_reconnect = false;
-        esp_err_t err;
-
-        if (protocol == STRATUM_PROTOCOL_V2) {
-            err = stratum_v2_run(GLOBAL_STATE, active_idx);
-        } else {
-            err = stratum_v1_run(GLOBAL_STATE, active_idx);
+        // Check if fallback should exit after session unblocks
+        if (!is_primary && !GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback && !GLOBAL_STATE->SYSTEM_MODULE.use_fallback_stratum) {
+            break;
         }
 
-        if (err == ESP_OK || s_should_reconnect || GLOBAL_STATE->SYSTEM_MODULE.work_received > 0) {
-            // Clean disconnect, mode switch, reconnect requested, or was actively mining
-            consecutive_pool_failures = 0;
+        if (err == ESP_OK || GLOBAL_STATE->SYSTEM_MODULE.work_received > 0) {
             retry_attempts = 0;
-            GLOBAL_STATE->SYSTEM_MODULE.pools_unavailable = false;
-            if (!GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback) {
+            if (is_primary) {
+                GLOBAL_STATE->SYSTEM_MODULE.pools_unavailable = false;
                 GLOBAL_STATE->SYSTEM_MODULE.primary_pool_error[0] = '\0';
             }
             GLOBAL_STATE->SYSTEM_MODULE.work_received = 0;
             SYSTEM_reset_pool_session(GLOBAL_STATE);
-            s_should_reconnect = false;
         } else {
+            if (is_primary && GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback) {
+                ESP_LOGI(TAG, "Primary pool %u probe failed, waiting %d seconds...",
+                         pool_idx, RECOVERY_PROBE_INTERVAL_MS / 1000);
+                ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(RECOVERY_PROBE_INTERVAL_MS));
+                continue;
+            }
+
             retry_attempts++;
-            ESP_LOGW(TAG, "Pool %u (%s) connection failed (attempt %d/%d)",
-                     active_idx, GLOBAL_STATE->SYSTEM_MODULE.pools[active_idx].url,
-                     retry_attempts, MAX_RETRY_ATTEMPTS);
+            ESP_LOGW(TAG, "%s pool %u (%s) failed (attempt %d/%d)",
+                     is_primary ? "Primary" : "Fallback", pool_idx, pool->url, retry_attempts, MAX_RETRY_ATTEMPTS);
 
             if (retry_attempts >= MAX_RETRY_ATTEMPTS) {
-                consecutive_pool_failures++;
                 retry_attempts = 0;
 
-                if (has_fallback) {
-                    if (!GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback) {
-                        strlcpy(GLOBAL_STATE->SYSTEM_MODULE.primary_pool_error,
-                                GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info,
-                                sizeof(GLOBAL_STATE->SYSTEM_MODULE.primary_pool_error));
-                    }
-                    GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback = !GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback;
-                    ESP_LOGI(TAG, "Switching to %s pool (%s)",
-                             GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback ? "fallback" : "primary",
-                             GLOBAL_STATE->SYSTEM_MODULE.pools[GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback ? sec_idx : prim_idx].url);
-                    GLOBAL_STATE->SYSTEM_MODULE.work_received = 0;
-                    SYSTEM_reset_pool_session(GLOBAL_STATE);
+                if (is_primary) {
+                    strlcpy(GLOBAL_STATE->SYSTEM_MODULE.primary_pool_error,
+                            GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info,
+                            sizeof(GLOBAL_STATE->SYSTEM_MODULE.primary_pool_error));
+
+                    GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback = true;
+                    start_fallback_if_needed(GLOBAL_STATE);
+
+                    ESP_LOGI(TAG, "Primary waiting %d seconds before retry...", RECOVERY_PROBE_INTERVAL_MS / 1000);
+                    ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(RECOVERY_PROBE_INTERVAL_MS));
+                } else {
+                    GLOBAL_STATE->SYSTEM_MODULE.pools_unavailable = true;
+                    ESP_LOGW(TAG, "Both primary and fallback pools unavailable");
+                    ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(RECOVERY_PROBE_INTERVAL_MS));
                 }
+            } else {
+                vTaskDelay(pdMS_TO_TICKS(2000));
             }
-            vTaskDelay(2000 / portTICK_PERIOD_MS);
         }
+    }
+
+    if (!is_primary) {
+        ESP_LOGI(TAG, "Fallback stratum task exiting");
+        s_fallback_task_handle = NULL;
+        vTaskDelete(NULL);
     }
 }
 
 int stratum_submit_share(GlobalState *GLOBAL_STATE, const asic_job_t *active_job,
                          uint32_t nonce, uint32_t rolled_version, uint64_t *sent_time_us)
 {
-    if (!GLOBAL_STATE || !active_job) {
+    if (!GLOBAL_STATE || !active_job || active_job->pool_id >= MAX_POOLS) {
         return -1;
     }
 
-    uint16_t active_pool_idx = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback
-        ? GLOBAL_STATE->SYSTEM_MODULE.secondary_pool_index
-        : GLOBAL_STATE->SYSTEM_MODULE.primary_pool_index;
-
-    if (active_job->pool_id != (uint8_t)active_pool_idx) {
-        ESP_LOGW(TAG, "Dropping share for stale pool index %u (active pool is %u)",
-                 active_job->pool_id, active_pool_idx);
+    const stratum_driver_t *driver = stratum_get_driver_for_job(active_job);
+    if (!driver || !driver->submit_share) {
         return -1;
     }
 
-    int ret;
-    if (active_job->source_type == JOB_TYPE_SV2_STANDARD || active_job->source_type == JOB_TYPE_SV2_EXTENDED) {
-        ret = stratum_v2_submit_share(GLOBAL_STATE, active_job, nonce, rolled_version, sent_time_us);
-    } else {
-        ret = stratum_v1_submit_share(GLOBAL_STATE, active_job, nonce, rolled_version, sent_time_us);
-    }
+    int ret = driver->submit_share(GLOBAL_STATE, active_job, nonce, rolled_version, sent_time_us);
 
     if (ret < 0) {
-        ESP_LOGW(TAG, "Failed to submit share to socket (ret: %d, errno %d: %s)", ret, errno, strerror(errno));
-        // stratum_task recv loop will detect a broken connection on its next read and handle reconnection
+        ESP_LOGW(TAG, "Failed to submit share to socket for pool %u (ret: %d)",
+                 active_job->pool_id, ret);
     }
     return ret;
 }
