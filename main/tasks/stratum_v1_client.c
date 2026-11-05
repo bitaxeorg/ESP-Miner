@@ -81,7 +81,7 @@ int stratum_v1_submit_share(GlobalState *GLOBAL_STATE, const asic_job_t *active_
                             uint32_t nonce, uint32_t rolled_version, uint64_t *sent_time_us)
 {
     if (!GLOBAL_STATE || !active_job) return -1;
-    uint32_t version_bits = rolled_version ^ active_job->version;
+    uint32_t version_bits = rolled_version & active_job->version_mask;
 
     pthread_mutex_lock(&GLOBAL_STATE->transport_mutex);
     esp_transport_handle_t transport = GLOBAL_STATE->transport;

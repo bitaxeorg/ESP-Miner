@@ -161,3 +161,72 @@ TEST_CASE("BM1366 and BM1397 reject response job IDs outside the active slots",
         }
     }
 }
+
+TEST_CASE("BM1397 deduplicates repeated and previously found nonces",
+          "[asic][result][bm1397]")
+{
+    GlobalState *state = bm1397_harness_begin();
+    TEST_ASSERT_EQUAL_UINT8(2, bm1397_harness_driver.init(state));
+
+    asic_job_t job = make_job(JOB_TYPE_V1);
+    bm1397_harness_install_job(0, &job);
+    uint8_t wire_job_id = 0;
+
+    // First nonce should succeed
+    queue_response(true, wire_job_id, 0x12345678);
+    task_result *res = bm1397_harness_driver.process_work(state);
+    TEST_ASSERT_NOT_NULL(res);
+    TEST_ASSERT_EQUAL_HEX32(0x12345678, res->nonce);
+
+    // Immediate duplicate nonce should be rejected
+    queue_response(true, wire_job_id, 0x12345678);
+    TEST_ASSERT_NULL(bm1397_harness_driver.process_work(state));
+
+    // A different nonce should succeed
+    queue_response(true, wire_job_id, 0x87654321);
+    res = bm1397_harness_driver.process_work(state);
+    TEST_ASSERT_NOT_NULL(res);
+    TEST_ASSERT_EQUAL_HEX32(0x87654321, res->nonce);
+
+    // The first nonce re-emitted later should still be rejected (in ring buffer)
+    queue_response(true, wire_job_id, 0x12345678);
+    TEST_ASSERT_NULL(bm1397_harness_driver.process_work(state));
+
+    bm1397_harness_end();
+}
+
+TEST_CASE("BM1397 software rolled starting_version decodes rolled_version and computes correct version_bits",
+          "[asic][bm1397][result-job]")
+{
+    GlobalState *state = bm1397_harness_begin();
+
+    asic_job_t job = make_job(JOB_TYPE_V1);
+    job.version = 0x207D8000;      // Software-rolled version for this midstate batch
+    job.version_mask = BIP320_VERSION_ROLLING_MASK;
+    bm1397_harness_install_job(0, &job);
+
+    // Wire chip slot encodes slot 0 and midstate index 1
+    // (slot << 2) | midstate_index: (0 << 2) | 1 = 1
+    uint8_t wire_chip_slot = 1;
+    queue_response(true, wire_chip_slot, 0xFC7BDA94);
+
+    task_result *res = bm1397_harness_driver.process_work(state);
+    TEST_ASSERT_NOT_NULL(res);
+    TEST_ASSERT_EQUAL_HEX32(0xFC7BDA94, res->nonce);
+    // Rolled version should be packet version incremented by midstate index 1: 0x207D8000 -> 0x207DA000
+    TEST_ASSERT_EQUAL_HEX32(0x207DA000, res->rolled_version);
+    // Packet job version
+    TEST_ASSERT_EQUAL_HEX32(0x207D8000, res->job.version);
+
+    // BIP-320 version bits submitted to pool: rolled_version & version_mask
+    uint32_t version_bits = res->rolled_version & res->job.version_mask;
+    TEST_ASSERT_EQUAL_HEX32(0x007DA000, version_bits);
+
+    // Pool verification check with base job template version (e.g. 0x207C8000):
+    // (pool_template_version & ~mask) | (version_bits & mask) == rolled_version
+    uint32_t pool_template_version = 0x207C8000;
+    uint32_t pool_reconstructed = (pool_template_version & ~job.version_mask) | (version_bits & job.version_mask);
+    TEST_ASSERT_EQUAL_HEX32(res->rolled_version, pool_reconstructed);
+
+    bm1397_harness_end();
+}
