@@ -118,6 +118,15 @@ float Thermal_get_chip_temp(GlobalState * GLOBAL_STATE)
     return -1;
 }
 
+// Unlike Thermal_get_chip_temp, this stays valid while the ASIC is powered down.
+float Thermal_get_emc_internal_temp(GlobalState * GLOBAL_STATE)
+{
+    if (GLOBAL_STATE->DEVICE_CONFIG.EMC2101 && GLOBAL_STATE->DEVICE_CONFIG.emc_internal_temp) {
+        return EMC2101_get_internal_temp();
+    }
+    return -1;
+}
+
 float Thermal_get_chip_temp2(GlobalState * GLOBAL_STATE)
 {
     if (!GLOBAL_STATE->ASIC_initalized) {
