@@ -12,6 +12,7 @@ SRCS
     "input.c"
     "filesystem.c"
     "system.c"
+    "webhook_alerts.c"
     "firmware_checksum.c"
     "lv_font_portfolio-6x8.c"
     "logo.c"
@@ -37,6 +38,7 @@ SRCS
     "./http_server/websocket_log.c"
     "./http_server/websocket_api.c"
     "./http_server/system_api_json.c"
+    "./http_server/webhook_alert_api.c"
     "./http_server/theme_api.c"
     "./http_server/axe-os/api/system/asic_settings.c"
     "./self_test/self_test.c"
@@ -82,6 +84,7 @@ REQUIRES
     "dns_server"
     "stratum"
     "stratum_v2"
+    "webhook_alert_utils"
     "yyjson"
 
 PRIV_REQUIRES
@@ -92,6 +95,7 @@ PRIV_REQUIRES
     "esp_driver_gpio"
     "esp_event"
     "esp_http_server"
+    "esp_http_client"
     "esp_lcd"
     "esp_netif"
     "esp_psram"
