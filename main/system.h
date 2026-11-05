@@ -37,7 +37,7 @@ void SYSTEM_noinit_update(SystemModule * SYSTEM_MODULE);
 uint64_t SYSTEM_noinit_get_total_uptime_seconds();
 double SYSTEM_noinit_get_total_hashes();
 double SYSTEM_noinit_get_total_log2_work();
-void SYSTEM_load_pool_from_nvs(GlobalState * GLOBAL_STATE, int i);
+void SYSTEM_load_pool_from_nvs(GlobalState * GLOBAL_STATE, int i, bool *reconnect_required);
 void SYSTEM_reload_pool_config(GlobalState * GLOBAL_STATE);
 
 #endif /* SYSTEM_H_ */

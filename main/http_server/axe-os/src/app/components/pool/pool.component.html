@@ -10,30 +10,6 @@
         </div>
       }
 
-      <h2 class="mb-3 text-main">Active Pool Selection</h2>
-      <div class="flex flex-col mb-4 gap-4">
-        <div class="flex flex-col md:flex-row md:items-center gap-2">
-          <label for="primaryPoolSelect" class="w-full md:w-2/12 font-semibold">Primary Pool</label>
-          <div class="w-full md:w-10/12">
-            <app-dropdown
-              id="primaryPoolSelect"
-              [options]="poolDropdownOptions"
-              formControlName="primaryPoolIndex">
-            </app-dropdown>
-          </div>
-        </div>
-        <div class="flex flex-col md:flex-row md:items-center gap-2">
-          <label for="secondaryPoolSelect" class="w-full md:w-2/12 font-semibold">Fallback Pool</label>
-          <div class="w-full md:w-10/12">
-            <app-dropdown
-              id="secondaryPoolSelect"
-              [options]="poolDropdownOptions"
-              formControlName="secondaryPoolIndex">
-            </app-dropdown>
-          </div>
-        </div>
-      </div>
-
       <h2 class="mb-3 text-main">Pool Configurations <span class="text-sm text-secondary font-normal ml-2">({{ poolsArray.length }}/8)</span></h2>
 
       <div formArrayName="pools" class="flex flex-col gap-4 mb-4">
@@ -43,13 +19,13 @@
             <div class="flex justify-between items-center p-3 cursor-pointer bg-bg-hover border-b border-surface" (click)="toggleCard(i)">
               <div class="flex items-center gap-2">
                 <i class="pi mr-1 text-secondary transition-transform duration-200" [class]="activeCardIndex === i ? 'pi-chevron-up' : 'pi-chevron-down'" style="font-size: 0.9rem;"></i>
-                <span class="font-bold text-lg text-main">Pool {{ poolControl.get('id')?.value + 1 }}</span>
+                <span class="font-bold text-lg text-main">Pool {{ i + 1 }}</span>
                 <!-- Status / Protocol Badges -->
                 <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-blue-500 text-white">{{ getProtocolLabel(poolControl.get('stratumProtocol')?.value) }}</span>
-                @if (poolControl.get('id')?.value === form.get('primaryPoolIndex')?.value) {
+                @if (i === 0) {
                   <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-green-500 text-white">Primary</span>
                 }
-                @if (poolControl.get('id')?.value === form.get('secondaryPoolIndex')?.value) {
+                @if (i === 1) {
                   <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-amber-500 text-white">Fallback</span>
                 }
 
@@ -65,8 +41,32 @@
                   </span>
                 }
               </div>
-              <div>
-                <button type="button" class="btn btn-secondary border-none p-1 text-red-500 hover:text-red-700 bg-transparent disabled:opacity-50" [disabled]="isDeleteDisabled(poolControl.get('id')?.value)" (click)="deletePool(i); $event.stopPropagation();" appTooltip="Delete Pool" tooltipPosition="left">
+              <div class="flex items-center gap-1">
+                <button
+                  type="button"
+                  class="btn btn-secondary border-none p-1 text-secondary hover:text-main bg-transparent disabled:opacity-30 disabled:cursor-not-allowed"
+                  [disabled]="i === 0"
+                  (click)="movePoolUp(i); $event.stopPropagation();"
+                  appTooltip="Move Pool Up"
+                  tooltipPosition="left">
+                  <i class="pi pi-arrow-up text-base"></i>
+                </button>
+                <button
+                  type="button"
+                  class="btn btn-secondary border-none p-1 text-secondary hover:text-main bg-transparent disabled:opacity-30 disabled:cursor-not-allowed"
+                  [disabled]="i === poolsArray.length - 1"
+                  (click)="movePoolDown(i); $event.stopPropagation();"
+                  appTooltip="Move Pool Down"
+                  tooltipPosition="left">
+                  <i class="pi pi-arrow-down text-base"></i>
+                </button>
+                <button
+                  type="button"
+                  class="btn btn-secondary border-none p-1 text-red-500 hover:text-red-700 bg-transparent disabled:opacity-50"
+                  [disabled]="isDeleteDisabled()"
+                  (click)="deletePool(i); $event.stopPropagation();"
+                  appTooltip="Delete Pool"
+                  tooltipPosition="left">
                   <i class="pi pi-trash text-lg"></i>
                 </button>
               </div>
@@ -105,9 +105,8 @@
                         <app-radio-button
                           name="stratumProtocol_{{poolControl.get('id')?.value}}"
                           [value]="option.value"
-                          [ngModel]="poolControl.get('stratumProtocol')?.value"
-                          [ngModelOptions]="{standalone: true}"
-                          (ngModelChange)="poolControl.get('stratumProtocol')?.setValue($event); poolControl.get('stratumProtocol')?.markAsDirty()"
+                          [checked]="poolControl.get('stratumProtocol')?.value === option.value"
+                          (onClick)="poolControl.get('stratumProtocol')?.setValue(option.value); poolControl.get('stratumProtocol')?.markAsDirty()"
                           [inputId]="'stratumProtocol_' + poolControl.get('id')?.value + '_' + option.value">
                         </app-radio-button>
                         <label [for]="'stratumProtocol_' + poolControl.get('id')?.value + '_' + option.value" class="ml-2 cursor-pointer">
@@ -161,9 +160,8 @@
                           <app-radio-button
                             name="stratumV2ChannelType_{{poolControl.get('id')?.value}}"
                             [value]="option.value"
-                            [ngModel]="poolControl.get('stratumV2ChannelType')?.value"
-                            [ngModelOptions]="{standalone: true}"
-                            (ngModelChange)="poolControl.get('stratumV2ChannelType')?.setValue($event); poolControl.get('stratumV2ChannelType')?.markAsDirty()"
+                            [checked]="poolControl.get('stratumV2ChannelType')?.value === option.value"
+                            (onClick)="poolControl.get('stratumV2ChannelType')?.setValue(option.value); poolControl.get('stratumV2ChannelType')?.markAsDirty()"
                             [inputId]="'stratumV2ChannelType_' + poolControl.get('id')?.value + '_' + option.value">
                           </app-radio-button>
                           <label [for]="'stratumV2ChannelType_' + poolControl.get('id')?.value + '_' + option.value"
@@ -230,105 +228,104 @@
               }
 
               <!-- Advanced Options Border/Legend -->
-              <fieldset class="m-0 p-0 mt-2 border-t border-b-0 border-l-0 border-r-0 border-surface">
-                <legend class="p-0 pr-3">
-                  <span class="cursor-pointer font-semibold select-none text-main" (click)="showAdvancedOptions[poolControl.get('id')?.value] = !showAdvancedOptions[poolControl.get('id')?.value]">
-                    <i class="pi pi-angle-{{showAdvancedOptions[poolControl.get('id')?.value] ? 'down' : 'right'}} text-sm -ml-1 mr-1"></i>
-                    {{showAdvancedOptions[poolControl.get('id')?.value] ? 'Hide' : 'Show'}} Advanced Options
-                  </span>
-                </legend>
+              @if (hasAdvancedOptions(i)) {
+                <fieldset class="m-0 p-0 mt-2 border-t border-b-0 border-l-0 border-r-0 border-surface">
+                  <legend class="p-0 pr-3">
+                    <span class="cursor-pointer font-semibold select-none text-main" (click)="showAdvancedOptions[poolControl.get('id')?.value] = !showAdvancedOptions[poolControl.get('id')?.value]">
+                      <i class="pi pi-angle-{{showAdvancedOptions[poolControl.get('id')?.value] ? 'down' : 'right'}} text-sm -ml-1 mr-1"></i>
+                      {{showAdvancedOptions[poolControl.get('id')?.value] ? 'Hide' : 'Show'}} Advanced Options
+                    </span>
+                  </legend>
 
-                <div [hidden]="!showAdvancedOptions[poolControl.get('id')?.value]" class="pt-3 flex flex-col gap-4">
-                  <!-- SV1-only options (below the fold) -->
-                  @if (!isPoolV2Enabled(i)) {
-                    <!-- Suggested Difficulty -->
-                    <div class="flex flex-col md:flex-row md:items-center gap-2">
-                      <label [htmlFor]="'stratumSuggestedDifficulty_' + poolControl.get('id')?.value" class="w-full md:w-2/12 font-medium">
-                        <tooltip-text-icon
-                          text="Suggested Difficulty"
-                          tooltip="Used to indicate a preference for share difficulty to the pool. Servers are not required to honour this request, even if they support the stratum method. (0 to disable)"
-                        />
-                      </label>
-                      <div class="w-full md:w-10/12">
-                        <input class="input-text" [id]="'stratumSuggestedDifficulty_' + poolControl.get('id')?.value" formControlName="stratumSuggestedDifficulty" type="number" />
-                      </div>
-                    </div>
-
-                    <!-- Extranonce Subscribe -->
-                    <div class="flex flex-col md:flex-row md:items-center gap-2">
-                      <label [htmlFor]="'stratumExtranonceSubscribe_' + poolControl.get('id')?.value" class="w-full md:w-2/12 font-medium cursor-pointer select-none">
-                        <tooltip-text-icon
-                          text="Enable Extranonce Subscribe"
-                          tooltip="Indicates to the server that the client supports the mining.set_extranonce method. Required by some pools, check the pool documentation."
-                        />
-                      </label>
-                      <div class="w-full md:w-10/12 flex items-center">
-                        <app-checkbox [name]="'stratumExtranonceSubscribe_' + poolControl.get('id')?.value" [inputId]="'stratumExtranonceSubscribe_' + poolControl.get('id')?.value" formControlName="stratumExtranonceSubscribe"
-                          [binary]="true"></app-checkbox>
-                      </div>
-                    </div>
-
-                    <!-- Connection Security -->
-                    <div class="flex flex-col md:flex-row md:items-center gap-2">
-                      <label [htmlFor]="'stratumTLS_' + poolControl.get('id')?.value" class="w-full md:w-2/12 font-medium">Connection Security</label>
-                      <div class="w-full md:w-10/12">
-                        <div class="flex flex-wrap gap-4">
-                          @for (option of tlsOptions; track option.value) {
-                            <div class="flex items-center">
-                              <app-radio-button
-                                name="stratumTLS_{{poolControl.get('id')?.value}}"
-                                [value]="option.value"
-                                [ngModel]="poolControl.get('stratumTLS')?.value"
-                                [ngModelOptions]="{standalone: true}"
-                                (ngModelChange)="poolControl.get('stratumTLS')?.setValue($event); poolControl.get('stratumTLS')?.markAsDirty()"
-                                [inputId]="'stratumTLS_' + poolControl.get('id')?.value + '_' + option.value">
-                              </app-radio-button>
-                              <label [for]="'stratumTLS_' + poolControl.get('id')?.value + '_' + option.value" class="ml-2 cursor-pointer">
-                                {{ option.label }}
-                              </label>
-                            </div>
-                          }
-                        </div>
-                      </div>
-                    </div>
-
-                    <!-- Certificate File -->
-                    @if (poolControl.get('stratumTLS')?.value === 2) {
-                      <div class="flex flex-col md:flex-row md:items-start gap-2">
-                        <label [htmlFor]="'stratumCert_' + poolControl.get('id')?.value" class="w-full md:w-2/12 font-medium">Certificate</label>
+                  <div [hidden]="!showAdvancedOptions[poolControl.get('id')?.value]" class="pt-3 flex flex-col gap-4">
+                    <!-- SV1-only options (below the fold) -->
+                    @if (!isPoolV2Enabled(i)) {
+                      <!-- Suggested Difficulty -->
+                      <div class="flex flex-col md:flex-row md:items-center gap-2">
+                        <label [htmlFor]="'stratumSuggestedDifficulty_' + poolControl.get('id')?.value" class="w-full md:w-2/12 font-medium">
+                          <tooltip-text-icon
+                            text="Suggested Difficulty"
+                            tooltip="Used to indicate a preference for share difficulty to the pool. Servers are not required to honour this request, even if they support the stratum method. (0 to disable)"
+                          />
+                        </label>
                         <div class="w-full md:w-10/12">
-                          <div class="flex items-stretch">
-                            <textarea
-                              [id]="'stratumCert_' + poolControl.get('id')?.value"
-                              formControlName="stratumCert"
-                              rows="6"
-                              class="w-full p-2 text-sm font-mono bg-transparent text-main border border-surface rounded-l outline-none focus:border-primary"
-                              placeholder="Enter or choose a certificate file (.pem, .crt, .cer)"></textarea>
-                            <span class="flex items-center px-3 border border-l-0 border-surface bg-bg-hover rounded-r">
-                              <button
-                                type="button"
-                                class="btn btn-secondary border-none px-3"
-                                appTooltip="Choose a certificate file"
-                                tooltipPosition="top"
-                                (click)="certFileInput.click()">
-                                <i class="pi pi-upload"></i>
-                              </button>
-                              <input #certFileInput type="file" (change)="onCertFileSelected($event, i)"
-                                class="hidden" accept=".pem,.crt,.cer" />
-                            </span>
-                          </div>
-                          @if (poolControl.get('stratumCert')?.errors?.['invalidCertificate']) {
-                            <small class="block text-red-500 mt-1">
-                              Please enter a valid SSL/TLS certificate
-                            </small>
-                          }
+                          <input class="input-text" [id]="'stratumSuggestedDifficulty_' + poolControl.get('id')?.value" formControlName="stratumSuggestedDifficulty" type="number" />
                         </div>
                       </div>
-                    }
-                  }
 
-                  <!-- Decode Coinbase Tx -->
-                  @if (!isPoolV2Enabled(i) || isPoolV2Extended(i)) {
+                      <!-- Extranonce Subscribe -->
+                      <div class="flex flex-col md:flex-row md:items-center gap-2">
+                        <label [htmlFor]="'stratumExtranonceSubscribe_' + poolControl.get('id')?.value" class="w-full md:w-2/12 font-medium cursor-pointer select-none">
+                          <tooltip-text-icon
+                            text="Enable Extranonce Subscribe"
+                            tooltip="Indicates to the server that the client supports the mining.set_extranonce method. Required by some pools, check the pool documentation."
+                          />
+                        </label>
+                        <div class="w-full md:w-10/12 flex items-center">
+                          <app-checkbox [name]="'stratumExtranonceSubscribe_' + poolControl.get('id')?.value" [inputId]="'stratumExtranonceSubscribe_' + poolControl.get('id')?.value" formControlName="stratumExtranonceSubscribe"
+                            [binary]="true"></app-checkbox>
+                        </div>
+                      </div>
+
+                      <!-- Connection Security -->
+                      <div class="flex flex-col md:flex-row md:items-center gap-2">
+                        <label [htmlFor]="'stratumTLS_' + poolControl.get('id')?.value" class="w-full md:w-2/12 font-medium">Connection Security</label>
+                        <div class="w-full md:w-10/12">
+                          <div class="flex flex-wrap gap-4">
+                            @for (option of tlsOptions; track option.value) {
+                              <div class="flex items-center">
+                                <app-radio-button
+                                  name="stratumTLS_{{poolControl.get('id')?.value}}"
+                                  [value]="option.value"
+                                  [checked]="poolControl.get('stratumTLS')?.value === option.value"
+                                  (onClick)="poolControl.get('stratumTLS')?.setValue(option.value); poolControl.get('stratumTLS')?.markAsDirty()"
+                                  [inputId]="'stratumTLS_' + poolControl.get('id')?.value + '_' + option.value">
+                                </app-radio-button>
+                                <label [for]="'stratumTLS_' + poolControl.get('id')?.value + '_' + option.value" class="ml-2 cursor-pointer">
+                                  {{ option.label }}
+                                </label>
+                              </div>
+                            }
+                          </div>
+                        </div>
+                      </div>
+
+                      <!-- Certificate File -->
+                      @if (poolControl.get('stratumTLS')?.value === 2) {
+                        <div class="flex flex-col md:flex-row md:items-start gap-2">
+                          <label [htmlFor]="'stratumCert_' + poolControl.get('id')?.value" class="w-full md:w-2/12 font-medium">Certificate</label>
+                          <div class="w-full md:w-10/12">
+                            <div class="flex items-stretch">
+                              <textarea
+                                [id]="'stratumCert_' + poolControl.get('id')?.value"
+                                formControlName="stratumCert"
+                                rows="6"
+                                class="w-full p-2 text-sm font-mono bg-transparent text-main border border-surface rounded-l outline-none focus:border-primary"
+                                placeholder="Enter or choose a certificate file (.pem, .crt, .cer)"></textarea>
+                              <span class="flex items-center px-3 border border-l-0 border-surface bg-bg-hover rounded-r">
+                                <button
+                                  type="button"
+                                  class="btn btn-secondary border-none px-3"
+                                  appTooltip="Choose a certificate file"
+                                  tooltipPosition="top"
+                                  (click)="certFileInput.click()">
+                                  <i class="pi pi-upload"></i>
+                                </button>
+                                <input #certFileInput type="file" (change)="onCertFileSelected($event, i)"
+                                  class="hidden" accept=".pem,.crt,.cer" />
+                              </span>
+                            </div>
+                            @if (poolControl.get('stratumCert')?.errors?.['invalidCertificate']) {
+                              <small class="block text-red-500 mt-1">
+                                Please enter a valid SSL/TLS certificate
+                              </small>
+                            }
+                          </div>
+                        </div>
+                      }
+                    }
+
+                    <!-- Decode Coinbase Tx -->
                     <div class="flex flex-col md:flex-row md:items-center gap-2">
                       <label [htmlFor]="'stratumDecodeCoinbase_' + poolControl.get('id')?.value" class="w-full md:w-2/12 font-medium cursor-pointer select-none">
                         <tooltip-text-icon
@@ -355,9 +352,9 @@
                           [binary]="true"></app-checkbox>
                       </div>
                     </div>
-                  }
-                </div>
-              </fieldset>
+                  </div>
+                </fieldset>
+              }
             </div>
           </div>
         }

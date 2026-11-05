@@ -735,8 +735,11 @@ static bool validate_pool_json(const cJSON *pool_item, int i) {
     return true;
 }
 
-static bool update_pool_nvs(const cJSON *pool_item, int i, GlobalState *GLOBAL_STATE)
+static void update_pool_nvs(const cJSON *pool_item, int i, GlobalState *GLOBAL_STATE, bool *reconnect_required)
 {
+    if (reconnect_required) {
+        *reconnect_required = false;
+    }
     cJSON *p_obj = cJSON_CreateObject();
     
     char *old_json_str = nvs_config_get_string_indexed(NVS_CONFIG_POOL, i);
@@ -792,9 +795,8 @@ static bool update_pool_nvs(const cJSON *pool_item, int i, GlobalState *GLOBAL_S
     if (old_json_str) free(old_json_str);
 
     if (modified) {
-        SYSTEM_load_pool_from_nvs(GLOBAL_STATE, i);
+        SYSTEM_load_pool_from_nvs(GLOBAL_STATE, i, reconnect_required);
     }
-    return modified;
 }
 
 bool check_settings_and_update(const cJSON * const root, char **redirect_url, GlobalState * GLOBAL_STATE)
@@ -967,7 +969,7 @@ bool check_settings_and_update(const cJSON * const root, char **redirect_url, Gl
             }
         }
 
-        bool modified_pools[MAX_POOLS] = {false};
+        bool pool_reconnect_required[MAX_POOLS] = {false};
         // Save pools array to NVS
         if (pools_item && cJSON_IsArray(pools_item)) {
             int size = cJSON_GetArraySize(pools_item);
@@ -977,9 +979,7 @@ bool check_settings_and_update(const cJSON * const root, char **redirect_url, Gl
                 if (id_item && cJSON_IsNumber(id_item)) {
                     int idx = id_item->valueint;
                     if (idx >= 0 && idx < MAX_POOLS) {
-                        if (update_pool_nvs(pool_item, idx, GLOBAL_STATE)) {
-                            modified_pools[idx] = true;
-                        }
+                        update_pool_nvs(pool_item, idx, GLOBAL_STATE, &pool_reconnect_required[idx]);
                     }
                 }
             }
@@ -1000,7 +1000,7 @@ bool check_settings_and_update(const cJSON * const root, char **redirect_url, Gl
             }
 
             for (int i = 0; i < MAX_POOLS; i++) {
-                if (modified_pools[i]) {
+                if (pool_reconnect_required[i]) {
                     stratum_notify_pool_modified(GLOBAL_STATE, i);
                 }
             }
@@ -1237,11 +1237,14 @@ static esp_err_t PUT_system_pool(httpd_req_t *req)
         return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid pool configuration payload");
     }
 
-    update_pool_nvs(root, idx, GLOBAL_STATE);
+    bool reconnect_required = false;
+    update_pool_nvs(root, idx, GLOBAL_STATE, &reconnect_required);
     cJSON_Delete(root);
 
     SYSTEM_reload_pool_config(GLOBAL_STATE);
-    stratum_notify_pool_modified(GLOBAL_STATE, idx);
+    if (reconnect_required) {
+        stratum_notify_pool_modified(GLOBAL_STATE, idx);
+    }
 
     cJSON *resp = cJSON_CreateObject();
     cJSON_AddStringToObject(resp, "message", "Pool updated successfully");
@@ -1266,9 +1269,7 @@ static esp_err_t DELETE_system_pool(httpd_req_t *req)
     }
 
     // Check if the index is selected as primary or fallback
-    uint16_t prim = nvs_config_get_u16(NVS_CONFIG_PRIMARY_POOL_INDEX);
-    uint16_t sec = nvs_config_get_u16(NVS_CONFIG_SECONDARY_POOL_INDEX);
-    if (idx == prim || idx == sec) {
+    if (idx == 0 || idx == 1) {
         return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Cannot delete a pool that is currently selected as primary or fallback");
     }
 
@@ -1276,7 +1277,7 @@ static esp_err_t DELETE_system_pool(httpd_req_t *req)
     nvs_config_set_string_indexed(NVS_CONFIG_POOL, idx, "");
 
     // Reload in global state memory
-    SYSTEM_load_pool_from_nvs(GLOBAL_STATE, idx);
+    SYSTEM_load_pool_from_nvs(GLOBAL_STATE, idx, NULL);
     SYSTEM_reload_pool_config(GLOBAL_STATE);
 
     cJSON *resp = cJSON_CreateObject();

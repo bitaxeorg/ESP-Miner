@@ -249,7 +249,7 @@ void SYSTEM_init_system(GlobalState * GLOBAL_STATE)
         module->pools[i].pass = NULL;
         module->pools[i].cert = NULL;
         module->pools[i].sv2_authority_pubkey = NULL;
-        SYSTEM_load_pool_from_nvs(GLOBAL_STATE, i);
+        SYSTEM_load_pool_from_nvs(GLOBAL_STATE, i, NULL);
     }
 
     // load primary and secondary pool index selectors and fallback preference
@@ -795,39 +795,84 @@ void SYSTEM_init_partitions(GlobalState * GLOBAL_STATE) {
     }
 }
 
-void SYSTEM_load_pool_from_nvs(GlobalState * GLOBAL_STATE, int i) {
-    if (i < 0 || i >= MAX_POOLS) return;
-    
-    PoolConfig *cfg = &GLOBAL_STATE->SYSTEM_MODULE.pools[i];
+static inline bool pool_str_equal(const char *a, const char *b) {
+    return strcmp(a ? a : "", b ? b : "") == 0;
+}
+
+static bool pool_config_needs_reconnect(const PoolConfig *old_cfg, const PoolConfig *new_cfg)
+{
+    if (!old_cfg || !new_cfg) {
+        return true;
+    }
+
+    if (old_cfg->protocol != new_cfg->protocol ||
+        old_cfg->port != new_cfg->port ||
+        !pool_str_equal(old_cfg->url, new_cfg->url)) {
+        return true;
+    }
+
+    switch (new_cfg->protocol) {
+        case STRATUM_PROTOCOL_V1:
+            if (old_cfg->tls != new_cfg->tls ||
+                old_cfg->difficulty != new_cfg->difficulty ||
+                old_cfg->extranonce_subscribe != new_cfg->extranonce_subscribe ||
+                !pool_str_equal(old_cfg->user, new_cfg->user) ||
+                !pool_str_equal(old_cfg->pass, new_cfg->pass) ||
+                !pool_str_equal(old_cfg->cert, new_cfg->cert)) {
+                return true;
+            }
+            return false;
+
+        case STRATUM_PROTOCOL_V2:
+            if (old_cfg->sv2_channel_type != new_cfg->sv2_channel_type ||
+                old_cfg->sv2_require_auth != new_cfg->sv2_require_auth ||
+                !pool_str_equal(old_cfg->user, new_cfg->user) ||
+                !pool_str_equal(old_cfg->sv2_authority_pubkey, new_cfg->sv2_authority_pubkey)) {
+                return true;
+            }
+            return false;
+
+        default:
+            return true;
+    }
+}
+
+static void free_pool_config(PoolConfig *cfg) {
+    if (!cfg) return;
     free(cfg->url);
     free(cfg->user);
     free(cfg->pass);
     free(cfg->cert);
     free(cfg->sv2_authority_pubkey);
+    memset(cfg, 0, sizeof(*cfg));
+}
+
+void SYSTEM_load_pool_from_nvs(GlobalState * GLOBAL_STATE, int i, bool *reconnect_required) {
+    if (reconnect_required) {
+        *reconnect_required = false;
+    }
+    if (i < 0 || i >= MAX_POOLS) return;
     
-    cfg->url = NULL;
-    cfg->user = NULL;
-    cfg->pass = NULL;
-    cfg->cert = NULL;
-    cfg->sv2_authority_pubkey = NULL;
+    PoolConfig *cfg = &GLOBAL_STATE->SYSTEM_MODULE.pools[i];
+    PoolConfig new_cfg;
+    memset(&new_cfg, 0, sizeof(new_cfg));
 
     char *json_str = nvs_config_get_string_indexed(NVS_CONFIG_POOL, i);
-    parse_pool_config_json(json_str, cfg, i);
+    parse_pool_config_json(json_str, &new_cfg, i);
     free(json_str);
+
+    if (reconnect_required) {
+        *reconnect_required = pool_config_needs_reconnect(cfg, &new_cfg);
+    }
+
+    free_pool_config(cfg);
+    *cfg = new_cfg;
 }
 
 void SYSTEM_reload_pool_config(GlobalState * GLOBAL_STATE)
 {
     SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
-    module->primary_pool_index = nvs_config_get_u16(NVS_CONFIG_PRIMARY_POOL_INDEX);
-    module->secondary_pool_index = nvs_config_get_u16(NVS_CONFIG_SECONDARY_POOL_INDEX);
-
-    if (module->primary_pool_index >= MAX_POOLS) {
-        module->primary_pool_index = 0;
-    }
-    if (module->secondary_pool_index >= MAX_POOLS) {
-        module->secondary_pool_index = 1;
-    }
-
+    module->primary_pool_index = 0;
+    module->secondary_pool_index = 1;
     module->use_fallback_stratum = nvs_config_get_bool(NVS_CONFIG_USE_FALLBACK_STRATUM);
 }
