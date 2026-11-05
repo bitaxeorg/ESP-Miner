@@ -1,6 +1,7 @@
 #include "unity.h"
 #include "sv2_protocol.h"
 #include <string.h>
+#include <stdlib.h>
 
 TEST_CASE("SV2 parse open extended channel extranonce bounds", "[sv2]")
 {
@@ -115,11 +116,9 @@ TEST_CASE("SV2 parse new extended mining job direct decoding", "[sv2]")
     payload[pos++] = 5; payload[pos++] = 6; payload[pos++] = 7;
 
     uint8_t p_buf[1024];
-    uint8_t s_buf[2048];
     miner_job_t job;
     memset(&job, 0, sizeof(job));
     job.coinbase_prefix = p_buf;
-    job.coinbase_suffix = s_buf;
 
     uint32_t channel_id = 0;
     bool has_min_ntime = false;
@@ -141,6 +140,7 @@ TEST_CASE("SV2 parse new extended mining job direct decoding", "[sv2]")
     TEST_ASSERT_EQUAL(3, job.coinbase_suffix_len);
     TEST_ASSERT_EQUAL_HEX8(5, job.coinbase_suffix[0]);
     TEST_ASSERT_EQUAL_HEX8(7, job.coinbase_suffix[2]);
+    free(job.coinbase_suffix);
 }
 
 TEST_CASE("SV2 setup requires version rolling", "[sv2]")
@@ -177,11 +177,9 @@ TEST_CASE("SV2 extended job reports fixed-version jobs", "[sv2]")
     payload[pos++] = 0; payload[pos++] = 0; // suffix len = 0
 
     uint8_t p_buf[128];
-    uint8_t s_buf[128];
     miner_job_t job;
     memset(&job, 0, sizeof(job));
     job.coinbase_prefix = p_buf;
-    job.coinbase_suffix = s_buf;
 
     bool version_rolling_allowed = true;
     int res = sv2_parse_new_extended_mining_job(payload, pos, NULL, &job, NULL, &version_rolling_allowed);
@@ -189,6 +187,7 @@ TEST_CASE("SV2 extended job reports fixed-version jobs", "[sv2]")
     TEST_ASSERT_EQUAL(0, res);
     TEST_ASSERT_FALSE(version_rolling_allowed);
     TEST_ASSERT_EQUAL_HEX32(0, job.version_mask);
+    free(job.coinbase_suffix);
 }
 
 TEST_CASE("SV2 accepts direct and group channel broadcasts", "[sv2]")

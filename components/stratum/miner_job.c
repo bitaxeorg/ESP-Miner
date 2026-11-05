@@ -6,23 +6,34 @@
 #include <stdlib.h>
 #include "esp_log.h"
 #include "esp_heap_caps.h"
+#include "esp_psram.h"
 
 static miner_job_t s_job_pool[MINER_JOB_POOL_SIZE];
+
+bool miner_job_resize_coinbase_suffix(miner_job_t *job, size_t length)
+{
+    if (!job || length > MAX_COINBASE_SUFFIX_LEN) return false;
+    uint32_t caps = MALLOC_CAP_8BIT;
+    if (esp_psram_is_initialized()) caps |= MALLOC_CAP_SPIRAM;
+    uint8_t *buffer = heap_caps_realloc(job->coinbase_suffix, length ? length : 1, caps);
+    if (!buffer) return false;
+    job->coinbase_suffix = buffer;
+    return true;
+}
 
 void miner_job_pool_init(void)
 {
     for (size_t i = 0; i < MINER_JOB_POOL_SIZE; i++) {
         if (!s_job_pool[i].coinbase_prefix) {
-            s_job_pool[i].coinbase_prefix = heap_caps_calloc(1, MAX_COINBASE_PREFIX_LEN, MALLOC_CAP_SPIRAM);
+            if (esp_psram_is_initialized()) {
+                s_job_pool[i].coinbase_prefix = heap_caps_calloc(1, MAX_COINBASE_PREFIX_LEN, MALLOC_CAP_SPIRAM);
+            }
             if (!s_job_pool[i].coinbase_prefix) {
                 s_job_pool[i].coinbase_prefix = calloc(1, MAX_COINBASE_PREFIX_LEN);
             }
         }
         if (!s_job_pool[i].coinbase_suffix) {
-            s_job_pool[i].coinbase_suffix = heap_caps_calloc(1, MAX_COINBASE_SUFFIX_LEN, MALLOC_CAP_SPIRAM);
-            if (!s_job_pool[i].coinbase_suffix) {
-                s_job_pool[i].coinbase_suffix = calloc(1, 2048);
-            }
+            miner_job_resize_coinbase_suffix(&s_job_pool[i], 2048);
         }
         uint8_t *p_buf = s_job_pool[i].coinbase_prefix;
         uint8_t *s_buf = s_job_pool[i].coinbase_suffix;

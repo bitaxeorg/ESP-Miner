@@ -7,6 +7,7 @@
 #include "stratum_api.h"
 #include "stratum_socket.h"
 #include "yyjson.h"
+#include "yyjson_utils.h"
 #include "esp_log.h"
 #include "esp_app_desc.h"
 #include "esp_transport.h"
@@ -16,6 +17,7 @@
 #include "utils.h"
 #include "esp_timer.h"
 #include "esp_heap_caps.h"
+#include "esp_psram.h"
 #include <inttypes.h>
 #include <stdio.h>
 #include <string.h>
@@ -106,10 +108,12 @@ static bool ensure_json_buffer_capacity(size_t required_size)
 
     size_t new_size = json_rpc_buffer_size;
     while (new_size < required_size && new_size < JSON_RPC_BUFFER_LIMIT) {
-        new_size = MIN(new_size + BUFFER_SIZE, JSON_RPC_BUFFER_LIMIT);
+        new_size = MIN(new_size * 2U, JSON_RPC_BUFFER_LIMIT);
     }
 
-    char *new_buffer = realloc(json_rpc_buffer, new_size);
+    uint32_t caps = MALLOC_CAP_8BIT;
+    if (esp_psram_is_initialized()) caps |= MALLOC_CAP_SPIRAM;
+    char *new_buffer = heap_caps_realloc(json_rpc_buffer, new_size, caps);
     if (new_buffer == NULL) {
         ESP_LOGE(TAG, "Failed to grow JSON-RPC receive buffer to %zu bytes", new_size);
         return false;
@@ -174,11 +178,12 @@ char * STRATUM_V1_receive_jsonrpc_line(esp_transport_handle_t transport)
                 return NULL;
             }
 
-            memcpy(json_rpc_buffer + json_rpc_buffer_len, recv_buffer,
+            size_t previous_len = json_rpc_buffer_len;
+            memcpy(json_rpc_buffer + previous_len, recv_buffer,
                    (size_t)nbytes);
             json_rpc_buffer_len += (size_t)nbytes;
             json_rpc_buffer[json_rpc_buffer_len] = '\0';
-            newline_pos = memchr(json_rpc_buffer, '\n', json_rpc_buffer_len);
+            newline_pos = memchr(json_rpc_buffer + previous_len, '\n', (size_t)nbytes);
 
             if (newline_pos == NULL &&
                 json_rpc_buffer_len > STRATUM_V1_MAX_JSON_LINE_SIZE) {
@@ -194,7 +199,15 @@ char * STRATUM_V1_receive_jsonrpc_line(esp_transport_handle_t transport)
     // Extract the line
     if (newline_pos) {
         size_t line_len = (size_t)(newline_pos - json_rpc_buffer);
-        line = strndup(json_rpc_buffer, line_len);  // Copy only up to \n
+        uint32_t caps = MALLOC_CAP_8BIT;
+        if (esp_psram_is_initialized()) caps |= MALLOC_CAP_SPIRAM;
+        line = heap_caps_malloc(line_len + 1U, caps);
+        if (!line) {
+            ESP_LOGE(TAG, "Failed to allocate JSON-RPC line (%zu bytes)", line_len);
+            return NULL;
+        }
+        memcpy(line, json_rpc_buffer, line_len);
+        line[line_len] = '\0';
         size_t remaining_len = json_rpc_buffer_len - line_len - 1U;
         if (remaining_len > 0) {
             memmove(json_rpc_buffer, newline_pos + 1, remaining_len);
@@ -341,13 +354,18 @@ static bool parse_mining_notify(yyjson_val *root, miner_job_t *job)
         return false;
     }
 
-    if (!job->coinbase_prefix) {
-        job->coinbase_prefix = heap_caps_calloc(1, MAX_COINBASE_PREFIX_LEN, MALLOC_CAP_SPIRAM);
-        if (!job->coinbase_prefix) job->coinbase_prefix = calloc(1, MAX_COINBASE_PREFIX_LEN);
+    size_t c1_len = c1_str_len / 2;
+    size_t c2_len = c2_str_len / 2;
+    if (c1_len > MAX_COINBASE_PREFIX_LEN || c2_len > MAX_COINBASE_SUFFIX_LEN) {
+        ESP_LOGE(TAG, "Coinbase exceeds supported size: prefix=%zu, suffix=%zu", c1_len, c2_len);
+        return false;
     }
-    if (!job->coinbase_suffix) {
-        job->coinbase_suffix = heap_caps_calloc(1, MAX_COINBASE_SUFFIX_LEN, MALLOC_CAP_SPIRAM);
-        if (!job->coinbase_suffix) job->coinbase_suffix = calloc(1, 2048);
+    if (!job->coinbase_prefix) {
+        job->coinbase_prefix = calloc(1, MAX_COINBASE_PREFIX_LEN);
+    }
+    if (!job->coinbase_prefix || !miner_job_resize_coinbase_suffix(job, c2_len)) {
+        ESP_LOGE(TAG, "Failed to allocate coinbase buffers (suffix=%zu bytes)", c2_len);
+        return false;
     }
     uint8_t *p_buf = job->coinbase_prefix;
     uint8_t *s_buf = job->coinbase_suffix;
@@ -366,21 +384,11 @@ static bool parse_mining_notify(yyjson_val *root, miner_job_t *job)
     hex2bin(prev_hash_str, job->prev_hash, 32);
     reverse_endianness_per_word(job->prev_hash);
 
-    size_t c1_len = c1_str_len / 2;
-    if (c1_len > MAX_COINBASE_PREFIX_LEN) {
-        ESP_LOGE(TAG, "coinbase_1 length %zu exceeds maximum %d in mining.notify", c1_len, MAX_COINBASE_PREFIX_LEN);
-        return false;
-    }
     hex2bin(c1_str, job->coinbase_prefix, c1_len);
     job->coinbase_prefix_len = (uint16_t)c1_len;
 
-    size_t c2_len = c2_str_len / 2;
-    if (c2_len > MAX_COINBASE_SUFFIX_LEN) {
-        ESP_LOGE(TAG, "coinbase_2 length %zu exceeds maximum %d in mining.notify", c2_len, MAX_COINBASE_SUFFIX_LEN);
-        return false;
-    }
     hex2bin(c2_str, job->coinbase_suffix, c2_len);
-    job->coinbase_suffix_len = (uint16_t)c2_len;
+    job->coinbase_suffix_len = (uint32_t)c2_len;
 
     size_t count = yyjson_arr_size(merkle_branch);
     if (count > MAX_MERKLE_BRANCHES) {
@@ -676,16 +684,27 @@ bool STRATUM_V1_parse(StratumApiV1Message *message, const char *stratum_json, mi
     ESP_LOGD(TAG, "rx: %.*s%s", (int)MIN(json_length, 512U), stratum_json,
              json_length > 512U ? "..." : "");
 
-    yyjson_doc *doc = yyjson_read(stratum_json, json_length, YYJSON_READ_NOFLAG);
+    // Start with a small value table even when coinbase hex strings are large.
+    yyjson_doc *doc = yyjson_read_opts((char *)stratum_json, json_length, YYJSON_READ_STOP_WHEN_DONE,
+                                      esp_psram_is_initialized() ? yyjson_psram_alc() : NULL, NULL);
     if (!doc) {
-        ESP_LOGE(TAG, "JSON-RPC message is not valid JSON: %s", stratum_json);
+        ESP_LOGE(TAG, "Cannot parse JSON-RPC message (%zu bytes)", json_length);
         message->method = METHOD_UNKNOWN;
         return false;
     }
 
+    for (size_t i = yyjson_doc_get_read_size(doc); i < json_length; ++i) {
+        char c = stratum_json[i];
+        if (c != ' ' && c != '\t' && c != '\r' && c != '\n') {
+            ESP_LOGE(TAG, "Trailing data after JSON-RPC message");
+            yyjson_doc_free(doc);
+            return false;
+        }
+    }
+
     yyjson_val *root = yyjson_doc_get_root(doc);
     if (!yyjson_is_obj(root)) {
-        ESP_LOGE(TAG, "JSON-RPC message is not a valid JSON object: %s", stratum_json);
+        ESP_LOGE(TAG, "JSON-RPC message is not a valid JSON object");
         message->method = METHOD_UNKNOWN;
         yyjson_doc_free(doc);
         return false;
