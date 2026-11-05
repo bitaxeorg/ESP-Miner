@@ -52,6 +52,7 @@ static SemaphoreHandle_t nvs_cache_mutex = NULL;
 static SemaphoreHandle_t nvs_update_mutex = NULL;
 
 static Settings settings[NVS_CONFIG_COUNT] = {
+    [NVS_CONFIG_OTA_BUTTON_REQUIRED]                   = {.nvs_key_name = "otabtnreq",       .type = TYPE_BOOL,  .default_value = {.b = true},                                          .rest_name = "otaButtonRequired",                  .min = 0,  .max = 1},
     [NVS_CONFIG_WIFI_SSID]                             = {.nvs_key_name = "wifissid",        .type = TYPE_STR,   .default_value = {.str = (char *)CONFIG_ESP_WIFI_SSID},                .rest_name = "ssid",                               .min = 1,  .max = 32},
     [NVS_CONFIG_WIFI_PASS]                             = {.nvs_key_name = "wifipass",        .type = TYPE_STR,   .default_value = {.str = (char *)CONFIG_ESP_WIFI_PASSWORD},            .rest_name = "wifiPass",                           .min = 0,  .max = 63},
     [NVS_CONFIG_HOSTNAME]                              = {.nvs_key_name = "hostname",        .type = TYPE_STR,   .default_value = {.str = (char *)CONFIG_LWIP_LOCAL_HOSTNAME},          .rest_name = "hostname",                           .min = 1,  .max = 32},

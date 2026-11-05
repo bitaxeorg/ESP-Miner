@@ -186,6 +186,8 @@ export class SystemApiService {
         isPSRAMAvailable: 1,
         overclockEnabled: 1,
         useCustomWWW: 0 as const,
+        otaButtonRequired: 1 as const,
+        otaUnlockRemaining: 0,
         runningPartition: "factory",
         minFanSpeed: 25,
         fanspeed: 50,

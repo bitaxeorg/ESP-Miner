@@ -29,6 +29,7 @@
 #include "yyjson_utils.h"
 #include "global_state.h"
 #include "nvs_config.h"
+#include "ota_security.h"
 #include "system.h"
 #include "firmware_checksum.h"
 #include "connect.h"
@@ -959,6 +960,10 @@ bool check_settings_and_update(const cJSON * const root, char **redirect_url, Gl
                     nvs_config_set_u64(key, (uint64_t)item->valuedouble);
                     break;
                 case TYPE_BOOL:
+                    if (key == NVS_CONFIG_OTA_BUTTON_REQUIRED && item->valueint != 0 &&
+                        !nvs_config_get_bool(NVS_CONFIG_OTA_BUTTON_REQUIRED)) {
+                        ota_security_lock();
+                    }
                     nvs_config_set_bool(key, item->valueint != 0 || cJSON_IsTrue(item));
                     break;
                 case TYPE_FLOAT:
@@ -1063,6 +1068,14 @@ static esp_err_t PATCH_update_settings(httpd_req_t * req)
     free(buf);
     if (root == NULL) {
         httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid JSON");
+        return ESP_OK;
+    }
+
+    cJSON *ota_button_item = cJSON_GetObjectItem(root, "otaButtonRequired");
+    if (ota_button_item && (cJSON_IsBool(ota_button_item) || cJSON_IsNumber(ota_button_item)) &&
+        ota_button_item->valueint == 0 && !ota_security_is_update_allowed()) {
+        cJSON_Delete(root);
+        HTTP_send_json_error(req, "403 Forbidden", "Press the BOOT button before disabling OTA protection");
         return ESP_OK;
     }
 
@@ -1379,6 +1392,10 @@ static esp_err_t GET_system_info(httpd_req_t *req)
 
 static esp_err_t POST_system_boot(httpd_req_t *req)
 {
+    if (!ota_security_is_update_allowed()) {
+        return HTTP_send_json_error(req, "403 Forbidden", "Press the BOOT button to unlock firmware activation for 120 seconds");
+    }
+
     int total_len = req->content_len;
     if (total_len <= 0 || total_len > MAX_REST_PAYLOAD_SIZE) {
         return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Content length invalid or too large");
@@ -1635,6 +1652,10 @@ static esp_err_t GET_scoreboard(httpd_req_t * req)
 
 esp_err_t POST_WWW_update(httpd_req_t * req)
 {
+    if (!ota_security_is_update_allowed()) {
+        return HTTP_send_json_error(req, "403 Forbidden", "Press the BOOT button to unlock OTA for 120 seconds");
+    }
+
     GlobalState *GLOBAL_STATE = (GlobalState *)httpd_get_global_user_ctx(req->handle);
 
     wifi_mode_t mode;
@@ -1719,6 +1740,10 @@ esp_err_t POST_WWW_update(httpd_req_t * req)
  */
 esp_err_t POST_OTA_update(httpd_req_t * req)
 {
+    if (!ota_security_is_update_allowed()) {
+        return HTTP_send_json_error(req, "403 Forbidden", "Press the BOOT button to unlock OTA for 120 seconds");
+    }
+
     GlobalState *GLOBAL_STATE = (GlobalState *)httpd_get_global_user_ctx(req->handle);
 
     wifi_mode_t mode;

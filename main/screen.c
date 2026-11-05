@@ -917,6 +917,10 @@ static void screen_update_cb(lv_timer_t * timer)
 
 void screen_button_press() 
 {
+    if (!GLOBAL_STATE || !GLOBAL_STATE->SYSTEM_MODULE.is_screen_active) {
+        return;
+    }
+
     if (GLOBAL_STATE->SYSTEM_MODULE.identify_mode_time_ms > 0) {
         GLOBAL_STATE->SYSTEM_MODULE.identify_mode_time_ms = 0;
     } else if (use_stats_background()) {

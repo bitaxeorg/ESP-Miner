@@ -10,6 +10,7 @@ SRCS
     "display_st7789.c"
     "screen.c"
     "input.c"
+    "ota_security.c"
     "filesystem.c"
     "system.c"
     "firmware_checksum.c"
