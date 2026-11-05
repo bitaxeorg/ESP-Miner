@@ -261,10 +261,12 @@ static void system_api_add_hashrate_monitor(yyjson_mut_doc *doc, yyjson_mut_val 
         yyjson_mut_obj_add_float(doc, asic, "total", g->HASHRATE_MONITOR_MODULE.total_measurement[i].hashrate);
         yyjson_mut_obj_add_uint(doc, asic, "errorCount", g->HASHRATE_MONITOR_MODULE.error_measurement[i].value);
         yyjson_mut_val *domains = yyjson_mut_obj_add_arr(doc, asic, "domains");
+        yyjson_mut_val *stalled_domains = yyjson_mut_obj_add_arr(doc, asic, "stalledDomains");
         for (int j = 0; j < hash_domains; j++) {
             asic_domain_measurement_t measurement = {0};
             ASIC_get_domain_measurement(g, i, j, &measurement);
             yyjson_mut_arr_add_float(doc, domains, measurement.hashrate);
+            yyjson_mut_arr_add_bool(doc, stalled_domains, g->HASHRATE_MONITOR_MODULE.domain_stalled[i][j]);
         }
     }
 }

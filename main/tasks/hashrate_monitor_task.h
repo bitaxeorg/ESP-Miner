@@ -3,6 +3,7 @@
 
 #include "asic_common.h"
 #include <pthread.h>
+#include <stdbool.h>
 
 typedef struct {
     uint32_t value;
@@ -13,6 +14,8 @@ typedef struct {
 typedef struct {
     measurement_t* total_measurement;
     measurement_t** domain_measurements;
+    uint8_t** domain_stall_counts;
+    bool** domain_stalled;
     measurement_t* error_measurement;
 
     pthread_mutex_t lock;
@@ -25,4 +28,5 @@ void hashrate_monitor_reset_measurements(void *pvParameters);
 
 void update_hashrate(measurement_t * measurement, uint32_t value);
 void update_hash_counter(measurement_t * measurement, uint32_t value, uint64_t time_us);
+bool hashrate_monitor_has_stalled_domains(void *pvParameters, int *stalled_count_out);
 #endif /* HASHRATE_MONITOR_TASK_H_ */

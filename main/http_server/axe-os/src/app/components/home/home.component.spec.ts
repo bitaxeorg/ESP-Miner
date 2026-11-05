@@ -128,6 +128,7 @@ const mockSystemInfo: ISystemInfo = {
       {
         errorCount: 0,
         domains: [500],
+        stalledDomains: [false],
         total: 500
       }
     ]
@@ -756,6 +757,47 @@ describe('HomeComponent', () => {
 
         const msg = component.messages.find(m => m.type === 'FALLBACK_STRATUM');
         expect(msg).toBeUndefined();
+      });
+
+      it('should show warn banner when hash domains are stalled', () => {
+        component.handleSystemMessages({
+          ...mockSystemInfo,
+          hashrateMonitor: {
+            asics: [{
+              total: 500,
+              errorCount: 0,
+              domains: [250, 250],
+              stalledDomains: [false, true]
+            }]
+          }
+        }, error);
+
+        const msg = component.messages.find(m => m.type === 'HASH_DOMAIN_STALLED');
+        expect(msg).toBeDefined();
+        expect(msg?.severity).toBe('warn');
+      });
+
+      it('should mark stalled domain cells on sparklines', () => {
+        const info: ISystemInfo = {
+          ...mockSystemInfo,
+          expectedHashrate: 500,
+          hashrateMonitor: {
+            asics: [{
+              total: 500,
+              errorCount: 0,
+              domains: [250, 250],
+              stalledDomains: [false, true]
+            }]
+          }
+        };
+
+        (component as any).updateDomainSparklines(info);
+        expect(component.sparklineAsicRows.length).toBe(1);
+        expect(component.sparklineAsicRows[0].cells[0].stalled).toBeFalse();
+        expect(component.sparklineAsicRows[0].cells[0].hashrate).not.toBe('stalled');
+        expect(component.sparklineAsicRows[0].cells[1].stalled).toBeTrue();
+        expect(component.sparklineAsicRows[0].cells[1].hashrate).toBe('stalled');
+        expect(component.sparklineAsicRows[0].cells[1].tooltip).toContain('Stalled: Hash domain counter stopped incrementing');
       });
     });
 

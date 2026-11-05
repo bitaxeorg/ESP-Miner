@@ -44,6 +44,7 @@ type MessageType =
   | 'FALLBACK_STRATUM'
   | 'NOT_SOLO_MINING'
   | 'NO_MINING_REWARD'
+  | 'HASH_DOMAIN_STALLED'
   | 'HARDWARE_FAULT';
 
 interface ISystemMessage {
@@ -63,6 +64,7 @@ export interface SparklineDomainCell {
   nominalY: number;
   path: string;
   tooltip: string;
+  stalled?: boolean;
 }
 
 export interface SparklineAsicRow {
@@ -1344,6 +1346,7 @@ export class HomeComponent implements OnInit, OnDestroy {
     updateMessage(!!info.overheat_mode, 'DEVICE_OVERHEAT', 'error', 'Device has overheated - See settings');
     updateMessage(!!info.power_fault, 'POWER_FAULT', 'error', `${info.power_fault} Check your Power Supply.`);
     updateMessage(!!info.hardware_fault, 'HARDWARE_FAULT', 'error', `${info.hardware_fault}`);
+    updateMessage(this.hasStalledHashDomains(info), 'HASH_DOMAIN_STALLED', 'warn', 'One or more ASIC hash domains stopped incrementing. Check power supply, voltage and frequency settings.');
     updateMessage(isFrequencyLow(info.frequency, frequencyOptions), 'FREQUENCY_LOW', 'warn', 'Device frequency is set low - See settings');
     if (info.useFallbackStratum === 0) {
       if (info.isUsingFallbackStratum === 0) {
@@ -1383,6 +1386,14 @@ export class HomeComponent implements OnInit, OnDestroy {
     const percentage = (info.bestDiff / info.networkDifficulty) * 100;
     // Show 2 significant digits
     return percentage < 10 ? percentage.toPrecision(2) : percentage.toFixed(1);
+  }
+
+  public hasStalledHashDomains(info: ISystemInfo): boolean {
+    return info.hashrateMonitor?.asics?.some(asic => asic.stalledDomains?.some(Boolean)) ?? false;
+  }
+
+  public isHashDomainStalled(asic: { stalledDomains?: boolean[] }, domainIndex: number): boolean {
+    return asic.stalledDomains?.[domainIndex] ?? false;
   }
 
   private updateDomainSparklines(info: ISystemInfo): void {
@@ -1429,19 +1440,22 @@ export class HomeComponent implements OnInit, OnDestroy {
           }
         }
 
+        const isStalled = this.isHashDomainStalled(asics[a], d);
         const pct = nominal > 0 ? Math.round((currentVal / nominal) * 100) : 0;
         const valStr = HashSuffixPipe.transform(currentVal, { hideUnit: true, power });
         const title = asicsCount > 1 ? `ASIC ${a + 1} • Domain ${d + 1}` : `Domain ${d + 1}`;
         const errorLine = errorCount > 0 ? `\nErrors: ${errorCount}` : '';
-        const tooltip = `${title}\n${valStr} ${suffix} (${pct}% target)${errorLine}`;
+        const stallLine = isStalled ? '\nStalled: Hash domain counter stopped incrementing' : '';
+        const tooltip = `${title}\n${valStr} ${suffix} (${pct}% target)${errorLine}${stallLine}`;
 
         cells.push({
           id: `${a}-${d}`,
           domainNumber: d + 1,
-          hashrate: valStr,
+          hashrate: isStalled ? 'stalled' : valStr,
           nominalY,
           path,
-          tooltip
+          tooltip,
+          stalled: isStalled
         });
       }
 

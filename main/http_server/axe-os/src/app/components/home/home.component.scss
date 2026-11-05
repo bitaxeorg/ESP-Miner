@@ -18,6 +18,15 @@
         border-color: var(--color-primary);
     }
 
+    &.stalled {
+        border-color: var(--p-red-600, #dc2626) !important;
+        background-color: rgba(220, 38, 38, 0.15) !important;
+
+        .sparkline-path {
+            stroke: var(--p-red-600, #dc2626);
+        }
+    }
+
     .sparkline-svg {
         position: absolute;
         inset: 0;
