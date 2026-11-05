@@ -13,6 +13,10 @@ sv2_noise_ctx_t *sv2_noise_create(void);
 // Destroy a Noise context and free all resources.
 void sv2_noise_destroy(sv2_noise_ctx_t *ctx);
 
+// Certificate validity dates are only checked once this has been called with true,
+// i.e. once NTP has set the clock (a clock set from pool ntime proves nothing).
+void sv2_noise_set_clock_trusted(bool trusted);
+
 // Perform Noise_NX handshake as initiator over the given transport.
 // authority_pubkey is an optional 32-byte x-only public key for Schnorr
 // signature verification of the responder's certificate. Pass NULL to skip.
