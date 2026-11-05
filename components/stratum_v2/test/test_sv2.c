@@ -199,3 +199,36 @@ TEST_CASE("SV2 accepts direct and group channel broadcasts", "[sv2]")
     TEST_ASSERT_TRUE(sv2_channel_or_group_matches(7, 7, 0));
     TEST_ASSERT_FALSE(sv2_channel_or_group_matches(0, 7, 0));
 }
+
+TEST_CASE("SV2 share accounting keeps batched successes after one rejection", "[sv2]")
+{
+    uint32_t resolved = 0;
+
+    // Ten accepted shares and one independent rejected share. The rejection
+    // sequence position is not an absolute count of resolved shares.
+    TEST_ASSERT_TRUE(sv2_account_rejected_share(11, &resolved, 10));
+    TEST_ASSERT_EQUAL_UINT32(1, resolved);
+    TEST_ASSERT_EQUAL_UINT32(10, sv2_account_accepted_shares(11, &resolved, 10));
+    TEST_ASSERT_EQUAL_UINT32(11, resolved);
+
+    // Repeated or excessive success count is bounded by pending shares.
+    TEST_ASSERT_EQUAL_UINT32(0, sv2_account_accepted_shares(11, &resolved, 10));
+    resolved = 2;
+    TEST_ASSERT_EQUAL_UINT32(1, sv2_account_accepted_shares(3, &resolved, UINT32_MAX));
+    TEST_ASSERT_EQUAL_UINT32(3, resolved);
+}
+
+TEST_CASE("SV2 error acknowledgement requires a submitted sequence number", "[sv2]")
+{
+    uint32_t resolved = 0;
+
+    TEST_ASSERT_FALSE(sv2_account_rejected_share(0, &resolved, 0));
+    TEST_ASSERT_FALSE(sv2_account_rejected_share(11, &resolved, 11));
+    TEST_ASSERT_FALSE(sv2_account_rejected_share(11, &resolved, UINT32_MAX));
+    TEST_ASSERT_EQUAL_UINT32(0, resolved);
+
+    TEST_ASSERT_TRUE(sv2_account_rejected_share(11, &resolved, 10));
+    TEST_ASSERT_EQUAL_UINT32(1, resolved);
+    TEST_ASSERT_TRUE(sv2_account_rejected_share(11, &resolved, 0));
+    TEST_ASSERT_EQUAL_UINT32(2, resolved);
+}

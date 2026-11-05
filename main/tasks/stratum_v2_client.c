@@ -800,13 +800,12 @@ esp_err_t stratum_v2_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
                                  (unsigned long)channel_id, (unsigned long)conn->channel_id);
                         break;
                     }
-                    uint32_t pending = (conn->sequence_number > conn->resolved_shares)
-                                           ? (conn->sequence_number - conn->resolved_shares)
-                                           : 0;
-                    if (accepted_count > pending) {
+                    uint32_t reported_count = accepted_count;
+                    accepted_count = sv2_account_accepted_shares(
+                        conn->sequence_number, &conn->resolved_shares, accepted_count);
+                    if (reported_count > accepted_count) {
                         ESP_LOGW(TAG, "Clamping accepted_count (%lu) to pending shares (%lu)",
-                                 (unsigned long)accepted_count, (unsigned long)pending);
-                        accepted_count = pending;
+                                 (unsigned long)reported_count, (unsigned long)accepted_count);
                     }
                     float response_time_ms = stratum_timing_calculate_ms(&s_v2_timing, last_sequence_number, esp_timer_get_time());
                     if (response_time_ms >= 0) {
@@ -817,10 +816,6 @@ esp_err_t stratum_v2_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
                     }
                     for (uint32_t i = 0; i < accepted_count; i++) {
                         SYSTEM_notify_accepted_share(GLOBAL_STATE);
-                    }
-                    uint32_t resolved = last_sequence_number + 1;
-                    if (resolved > conn->resolved_shares) {
-                        conn->resolved_shares = resolved;
                     }
                 }
                 break;
@@ -837,12 +832,15 @@ esp_err_t stratum_v2_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
                                  (unsigned long)channel_id, (unsigned long)conn->channel_id);
                         break;
                     }
+                    // A reply must refer to a sequence sent on this connection.
+                    if (!sv2_account_rejected_share(
+                            conn->sequence_number, &conn->resolved_shares, seq_num)) {
+                        ESP_LOGW(TAG, "Dropping SubmitSharesError for unsent sequence %lu (sent %lu)",
+                                 (unsigned long)seq_num, (unsigned long)conn->sequence_number);
+                        break;
+                    }
                     ESP_LOGW(TAG, "Share rejected: %s", error_code);
                     SYSTEM_notify_rejected_share(GLOBAL_STATE, error_code);
-                    uint32_t resolved = seq_num + 1;
-                    if (resolved > conn->resolved_shares) {
-                        conn->resolved_shares = resolved;
-                    }
                 }
                 break;
             }

@@ -197,4 +197,27 @@ int sv2_parse_new_extended_mining_job(const uint8_t *payload, uint32_t len,
                                       uint32_t *channel_id_out, miner_job_t *job_out,
                                       bool *has_min_ntime_out, bool *version_rolling_allowed_out);
 
+// Account resolved shares by count. Sequence IDs identify individual replies,
+// while SubmitShares.Success carries a number of newly accepted shares.
+static inline uint32_t sv2_account_accepted_shares(uint32_t submitted,
+                                                    uint32_t *resolved,
+                                                    uint32_t accepted)
+{
+    if (!resolved) return 0;
+    uint32_t pending = submitted > *resolved ? submitted - *resolved : 0;
+    if (accepted > pending) accepted = pending;
+    *resolved += accepted;
+    return accepted;
+}
+
+// A pool cannot reject a share that this connection has not submitted.
+static inline bool sv2_account_rejected_share(uint32_t submitted,
+                                              uint32_t *resolved,
+                                              uint32_t sequence_number)
+{
+    if (!resolved || sequence_number >= submitted) return false;
+    if (*resolved < submitted) (*resolved)++;
+    return true;
+}
+
 #endif /* SV2_PROTOCOL_H */
