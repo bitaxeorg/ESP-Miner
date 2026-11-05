@@ -54,6 +54,7 @@ $BAP,<COMMAND>,<PARAMETER>,<VALUE>*<CHECKSUM>\r\n
 | `password` | WiFi password | String | "secret123" |
 | `fan_speed` | Fan speed percentage | Integer | "80" |
 | `auto_fan` | Auto fan speed control | Boolean | "1" |
+| `manual_fan_speed` | Saved manual fan speed percentage | Integer | "65" |
 | `best_difficulty` | Best difficulty achieved | String | "1024" |
 | `block_height` | Current network block height | Integer | "845123" |
 | `wifi` | WiFi status information (ssid/password/rssi/ip) | String | Various |
@@ -99,7 +100,9 @@ BAP operates differently based on the device's WiFi connection status:
 #### Subscription Management
 - Clients can subscribe to real-time parameter updates
 - Configurable update intervals
-- Automatic timeout after 5 minutes of inactivity
+- Default display telemetry runs every 3 seconds without subscription expiry; WiFi credentials are excluded
+- Explicit subscriptions expire after 5 minutes of inactivity
+- `fan_speed` reports live RPM; `manual_fan_speed` reports the saved percentage
 - Efficient resource management with mutex protection
 
 #### Error Handling
@@ -123,6 +126,8 @@ Device: $BAP,RES,asicModel,BM1366*4B\r\n
 Device: $BAP,RES,pool,example.com*5C\r\n
 Device: $BAP,RES,poolPort,3333*5D\r\n
 Device: $BAP,RES,poolUser,worker*5E\r\n
+Device: $BAP,RES,auto_fan,0*32\r\n
+Device: $BAP,RES,manual_fan_speed,65*2C\r\n
 ```
 
 ### Subscribing to Hashrate Updates
