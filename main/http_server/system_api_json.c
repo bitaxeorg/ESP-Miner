@@ -5,6 +5,7 @@
 #include "esp_wifi.h"
 #include "esp_ota_ops.h"
 #include "esp_system.h"
+#include "esp_mac.h"
 #include "esp_heap_caps.h"
 #include "global_state.h"
 #include "system_api_json.h"
@@ -103,10 +104,13 @@ static void system_api_add_telemetry(yyjson_mut_doc *doc, yyjson_mut_val *root, 
     yyjson_mut_obj_add_bool(doc, root, "miningPaused", g->SYSTEM_MODULE.mining_paused);
     yyjson_mut_obj_add_int(doc, root, "overheat_mode", g->SYSTEM_MODULE.overheat_mode ? 1 : 0);
     yyjson_mut_obj_add_strcpy(doc, root, "wifiStatus", g->SYSTEM_MODULE.wifi_status);
+    yyjson_mut_obj_add_strcpy(doc, root, "networkStatus", g->SYSTEM_MODULE.wifi_status);
 
-    int8_t rssi = -90;
-    get_wifi_current_rssi(&rssi);
-    yyjson_mut_obj_add_int(doc, root, "wifiRSSI", rssi);
+    if (g->SYSTEM_MODULE.network_mode == NETWORK_MODE_WIFI) {
+        int8_t rssi = -90;
+        get_wifi_current_rssi(&rssi);
+        yyjson_mut_obj_add_int(doc, root, "wifiRSSI", rssi);
+    }
 
     // Faults
     if (g->SYSTEM_MODULE.power_fault > 0) {
@@ -141,7 +145,7 @@ static void system_api_add_config(yyjson_mut_doc *doc, yyjson_mut_val *root, Glo
     yyjson_mut_obj_add_str(doc, root, "runningPartition", running ? running->label : "Unknown");
 
     uint8_t mac[6];
-    esp_wifi_get_mac(WIFI_IF_STA, mac);
+    esp_read_mac(mac, ESP_MAC_WIFI_STA);
     char formattedMac[18];
     snprintf(formattedMac, sizeof(formattedMac), "%02X:%02X:%02X:%02X:%02X:%02X", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
     yyjson_mut_obj_add_strcpy(doc, root, "macAddr", formattedMac);
@@ -159,6 +163,10 @@ static void system_api_add_config(yyjson_mut_doc *doc, yyjson_mut_val *root, Glo
     yyjson_mut_obj_add_strcpy(doc, root, "ipv6", g->SYSTEM_MODULE.ipv6_addr_str);
     yyjson_mut_obj_add_int(doc, root, "apEnabled", g->SYSTEM_MODULE.ap_enabled ? 1 : 0);
     yyjson_mut_obj_add_int(doc, root, "useNTP", nvs_config_get_bool(NVS_CONFIG_USE_NTP) ? 1 : 0);
+
+    char *network_mode = nvs_config_get_string(NVS_CONFIG_NETWORK_MODE);
+    yyjson_mut_obj_add_strcpy(doc, root, "networkMode", network_mode ? network_mode : "wifi");
+    free(network_mode);
 
     // Pool Configuration
     yyjson_mut_obj_add_strcpy(doc, root, "poolConnectionInfo", g->SYSTEM_MODULE.pool_connection_info);
