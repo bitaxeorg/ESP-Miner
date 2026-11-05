@@ -7,6 +7,14 @@ permissions:
   contents: read
 
 jobs:
+  ca-bundle-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v6
+      - name: Check pinned CA bundle and compromised certificate chains
+        run: python3 tools/test_ca_bundle.py
+
   build-and-test:
     runs-on: ubuntu-latest
     steps:
