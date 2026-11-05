@@ -2,7 +2,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { HttpClient, provideHttpClient } from '@angular/common/http';
 import { provideToastr } from 'ngx-toastr';
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
 
 import { FormControl } from '@angular/forms';
 import { addressValidator, SwarmComponent } from './swarm.component';
@@ -61,6 +61,202 @@ describe('SwarmComponent', () => {
 
   it('should create', () => {
     expect(component).toBeTruthy();
+  });
+
+  it('rejects HTTP 200 JSON without an ASIC model during discovery', (done) => {
+    const address = 'non-miner.test';
+
+    (httpClient.get as jasmine.Spy).and.callFake((url: string) => {
+      if (url.endsWith('/api/system/info')) {
+        return of({ status: 'ok' });
+      }
+      return of({});
+    });
+
+    (component as any).fetchDevice(address).subscribe((device: any) => {
+      expect(device).toBeNull();
+      expect(httpClient.get).not.toHaveBeenCalledWith(`http://${address}/api/system/asic`);
+      done();
+    });
+  });
+
+  it('keeps an AxeOS device with any non-empty ASIC model during discovery', (done) => {
+    const address = 'miner.test';
+    const asicModel = 'test-asic';
+
+    (httpClient.get as jasmine.Spy).and.callFake((url: string) => {
+      if (url.endsWith('/api/system/info')) {
+        return of({
+          ASICModel: asicModel,
+          hashRate: 500,
+          sharesAccepted: 10,
+          hostname: 'bitaxe-test',
+          ipv4: address,
+          bestDiff: 100,
+          bestSessionDiff: 50
+        });
+      }
+      if (url.endsWith('/api/system/asic')) {
+        return of({ ASICModel: asicModel, asicCount: 1 });
+      }
+      return of({});
+    });
+
+    (component as any).fetchDevice(address).subscribe((device: any) => {
+      expect(device?.ASICModel).toBe(asicModel);
+      expect(device?.hostname).toBe('bitaxe-test');
+      expect(device?.connectionAddress).toBe(address);
+      done();
+    });
+  });
+
+  it('keeps a legacy AxeOS device when the optional ASIC endpoint is unavailable', (done) => {
+    const address = 'legacy-miner.test';
+    const asicModel = 'legacy-asic';
+
+    (httpClient.get as jasmine.Spy).and.callFake((url: string) => {
+      if (url.endsWith('/api/system/info')) {
+        return of({
+          ASICModel: asicModel,
+          hashRate: 500,
+          sharesAccepted: 10,
+          hostname: 'legacy-miner',
+          ipv4: address,
+          bestDiff: 100,
+          bestSessionDiff: 50
+        });
+      }
+      if (url.endsWith('/api/system/asic')) {
+        return throwError(() => ({ status: 404 }));
+      }
+      return of({});
+    });
+
+    (component as any).fetchDevice(address).subscribe((device: any) => {
+      expect(device?.ASICModel).toBe(asicModel);
+      expect(device?.hostname).toBe('legacy-miner');
+      done();
+    });
+  });
+
+  it('ignores malformed optional ASIC enrichment for an identified AxeOS device', (done) => {
+    const address = 'miner-with-invalid-enrichment.test';
+    const asicModel = 'test-asic';
+
+    (httpClient.get as jasmine.Spy).and.callFake((url: string) => {
+      if (url.endsWith('/api/system/info')) {
+        return of({
+          ASICModel: asicModel,
+          hashRate: 500,
+          sharesAccepted: 10,
+          hostname: 'identified-miner',
+          ipv4: address,
+          bestDiff: 100,
+          bestSessionDiff: 50
+        });
+      }
+      if (url.endsWith('/api/system/asic')) {
+        return of({ status: 'not-supported' });
+      }
+      return of({});
+    });
+
+    (component as any).fetchDevice(address).subscribe((device: any) => {
+      expect(device?.ASICModel).toBe(asicModel);
+      expect(device?.hostname).toBe('identified-miner');
+      expect(device?.status).toBeUndefined();
+      done();
+    });
+  });
+
+  describe('miner response validation', () => {
+    const address = 'validation-miner.test';
+    const validInfo = {
+      ASICModel: 'future-asic',
+      hashRate: 0,
+      hashRate_10m: 100,
+      sharesAccepted: 0,
+      hostname: 'validation-miner',
+      ipv4: '192.168.1.99',
+      bestDiff: 0,
+      bestSessionDiff: 0
+    };
+    const invalidResponses: { name: string, info: any }[] = [
+      { name: 'null response', info: null },
+      { name: 'array response', info: [] },
+      { name: 'unrelated JSON', info: { status: 'ok' } },
+      { name: 'ASIC model only', info: { ASICModel: 'BM1370' } },
+      ...[undefined, null, '', '  ', 1370].map(value => ({
+        name: `invalid ASICModel ${JSON.stringify(value)}`,
+        info: { ...validInfo, ASICModel: value }
+      })),
+      ...['hashRate', 'sharesAccepted'].flatMap(field =>
+        [undefined, null, '0', false, -1, NaN, Infinity, -Infinity].map(value => ({
+          name: `invalid ${field} ${String(value)}`,
+          info: { ...validInfo, [field]: value }
+        }))
+      )
+    ];
+
+    function mockResponse(info: any) {
+      component.swarm = [];
+      spyOn<any>(component, 'saveSwarmData');
+      const get = httpClient.get as jasmine.Spy;
+      get.calls.reset();
+      get.and.callFake((url: string) => {
+        if (url.endsWith('/api/system/info')) {
+          return of(info);
+        }
+        if (url.endsWith('/api/system/asic')) {
+          return of({ ASICModel: 'future-asic', asicCount: 1 });
+        }
+        return of({});
+      });
+    }
+
+    for (const { name, info } of invalidResponses) {
+      it(`rejects ${name} during discovery`, () => {
+        mockResponse(info);
+        let result: any = undefined;
+        (component as any).fetchDevice(address).subscribe((device: any) => result = device);
+        expect(result).toBeNull();
+        expect(httpClient.get).not.toHaveBeenCalledWith(`http://${address}/api/system/asic`);
+      });
+
+      it(`rejects ${name} when manually adding a device`, () => {
+        mockResponse(info);
+        component.form.patchValue({ manualAddAddress: address });
+        component.add();
+        expect(component.swarm).toEqual([]);
+        expect(httpClient.get).not.toHaveBeenCalledWith(`http://${address}/api/system/asic`);
+      });
+    }
+
+    for (const stats of [
+      { hashRate: 0, sharesAccepted: 0 },
+      { hashRate: 500.5, sharesAccepted: 10 }
+    ]) {
+      it(`accepts mining stats ${JSON.stringify(stats)} during discovery`, () => {
+        mockResponse({ ...validInfo, ...stats });
+        let result: any;
+        (component as any).fetchDevice(address).subscribe((device: any) => result = device);
+        expect(result?.ASICModel).toBe('future-asic');
+        expect(result?.hashRate).toBe(stats.hashRate);
+        expect(result?.sharesAccepted).toBe(stats.sharesAccepted);
+        expect(result?.asicCount).toBe(1);
+      });
+
+      it(`accepts mining stats ${JSON.stringify(stats)} when manually adding a device`, () => {
+        mockResponse({ ...validInfo, ...stats });
+        component.form.patchValue({ manualAddAddress: address });
+        component.add();
+        expect(component.swarm.length).toBe(1);
+        expect(component.swarm[0].ASICModel).toBe('future-asic');
+        expect(component.swarm[0].hashRate).toBe(stats.hashRate);
+        expect(component.swarm[0].sharesAccepted).toBe(stats.sharesAccepted);
+        expect(component.swarm[0].asicCount).toBe(1);
+      });
+    }
   });
 
   it('uses each peer\'s own presets for low and normal frequencies', () => {
