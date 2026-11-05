@@ -17,6 +17,9 @@
 #define MAX_TEMP 90.0
 #define THROTTLE_TEMP 75.0
 #define SAFE_TEMP 45.0
+// Overheat has to hold this long before safe mode, so one corrupted sensor read
+// (the loop polls every 100 ms) can't stop the miner and lower its settings.
+#define OVERHEAT_CONFIRM_MS 2000
 
 #define VOLTAGE_START_THROTTLE 4900
 #define VOLTAGE_MIN_THROTTLE 3500
@@ -125,6 +128,7 @@ void POWER_MANAGEMENT_task(void * pvParameters)
     uint16_t last_known_asic_voltage = 0;
     float last_known_asic_frequency = 0.0;
     bool is_paused = false;
+    int overheat_ms = 0;
 
     while (1) {
         if (GLOBAL_STATE->SELF_TEST_MODULE.is_finished) {
@@ -161,7 +165,12 @@ void POWER_MANAGEMENT_task(void * pvParameters)
             power_management->chip_temp_avg > THROTTLE_TEMP
             || power_management->chip_temp2_avg > THROTTLE_TEMP;
 
-        if ((power_management->vr_temp > TPS546_THROTTLE_TEMP || asic_overheat) && (power_management->frequency_value > 50 || power_management->voltage > 1000)) {
+        bool overheat_now = (power_management->vr_temp > TPS546_THROTTLE_TEMP || asic_overheat) &&
+                            (power_management->frequency_value > 50 || power_management->voltage > 1000);
+        overheat_ms = overheat_now ? overheat_ms + POLL_RATE : 0;
+
+        if (overheat_ms >= OVERHEAT_CONFIRM_MS) {
+            overheat_ms = 0;
             if (power_management->chip_temp2_avg > 0) {
                 ESP_LOGE(TAG, "OVERHEAT! VR: %fC ASIC1: %fC ASIC2: %fC", power_management->vr_temp, power_management->chip_temp_avg, power_management->chip_temp2_avg);
             } else {
