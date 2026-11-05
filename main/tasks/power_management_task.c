@@ -17,6 +17,9 @@
 #define MAX_TEMP 90.0
 #define THROTTLE_TEMP 75.0
 #define SAFE_TEMP 45.0
+// A failed temperature read returns -1, which no overheat check can catch. While
+// the ASIC is running, a sensor that keeps failing this long stops mining.
+#define SENSOR_LOSS_MS 3000
 
 #define VOLTAGE_START_THROTTLE 4900
 #define VOLTAGE_MIN_THROTTLE 3500
@@ -125,6 +128,7 @@ void POWER_MANAGEMENT_task(void * pvParameters)
     uint16_t last_known_asic_voltage = 0;
     float last_known_asic_frequency = 0.0;
     bool is_paused = false;
+    int sensor_lost_ms = 0;
 
     while (1) {
         if (GLOBAL_STATE->SELF_TEST_MODULE.is_finished) {
@@ -155,6 +159,20 @@ void POWER_MANAGEMENT_task(void * pvParameters)
         if (is_paused || sys_module->hardware_fault) {
             vTaskDelay(POLL_RATE / portTICK_PERIOD_MS);
             continue;
+        }
+
+        if (GLOBAL_STATE->ASIC_initalized && !GLOBAL_STATE->SELF_TEST_MODULE.is_active && power_management->chip_temp_avg < 0) {
+            sensor_lost_ms += POLL_RATE;
+            if (sensor_lost_ms >= SENSOR_LOSS_MS) {
+                ESP_LOGE(TAG, "ASIC temperature sensor not responding for %d ms, stopping", sensor_lost_ms);
+                sys_module->hardware_fault = true;
+                snprintf(sys_module->hardware_fault_msg, sizeof(sys_module->hardware_fault_msg), "ASIC temperature sensor not responding");
+                sensor_lost_ms = 0;
+                vTaskDelay(POLL_RATE / portTICK_PERIOD_MS);
+                continue;
+            }
+        } else {
+            sensor_lost_ms = 0;
         }
 
         bool asic_overheat =
