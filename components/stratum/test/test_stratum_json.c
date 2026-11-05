@@ -2,6 +2,11 @@
 #include "stratum_api.h"
 #include <string.h>
 #include <sys/param.h>
+#include "esp_psram.h"
+#include "esp_heap_caps.h"
+#include "coinbase_decoder.h"
+#include "mining.h"
+#include "utils.h"
 
 static StratumApiV1Message stratum_api_v1_message;
 static StratumApiV1Message stratum_api_v1_message2;
@@ -11,9 +16,9 @@ static miner_job_t s_test_job;
 
 static bool test_parse(StratumApiV1Message *message, const char *stratum_json)
 {
-    if (!s_test_job.coinbase_prefix || !s_test_job.coinbase_suffix) {
-        miner_job_pool_init();
-        s_test_job = *miner_job_get_slot(0);
+    if (!s_test_job.coinbase_prefix) {
+        s_test_job.coinbase_prefix = calloc(1, MAX_COINBASE_PREFIX_LEN);
+        TEST_ASSERT_NOT_NULL(s_test_job.coinbase_prefix);
     }
     return STRATUM_V1_parse(message, stratum_json, &s_test_job);
 }
@@ -577,7 +582,7 @@ static int mock_transport_read(esp_transport_handle_t transport, char *buffer,
     mock_transport_data_t *mock =
         (mock_transport_data_t *)esp_transport_get_context_data(transport);
     if (mock == NULL || mock->offset >= mock->length) {
-        return 0;
+        return ERR_TCP_TRANSPORT_CONNECTION_CLOSED_BY_FIN;
     }
 
     size_t remaining = mock->length - mock->offset;
@@ -652,6 +657,7 @@ TEST_CASE("Receive preserves consecutive JSON-RPC lines", "[stratum][security]")
 
 TEST_CASE("Receive rejects oversized JSON-RPC line", "[stratum][security]")
 {
+    if (!esp_psram_is_initialized()) TEST_IGNORE_MESSAGE("Large line test requires PSRAM");
     size_t data_length = STRATUM_V1_MAX_JSON_LINE_SIZE + 2U;
     char *json = malloc(data_length);
     TEST_ASSERT_NOT_NULL(json);
@@ -669,12 +675,20 @@ TEST_CASE("Receive rejects oversized JSON-RPC line", "[stratum][security]")
     TEST_ASSERT_TRUE(STRATUM_V1_initialize_buffer());
     TEST_ASSERT_NULL(STRATUM_V1_receive_jsonrpc_line(transport));
 
+    TEST_ASSERT_TRUE(STRATUM_V1_initialize_buffer());
+    mock.data = "{}\n";
+    mock.length = 3;
+    mock.offset = 0;
+    char *line = STRATUM_V1_receive_jsonrpc_line(transport);
+    TEST_ASSERT_EQUAL_STRING("{}", line);
+    free(line);
     esp_transport_destroy(transport);
     free(json);
 }
 
 TEST_CASE("Receive accepts maximum line and preserves the next line", "[stratum][security]")
 {
+    if (!esp_psram_is_initialized()) TEST_IGNORE_MESSAGE("Large line test requires PSRAM");
     const char *next_line = "{}\n";
     size_t data_length = STRATUM_V1_MAX_JSON_LINE_SIZE + 1U + strlen(next_line);
     char *data = malloc(data_length);
@@ -736,4 +750,133 @@ TEST_CASE("Reject invalid numeric and trailing JSON-RPC values", "[stratum][secu
     // Non-object JSON
     TEST_ASSERT_FALSE(STRATUM_V1_parse(&msg, "true"));
     TEST_ASSERT_FALSE(STRATUM_V1_parse(&msg, "[1, 2, 3]"));
+    TEST_ASSERT_TRUE(STRATUM_V1_parse(&msg, "{\"id\":1,\"result\":true} \t\r\n"));
+    TEST_ASSERT_FALSE(STRATUM_V1_parse(&msg, "{\"id\":1,\"result\":true}{}"));
+}
+
+#undef STRATUM_V1_parse
+
+static char *make_payout_notify(size_t count)
+{
+    const char *prefix = "01000000010000000000000000000000000000000000000000000000000000000000000000ffffffff0803a08601";
+    const uint8_t user_script[] = {
+        0x00, 0x14, 0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff, 0x00, 0x11, 0x22,
+        0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xaa, 0xbb, 0xcc, 0xdd
+    };
+    size_t capacity = count * 43U + 16U;
+    uint8_t *suffix = malloc(capacity);
+    TEST_ASSERT_NOT_NULL(suffix);
+    memset(suffix, 0xff, 4);
+    size_t pos = 4;
+    if (count >= 253) {
+        suffix[pos++] = 0xfd;
+        suffix[pos++] = (uint8_t)count;
+        suffix[pos++] = (uint8_t)(count >> 8);
+    } else {
+        suffix[pos++] = (uint8_t)count;
+    }
+    for (size_t i = 0; i < count; ++i) {
+        uint64_t value = i == count - 1 ? 50000 : 1000;
+        for (int b = 0; b < 8; ++b) suffix[pos++] = (uint8_t)(value >> (b * 8));
+        if (i == count - 1) {
+            suffix[pos++] = sizeof(user_script);
+            memcpy(suffix + pos, user_script, sizeof(user_script));
+            pos += sizeof(user_script);
+        } else {
+            suffix[pos++] = 34;
+            suffix[pos++] = 0x51;
+            suffix[pos++] = 0x20;
+            memset(suffix + pos, 0, 32);
+            for (int b = 0; b < 4; ++b) suffix[pos + b] = (uint8_t)(i >> (b * 8));
+            pos += 32;
+        }
+    }
+    memset(suffix + pos, 0, 4);
+    pos += 4;
+
+    size_t json_capacity = pos * 2 + 1024;
+    char *json = malloc(json_capacity);
+    TEST_ASSERT_NOT_NULL(json);
+    size_t offset = snprintf(json, json_capacity,
+        "{\"id\":null,\"method\":\"mining.notify\",\"params\":[\"payouts\","
+        "\"0000000000000000000000000000000000000000000000000000000000000000\",\"%s\",\"", prefix);
+    bin2hex(suffix, pos, json + offset, json_capacity - offset);
+    offset += pos * 2;
+    snprintf(json + offset, json_capacity - offset,
+        "\",[],\"20000000\",\"1705ae3a\",\"647025b5\",true]}\n{\"id\":7,\"result\":true}\n");
+    free(suffix);
+    return json;
+}
+
+TEST_CASE("Mine fragmented jobs with 110 1800 and 10000 coinbase payouts", "[stratum][mining.notify]")
+{
+    if (!esp_psram_is_initialized()) TEST_IGNORE_MESSAGE("Large payout test requires PSRAM");
+    const size_t counts[] = {110, 1800, 10000, 110};
+    // Reference hashes from Python hashlib over the serialized transaction and rolled extranonce2.
+    const char *hashes[][2] = {
+        {"3bea6b3cf57b9b40d7308b694d893a0b932dc023858b5ec3a1e348dcf9a2e9a6", "a3301a2e7a493901cce87f78d4ffe8b4593479d9c31a221e6db285cf50a25d14"},
+        {"54257b73927b48262af74c4f57613c18d875cb3bc933360610a51555b1ecebb2", "69ba34f56c165e6d4e6f20006f3ece2403d17b1bf570253cfccc19126d066f17"},
+        {"6b25d72ae69ede37bc6fb4741bcdb4f761ed36db635f528240472bc9d18daa97", "2724f38d0a807a82d4606ff4f84e907e6ced27db109abfbe3a2c35ff504bd0f3"},
+        {"3bea6b3cf57b9b40d7308b694d893a0b932dc023858b5ec3a1e348dcf9a2e9a6", "a3301a2e7a493901cce87f78d4ffe8b4593479d9c31a221e6db285cf50a25d14"},
+    };
+    miner_job_t job = {0};
+    StratumApiV1Message message = {0};
+    for (size_t n = 0; n < sizeof(counts) / sizeof(counts[0]); ++n) {
+        char *data = make_payout_notify(counts[n]);
+        mock_transport_data_t mock = {.data = data, .length = strlen(data), .max_chunk = 733};
+        esp_transport_handle_t transport = create_mock_transport(&mock);
+        TEST_ASSERT_NOT_NULL(transport);
+        TEST_ASSERT_TRUE(STRATUM_V1_initialize_buffer());
+        char *line = STRATUM_V1_receive_jsonrpc_line(transport);
+        TEST_ASSERT_NOT_NULL(line);
+        char *reply = STRATUM_V1_receive_jsonrpc_line(transport);
+        TEST_ASSERT_EQUAL_STRING("{\"id\":7,\"result\":true}", reply);
+        free(data);
+        free(reply);
+        esp_transport_destroy(transport);
+
+        TEST_ASSERT_TRUE(STRATUM_V1_parse(&message, line, &job));
+        TEST_ASSERT_EQUAL(MINING_NOTIFY, message.method);
+        TEST_ASSERT_EQUAL_size_t(counts[n] * 43U - (counts[n] >= 253 ? 1U : 3U), job.coinbase_suffix_len);
+        free(line);
+        job.extranonce2_len = 4;
+
+        mining_notification_result_t result = {0};
+        TEST_ASSERT_EQUAL(ESP_OK, coinbase_process_miner_job(&job,
+            "bc1q42aueh0wluqpzg3ng32kvaugnx4thnxa7y625x.worker", true, &result));
+        TEST_ASSERT_TRUE(result.total_value_satoshis == (counts[n] - 1) * 1000U + 50000U);
+        TEST_ASSERT_TRUE(result.user_value_satoshis == 50000);
+        TEST_ASSERT_EQUAL_INT(MAX_COINBASE_TX_OUTPUTS, result.output_count);
+        TEST_ASSERT_EQUAL_INT(counts[n] - MAX_COINBASE_TX_OUTPUTS, result.others_count);
+
+        for (size_t roll = 0; roll < 2; ++roll) {
+            uint8_t expected[32];
+            hex2bin(hashes[n][roll], expected, sizeof(expected));
+            asic_job_t work;
+            TEST_ASSERT_TRUE(mining_build_asic_job(&job, 0x05040302U + roll, 0, &work));
+            TEST_ASSERT_EQUAL_MEMORY(expected, work.merkle_root, sizeof(expected));
+        }
+    }
+    free(job.coinbase_prefix);
+    free(job.coinbase_suffix);
+    STRATUM_V1_reset_message(&message);
+}
+
+TEST_CASE("Receive reconnect clears a truncated large line", "[stratum][security]")
+{
+    char data[4096];
+    memset(data, 'a', sizeof(data));
+    mock_transport_data_t mock = {.data = data, .length = sizeof(data), .max_chunk = 731};
+    esp_transport_handle_t transport = create_mock_transport(&mock);
+    TEST_ASSERT_NOT_NULL(transport);
+    TEST_ASSERT_TRUE(STRATUM_V1_initialize_buffer());
+    TEST_ASSERT_NULL(STRATUM_V1_receive_jsonrpc_line(transport));
+    TEST_ASSERT_TRUE(STRATUM_V1_initialize_buffer());
+    mock.data = "{}\n";
+    mock.length = 3;
+    mock.offset = 0;
+    char *line = STRATUM_V1_receive_jsonrpc_line(transport);
+    TEST_ASSERT_EQUAL_STRING("{}", line);
+    free(line);
+    esp_transport_destroy(transport);
 }
