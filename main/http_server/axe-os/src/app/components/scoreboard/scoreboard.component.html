@@ -1,5 +1,5 @@
 <div class="card">
-  <h2>Scoreboard</h2>
+  <h2>{{ 'nav.scoreboard' | t }}</h2>
 
   @if (scoreboard$ | async; as scoreboard) {
     <div class="mt-4 overflow-x-auto">
@@ -7,17 +7,17 @@
         <thead>
           <tr>
             @for (field of [
-              { label: 'Rank', name: 'rank' },
-              { label: 'Difficulty', name: 'difficulty' },
-              { label: 'Job ID', name: 'job_id' },
-              { label: 'ExtraNonce2', name: 'extranonce2' },
-              { label: 'Time', name: 'ntime' },
-              { label: 'Nonce', name: 'nonce' },
-              { label: 'Version Bits', name: 'version_bits' }
+              { label: 'scoreboard.rank', name: 'rank' },
+              { label: 'scoreboard.difficulty', name: 'difficulty' },
+              { label: 'scoreboard.job_id', name: 'job_id' },
+              { label: 'scoreboard.extranonce2', name: 'extranonce2' },
+              { label: 'scoreboard.time', name: 'ntime' },
+              { label: 'scoreboard.nonce', name: 'nonce' },
+              { label: 'scoreboard.version_bits', name: 'version_bits' }
               ]; track field) {
               <th class="text-secondary font-medium">
                 <div class="flex items-center cursor-pointer select-none relative" (click)="sortBy(field.name)">
-                  <span class="pr-3">{{field.label}}</span>
+                  <span class="pr-3">{{ field.label | t }}</span>
                                 <i class="pi text-xs ml-2 absolute right-0" [class]="{
                                     'pi-sort-up-fill': sortField === field.name && sortDirection === 'asc',
                                     'pi-sort-down-fill': sortField === field.name && sortDirection === 'desc'

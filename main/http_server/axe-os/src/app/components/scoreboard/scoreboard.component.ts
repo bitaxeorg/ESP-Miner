@@ -8,6 +8,7 @@ import { AsyncPipe, DatePipe } from '@angular/common';
 import { TooltipDirective } from '../../directives/tooltip.directive';
 import { DateAgoPipe } from '../../pipes/date-ago.pipe';
 import { DiffSuffixPipe } from '../../pipes/diff-suffix.pipe';
+import { TranslatePipe } from '../../i18n/translate.pipe';
 
 const SWARM_SORTING = 'SCOREBOARD_SORTING';
 
@@ -15,7 +16,7 @@ const SWARM_SORTING = 'SCOREBOARD_SORTING';
   selector: 'app-scoreboard',
   templateUrl: './scoreboard.component.html',
   styleUrls: ['./scoreboard.component.scss'],
-  imports: [TooltipDirective, AsyncPipe, DatePipe, DateAgoPipe, DiffSuffixPipe]
+  imports: [TooltipDirective, AsyncPipe, DatePipe, DateAgoPipe, DiffSuffixPipe, TranslatePipe]
 })
 export class ScoreboardComponent implements OnInit, OnDestroy {
   public scoreboard$: Observable<ISystemScoreboardEntry[]>;

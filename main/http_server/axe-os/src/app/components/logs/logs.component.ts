@@ -6,12 +6,14 @@ import { WebsocketService } from 'src/app/services/web-socket.service';
 import { SystemApiService } from 'src/app/services/system.service';
 import { TooltipDirective } from '../../directives/tooltip.directive';
 import { ANSIPipe } from '../../pipes/ansi.pipe';
+import { I18nService } from 'src/app/i18n/i18n.service';
+import { TranslatePipe } from 'src/app/i18n/translate.pipe';
 
 @Component({
   selector: 'app-logs',
   templateUrl: './logs.component.html',
   styleUrl: './logs.component.scss',
-  imports: [FormsModule, ReactiveFormsModule, TooltipDirective, ANSIPipe]
+  imports: [FormsModule, ReactiveFormsModule, TooltipDirective, ANSIPipe, TranslatePipe]
 })
 export class LogsComponent implements OnInit, OnDestroy, AfterViewChecked {
   public loadingLogs: boolean = false;
@@ -34,6 +36,7 @@ export class LogsComponent implements OnInit, OnDestroy, AfterViewChecked {
     private websocketService: WebsocketService,
     private systemApiService: SystemApiService,
     private toastr: ToastrService,
+    private i18n: I18nService,
   ) {}
 
   ngOnInit(): void {
@@ -90,7 +93,7 @@ export class LogsComponent implements OnInit, OnDestroy, AfterViewChecked {
           }
         },
         error: (error) => {
-          this.toastr.error("Error opening websocket connection");
+          this.toastr.error(this.i18n.t('errors.websocket_connection_failed'));
         }
       })
   }

@@ -2,13 +2,14 @@ import { Component, ViewChild, AfterViewInit } from '@angular/core';
 import { FormGroup } from '@angular/forms';
 import { Observable } from 'rxjs';
 import { AsyncPipe } from '@angular/common';
+import { TranslatePipe } from 'src/app/i18n/translate.pipe';
 import { NetworkEditComponent } from '../network-edit/network.edit.component';
 
 @Component({
     selector: 'app-network',
     templateUrl: './network.component.html',
     styleUrls: ['./network.component.scss'],
-    imports: [NetworkEditComponent, AsyncPipe]
+    imports: [NetworkEditComponent, AsyncPipe, TranslatePipe]
 })
 export class NetworkComponent implements AfterViewInit {
   form$!: Observable<FormGroup | null>;
