@@ -247,7 +247,7 @@
             <h6 class="flex justify-between mb-1">
               Power<span>{{info.power}} W</span>
             </h6>
-            <app-progressbar [value]="(info.power / info.maxPower) * 100"></app-progressbar>
+            <app-progressbar tone="auto" [value]="(info.power / info.maxPower) * 100"></app-progressbar>
           </div>
 
           <div class="mb-4">
@@ -305,6 +305,7 @@
               </span>
             </h6>
             <app-progressbar
+              tone="auto"
               [value]="(info.temp / maxTemp) * 100"
               [markers]="[{ value: (info.temptarget / maxTemp) * 100, label: info.temptarget + ' °C', visible: info.autofanspeed === 1 && 0 >= info.temp2 }]">
             </app-progressbar>
@@ -325,6 +326,7 @@
                 </span>
               </h6>
               <app-progressbar
+                tone="auto"
                 [value]="(info.temp2 / maxTemp) * 100"
                 [markers]="[{ value: (info.temptarget / maxTemp) * 100, label: info.temptarget + ' °C', visible: info.autofanspeed === 1 }]">
               </app-progressbar>
@@ -342,7 +344,10 @@
               <h6 class="flex justify-between mb-1">
                 Voltage Regulator Temperature<span>{{info.vrTemp}} °C</span>
               </h6>
-              <app-progressbar [value]="(info.vrTemp / 120) * 100"></app-progressbar>
+              <!-- Same 105 C threshold as the warning directly below. -->
+              <app-progressbar
+                [tone]="info.vrTemp >= 105 ? 'critical' : 'brand'"
+                [value]="(info.vrTemp / 120) * 100"></app-progressbar>
 
               @if (info.vrTemp >= 105) {
                 <strong class="text-red-500">
