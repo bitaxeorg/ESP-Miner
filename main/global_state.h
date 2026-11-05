@@ -160,8 +160,6 @@ typedef struct GlobalState
 
     uint8_t current_difficulty_power;
     double target_share_interval_s;
-    esp_transport_handle_t transport;
-    pthread_mutex_t transport_mutex;
 
     bool ASIC_initalized;
     bool has_work;

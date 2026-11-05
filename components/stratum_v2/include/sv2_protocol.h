@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <stddef.h>
+#include "esp_transport.h"
 #include "miner_job.h"
 
 // Frame header size (extension_type[2] + msg_type[1] + msg_length[3])
@@ -89,6 +90,7 @@ struct sv2_noise_ctx;
 
 // SV2 connection state
 typedef struct sv2_conn {
+    esp_transport_handle_t transport;
     struct sv2_noise_ctx *noise_ctx;
     uint32_t channel_id;
     uint32_t group_channel_id;

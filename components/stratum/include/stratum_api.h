@@ -71,6 +71,7 @@ typedef struct StratumApiV1Message
 #define SV1_MAX_ACTIVE_JOB_IDS 16
 
 typedef struct sv1_conn {
+    esp_transport_handle_t transport;
     int send_uid;
     char user[256];
     uint8_t pool_target[32];

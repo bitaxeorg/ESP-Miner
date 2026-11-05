@@ -6,6 +6,7 @@
 #include "system.h"
 #include "global_state.h"
 #include "stratum_v2_client.h"
+#include "stratum_driver.h"
 #include "stratum_task.h"
 #include "stratum_socket.h"
 #include "connect.h"
@@ -26,6 +27,7 @@
 static const char *TAG = "stratum_v2";
 
 static sv2_conn_t *s_v2_conn = NULL;
+static pthread_mutex_t s_v2_conn_mutex = PTHREAD_MUTEX_INITIALIZER;
 static stratum_timing_tracker_t s_v2_timing = {0};
 
 static bool add_active_job_id(uint32_t *active_job_ids, int *count, uint32_t job_id)
@@ -94,27 +96,38 @@ static bool stratum_v2_load_authority_pubkey(uint8_t out[SV2_AUTHORITY_PUBKEY_SI
     return true;
 }
 
+void stratum_v2_abort_connection(void)
+{
+    pthread_mutex_lock(&s_v2_conn_mutex);
+    if (s_v2_conn != NULL && s_v2_conn->transport != NULL) {
+        int sock = esp_transport_get_socket(s_v2_conn->transport);
+        if (sock >= 0) {
+            shutdown(sock, SHUT_RDWR);
+        }
+    }
+    pthread_mutex_unlock(&s_v2_conn_mutex);
+}
+
 void stratum_v2_close_connection(GlobalState *GLOBAL_STATE)
 {
-    pthread_mutex_lock(&GLOBAL_STATE->transport_mutex);
-    esp_transport_handle_t transport = GLOBAL_STATE->transport;
-    GLOBAL_STATE->transport = NULL;
+    pthread_mutex_lock(&s_v2_conn_mutex);
     sv2_conn_t *conn = s_v2_conn;
     s_v2_conn = NULL;
 
     SYSTEM_reset_pool_session(GLOBAL_STATE);
     stratum_timing_reset(&s_v2_timing);
-    pthread_mutex_unlock(&GLOBAL_STATE->transport_mutex);
+    pthread_mutex_unlock(&s_v2_conn_mutex);
 
     if (conn && conn->noise_ctx) {
         sv2_noise_destroy(conn->noise_ctx);
         conn->noise_ctx = NULL;
     }
-    if (transport != NULL) {
-        esp_transport_close(transport);
-        esp_transport_destroy(transport);
-    }
     if (conn != NULL) {
+        if (conn->transport != NULL) {
+            esp_transport_close(conn->transport);
+            esp_transport_destroy(conn->transport);
+            conn->transport = NULL;
+        }
         clear_active_job_ids(conn->active_job_ids, &conn->active_job_ids_count);
         free(conn);
     }
@@ -141,18 +154,17 @@ int stratum_v2_submit_share(GlobalState *GLOBAL_STATE, const asic_job_t *active_
         hex2bin(active_job->extranonce2, extranonce_2, en2_len);
     }
 
-    pthread_mutex_lock(&GLOBAL_STATE->transport_mutex);
-    esp_transport_handle_t transport = GLOBAL_STATE->transport;
+    pthread_mutex_lock(&s_v2_conn_mutex);
     sv2_conn_t *conn = s_v2_conn;
 
-    if (!transport || !conn || !conn->noise_ctx) {
-        pthread_mutex_unlock(&GLOBAL_STATE->transport_mutex);
+    if (!conn || !conn->transport || !conn->noise_ctx) {
+        pthread_mutex_unlock(&s_v2_conn_mutex);
         return -1;
     }
 
     uint32_t sv2_job_id = (uint32_t)strtoul(active_job->job_id, NULL, 10);
     if (!is_active_job_id(conn->active_job_ids, conn->active_job_ids_count, sv2_job_id)) {
-        pthread_mutex_unlock(&GLOBAL_STATE->transport_mutex);
+        pthread_mutex_unlock(&s_v2_conn_mutex);
         ESP_LOGW(TAG, "Dropping stale share for job %lu (not in active jobs)", (unsigned long)sv2_job_id);
         return -1;
     }
@@ -165,11 +177,11 @@ int stratum_v2_submit_share(GlobalState *GLOBAL_STATE, const asic_job_t *active_
                                       sv2_job_id, nonce, active_job->ntime, rolled_version,
                                       en2_len > 0 ? extranonce_2 : NULL, en2_len);
     if (len < 0) {
-        pthread_mutex_unlock(&GLOBAL_STATE->transport_mutex);
+        pthread_mutex_unlock(&s_v2_conn_mutex);
         return -1;
     }
 
-    int ret = sv2_noise_send(conn->noise_ctx, transport, buf, len);
+    int ret = sv2_noise_send(conn->noise_ctx, conn->transport, buf, len);
     if (ret >= 0) {
         stratum_v2_track_submit(sequence_number);
         if (sent_time_us) {
@@ -177,7 +189,7 @@ int stratum_v2_submit_share(GlobalState *GLOBAL_STATE, const asic_job_t *active_
         }
         SYSTEM_notify_submitted_share(GLOBAL_STATE);
     }
-    pthread_mutex_unlock(&GLOBAL_STATE->transport_mutex);
+    pthread_mutex_unlock(&s_v2_conn_mutex);
     return ret;
 }
 
@@ -479,9 +491,9 @@ esp_err_t stratum_v2_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
 
     ESP_LOGI(TAG, "TCP connected to %s:%d (%s)", stratum_url, port, conn_info.host_ip);
 
-    pthread_mutex_lock(&GLOBAL_STATE->transport_mutex);
-    GLOBAL_STATE->transport = transport;
-    pthread_mutex_unlock(&GLOBAL_STATE->transport_mutex);
+    pthread_mutex_lock(&s_v2_conn_mutex);
+    conn->transport = transport;
+    pthread_mutex_unlock(&s_v2_conn_mutex);
 
     stratum_socket_set_options(transport);
 
@@ -962,3 +974,13 @@ bool stratum_v2_probe_pool(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
     esp_transport_destroy(transport);
     return success;
 }
+
+const stratum_driver_t g_stratum_v2_driver = {
+    .protocol = STRATUM_PROTOCOL_V2,
+    .name = "Stratum V2",
+    .run = stratum_v2_run,
+    .close_connection = stratum_v2_close_connection,
+    .abort_connection = stratum_v2_abort_connection,
+    .submit_share = stratum_v2_submit_share,
+    .probe_pool = stratum_v2_probe_pool,
+};
