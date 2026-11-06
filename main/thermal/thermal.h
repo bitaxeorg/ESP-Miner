@@ -7,6 +7,11 @@
 typedef struct GlobalState GlobalState;
 typedef struct DeviceConfig DeviceConfig;
 
+typedef struct FanDriver {
+    esp_err_t (*set_percent)(float percent);
+    uint16_t (*get_rpm)(void);
+} FanDriver;
+
 esp_err_t Thermal_init(DeviceConfig * DEVICE_CONFIG);
 esp_err_t Thermal_set_fan_percent(DeviceConfig * DEVICE_CONFIG, float percent);
 uint16_t Thermal_get_fan_speed(DeviceConfig * DEVICE_CONFIG);

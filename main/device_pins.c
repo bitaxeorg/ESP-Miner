@@ -1,9 +1,24 @@
 #include "device_pins.h"
+#include "bzm/control.h"
 #include "driver/gpio.h"
 #include "esp_log.h"
 #include "sdkconfig.h"
 
 static const char * TAG = "device_pins";
+
+/* bitaxeBonanza tag 1004x-PCBA-order, commit a0c96ae0. */
+const BzmPins BONANZA_1004_CONTROL_PINS = {
+    .asic_reset = GPIO_NUM_1, .asic_trip = GPIO_NUM_2,
+    .fan_pwm = GPIO_NUM_8, .fan_tach = GPIO_NUM_9,
+    .core_enable = GPIO_NUM_10, .core_power_good = GPIO_NUM_11,
+    .enable_5v = GPIO_NUM_21,
+    .bridge_swclk = GPIO_NUM_14, .bridge_swdio = GPIO_NUM_15,
+};
+
+const UartPins BONANZA_1004_UART_PINS = {
+    .tx = GPIO_NUM_17,
+    .rx = GPIO_NUM_18,
+};
 
 const BapPins DEFAULT_BAP_PINS = {
     .tx = GPIO_NUM_39,
@@ -58,6 +73,15 @@ static esp_err_t device_pins_validate(const DevicePins * pins)
         if (check_pin(pins->bap->rx, "BAP RX", &allocated_pins_mask) != ESP_OK) status = ESP_ERR_INVALID_STATE;
     }
 
+    if (pins->asic_uart) {
+        if (!GPIO_IS_VALID_OUTPUT_GPIO(pins->asic_uart->tx) || pins->asic_uart->rx == GPIO_NUM_NC) {
+            ESP_LOGE(TAG, "ASIC UART requires an output-capable TX and a connected RX");
+            status = ESP_ERR_INVALID_STATE;
+        }
+        if (check_pin(pins->asic_uart->tx, "ASIC UART TX", &allocated_pins_mask) != ESP_OK) status = ESP_ERR_INVALID_STATE;
+        if (check_pin(pins->asic_uart->rx, "ASIC UART RX", &allocated_pins_mask) != ESP_OK) status = ESP_ERR_INVALID_STATE;
+    }
+
     if (pins->i2c) {
         if (check_pin(pins->i2c->sda, "I2C SDA", &allocated_pins_mask) != ESP_OK) status = ESP_ERR_INVALID_STATE;
         if (check_pin(pins->i2c->scl, "I2C SCL", &allocated_pins_mask) != ESP_OK) status = ESP_ERR_INVALID_STATE;
@@ -74,6 +98,18 @@ static esp_err_t device_pins_validate(const DevicePins * pins)
         if (check_pin(pins->i80->rst, "LCD RST", &allocated_pins_mask) != ESP_OK) status = ESP_ERR_INVALID_STATE;
         if (check_pin(pins->i80->pwr, "LCD PWR", &allocated_pins_mask) != ESP_OK) status = ESP_ERR_INVALID_STATE;
         if (check_pin(pins->i80->bk_light, "LCD BK_LIGHT", &allocated_pins_mask) != ESP_OK) status = ESP_ERR_INVALID_STATE;
+    }
+
+    if (pins->bzm) {
+        if (check_pin(pins->bzm->asic_reset, "ASIC reset", &allocated_pins_mask) != ESP_OK) status = ESP_ERR_INVALID_STATE;
+        if (check_pin(pins->bzm->asic_trip, "ASIC trip", &allocated_pins_mask) != ESP_OK) status = ESP_ERR_INVALID_STATE;
+        if (check_pin(pins->bzm->fan_pwm, "Fan PWM", &allocated_pins_mask) != ESP_OK) status = ESP_ERR_INVALID_STATE;
+        if (check_pin(pins->bzm->fan_tach, "Fan tach", &allocated_pins_mask) != ESP_OK) status = ESP_ERR_INVALID_STATE;
+        if (check_pin(pins->bzm->core_enable, "Core enable", &allocated_pins_mask) != ESP_OK) status = ESP_ERR_INVALID_STATE;
+        if (check_pin(pins->bzm->core_power_good, "Core PGOOD", &allocated_pins_mask) != ESP_OK) status = ESP_ERR_INVALID_STATE;
+        if (check_pin(pins->bzm->enable_5v, "5 V enable", &allocated_pins_mask) != ESP_OK) status = ESP_ERR_INVALID_STATE;
+        if (check_pin(pins->bzm->bridge_swclk, "Bridge SWCLK", &allocated_pins_mask) != ESP_OK) status = ESP_ERR_INVALID_STATE;
+        if (check_pin(pins->bzm->bridge_swdio, "Bridge SWDIO", &allocated_pins_mask) != ESP_OK) status = ESP_ERR_INVALID_STATE;
     }
 
     return status;
@@ -111,5 +147,6 @@ esp_err_t device_pins_init(DevicePins * pins)
         return ESP_ERR_INVALID_ARG;
     }
     apply_kconfig_pin_overrides(pins);
+    if (pins->oled != NULL) pins->oled = pins->i2c;
     return device_pins_validate(pins);
 }

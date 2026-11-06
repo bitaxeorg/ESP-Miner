@@ -3,6 +3,7 @@
 #include <inttypes.h>
 
 #include "global_state.h"
+#include "create_jobs_task.h"
 #include "esp_log.h"
 #include "mining.h"
 #include "miner_job.h"
@@ -15,6 +16,14 @@
 #include "utils.h"
 
 static const char *TAG = "create_jobs_task";
+
+void create_jobs_refresh(GlobalState *state)
+{
+    if (state->create_jobs_task_handle) {
+        // Preserve any pending pool job when the driver requests more work.
+        xTaskNotify(state->create_jobs_task_handle, CREATE_JOBS_NOTIFY_REFRESH, eSetValueWithoutOverwrite);
+    }
+}
 
 static void generate_work_from_miner_job(GlobalState *GLOBAL_STATE, const miner_job_t *job, uint64_t extranonce_2, uint32_t current_version)
 {
@@ -60,7 +69,7 @@ void create_jobs_task(void *pvParameters)
         BaseType_t notified = xTaskNotifyWait(0, ULONG_MAX, &slot_notify, wait_ticks);
         timeout_ms -= (esp_timer_get_time() - start_time) / 1000;
 
-        if (notified == pdTRUE) {
+        if (notified == pdTRUE && slot_notify != CREATE_JOBS_NOTIFY_REFRESH) {
             miner_job_t *new_work = miner_job_get_slot((size_t)slot_notify);
             ESP_LOGI(TAG, "New Work Activated %s (type %d)", new_work->job_id, new_work->type);
             current_work = new_work;
@@ -83,8 +92,11 @@ void create_jobs_task(void *pvParameters)
 
             if (!current_work->clean_jobs) {
                 // Staged job for next cycle, let current ASIC cycle finish
+                int remaining_ms = ASIC_get_asic_job_frequency_ms(GLOBAL_STATE);
+                if (timeout_ms > remaining_ms) timeout_ms = remaining_ms;
                 continue;
             }
+            ASIC_clear_work(GLOBAL_STATE);
         } else {
             if (current_work == NULL || !GLOBAL_STATE->has_work) {
                 current_work = NULL;

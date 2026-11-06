@@ -1,2 +1,2 @@
 #include "bm13xx_test_bindings.h"
-#include "../bm1373.c"
+#include "components/asic/bm1373.c"
