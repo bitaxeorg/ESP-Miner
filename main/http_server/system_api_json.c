@@ -245,6 +245,12 @@ static void system_api_add_config(yyjson_mut_doc *doc, yyjson_mut_val *root, Glo
     yyjson_mut_obj_add_float(doc, root, "frequency", nvs_config_get_float(NVS_CONFIG_ASIC_FREQUENCY));
     yyjson_mut_obj_add_uint(doc, root, "statsFrequency", nvs_config_get_u16(NVS_CONFIG_STATISTICS_FREQUENCY));
     yyjson_mut_obj_add_uint(doc, root, "statsLimit", MAX_STATISTICS_COUNT);
+
+    char *pass = nvs_config_get_string(NVS_CONFIG_AXEOS_PASSWORD);
+    bool is_pass_set = pass && (strlen(pass) > 0);
+    free(pass);
+    yyjson_mut_obj_add_int(doc, root, "authEnabled", is_pass_set ? 1 : 0);
+    yyjson_mut_obj_add_int(doc, root, "authReadRequired", nvs_config_get_bool(NVS_CONFIG_AUTH_READ_REQUIRED) ? 1 : 0);
 }
 
 static void system_api_add_hashrate_monitor(yyjson_mut_doc *doc, yyjson_mut_val *root, GlobalState *g) {

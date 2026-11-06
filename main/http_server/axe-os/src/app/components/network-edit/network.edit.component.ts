@@ -52,6 +52,8 @@ export class NetworkEditComponent implements OnInit {
           ssid: [info.ssid, [Validators.required]],
           wifiPass: ['*****'],
           useNTP: [info.useNTP],
+          axeosPassword: [info.authEnabled === 1 ? '*****' : ''],
+          authReadRequired: [info.authReadRequired === 1]
         });
         this.formSubject.next(this.form);
       });
@@ -69,6 +71,10 @@ export class NetworkEditComponent implements OnInit {
 
     if (form.wifiPass === '*****') {
       delete form.wifiPass;
+    }
+
+    if (!this.form.controls['axeosPassword']?.dirty || form.axeosPassword === '*****') {
+      delete form.axeosPassword;
     }
 
     // Trim SSID to remove any leading/trailing whitespace
@@ -188,7 +194,9 @@ export class NetworkEditComponent implements OnInit {
 
   get noRestartFields(): string[] {
     return [
-      'hostname'
+      'hostname',
+      'axeosPassword',
+      'authReadRequired'
     ];
   }
 
