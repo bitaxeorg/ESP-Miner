@@ -228,13 +228,14 @@ static void stratum_v2_handle_new_extended_mining_job(GlobalState *GLOBAL_STATE,
     conn->pending_jobs_valid |= (1U << slot);
 
     if (has_min_ntime && conn->has_prev_hash) {
+        bool is_first_job = (conn->active_job_ids_count == 0);
         if (!add_active_job_id(conn->active_job_ids, &conn->active_job_ids_count, job_id)) {
             ESP_LOGW(TAG, "Ignoring duplicate V2 job %s", job->job_id);
             return;
         }
         memcpy(job->prev_hash, conn->prev_hash, 32);
         job->nbits = conn->prev_hash_nbits;
-        job->clean_jobs = false;
+        job->clean_jobs = is_first_job;
 
         POOL_notify_work_received(GLOBAL_STATE, pool_idx);
         stratum_check_primary_handover(GLOBAL_STATE, pool_idx);
@@ -283,6 +284,7 @@ static void stratum_v2_handle_new_mining_job(GlobalState *GLOBAL_STATE, uint16_t
     conn->pending_jobs_valid |= (1U << slot);
 
     if (has_min_ntime && conn->has_prev_hash) {
+        bool is_first_job = (conn->active_job_ids_count == 0);
         if (!add_active_job_id(conn->active_job_ids, &conn->active_job_ids_count, job_id)) {
             ESP_LOGW(TAG, "Ignoring duplicate V2 job %s", job->job_id);
             return;
@@ -290,7 +292,7 @@ static void stratum_v2_handle_new_mining_job(GlobalState *GLOBAL_STATE, uint16_t
         memcpy(job->prev_hash, conn->prev_hash, 32);
         job->ntime = min_ntime;
         job->nbits = conn->prev_hash_nbits;
-        job->clean_jobs = false;
+        job->clean_jobs = is_first_job;
 
         POOL_notify_work_received(GLOBAL_STATE, pool_idx);
         stratum_check_primary_handover(GLOBAL_STATE, pool_idx);

@@ -18,11 +18,12 @@
 static TaskHandle_t s_primary_task_handle = NULL;
 static TaskHandle_t s_fallback_task_handle = NULL;
 static GlobalState *s_global_state = NULL;
-static volatile bool s_should_reconnect = false;
+static volatile bool s_should_reconnect[MAX_POOLS] = {false};
 
 void stratum_abort_pool(uint16_t pool_idx)
 {
     if (pool_idx >= MAX_POOLS) return;
+    s_should_reconnect[pool_idx] = true;
     const stratum_driver_t *v1 = stratum_get_driver(STRATUM_PROTOCOL_V1);
     const stratum_driver_t *v2 = stratum_get_driver(STRATUM_PROTOCOL_V2);
     if (v1 && v1->abort_connection) v1->abort_connection(pool_idx);
@@ -34,7 +35,6 @@ void stratum_abort_pool(uint16_t pool_idx)
 
 void stratum_abort_connection(void)
 {
-    s_should_reconnect = true;
     for (uint16_t i = 0; i < MAX_POOLS; i++) {
         stratum_abort_pool(i);
     }
@@ -42,7 +42,17 @@ void stratum_abort_connection(void)
 
 bool stratum_reconnect_requested(void)
 {
-    return s_should_reconnect;
+    if (!s_global_state) return false;
+    bool is_fallback_task = (xTaskGetCurrentTaskHandle() == s_fallback_task_handle);
+    if (is_fallback_task &&
+        !s_global_state->SYSTEM_MODULE.is_using_fallback &&
+        !s_global_state->SYSTEM_MODULE.use_fallback_stratum) {
+        return true;
+    }
+    uint16_t pool_idx = is_fallback_task
+        ? s_global_state->SYSTEM_MODULE.secondary_pool_index
+        : s_global_state->SYSTEM_MODULE.primary_pool_index;
+    return (pool_idx < MAX_POOLS) ? s_should_reconnect[pool_idx] : true;
 }
 
 void stratum_set_pool_error(GlobalState *gs, uint16_t pool_idx, const char *err_msg)
@@ -80,7 +90,7 @@ static esp_err_t run_pool_session(GlobalState *gs, uint16_t pool_idx)
         return ESP_ERR_NOT_FOUND;
     }
 
-    s_should_reconnect = false;
+    s_should_reconnect[pool_idx] = false;
     return driver->run(gs, pool_idx);
 }
 
@@ -200,7 +210,7 @@ void stratum_task(void *pvParameters)
         }
 
         // If primary was probing while fallback is active and failed to recover, sleep before next probe
-        if (is_primary && GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback) {
+        if (err != ESP_OK && is_primary && GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback) {
             ESP_LOGI(TAG, "Primary pool %u probe failed, waiting %d seconds...",
                      pool_idx, RECOVERY_PROBE_INTERVAL_MS / 1000);
             ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(RECOVERY_PROBE_INTERVAL_MS));
