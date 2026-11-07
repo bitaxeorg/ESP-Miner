@@ -864,9 +864,9 @@ int STRATUM_V1_submit_share(esp_transport_handle_t transport, int send_uid, cons
         "{\"id\":%d,\"method\":\"mining.submit\",\"params\":[\"%s\",\"%s\",\"%s\",\"%08lx\",\"%08lx\",\"%08lx\"]}\n",
         send_uid, username, job_id, extranonce_2, ntime, nonce, version_bits);
 
-    int ret = stratum_socket_send_all(transport, submit_msg, strlen(submit_msg));
-
     if (out_sent_time_us) *out_sent_time_us = esp_timer_get_time();
+
+    int ret = stratum_socket_send_all(transport, submit_msg, strlen(submit_msg));
 
     debug_stratum_tx(submit_msg);
 

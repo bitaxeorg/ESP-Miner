@@ -97,7 +97,8 @@ int stratum_v1_submit_share(GlobalState *GLOBAL_STATE, const asic_job_t *active_
     }
 
     int uid = s_v1_conn->send_uid++;
-    uint64_t now = 0;
+    uint64_t now = esp_timer_get_time();
+    stratum_timing_record(&s_v1_timing, (uint32_t)uid, now);
     int ret = STRATUM_V1_submit_share(
         transport,
         uid,
@@ -107,14 +108,15 @@ int stratum_v1_submit_share(GlobalState *GLOBAL_STATE, const asic_job_t *active_
         active_job->ntime,
         nonce,
         version_bits,
-        &now);
+        NULL);
 
     if (ret >= 0) {
-        stratum_timing_record(&s_v1_timing, (uint32_t)uid, now);
         if (sent_time_us) {
             *sent_time_us = now;
         }
         SYSTEM_notify_submitted_share(GLOBAL_STATE);
+    } else {
+        stratum_timing_record(&s_v1_timing, (uint32_t)uid, 0);
     }
     pthread_mutex_unlock(&GLOBAL_STATE->transport_mutex);
     return ret;
