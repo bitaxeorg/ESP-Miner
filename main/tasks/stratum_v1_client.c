@@ -138,8 +138,6 @@ void stratum_v1_close_connection(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
     s_v1_conns[pool_idx] = NULL;
     pthread_mutex_unlock(&s_v1_conn_mutex);
 
-    POOL_reset_session(GLOBAL_STATE, pool_idx);
-
     if (conn != NULL) {
         if (conn->transport != NULL) {
             esp_transport_close(conn->transport);

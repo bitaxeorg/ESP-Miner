@@ -114,8 +114,6 @@ void stratum_v2_close_connection(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
     s_v2_conns[pool_idx] = NULL;
     pthread_mutex_unlock(&s_v2_conn_mutex);
 
-    POOL_reset_session(GLOBAL_STATE, pool_idx);
-
     if (conn && conn->noise_ctx) {
         sv2_noise_destroy(conn->noise_ctx);
         conn->noise_ctx = NULL;

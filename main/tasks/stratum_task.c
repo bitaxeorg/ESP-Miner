@@ -67,10 +67,11 @@ void stratum_check_primary_handover(GlobalState *gs, uint16_t pool_idx)
         gs->SYSTEM_MODULE.is_using_fallback &&
         !gs->SYSTEM_MODULE.use_fallback_stratum) {
         ESP_LOGI(TAG, "Primary pool %u received work! Switching from fallback.", pool_idx);
-        gs->SYSTEM_MODULE.is_using_fallback = false;
-        POOL_clear_status(gs, pool_idx);
         uint16_t sec_idx = gs->SYSTEM_MODULE.secondary_pool_index;
         stratum_abort_pool(sec_idx);
+        POOL_reset_session(gs, sec_idx);
+        gs->SYSTEM_MODULE.is_using_fallback = false;
+        POOL_clear_status(gs, pool_idx);
     }
 }
 
@@ -134,11 +135,12 @@ void stratum_notify_pool_selection_changed(GlobalState *gs)
 {
     if (!gs) return;
 
+    stratum_abort_connection();
+
     for (int i = 0; i < MAX_POOLS; i++) {
-        POOL_clear_status(gs, i);
+        POOL_reset_session(gs, i);
     }
 
-    stratum_abort_connection();
     if (s_primary_task_handle) {
         xTaskNotifyGive(s_primary_task_handle);
     }
@@ -181,8 +183,12 @@ void stratum_task(void *pvParameters)
 
         // If force fallback is toggled on, Primary steps down and sleeps
         if (is_primary && GLOBAL_STATE->SYSTEM_MODULE.use_fallback_stratum) {
-            stratum_abort_pool(GLOBAL_STATE->SYSTEM_MODULE.primary_pool_index);
-            GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback = true;
+            uint16_t prim_idx = GLOBAL_STATE->SYSTEM_MODULE.primary_pool_index;
+            stratum_abort_pool(prim_idx);
+            if (!GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback) {
+                POOL_reset_session(GLOBAL_STATE, prim_idx);
+                GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback = true;
+            }
             start_fallback_if_needed(GLOBAL_STATE);
             ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(5000));
             continue;
@@ -222,8 +228,8 @@ void stratum_task(void *pvParameters)
             retry_attempts = 0;
             if (is_primary) {
                 GLOBAL_STATE->SYSTEM_MODULE.pools_unavailable = false;
-                POOL_clear_status(GLOBAL_STATE, pool_idx);
             }
+            POOL_reset_session(GLOBAL_STATE, pool_idx);
         } else {
 
             retry_attempts++;
