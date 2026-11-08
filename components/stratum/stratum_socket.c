@@ -164,6 +164,14 @@ void stratum_socket_set_options(esp_transport_handle_t transport)
         ESP_LOGE(TAG, "Failed to set TCP_NODELAY");
     }
 
+    // Mark Stratum traffic with DSCP EF (Expedited Forwarding, 0xB8) so Wi-Fi
+    // WMM classifies frames into a high-priority hardware TX queue ahead of
+    // best-effort HTTP/WebSocket traffic.
+    int tos = 0xB8;
+    if (setsockopt(sock, IPPROTO_IP, IP_TOS, &tos, sizeof(tos)) < 0) {
+        ESP_LOGE(TAG, "Failed to set IP_TOS");
+    }
+
     // Keepalive
     int keepalive = 1;
     if (setsockopt(sock, SOL_SOCKET, SO_KEEPALIVE, &keepalive, sizeof(keepalive)) < 0) {
