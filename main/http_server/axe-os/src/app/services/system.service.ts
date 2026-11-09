@@ -165,6 +165,7 @@ export class SystemApiService {
         responseTime: 10,
         responseTimeMin: 10,
         responseTimeMax: 10,
+        difficulty: 5000000,
         responseShareBatch: 1,
         isUsingFallbackStratum: 0,
         useFallbackStratum: 0,
@@ -264,6 +265,7 @@ export class SystemApiService {
     const wifiRssiData = [-35,-34,-33,-34,-34,-34,-33,-35,-33,-34];
     const freeHeapData = [214504,212504,213504,210504,207504,209504,203504,202504,201504,200504];
     const responseTimeData = [15.1,14.5,14.3,15.1,13.1,16.1,28.6,18.4,17.7,17.6,18.0,15.5];
+    const difficultyData = [null, 500, 1500, 4500, 12000, 35000, 100000, 400000, 1200000, 5000000];
     const timestampData = [13131,18126,23125,28125,33125,38125,43125,48125,53125,58125];
 
     columnList.push("timestamp");
@@ -291,6 +293,7 @@ export class SystemApiService {
           case 'freeHeap':        statisticsList[i][j] = freeHeapData[i];     break;
           case 'responseTimeMin': statisticsList[i][j] = responseTimeData[i] ? responseTimeData[i] - 1 : null; break;
           case 'responseTimeMax': statisticsList[i][j] = responseTimeData[i] ? responseTimeData[i] + 1 : null; break;
+          case 'difficulty':      statisticsList[i][j] = difficultyData[i];   break;
           case 'timestamp':       statisticsList[i][j] = timestampData[i];    break;
           default:                statisticsList[i][j] = 0;                   break;
         }

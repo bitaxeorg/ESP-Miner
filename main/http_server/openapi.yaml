@@ -306,6 +306,7 @@ components:
         - responseTime
         - responseTimeMin
         - responseTimeMax
+        - difficulty
         - runningPartition
         - sharesAccepted
         - sharesRejected
@@ -441,6 +442,9 @@ components:
         responseTimeMax:
           type: number
           description: Maximum pool response time in ms for current tick
+        difficulty:
+          type: number
+          description: Best difficulty found in the current segment
         responseShareBatch:
           type: number
           description: Number of shares acknowledged in the batch that produced responseTime (SV2; 1 = single share, >1 = batched ack)
@@ -1197,7 +1201,7 @@ paths:
             type: array
             items:
               type: string
-            example: [hashrate,hashrate_1m,hashrate_10m,hashrate_1h,asicTemp,vrTemp,asicVoltage,voltage,power,current,fanSpeed,fanRpm,fan2Rpm,wifiRssi,freeHeap,responseTimeMin,responseTimeMax]
+            example: [hashrate,hashrate_1m,hashrate_10m,hashrate_1h,asicTemp,vrTemp,asicVoltage,voltage,power,current,fanSpeed,fanRpm,fan2Rpm,wifiRssi,freeHeap,responseTimeMin,responseTimeMax,difficulty]
           description: List of labels for which data should be retrieved
       tags:
         - system

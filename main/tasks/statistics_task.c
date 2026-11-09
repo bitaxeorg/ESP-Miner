@@ -37,6 +37,7 @@ const char * const STATS_LABELS[SRC_NONE] = {
     [SRC_FREE_HEAP] = "freeHeap",
     [SRC_RESPONSE_TIME_MIN] = "responseTimeMin",
     [SRC_RESPONSE_TIME_MAX] = "responseTimeMax",
+    [SRC_DIFFICULTY] = "difficulty",
 };
 
 static StatisticsDataPtr statisticsBuffer;
@@ -93,6 +94,24 @@ static inline void merge_max_positive(float *target, char *token, float val)
     }
 }
 
+static inline void format_difficulty(char *token, double val)
+{
+    if (val <= 0.0) {
+        strcpy(token, "null");
+    } else if (val >= 1000.0) {
+        snprintf(token, STATS_TOKEN_LEN, "%.0f", val);
+    } else {
+        snprintf(token, STATS_TOKEN_LEN, "%.2f", val);
+    }
+}
+
+static inline void merge_max_positive_double(double *target, char *token, double val)
+{
+    if (val > 0.0 && (*target <= 0.0 || val > *target)) {
+        *target = val;
+        format_difficulty(token, val);
+    }
+}
 bool addStatisticData(StatisticsDataPtr data, uint16_t statsFrequency)
 {
     bool result = false;
@@ -159,6 +178,7 @@ bool addStatisticData(StatisticsDataPtr data, uint16_t statsFrequency)
             if (indexToRemove > 0) {
                 merge_min_positive(&successor->responseTimeMin, successor->tokens[SRC_RESPONSE_TIME_MIN], toRemove->responseTimeMin);
                 merge_max_positive(&successor->responseTimeMax, successor->tokens[SRC_RESPONSE_TIME_MAX], toRemove->responseTimeMax);
+                merge_max_positive_double(&successor->difficulty, successor->tokens[SRC_DIFFICULTY], toRemove->difficulty);
             }
 
             // Shift and append (Standard linear array shift)
@@ -248,6 +268,11 @@ void statistics_task(void * pvParameters)
                 last_shares_count = current_shares;
                 sys_module->response_time_min = 0.0f;
                 sys_module->response_time_max = 0.0f;
+
+                statsData.difficulty = sys_module->difficulty;
+                sys_module->last_difficulty = sys_module->difficulty;
+                format_difficulty(statsData.tokens[SRC_DIFFICULTY], statsData.difficulty);
+                sys_module->difficulty = 0.0;
 
                 addStatisticData(&statsData, configStatsFrequency);
             }
