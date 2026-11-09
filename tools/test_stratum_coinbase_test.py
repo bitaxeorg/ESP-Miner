@@ -14,7 +14,7 @@ def double_hash(data):
 
 class CoinbaseTests(unittest.TestCase):
     def test_serialized_transactions_have_distinct_payouts_and_correct_value(self):
-        for count in (1, 110, 1800, 10000, 20000):
+        for count in (1, 110, 1800, 10000, 25000):
             with self.subTest(count=count):
                 prefix, suffix = coinbase_parts(count)
                 tx = prefix + bytes(4 + 8) + suffix
@@ -42,8 +42,8 @@ class CoinbaseTests(unittest.TestCase):
                 self.assertEqual(tx[pos:], bytes(4))
                 if count == 10000:
                     self.assertEqual(len(suffix), 430011)
-                if count == 20000:
-                    self.assertGreater(len(suffix) * 2, 2 * 512 * 1024 + 8192)
+                if count == 25000:
+                    self.assertGreater(len(suffix), 1_000_000)
 
     def test_header_matches_independent_node_crypto_reference(self):
         job = Job("ref", 1, b"\x01", b"\x03", 0x64495522)
@@ -145,13 +145,13 @@ class PoolTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.config.difficulty, Fraction(1, 100_000_000))
 
     async def test_disconnect_during_oversized_job_can_reconnect_and_mine(self):
-        self.config.counts = (110, 20000, 110)
+        self.config.counts = (110, 25000, 110)
         self.config.interval = 0.01
         self.config.chunk_delay = 0.001
         await self.handshake()
 
         async def large_job_started():
-            while self.sessions[0].current.count != 20000:
+            while self.sessions[0].current.count != 25000:
                 await asyncio.sleep(0.001)
 
         await asyncio.wait_for(large_job_started(), 5)

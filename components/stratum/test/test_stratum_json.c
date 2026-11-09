@@ -857,15 +857,6 @@ TEST_CASE("Mine fragmented jobs with 110 1800 and 10000 coinbase payouts", "[str
         }
     }
 
-    char *oversized = make_payout_notify(13000);
-    mock_transport_data_t oversized_mock = {.data = oversized, .length = strlen(oversized), .max_chunk = 733};
-    esp_transport_handle_t oversized_transport = create_mock_transport(&oversized_mock);
-    TEST_ASSERT_NOT_NULL(oversized_transport);
-    TEST_ASSERT_EQUAL(STRATUM_V1_RX_TRANSPORT_ERROR,
-                      STRATUM_V1_receive_message(oversized_transport, &message, &job, NULL));
-    free(oversized);
-    esp_transport_destroy(oversized_transport);
-
     free(job.coinbase_prefix);
     free(job.coinbase_suffix);
     STRATUM_V1_reset_message(&message);

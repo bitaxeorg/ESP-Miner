@@ -39,10 +39,10 @@ TCP may combine or split writes, so these are application write sizes rather tha
 To test an oversized job and reconnect recovery:
 
 ```sh
-python3 tools/stratum_coinbase_test.py --counts 110,20000,110 --interval 60
+python3 tools/stratum_coinbase_test.py --counts 110,25000,110 --interval 60
 ```
 
-20,000 payouts produce an approximately 860 KB coinbase suffix (1.72 MB of hex), above the 512 KiB `MAX_COINBASE_SUFFIX_LEN` limit. Expect an explicit oversized-suffix error in the miner log and a disconnect. Every new connection restarts the sequence at 110 payouts, so verify that shares resume after reconnect. Unfixed firmware can also disconnect or stall on the 1,800- and 10,000-payout stages; compare its logs with the fixed build.
+25,000 payouts produce an approximately 1.075 MB coinbase suffix (2.15 MB of hex), above the 1,000,000-byte `MAX_COINBASE_SUFFIX_LEN` consensus limit. Expect an explicit oversized-suffix error in the miner log and a disconnect. Every new connection restarts the sequence at 110 payouts, so verify that shares resume after reconnect. Unfixed firmware can also disconnect or stall on the 1,800- and 10,000-payout stages; compare its logs with the fixed build.
 
 Change `--difficulty` to adjust share frequency, `--interval` for the time per stage, and `--port` if 3333 is occupied. Higher difficulties produce fewer shares; choose an interval long enough to observe several shares from your hardware.
 

@@ -250,3 +250,80 @@ TEST_CASE("stratum_rx_stream rejects oversized non-notify method", "[stratum][rx
     esp_transport_destroy(transport);
 }
 
+typedef struct {
+    const char *prefix;
+    size_t prefix_len;
+    size_t hex_len;
+    const char *suffix;
+    size_t suffix_len;
+    size_t offset;
+} generated_notify_transport_t;
+
+static int generated_notify_read(esp_transport_handle_t transport, char *buffer,
+                                 int len, int timeout_ms)
+{
+    (void)timeout_ms;
+    generated_notify_transport_t *gen =
+        (generated_notify_transport_t *)esp_transport_get_context_data(transport);
+    size_t total = gen->prefix_len + gen->hex_len + gen->suffix_len;
+    if (gen == NULL || gen->offset >= total) {
+        return ERR_TCP_TRANSPORT_CONNECTION_CLOSED_BY_FIN;
+    }
+
+    size_t max_copy = MIN((size_t)len, 733U);
+    size_t copied = 0;
+    while (copied < max_copy && gen->offset < total) {
+        if (gen->offset < gen->prefix_len) {
+            size_t avail = MIN(max_copy - copied, gen->prefix_len - gen->offset);
+            memcpy(buffer + copied, gen->prefix + gen->offset, avail);
+            copied += avail;
+            gen->offset += avail;
+        } else if (gen->offset < gen->prefix_len + gen->hex_len) {
+            size_t avail = MIN(max_copy - copied, (gen->prefix_len + gen->hex_len) - gen->offset);
+            memset(buffer + copied, 'a', avail);
+            copied += avail;
+            gen->offset += avail;
+        } else {
+            size_t suf_off = gen->offset - (gen->prefix_len + gen->hex_len);
+            size_t avail = MIN(max_copy - copied, gen->suffix_len - suf_off);
+            memcpy(buffer + copied, gen->suffix + suf_off, avail);
+            copied += avail;
+            gen->offset += avail;
+        }
+    }
+    return (int)copied;
+}
+
+TEST_CASE("stratum_rx_stream rejects coinb2 exceeding MAX_COINBASE_SUFFIX_LEN", "[stratum][rx_stream]")
+{
+    const char *prefix =
+        "{\"id\":null,\"method\":\"mining.notify\",\"params\":[\"oversized\","
+        "\"0000000000000000000000000000000000000000000000000000000000000000\","
+        "\"01000000\",\"";
+    const char *suffix = "\",[],\"20000000\",\"1705ae3a\",\"647025b5\",true]}\n";
+
+    generated_notify_transport_t gen = {
+        .prefix = prefix,
+        .prefix_len = strlen(prefix),
+        .hex_len = ((size_t)MAX_COINBASE_SUFFIX_LEN + 1U) * 2U,
+        .suffix = suffix,
+        .suffix_len = strlen(suffix),
+        .offset = 0,
+    };
+
+    esp_transport_handle_t transport = esp_transport_init();
+    TEST_ASSERT_NOT_NULL(transport);
+    TEST_ASSERT_EQUAL(ESP_OK, esp_transport_set_context_data(transport, &gen));
+    TEST_ASSERT_EQUAL(ESP_OK, esp_transport_set_func(transport, NULL, generated_notify_read,
+                                                     NULL, NULL, NULL, NULL, NULL));
+    TEST_ASSERT_TRUE(stratum_rx_stream_init());
+
+    const char *line_buf = NULL;
+    size_t line_len = 0;
+    TEST_ASSERT_FALSE(stratum_rx_stream_read_line(transport, &line_buf, &line_len, NULL));
+    TEST_ASSERT_FALSE(stratum_rx_stream_has_coinb2("*", NULL));
+    TEST_ASSERT_NULL(stratum_rx_stream_take_coinb2(NULL));
+
+    esp_transport_destroy(transport);
+}
+

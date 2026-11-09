@@ -10,7 +10,7 @@
 typedef mining_job_source_t miner_job_type_t;
 
 #define MAX_COINBASE_PREFIX_LEN 1024
-#define MAX_COINBASE_SUFFIX_LEN (512 * 1024)
+#define MAX_COINBASE_SUFFIX_LEN 1000000
 #define MAX_EXTRANONCE_2_LEN 32
 #define MAX_MERKLE_BRANCHES 32
 #define MAX_JOB_ID_LEN ASIC_JOB_ID_LEN
