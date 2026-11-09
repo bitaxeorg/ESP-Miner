@@ -657,7 +657,6 @@ TEST_CASE("Receive preserves consecutive JSON-RPC lines", "[stratum][security]")
 
 TEST_CASE("Receive rejects oversized JSON-RPC line", "[stratum][security]")
 {
-    if (!esp_psram_is_initialized()) TEST_IGNORE_MESSAGE("Large line test requires PSRAM");
     size_t data_length = STRATUM_V1_MAX_JSON_LINE_SIZE + 2U;
     char *json = malloc(data_length);
     TEST_ASSERT_NOT_NULL(json);
@@ -688,7 +687,6 @@ TEST_CASE("Receive rejects oversized JSON-RPC line", "[stratum][security]")
 
 TEST_CASE("Receive accepts maximum line and preserves the next line", "[stratum][security]")
 {
-    if (!esp_psram_is_initialized()) TEST_IGNORE_MESSAGE("Large line test requires PSRAM");
     const char *next_line = "{}\n";
     size_t data_length = STRATUM_V1_MAX_JSON_LINE_SIZE + 1U + strlen(next_line);
     char *data = malloc(data_length);
@@ -821,24 +819,27 @@ TEST_CASE("Mine fragmented jobs with 110 1800 and 10000 coinbase payouts", "[str
     };
     miner_job_t job = {0};
     StratumApiV1Message message = {0};
+    StratumApiV1Message reply_msg = {0};
+    TEST_ASSERT_TRUE(STRATUM_V1_initialize_buffer());
     for (size_t n = 0; n < sizeof(counts) / sizeof(counts[0]); ++n) {
         char *data = make_payout_notify(counts[n]);
         mock_transport_data_t mock = {.data = data, .length = strlen(data), .max_chunk = 733};
         esp_transport_handle_t transport = create_mock_transport(&mock);
         TEST_ASSERT_NOT_NULL(transport);
-        TEST_ASSERT_TRUE(STRATUM_V1_initialize_buffer());
-        char *line = STRATUM_V1_receive_jsonrpc_line(transport);
-        TEST_ASSERT_NOT_NULL(line);
-        char *reply = STRATUM_V1_receive_jsonrpc_line(transport);
-        TEST_ASSERT_EQUAL_STRING("{\"id\":7,\"result\":true}", reply);
-        free(data);
-        free(reply);
-        esp_transport_destroy(transport);
 
-        TEST_ASSERT_TRUE(STRATUM_V1_parse(&message, line, &job));
+        int64_t rx_time_us = 0;
+        TEST_ASSERT_EQUAL(STRATUM_V1_RX_OK, STRATUM_V1_receive_message(transport, &message, &job, &rx_time_us));
         TEST_ASSERT_EQUAL(MINING_NOTIFY, message.method);
         TEST_ASSERT_EQUAL_size_t(counts[n] * 43U - (counts[n] >= 253 ? 1U : 3U), job.coinbase_suffix_len);
-        free(line);
+
+        TEST_ASSERT_EQUAL(STRATUM_V1_RX_OK, STRATUM_V1_receive_message(transport, &reply_msg, NULL, NULL));
+        TEST_ASSERT_EQUAL(STRATUM_RESULT, reply_msg.method);
+        TEST_ASSERT_EQUAL_INT(7, reply_msg.message_id);
+        TEST_ASSERT_TRUE(reply_msg.response_success);
+        STRATUM_V1_reset_message(&reply_msg);
+
+        free(data);
+        esp_transport_destroy(transport);
         job.extranonce2_len = 4;
 
         mining_notification_result_t result = {0};
@@ -857,6 +858,16 @@ TEST_CASE("Mine fragmented jobs with 110 1800 and 10000 coinbase payouts", "[str
             TEST_ASSERT_EQUAL_MEMORY(expected, work.merkle_root, sizeof(expected));
         }
     }
+
+    char *oversized = make_payout_notify(13000);
+    mock_transport_data_t oversized_mock = {.data = oversized, .length = strlen(oversized), .max_chunk = 733};
+    esp_transport_handle_t oversized_transport = create_mock_transport(&oversized_mock);
+    TEST_ASSERT_NOT_NULL(oversized_transport);
+    TEST_ASSERT_EQUAL(STRATUM_V1_RX_TRANSPORT_ERROR,
+                      STRATUM_V1_receive_message(oversized_transport, &message, &job, NULL));
+    free(oversized);
+    esp_transport_destroy(oversized_transport);
+
     free(job.coinbase_prefix);
     free(job.coinbase_suffix);
     STRATUM_V1_reset_message(&message);

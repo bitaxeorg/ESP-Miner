@@ -32,9 +32,7 @@ void miner_job_pool_init(void)
                 s_job_pool[i].coinbase_prefix = calloc(1, MAX_COINBASE_PREFIX_LEN);
             }
         }
-        if (!s_job_pool[i].coinbase_suffix) {
-            miner_job_resize_coinbase_suffix(&s_job_pool[i], 2048);
-        }
+        miner_job_resize_coinbase_suffix(&s_job_pool[i], 2048);
         uint8_t *p_buf = s_job_pool[i].coinbase_prefix;
         uint8_t *s_buf = s_job_pool[i].coinbase_suffix;
         memset(&s_job_pool[i], 0, sizeof(miner_job_t));
