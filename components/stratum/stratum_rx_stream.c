@@ -327,11 +327,11 @@ static bool find_params_coinb2_quote(const char *buf, size_t len, size_t *out_co
     return false;
 }
 
-static bool try_begin_coinb2_stream(void)
+static bool try_begin_coinb2_stream(size_t parse_len)
 {
     s_rx_coinb2_checked = true;
     size_t coinb2_start = 0;
-    if (!find_params_coinb2_quote(json_rpc_buffer, json_rpc_buffer_len, &coinb2_start)) {
+    if (!find_params_coinb2_quote(json_rpc_buffer, parse_len, &coinb2_start)) {
         return true;
     }
 
@@ -341,9 +341,9 @@ static bool try_begin_coinb2_stream(void)
     s_rx_coinb2_hex_count = 0;
 
     char *close_quote = memchr(json_rpc_buffer + coinb2_start, '"',
-                               json_rpc_buffer_len - coinb2_start);
+                               parse_len - coinb2_start);
     if (close_quote == NULL) {
-        size_t hex_len = json_rpc_buffer_len - coinb2_start;
+        size_t hex_len = parse_len - coinb2_start;
         if (!stream_coinb2_hex_bytes(json_rpc_buffer + coinb2_start, hex_len)) {
             return false;
         }
@@ -390,7 +390,7 @@ bool stratum_rx_stream_read_line(esp_transport_handle_t transport,
     while (newline_pos == NULL) {
         if (!s_rx_streaming_coinb2 && !s_rx_coinb2_checked &&
             json_rpc_buffer_len >= STRATUM_V1_COINB2_STREAM_THRESHOLD) {
-            if (!try_begin_coinb2_stream()) {
+            if (!try_begin_coinb2_stream(json_rpc_buffer_len)) {
                 reset_json_rpc_buffer();
                 return false;
             }
@@ -473,7 +473,7 @@ bool stratum_rx_stream_read_line(esp_transport_handle_t transport,
 
             if (newline_pos == NULL && !s_rx_streaming_coinb2 && !s_rx_coinb2_checked &&
                 json_rpc_buffer_len >= STRATUM_V1_COINB2_STREAM_THRESHOLD) {
-                if (!try_begin_coinb2_stream()) {
+                if (!try_begin_coinb2_stream(json_rpc_buffer_len)) {
                     reset_json_rpc_buffer();
                     return false;
                 }
@@ -490,6 +490,21 @@ bool stratum_rx_stream_read_line(esp_transport_handle_t transport,
     }
 
     size_t line_len = (size_t)(newline_pos - json_rpc_buffer);
+    if (!s_rx_streaming_coinb2 && !s_rx_coinb2_checked &&
+        line_len >= STRATUM_V1_COINB2_STREAM_THRESHOLD) {
+        if (!try_begin_coinb2_stream(line_len)) {
+            reset_json_rpc_buffer();
+            return false;
+        }
+        newline_pos = memchr(json_rpc_buffer, '\n', json_rpc_buffer_len);
+        line_len = (size_t)(newline_pos - json_rpc_buffer);
+    }
+    if (line_len > STRATUM_V1_MAX_JSON_LINE_SIZE) {
+        ESP_LOGE(TAG, "JSON-RPC line exceeds %u bytes",
+                 STRATUM_V1_MAX_JSON_LINE_SIZE);
+        reset_json_rpc_buffer();
+        return false;
+    }
     size_t raw_len = line_len + (s_rx_coinb2_hex_count > 0 ? (s_rx_coinb2_hex_count - 1U) : 0U);
     json_rpc_buffer[line_len] = '\0';
     if (out_line != NULL) {
