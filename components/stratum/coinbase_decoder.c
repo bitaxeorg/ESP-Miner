@@ -193,11 +193,16 @@ esp_err_t coinbase_process_notification(const mining_notify *notification,
     hex2bin(notification->coinbase_1 + (coinbase_1_offset * 2), &block_height_len, 1);
     coinbase_1_offset++;
 
-    if (coinbase_1_len < coinbase_1_offset || block_height_len == 0 || block_height_len > 4) return ESP_ERR_INVALID_ARG;
-
-    result->block_height = 0;
-    hex2bin(notification->coinbase_1 + (coinbase_1_offset * 2), (uint8_t *)&result->block_height, block_height_len);
-    coinbase_1_offset += block_height_len;
+    if (block_height_len >= 0x51 && block_height_len <= 0x60) {
+        result->block_height = block_height_len - 0x50; // encoded as OP_1..OP_16
+        block_height_len = 0; // no push data to account for
+    } else if (coinbase_1_len < coinbase_1_offset || block_height_len == 0 || block_height_len > 4) {
+        return ESP_ERR_INVALID_ARG;
+    } else {
+        result->block_height = 0;
+        hex2bin(notification->coinbase_1 + (coinbase_1_offset * 2), (uint8_t *)&result->block_height, block_height_len);
+        coinbase_1_offset += block_height_len;
+    }
 
     // Detect BIP-110 signaling: check if bit 4 (0x00000010) is set in version
     result->bip110_signaling = decode_coinbase_tx && result->block_height < BIP110_SIGNAL_EXPIRY_BLOCK && (notification->version & (1U << BIP110_SIGNAL_BIT)) != 0;
