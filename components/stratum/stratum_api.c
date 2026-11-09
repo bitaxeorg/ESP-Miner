@@ -17,7 +17,6 @@
 #include "utils.h"
 #include "esp_timer.h"
 #include "esp_heap_caps.h"
-#include "esp_psram.h"
 #include <inttypes.h>
 #include <stdio.h>
 #include <string.h>
@@ -85,9 +84,7 @@ char * STRATUM_V1_receive_jsonrpc_line(esp_transport_handle_t transport)
         return NULL;
     }
 
-    uint32_t caps = MALLOC_CAP_8BIT;
-    if (esp_psram_is_initialized()) caps |= MALLOC_CAP_SPIRAM;
-    char *line = heap_caps_malloc(line_len + 1U, caps);
+    char *line = heap_caps_malloc(line_len + 1U, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     if (!line) {
         ESP_LOGE(TAG, "Failed to allocate JSON-RPC line (%zu bytes)", line_len);
         stratum_rx_stream_consume_line(line_len);
@@ -318,7 +315,8 @@ static bool parse_mining_notify(yyjson_val *root, miner_job_t *job)
         return false;
     }
     if (!job->coinbase_prefix) {
-        job->coinbase_prefix = calloc(1, MAX_COINBASE_PREFIX_LEN);
+        job->coinbase_prefix = heap_caps_calloc(1, MAX_COINBASE_PREFIX_LEN,
+                                                MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     }
     if (!job->coinbase_prefix) {
         ESP_LOGE(TAG, "Failed to allocate coinbase prefix buffer");

@@ -4,7 +4,6 @@
 #include "utils.h"
 #include "esp_log.h"
 #include "esp_heap_caps.h"
-#include "esp_psram.h"
 #include <stdlib.h>
 #include <string.h>
 #include <sys/param.h>
@@ -65,7 +64,7 @@ bool stratum_rx_stream_init(void)
     json_rpc_buffer_size = 0;
     json_rpc_buffer_len = 0;
 
-    json_rpc_buffer = malloc(BUFFER_SIZE);
+    json_rpc_buffer = heap_caps_malloc(BUFFER_SIZE, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     if (json_rpc_buffer == NULL) {
         ESP_LOGE(TAG, "Failed to allocate memory for JSON-RPC buffer");
         return false;
@@ -91,9 +90,8 @@ static bool ensure_json_buffer_capacity(size_t required_size)
         new_size = MIN(new_size * 2U, JSON_RPC_BUFFER_LIMIT);
     }
 
-    uint32_t caps = MALLOC_CAP_8BIT;
-    if (esp_psram_is_initialized()) caps |= MALLOC_CAP_SPIRAM;
-    char *new_buffer = heap_caps_realloc(json_rpc_buffer, new_size, caps);
+    char *new_buffer = heap_caps_realloc(json_rpc_buffer, new_size,
+                                         MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     if (new_buffer == NULL) {
         ESP_LOGE(TAG, "Failed to grow JSON-RPC receive buffer to %zu bytes", new_size);
         return false;
@@ -127,9 +125,8 @@ static bool stream_coinb2_hex_bytes(const char *data, size_t len)
         while (new_cap < s_rx_suffix_len + new_bytes && new_cap < MAX_COINBASE_SUFFIX_LEN) {
             new_cap = MIN(new_cap * 2U, (size_t)MAX_COINBASE_SUFFIX_LEN);
         }
-        uint32_t caps = MALLOC_CAP_8BIT;
-        if (esp_psram_is_initialized()) caps |= MALLOC_CAP_SPIRAM;
-        uint8_t *new_buf = heap_caps_realloc(s_rx_suffix, new_cap, caps);
+        uint8_t *new_buf = heap_caps_realloc(s_rx_suffix, new_cap,
+                                             MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
         if (!new_buf) {
             ESP_LOGE(TAG, "Failed to grow streamed coinbase suffix buffer to %zu bytes", new_cap);
             return false;
@@ -542,9 +539,8 @@ uint8_t *stratum_rx_stream_take_coinb2(size_t *out_len)
         return NULL;
     }
     size_t len = s_rx_suffix_len;
-    uint32_t caps = MALLOC_CAP_8BIT;
-    if (esp_psram_is_initialized()) caps |= MALLOC_CAP_SPIRAM;
-    uint8_t *shrunk = heap_caps_realloc(s_rx_suffix, len, caps);
+    uint8_t *shrunk = heap_caps_realloc(s_rx_suffix, len,
+                                        MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     if (shrunk != NULL) {
         s_rx_suffix = shrunk;
     }

@@ -2,7 +2,6 @@
 #include "miner_job.h"
 #include <stdlib.h>
 #include <string.h>
-#include "esp_psram.h"
 #include "esp_heap_caps.h"
 
 TEST_CASE("miner_job_get_slot indexing and buffer validity", "[stratum]")
@@ -73,7 +72,6 @@ TEST_CASE("coinbase suffix resize preserves storage on rejected size", "[stratum
 
 TEST_CASE("coinbase suffix allocation failure preserves job and permits recovery", "[stratum]")
 {
-    if (!esp_psram_is_initialized()) TEST_IGNORE_MESSAGE("PSRAM allocation failure test");
     miner_job_t job = {0};
     TEST_ASSERT_TRUE(miner_job_resize_coinbase_suffix(&job, 32));
     memset(job.coinbase_suffix, 0xa5, 32);

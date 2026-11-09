@@ -2,7 +2,6 @@
 #include "stratum_api.h"
 #include <string.h>
 #include <sys/param.h>
-#include "esp_psram.h"
 #include "esp_heap_caps.h"
 #include "coinbase_decoder.h"
 #include "mining.h"
@@ -808,7 +807,6 @@ static char *make_payout_notify(size_t count)
 
 TEST_CASE("Mine fragmented jobs with 110 1800 and 10000 coinbase payouts", "[stratum][mining.notify]")
 {
-    if (!esp_psram_is_initialized()) TEST_IGNORE_MESSAGE("Large payout test requires PSRAM");
     const size_t counts[] = {110, 1800, 10000, 110};
     // Reference hashes from Python hashlib over the serialized transaction and rolled extranonce2.
     const char *hashes[][2] = {
