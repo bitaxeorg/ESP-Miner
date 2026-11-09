@@ -162,39 +162,6 @@ TEST_CASE("BM1366 and BM1397 reject response job IDs outside the active slots",
     }
 }
 
-TEST_CASE("BM1397 deduplicates repeated and previously found nonces",
-          "[asic][result][bm1397]")
-{
-    GlobalState *state = bm1397_harness_begin();
-    TEST_ASSERT_EQUAL_UINT8(2, bm1397_harness_driver.init(state));
-
-    asic_job_t job = make_job(JOB_TYPE_V1);
-    bm1397_harness_install_job(0, &job);
-    uint8_t wire_job_id = 0;
-
-    // First nonce should succeed
-    queue_response(true, wire_job_id, 0x12345678);
-    task_result *res = bm1397_harness_driver.process_work(state);
-    TEST_ASSERT_NOT_NULL(res);
-    TEST_ASSERT_EQUAL_HEX32(0x12345678, res->nonce);
-
-    // Immediate duplicate nonce should be rejected
-    queue_response(true, wire_job_id, 0x12345678);
-    TEST_ASSERT_NULL(bm1397_harness_driver.process_work(state));
-
-    // A different nonce should succeed
-    queue_response(true, wire_job_id, 0x87654321);
-    res = bm1397_harness_driver.process_work(state);
-    TEST_ASSERT_NOT_NULL(res);
-    TEST_ASSERT_EQUAL_HEX32(0x87654321, res->nonce);
-
-    // The first nonce re-emitted later should still be rejected (in ring buffer)
-    queue_response(true, wire_job_id, 0x12345678);
-    TEST_ASSERT_NULL(bm1397_harness_driver.process_work(state));
-
-    bm1397_harness_end();
-}
-
 TEST_CASE("BM1397 software rolled starting_version decodes rolled_version and computes correct version_bits",
           "[asic][bm1397][result-job]")
 {

@@ -170,7 +170,7 @@ void ASIC_set_nonce_space(GlobalState * GLOBAL_STATE)
 
 double ASIC_get_asic_job_frequency_ms(GlobalState * GLOBAL_STATE)
 {
-    float freq = GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value;
+    float freq = GLOBAL_STATE->POWER_MANAGEMENT_MODULE.actual_frequency;
     int cores = GLOBAL_STATE->DEVICE_CONFIG.family.asic.core_count;
     int small_cores = GLOBAL_STATE->DEVICE_CONFIG.family.asic.small_core_count;
     int asic_count = GLOBAL_STATE->DEVICE_CONFIG.family.asic_count;

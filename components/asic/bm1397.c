@@ -72,27 +72,6 @@ typedef struct __attribute__((__packed__))
 
 static const char * TAG = "bm1397";
 
-#define BM1397_RECENT_NONCES_COUNT 16
-
-static uint32_t s_recent_nonces[BM1397_RECENT_NONCES_COUNT];
-static size_t s_recent_nonce_count = 0;
-static size_t s_recent_nonce_idx = 0;
-
-static bool bm1397_is_duplicate_nonce(uint32_t nonce)
-{
-    for (size_t i = 0; i < s_recent_nonce_count; i++) {
-        if (s_recent_nonces[i] == nonce) {
-            return true;
-        }
-    }
-    s_recent_nonces[s_recent_nonce_idx] = nonce;
-    s_recent_nonce_idx = (s_recent_nonce_idx + 1) % BM1397_RECENT_NONCES_COUNT;
-    if (s_recent_nonce_count < BM1397_RECENT_NONCES_COUNT) {
-        s_recent_nonce_count++;
-    }
-    return false;
-}
-
 static task_result result;
 
 static uint16_t address_interval;
@@ -201,10 +180,6 @@ float BM1397_send_hash_frequency(float target_freq)
 
 uint8_t BM1397_init(GlobalState * GLOBAL_STATE)
 {
-    s_recent_nonce_count = 0;
-    s_recent_nonce_idx = 0;
-    memset(s_recent_nonces, 0, sizeof(s_recent_nonces));
-
     // send the init command
     _send_read_address();
 
@@ -308,14 +283,6 @@ task_result *BM1397_process_work(GlobalState * GLOBAL_STATE)
                                   asic_result.job.nonce,
                                   asic_result.job.chip_slot,
                                   &result)) {
-        return NULL;
-    }
-
-    // ASIC may return the same nonce multiple times
-    // or one that was already found
-    // most of the time it behaves however
-    if (bm1397_is_duplicate_nonce(asic_result.job.nonce))
-    {
         return NULL;
     }
 
