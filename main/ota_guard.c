@@ -140,9 +140,10 @@ static void ota_guard_task(void * pvParameters)
         }
 
         // No verdict while the user paused mining, it's cooling down or the
-        // network/pools are down: none of that is the firmware's fault
+        // network/pools are down or the pool sends no work: none of that is the
+        // firmware's fault
         if (hashing || esp_timer_get_time() / 1000000 < VERDICT_S || sys->mining_paused || sys->overheat_mode
-            || !sys->is_connected || sys->pools_unavailable) {
+            || !sys->is_connected || sys->pools_unavailable || !GLOBAL_STATE->has_work) {
             continue;
         }
         roll_back(sys->hardware_fault ? "Hardware fault after the update" : "Not mining 10 minutes after the update");
