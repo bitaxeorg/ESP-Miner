@@ -36,6 +36,9 @@
 #include "theme_api.h"
 #include "axe-os/api/system/asic_settings.h"
 #include "display.h"
+#include "default_screens.h"
+#include "display_config.h"
+#include "screen.h"
 #include "http_server.h"
 #include "embedded_web_ui.h"
 #include "sv2_protocol.h"
@@ -1810,6 +1813,150 @@ esp_err_t http_404_error_handler(httpd_req_t * req, httpd_err_code_t err)
     return ESP_OK;
 }
 
+static int display_prebuffer_len = 512;
+
+// GET /api/display/screens handler
+static esp_err_t GET_display_screens(httpd_req_t *req)
+{
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_set_hdr(req, "Cache-Control", "no-cache, no-store, must-revalidate");
+
+    cJSON *root = cJSON_CreateArray();
+
+    for (int i = 0; i < MAX_CAROUSEL_SCREENS; i++) {
+        char *screen = nvs_config_get_string_indexed(NVS_CONFIG_SCREENS, i);
+        if (screen) {
+            cJSON_AddItemToArray(root, cJSON_CreateString(screen));
+            free(screen);
+        } else {
+            cJSON_AddItemToArray(root, cJSON_CreateString(""));
+        }
+    }
+
+    esp_err_t res = HTTP_send_json(req, root, &display_prebuffer_len);
+    cJSON_Delete(root);
+    return res;
+}
+
+// POST /api/display/screens handler
+static esp_err_t POST_display_screens(httpd_req_t *req)
+{
+    int remaining = req->content_len;
+    if (remaining <= 0 || remaining > 8192) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid content length");
+        return ESP_OK;
+    }
+
+    char *buf = malloc(remaining + 1);
+    if (!buf) {
+        httpd_resp_send_500(req);
+        return ESP_OK;
+    }
+
+    int recv_len = 0;
+    while (remaining > 0) {
+        int ret = httpd_req_recv(req, buf + recv_len, remaining);
+        if (ret <= 0) {
+            if (ret == HTTPD_SOCK_ERR_TIMEOUT) continue;
+            free(buf);
+            httpd_resp_send_500(req);
+            return ESP_OK;
+        }
+        recv_len += ret;
+        remaining -= ret;
+    }
+    buf[recv_len] = '\0';
+
+    cJSON *root = cJSON_Parse(buf);
+    free(buf);
+
+    if (!root || !cJSON_IsArray(root)) {
+        if (root) cJSON_Delete(root);
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid JSON array");
+        return ESP_OK;
+    }
+
+    int array_size = cJSON_GetArraySize(root);
+    if (array_size > MAX_CAROUSEL_SCREENS) {
+        cJSON_Delete(root);
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Too many screens");
+        return ESP_OK;
+    }
+
+    Settings *setting = nvs_config_get_settings(NVS_CONFIG_SCREENS);
+    int max_len = (setting && setting->max > 0) ? setting->max : 256;
+
+    for (int i = 0; i < array_size; i++) {
+        cJSON *item = cJSON_GetArrayItem(root, i);
+        if (cJSON_IsString(item)) {
+            if (strlen(item->valuestring) > max_len) {
+                cJSON_Delete(root);
+                httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Screen configuration is too long");
+                return ESP_OK;
+            }
+        }
+    }
+
+    for (int i = 0; i < array_size; i++) {
+        cJSON *item = cJSON_GetArrayItem(root, i);
+        if (cJSON_IsString(item)) {
+            nvs_config_set_string_indexed(NVS_CONFIG_SCREENS, i, item->valuestring);
+        }
+    }
+
+    // Set remaining screens to empty
+    for (int i = array_size; i < MAX_CAROUSEL_SCREENS; i++) {
+        nvs_config_set_string_indexed(NVS_CONFIG_SCREENS, i, "");
+    }
+
+    cJSON_Delete(root);
+
+    cJSON *resp = cJSON_CreateObject();
+    cJSON_AddStringToObject(resp, "message", "Screens saved successfully");
+    httpd_resp_set_type(req, "application/json");
+    esp_err_t res = HTTP_send_json(req, resp, &display_prebuffer_len);
+    cJSON_Delete(resp);
+    return res;
+}
+
+// POST /api/display/screens/reset handler
+static esp_err_t POST_display_reset(httpd_req_t *req)
+{
+    for (int i = 0; i < MAX_CAROUSEL_SCREENS; i++) {
+        nvs_config_set_string_indexed(NVS_CONFIG_SCREENS, i, i < DEFAULT_SCREENS_COUNT ? default_screens[i] : "");
+    }
+
+    cJSON *resp = cJSON_CreateObject();
+    cJSON_AddStringToObject(resp, "message", "Screens reset to defaults");
+    httpd_resp_set_type(req, "application/json");
+    esp_err_t res = HTTP_send_json(req, resp, &display_prebuffer_len);
+    cJSON_Delete(resp);
+    return res;
+}
+
+// GET /api/display/variables handler
+static esp_err_t GET_display_variables(httpd_req_t *req)
+{
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_set_hdr(req, "Cache-Control", "no-cache, no-store, must-revalidate");
+
+    const char **variables = NULL;
+    size_t count = 0;
+    if (display_config_get_variables(&variables, &count) != ESP_OK) {
+        httpd_resp_send_500(req);
+        return ESP_OK;
+    }
+
+    cJSON *root = cJSON_CreateArray();
+    for (size_t i = 0; i < count; i++) {
+        cJSON_AddItemToArray(root, cJSON_CreateString(variables[i]));
+    }
+
+    esp_err_t res = HTTP_send_json(req, root, &display_prebuffer_len);
+    cJSON_Delete(root);
+    return res;
+}
+
 esp_err_t start_rest_server(GlobalState * GLOBAL_STATE)
 {
     const httpd_uri_t routes[] = {
@@ -1843,6 +1990,12 @@ esp_err_t start_rest_server(GlobalState * GLOBAL_STATE)
         // Theme configuration
         { .uri = "/api/theme",                     .method = HTTP_GET,     .handler = theme_get_handler },
         { .uri = "/api/theme",                     .method = HTTP_POST,    .handler = theme_post_handler },
+
+        // Display screens
+        { .uri = "/api/display/screens",           .method = HTTP_GET,     .handler = GET_display_screens },
+        { .uri = "/api/display/screens",           .method = HTTP_POST,    .handler = POST_display_screens },
+        { .uri = "/api/display/screens/reset",     .method = HTTP_POST,    .handler = POST_display_reset },
+        { .uri = "/api/display/variables",         .method = HTTP_GET,     .handler = GET_display_variables },
 
         // WebSockets
         { .uri = "/api/ws",                        .method = HTTP_GET,     .handler = websocket_handler, .is_websocket = true, .ws_pre_handshake_cb = websocket_pre_handshake, .ws_post_handshake_cb = websocket_post_handshake_logs },
