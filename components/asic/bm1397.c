@@ -76,6 +76,10 @@ static task_result result;
 
 static uint16_t address_interval;
 
+static uint32_t first_nonce = 0;
+static bool nonce_found = false;
+static bool nonce_wrapped = false;
+
 /// @brief
 /// @param ftdi
 /// @param header
@@ -180,6 +184,10 @@ float BM1397_send_hash_frequency(float target_freq)
 
 uint8_t BM1397_init(GlobalState * GLOBAL_STATE)
 {
+    first_nonce = 0;
+    nonce_found = false;
+    nonce_wrapped = false;
+
     // send the init command
     _send_read_address();
 
@@ -254,6 +262,10 @@ void BM1397_send_work(GlobalState * GLOBAL_STATE, const asic_job_t * next_job)
                            GLOBAL_STATE->DEVICE_CONFIG.family.asic.software_midstates,
                            next_job, &job);
     _send_BM1397((TYPE_JOB | GROUP_SINGLE | CMD_WRITE), (uint8_t *)&job, sizeof(job), BM1397_DEBUG_WORK);
+
+    first_nonce = 0;
+    nonce_found = false;
+    nonce_wrapped = false;
 }
 
 task_result *BM1397_process_work(GlobalState * GLOBAL_STATE)
@@ -283,6 +295,22 @@ task_result *BM1397_process_work(GlobalState * GLOBAL_STATE)
                                   asic_result.job.nonce,
                                   asic_result.job.chip_slot,
                                   &result)) {
+        return NULL;
+    }
+
+    if (nonce_wrapped) {
+        return NULL;
+    }
+
+    // ASIC may return the same nonce multiple times
+    // or one that was already found
+    // most of the time it behaves however
+    if (!nonce_found) {
+        first_nonce = asic_result.job.nonce;
+        nonce_found = true;
+    } else if (asic_result.job.nonce == first_nonce) {
+        // stop if we've already seen this nonce
+        nonce_wrapped = true;
         return NULL;
     }
 

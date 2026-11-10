@@ -166,6 +166,7 @@ TEST_CASE("BM1397 software rolled starting_version decodes rolled_version and co
           "[asic][bm1397][result-job]")
 {
     GlobalState *state = bm1397_harness_begin();
+    TEST_ASSERT_EQUAL_UINT8(2, bm1397_harness_driver.init(state));
 
     asic_job_t job = make_job(JOB_TYPE_V1);
     job.version = 0x207D8000;      // Software-rolled version for this midstate batch
@@ -194,6 +195,63 @@ TEST_CASE("BM1397 software rolled starting_version decodes rolled_version and co
     uint32_t pool_template_version = 0x207C8000;
     uint32_t pool_reconstructed = (pool_template_version & ~job.version_mask) | (version_bits & job.version_mask);
     TEST_ASSERT_EQUAL_HEX32(res->rolled_version, pool_reconstructed);
+
+    bm1397_harness_end();
+}
+
+TEST_CASE("BM1397 ignores wrapped nonces after first_nonce repeats until next send_work",
+          "[asic][bm1397][result-job]")
+{
+    GlobalState *state = bm1397_harness_begin();
+    TEST_ASSERT_EQUAL_UINT8(2, bm1397_harness_driver.init(state));
+    bm1397_harness_clear_packets();
+
+    asic_job_t job_a = make_job(JOB_TYPE_V1);
+    bm1397_harness_driver.send_work(state, &job_a);
+    uint8_t job_id_a = bm1397_harness_packet(0)->bytes[4];
+
+    const uint32_t nonce_1 = 0x11223344;
+    const uint32_t nonce_2 = 0x55667788;
+    const uint32_t nonce_3 = 0x99AABBCC;
+
+    // First pass: nonce_1 and nonce_2 are both accepted
+    queue_response(true, job_id_a, nonce_1);
+    task_result *res = bm1397_harness_driver.process_work(state);
+    TEST_ASSERT_NOT_NULL(res);
+    TEST_ASSERT_EQUAL_HEX32(nonce_1, res->nonce);
+
+    queue_response(true, job_id_a, nonce_2);
+    res = bm1397_harness_driver.process_work(state);
+    TEST_ASSERT_NOT_NULL(res);
+    TEST_ASSERT_EQUAL_HEX32(nonce_2, res->nonce);
+
+    // Counter wraps: repeating first_nonce (nonce_1) latches nonce_wrapped and drops all further nonces
+    queue_response(true, job_id_a, nonce_1);
+    TEST_ASSERT_NULL(bm1397_harness_driver.process_work(state));
+
+    queue_response(true, job_id_a, nonce_2);
+    TEST_ASSERT_NULL(bm1397_harness_driver.process_work(state));
+
+    queue_response(true, job_id_a, nonce_3);
+    TEST_ASSERT_NULL(bm1397_harness_driver.process_work(state));
+
+    // Sending a new job resets wrap state so the same nonces are accepted on the new job
+    bm1397_harness_clear_packets();
+    asic_job_t job_b = make_job(JOB_TYPE_V1);
+    job_b.ntime = 0x64658bd9;
+    bm1397_harness_driver.send_work(state, &job_b);
+    uint8_t job_id_b = bm1397_harness_packet(0)->bytes[4];
+
+    queue_response(true, job_id_b, nonce_1);
+    res = bm1397_harness_driver.process_work(state);
+    TEST_ASSERT_NOT_NULL(res);
+    TEST_ASSERT_EQUAL_HEX32(nonce_1, res->nonce);
+    TEST_ASSERT_EQUAL_HEX32(job_b.ntime, res->job.ntime);
+
+    queue_response(true, job_id_b, nonce_2);
+    res = bm1397_harness_driver.process_work(state);
+    TEST_ASSERT_NOT_NULL(res);
+    TEST_ASSERT_EQUAL_HEX32(nonce_2, res->nonce);
 
     bm1397_harness_end();
 }

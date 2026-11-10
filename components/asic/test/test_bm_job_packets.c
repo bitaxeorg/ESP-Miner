@@ -242,7 +242,7 @@ TEST_CASE("BM1397 register results preserve type address value and reset job fie
     bm1397_harness_end();
 }
 
-TEST_CASE("BM1397 rejects inactive job results",
+TEST_CASE("BM1397 rejects inactive job results and repeated nonces",
           "[asic][result][job-store][characterization]")
 {
     GlobalState *state = bm1397_harness_begin();
@@ -265,6 +265,9 @@ TEST_CASE("BM1397 rejects inactive job results",
     TEST_ASSERT_EQUAL_STRING("packet-job", result->job.job_id);
     TEST_ASSERT_EQUAL_HEX32(nonce, result->nonce);
     TEST_ASSERT_EQUAL_HEX32(0x20004004, result->rolled_version);
+
+    queue_bm1397_job_response(job_id, 2, nonce);
+    TEST_ASSERT_NULL(bm1397_harness_driver.process_work(state));
     bm1397_harness_end();
 }
 
