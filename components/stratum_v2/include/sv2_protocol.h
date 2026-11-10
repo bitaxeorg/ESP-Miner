@@ -26,6 +26,7 @@
 #define SV2_MSG_SUBMIT_SHARES_EXTENDED                  0x1b
 #define SV2_MSG_SUBMIT_SHARES_SUCCESS                   0x1c
 #define SV2_MSG_SUBMIT_SHARES_ERROR                     0x1d
+#define SV2_MSG_SET_EXTRANONCE_PREFIX                   0x19
 #define SV2_MSG_SET_NEW_PREV_HASH                       0x20
 #define SV2_MSG_SET_TARGET                              0x21
 
@@ -168,6 +169,12 @@ int sv2_parse_set_new_prev_hash(const uint8_t *payload, uint32_t len,
                                 uint32_t *channel_id, uint32_t *job_id,
                                 uint8_t prev_hash[32],
                                 uint32_t *min_ntime, uint32_t *nbits);
+
+// Parse SetExtranoncePrefix: channel_id U32 + extranonce_prefix B0_32.
+int sv2_parse_set_extranonce_prefix(const uint8_t *payload, uint32_t len,
+                                    uint32_t *channel_id,
+                                    uint8_t *extranonce_prefix,
+                                    uint8_t *extranonce_prefix_len);
 
 int sv2_parse_set_target(const uint8_t *payload, uint32_t len,
                          uint32_t *channel_id, uint8_t max_target[32]);
