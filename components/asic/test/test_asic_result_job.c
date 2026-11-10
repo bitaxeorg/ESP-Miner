@@ -1,5 +1,6 @@
 #include "bm13xx_test_harness.h"
 #include "bm1397_test_harness.h"
+#include "bm_job_packet.h"
 #include "global_state.h"
 #include "mining.h"
 #include "utils.h"
@@ -199,7 +200,7 @@ TEST_CASE("BM1397 software rolled starting_version decodes rolled_version and co
     bm1397_harness_end();
 }
 
-TEST_CASE("BM1397 ignores wrapped nonces after first_nonce repeats until next send_work",
+TEST_CASE("BM1397 ignores wrapped nonces per slot across in-flight send_work overlap and slot reuse",
           "[asic][bm1397][result-job]")
 {
     GlobalState *state = bm1397_harness_begin();
@@ -214,7 +215,7 @@ TEST_CASE("BM1397 ignores wrapped nonces after first_nonce repeats until next se
     const uint32_t nonce_2 = 0x55667788;
     const uint32_t nonce_3 = 0x99AABBCC;
 
-    // First pass: nonce_1 and nonce_2 are both accepted
+    // First pass on job_a: nonce_1 and nonce_2 are both accepted
     queue_response(true, job_id_a, nonce_1);
     task_result *res = bm1397_harness_driver.process_work(state);
     TEST_ASSERT_NOT_NULL(res);
@@ -225,7 +226,14 @@ TEST_CASE("BM1397 ignores wrapped nonces after first_nonce repeats until next se
     TEST_ASSERT_NOT_NULL(res);
     TEST_ASSERT_EQUAL_HEX32(nonce_2, res->nonce);
 
-    // Counter wraps: repeating first_nonce (nonce_1) latches nonce_wrapped and drops all further nonces
+    // Next job_b is queued via send_work BEFORE job_a's wrapped responses finish arriving
+    bm1397_harness_clear_packets();
+    asic_job_t job_b = make_job(JOB_TYPE_V1);
+    job_b.ntime = 0x64658bd9;
+    bm1397_harness_driver.send_work(state, &job_b);
+    uint8_t job_id_b = bm1397_harness_packet(0)->bytes[4];
+
+    // Late wrapped responses on job_a still match job_a's first_nonce and get dropped
     queue_response(true, job_id_a, nonce_1);
     TEST_ASSERT_NULL(bm1397_harness_driver.process_work(state));
 
@@ -235,13 +243,7 @@ TEST_CASE("BM1397 ignores wrapped nonces after first_nonce repeats until next se
     queue_response(true, job_id_a, nonce_3);
     TEST_ASSERT_NULL(bm1397_harness_driver.process_work(state));
 
-    // Sending a new job resets wrap state so the same nonces are accepted on the new job
-    bm1397_harness_clear_packets();
-    asic_job_t job_b = make_job(JOB_TYPE_V1);
-    job_b.ntime = 0x64658bd9;
-    bm1397_harness_driver.send_work(state, &job_b);
-    uint8_t job_id_b = bm1397_harness_packet(0)->bytes[4];
-
+    // Meanwhile, the same nonces on job_b are accepted independently
     queue_response(true, job_id_b, nonce_1);
     res = bm1397_harness_driver.process_work(state);
     TEST_ASSERT_NOT_NULL(res);
@@ -252,6 +254,23 @@ TEST_CASE("BM1397 ignores wrapped nonces after first_nonce repeats until next se
     res = bm1397_harness_driver.process_work(state);
     TEST_ASSERT_NOT_NULL(res);
     TEST_ASSERT_EQUAL_HEX32(nonce_2, res->nonce);
+
+    // Reclaiming job_a's slot 32 jobs later resets its wrap state
+    uint8_t reclaimed_id = 0;
+    asic_job_t job_reclaimed = make_job(JOB_TYPE_V1);
+    job_reclaimed.ntime = 0x64658bda;
+    for (int i = 0; i < BM1397_JOB_SLOT_COUNT - 1; ++i) {
+        bm1397_harness_clear_packets();
+        bm1397_harness_driver.send_work(state, &job_reclaimed);
+        reclaimed_id = bm1397_harness_packet(0)->bytes[4];
+    }
+    TEST_ASSERT_EQUAL_HEX8(job_id_a, reclaimed_id);
+
+    queue_response(true, reclaimed_id, nonce_1);
+    res = bm1397_harness_driver.process_work(state);
+    TEST_ASSERT_NOT_NULL(res);
+    TEST_ASSERT_EQUAL_HEX32(nonce_1, res->nonce);
+    TEST_ASSERT_EQUAL_HEX32(job_reclaimed.ntime, res->job.ntime);
 
     bm1397_harness_end();
 }

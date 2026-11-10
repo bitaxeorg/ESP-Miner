@@ -76,9 +76,13 @@ static task_result result;
 
 static uint16_t address_interval;
 
-static uint32_t first_nonce = 0;
-static bool nonce_found = false;
-static bool nonce_wrapped = false;
+typedef struct {
+    uint32_t first_nonce;
+    bool nonce_found;
+    bool nonce_wrapped;
+} bm1397_slot_nonce_state_t;
+
+static bm1397_slot_nonce_state_t slot_nonce_state[BM1397_JOB_SLOT_COUNT];
 
 /// @brief
 /// @param ftdi
@@ -184,9 +188,7 @@ float BM1397_send_hash_frequency(float target_freq)
 
 uint8_t BM1397_init(GlobalState * GLOBAL_STATE)
 {
-    first_nonce = 0;
-    nonce_found = false;
-    nonce_wrapped = false;
+    memset(slot_nonce_state, 0, sizeof(slot_nonce_state));
 
     // send the init command
     _send_read_address();
@@ -261,11 +263,11 @@ void BM1397_send_work(GlobalState * GLOBAL_STATE, const asic_job_t * next_job)
     bm1397_build_job_packet(&GLOBAL_STATE->job_store,
                            GLOBAL_STATE->DEVICE_CONFIG.family.asic.software_midstates,
                            next_job, &job);
+    uint8_t slot = bm_decode_wire_job_slot(job.chip_slot, BM1397_TX_SLOT_SHIFT);
+    if (slot < BM1397_JOB_SLOT_COUNT) {
+        slot_nonce_state[slot] = (bm1397_slot_nonce_state_t){0};
+    }
     _send_BM1397((TYPE_JOB | GROUP_SINGLE | CMD_WRITE), (uint8_t *)&job, sizeof(job), BM1397_DEBUG_WORK);
-
-    first_nonce = 0;
-    nonce_found = false;
-    nonce_wrapped = false;
 }
 
 task_result *BM1397_process_work(GlobalState * GLOBAL_STATE)
@@ -298,20 +300,24 @@ task_result *BM1397_process_work(GlobalState * GLOBAL_STATE)
         return NULL;
     }
 
-    if (nonce_wrapped) {
-        return NULL;
-    }
+    uint8_t slot = bm_decode_wire_job_slot(asic_result.job.chip_slot, BM1397_MIDSTATE_BITS);
+    if (slot < BM1397_JOB_SLOT_COUNT) {
+        bm1397_slot_nonce_state_t *state = &slot_nonce_state[slot];
+        if (state->nonce_wrapped) {
+            return NULL;
+        }
 
-    // ASIC may return the same nonce multiple times
-    // or one that was already found
-    // most of the time it behaves however
-    if (!nonce_found) {
-        first_nonce = asic_result.job.nonce;
-        nonce_found = true;
-    } else if (asic_result.job.nonce == first_nonce) {
-        // stop if we've already seen this nonce
-        nonce_wrapped = true;
-        return NULL;
+        // ASIC may return the same nonce multiple times
+        // or one that was already found
+        // most of the time it behaves however
+        if (!state->nonce_found) {
+            state->first_nonce = asic_result.job.nonce;
+            state->nonce_found = true;
+        } else if (asic_result.job.nonce == state->first_nonce) {
+            // stop if we've already seen this nonce
+            state->nonce_wrapped = true;
+            return NULL;
+        }
     }
 
     return &result;
