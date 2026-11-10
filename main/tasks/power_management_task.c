@@ -7,10 +7,10 @@
 #include "thermal.h"
 #include "power.h"
 #include "asic.h"
+#include "asic_common.h"
 #include "utils.h"
 #include "asic_init.h"
 #include "asic_reset.h"
-#include "difficulty_controller.h"
 #include "driver/uart.h"
 
 #define POLL_RATE 100
@@ -256,7 +256,8 @@ void POWER_MANAGEMENT_task(void * pvParameters)
 
             ASIC_set_frequency(GLOBAL_STATE);
             ASIC_set_nonce_space(GLOBAL_STATE);
-            difficulty_controller_update(GLOBAL_STATE);
+            uint8_t difficulty_power = calculate_effective_asic_difficulty(power_management->expected_hashrate);
+            ASIC_set_difficulty(GLOBAL_STATE, difficulty_power);
             
             last_asic_frequency = asic_frequency;
         }

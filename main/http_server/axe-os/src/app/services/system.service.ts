@@ -162,6 +162,7 @@ export class SystemApiService {
         fallbackStratumV2AuthorityPubkey: "",
         fallbackStratumV2ChannelType: "extended" as const,
         poolDifficulty: 1000,
+        asicDifficulty: 256,
         responseTime: 10,
         responseTimeMin: 10,
         responseTimeMax: 10,
