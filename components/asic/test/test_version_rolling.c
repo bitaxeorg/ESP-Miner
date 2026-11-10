@@ -129,9 +129,14 @@ TEST_CASE("BM13xx response version bits reconstruct rolled block versions",
         {0x20000004, {0x01, 0x00}, 0x20200004},
         {0x20000004, {0x80, 0x00}, 0x30000004},
         {0x20000004, {0xff, 0xff}, 0x3fffe004},
-        /* The current drivers OR returned bits with the saved base version. */
-        {0x21002004, {0x00, 0x01}, 0x21002004},
-        {0x21002004, {0x00, 0x02}, 0x21006004},
+        /* Rolled version bits clear previously set bits within the version mask. */
+        {0x21002004, {0x00, 0x00}, 0x20000004},
+        {0x21002004, {0x00, 0x01}, 0x20002004},
+        {0x21002004, {0x00, 0x02}, 0x20004004},
+        {0x20002004, {0x00, 0x02}, 0x20004004},
+        /* Base version with BIP-8/9 voting bit 16 set (0x20010004) cleared when rolled bit 16 is 0. */
+        {0x20010004, {0x00, 0x00}, 0x20000004},
+        {0x20010004, {0x00, 0x01}, 0x20002004},
     };
 
     for (size_t d = 0; d < BM13XX_HARNESS_DRIVER_COUNT; d++) {
@@ -230,7 +235,7 @@ TEST_CASE("BM13xx rolled version reaches SV1 and SV2 share messages byte exact",
         const task_result *result = driver->process_work(state);
         TEST_ASSERT_NOT_NULL(result);
         const uint32_t rolled_version = result->rolled_version;
-        const uint32_t version_bits = rolled_version ^ base_version;
+        const uint32_t version_bits = rolled_version & result->job.version_mask;
         TEST_ASSERT_EQUAL_HEX32(0x20002004, rolled_version);
         TEST_ASSERT_EQUAL_HEX32(0x00002000, version_bits);
 
@@ -265,6 +270,56 @@ TEST_CASE("BM13xx rolled version reaches SV1 and SV2 share messages byte exact",
         };
         TEST_ASSERT_EQUAL_INT(sizeof(expected_sv2), sv2_length);
         TEST_ASSERT_EQUAL_UINT8_ARRAY(expected_sv2, sv2_message, sizeof(expected_sv2));
+        bm13xx_harness_end();
+    }
+}
+
+TEST_CASE("BM13xx rolled version clears pre-set mask voting bits and formats BIP-310 share correctly",
+          "[asic][version-rolling][stratum][bip310]")
+{
+    TEST_ASSERT_TRUE(STRATUM_V1_initialize_buffer());
+    for (size_t d = 0; d < BM13XX_HARNESS_DRIVER_COUNT; d++) {
+        const bm13xx_harness_driver_t *driver = &bm13xx_harness_drivers[d];
+        GlobalState *state = bm13xx_harness_begin(driver);
+        TEST_ASSERT_EQUAL_UINT8(2, driver->init(state));
+
+        /* Base version with BIP-8/9 voting bit 16 (0x00010000) and soft-fork bit 2 (0x04) set: 0x20010004. */
+        const uint32_t base_version = 0x20010004;
+        bm13xx_harness_set_job(base_version, true, true);
+
+        /* ASIC finds share where version counter is 0x0001 (bit 13 set, bit 16 cleared to 0). */
+        queue_job_response(driver, 0, 1);
+        const task_result *result = driver->process_work(state);
+        TEST_ASSERT_NOT_NULL(result);
+
+        /* Driver must clear pre-set voting bit 16 and set rolled bit 13 -> 0x20002004. */
+        const uint32_t rolled_version = result->rolled_version;
+        TEST_ASSERT_EQUAL_HEX32(0x20002004, rolled_version);
+
+        /* BIP-310 version_bits must mask against version_mask (0x00002000), not XOR diff. */
+        const uint32_t version_bits = rolled_version & result->job.version_mask;
+        TEST_ASSERT_EQUAL_HEX32(0x00002000, version_bits);
+
+        /* BIP-310 pool reconstruction: (job & ~mask) | (bits & mask) must equal rolled_version. */
+        const uint32_t pool_version = (base_version & ~result->job.version_mask) | (version_bits & result->job.version_mask);
+        TEST_ASSERT_EQUAL_HEX32(rolled_version, pool_version);
+
+        /* Verify wire JSON formatting with "00002000" parameter. */
+        sv1_capture_t sv1_capture = {0};
+        esp_transport_handle_t sv1_transport = create_sv1_capture(&sv1_capture);
+        TEST_ASSERT_NOT_NULL(sv1_transport);
+        int sv1_length = STRATUM_V1_submit_share(
+            sv1_transport, 10, "worker", "job-2", "0000000000000000",
+            0x64658bd8, result->nonce, version_bits, NULL);
+        const char *expected_sv1 =
+            "{\"id\":10,\"method\":\"mining.submit\",\"params\":["
+            "\"worker\",\"job-2\",\"0000000000000000\","
+            "\"64658bd8\",\"0a4c049b\",\"00002000\"]}\n";
+        TEST_ASSERT_EQUAL_INT((int)strlen(expected_sv1), sv1_length);
+        TEST_ASSERT_EQUAL_UINT((size_t)sv1_length, sv1_capture.length);
+        TEST_ASSERT_EQUAL_STRING(expected_sv1, sv1_capture.bytes);
+        esp_transport_destroy(sv1_transport);
+
         bm13xx_harness_end();
     }
 }

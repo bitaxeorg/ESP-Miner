@@ -116,8 +116,7 @@ TEST_CASE("ASIC results preserve complete matched jobs across slot reuse for eve
             queue_response(bm1397, wire_job_id, nonce + 1);
             result = process_work(state);
             TEST_ASSERT_NOT_NULL(result);
-            assert_result_job(&replacement, result, nonce + 1,
-                               bm1397 ? 0x21000004 : 0x21002004);
+            assert_result_job(&replacement, result, nonce + 1, 0x21000004);
             replace_slot(state, NULL);
             assert_result_job(&original, &saved, nonce, rolled_version);
         }

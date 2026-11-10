@@ -11,6 +11,7 @@
 #include "esp_log.h"
 #include "crc.h"
 #include "esp_timer.h"
+#include "utils.h"
 
 #define PREAMBLE 0xAA55
 
@@ -294,8 +295,8 @@ bool bm13xx_decode_job_result(asic_job_store_t *store,
     uint8_t asic_nr = (uint8_t)(((nonce_h >> 17) & 0xff) / address_interval);
     uint8_t core_id = (uint8_t)((nonce_h >> 25) & 0x7f);
     uint32_t version_bits = ((uint32_t)ntohs(wire_version) << 13);
-
-    result->rolled_version = result->job.version | version_bits;
+    uint32_t mask = result->job.version_mask & BIP320_VERSION_ROLLING_MASK;
+    result->rolled_version = (result->job.version & ~mask) | (version_bits & mask);
     result->nonce = wire_nonce;
     result->asic_nr = asic_nr;
     result->core_id = core_id;
