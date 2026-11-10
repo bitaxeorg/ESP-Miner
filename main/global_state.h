@@ -164,6 +164,7 @@ typedef struct GlobalState
     pthread_mutex_t transport_mutex;
 
     bool ASIC_initalized;
+    bool has_work;
     bool psram_is_available;
     bool filesystem_is_available;
 

@@ -277,6 +277,7 @@ void SYSTEM_init_system(GlobalState * GLOBAL_STATE)
     // Initialize mutexes and job slots
     ASIC_init_job_slots(GLOBAL_STATE);
     pthread_mutex_init(&GLOBAL_STATE->transport_mutex, NULL);
+    GLOBAL_STATE->has_work = false;
 }
 
 void SYSTEM_init_versions(GlobalState * GLOBAL_STATE)
@@ -409,6 +410,7 @@ static void clean_jobs_queue(GlobalState * GLOBAL_STATE)
     ESP_LOGI(TAG, "Clean Jobs: invalidating active jobs");
 
     ASIC_clear_work(GLOBAL_STATE);
+    GLOBAL_STATE->has_work = false;
 
     // Reset hashrate measurements to prevent a spike on reconnection
     hashrate_monitor_reset_measurements(GLOBAL_STATE);
