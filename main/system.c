@@ -529,6 +529,7 @@ void SYSTEM_reset_pool_session(GlobalState * GLOBAL_STATE)
     module->last_response_time_max = 0.0f;
     module->response_share_batch = 0;
     module->pool_difficulty = 0.0;
+    module->pool_banner[0] = '\0';
 
     clean_jobs_queue(GLOBAL_STATE);
     SYSTEM_reset_coinbase_ui_state(GLOBAL_STATE);
