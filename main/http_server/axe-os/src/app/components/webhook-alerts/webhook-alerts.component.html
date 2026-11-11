@@ -1,0 +1,42 @@
+<h3 class="mt-5">Webhook Alerts</h3>
+<form class="card" [formGroup]="form">
+  <p class="mb-4">
+    Get webhook alerts for specific miner events. Alerts are sent as JSON with a <code>content</code> field, compatible with Discord.
+  </p>
+  <div class="flex flex-col md:flex-row md:items-center mb-4 gap-2">
+    <label for="webhookUrl" class="w-full md:w-3/12 xl:w-2/12 font-medium">Webhook URL</label>
+    <div class="w-full md:w-9/12 xl:w-10/12">
+      <input class="input-text w-full" id="webhookUrl" formControlName="webhookUrl" type="password"
+             autocomplete="new-password" placeholder="https://..." />
+      @if (form.controls['webhookUrl'].invalid) {
+        <small class="block mt-1 text-red-500">Enter a valid HTTPS webhook URL.</small>
+      }
+    </div>
+  </div>
+  <div class="flex flex-col md:flex-row md:items-center mb-4 gap-2">
+    <label for="watchdogEnabled" class="w-full md:w-3/12 xl:w-2/12 font-medium cursor-pointer">Watchdog Reboot</label>
+    <div class="w-full md:w-9/12 xl:w-10/12 flex items-start gap-2">
+      <app-checkbox formControlName="watchdogEnabled" inputId="watchdogEnabled" [binary]="true"></app-checkbox>
+      <small>Alerts when the miner reboots after its firmware stops responding.</small>
+    </div>
+  </div>
+  <div class="flex flex-col md:flex-row md:items-center mb-4 gap-2">
+    <label for="blockFoundEnabled" class="w-full md:w-3/12 xl:w-2/12 font-medium cursor-pointer">Block Found</label>
+    <div class="w-full md:w-9/12 xl:w-10/12 flex items-start gap-2">
+      <app-checkbox formControlName="blockFoundEnabled" inputId="blockFoundEnabled" [binary]="true"></app-checkbox>
+      <small>Alerts when your miner finds a block.</small>
+    </div>
+  </div>
+  <div class="flex flex-col md:flex-row md:items-center mb-4 gap-2">
+    <label for="bestDiffEnabled" class="w-full md:w-3/12 xl:w-2/12 font-medium cursor-pointer">New Best Difficulty</label>
+    <div class="w-full md:w-9/12 xl:w-10/12 flex items-start gap-2">
+      <app-checkbox formControlName="bestDiffEnabled" inputId="bestDiffEnabled" [binary]="true"></app-checkbox>
+      <small>Alerts when your miner finds a new best difficulty.</small>
+    </div>
+  </div>
+  <div class="flex flex-col sm:flex-row sm:flex-wrap gap-3" data-testid="webhook-actions">
+    <button type="button" class="btn w-full sm:w-auto whitespace-nowrap" [disabled]="!form.dirty || form.invalid" (click)="save()">Save Alerts</button>
+    <button type="button" class="btn w-full sm:w-auto whitespace-nowrap" [disabled]="testDisabled" (click)="testWebhook()">Send Test</button>
+    <button type="button" class="btn btn-danger w-full sm:w-auto whitespace-nowrap" [disabled]="!hasWebhook" (click)="clearWebhook()">Clear Webhook</button>
+  </div>
+</form>
