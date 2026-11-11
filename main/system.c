@@ -276,7 +276,6 @@ void SYSTEM_init_system(GlobalState * GLOBAL_STATE)
 
     // Initialize mutexes and job slots
     ASIC_init_job_slots(GLOBAL_STATE);
-    pthread_mutex_init(&GLOBAL_STATE->transport_mutex, NULL);
     GLOBAL_STATE->has_work = false;
 }
 

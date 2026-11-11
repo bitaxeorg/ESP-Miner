@@ -5,6 +5,7 @@
 #include "freertos/task.h"
 #include "global_state.h"
 #include "stratum_task.h"
+#include "stratum_driver.h"
 #include "stratum_v1_client.h"
 #include "stratum_v2_client.h"
 #include "stratum_api.h"
@@ -19,24 +20,27 @@
 #define INITIAL_HEARTBEAT_DELAY_MS 10000
 #define RECOVERY_PROBE_INTERVAL_MS 30000
 
-static GlobalState *s_global_state = NULL;
 static volatile bool s_should_reconnect = false;
+static volatile bool s_client_running = false;
+static stratum_protocol_t s_running_protocol = STRATUM_PROTOCOL_V1;
 static TaskHandle_t s_heartbeat_task_handle = NULL;
 
-void stratum_request_reconnect(void)
+static void stratum_abort_connection(void)
+{
+    if (!s_client_running) {
+        return;
+    }
+
+    const stratum_driver_t *driver = stratum_get_driver(s_running_protocol);
+    if (driver && driver->abort_connection) {
+        driver->abort_connection();
+    }
+}
+
+static void stratum_request_reconnect(void)
 {
     s_should_reconnect = true;
-    if (s_global_state) {
-        pthread_mutex_lock(&s_global_state->transport_mutex);
-        esp_transport_handle_t transport = s_global_state->transport;
-        if (transport) {
-            int sock = esp_transport_get_socket(transport);
-            if (sock >= 0) {
-                shutdown(sock, SHUT_RDWR);
-            }
-        }
-        pthread_mutex_unlock(&s_global_state->transport_mutex);
-    }
+    stratum_abort_connection();
 }
 
 bool stratum_reconnect_requested(void)
@@ -44,16 +48,14 @@ bool stratum_reconnect_requested(void)
     return s_should_reconnect;
 }
 
-bool stratum_probe_pool(GlobalState *gs, uint16_t pool_idx)
+static bool stratum_probe_pool(GlobalState *gs, uint16_t pool_idx)
 {
     if (!gs || pool_idx >= MAX_POOLS) return false;
     const PoolConfig *pool = &gs->SYSTEM_MODULE.pools[pool_idx];
     if (!pool->url || pool->url[0] == '\0' || pool->port == 0) return false;
 
-    if (pool->protocol == STRATUM_PROTOCOL_V2) {
-        return stratum_v2_probe_pool(gs, pool_idx);
-    }
-    return stratum_v1_probe_pool(gs, pool_idx);
+    const stratum_driver_t *driver = stratum_get_driver(pool->protocol);
+    return (driver && driver->probe_pool) ? driver->probe_pool(gs, pool_idx) : false;
 }
 
 static void stratum_heartbeat_task(void *pvParameters)
@@ -84,7 +86,7 @@ static void stratum_heartbeat_task(void *pvParameters)
     }
 }
 
-void stratum_trigger_heartbeat_check(void)
+static void stratum_trigger_heartbeat_check(void)
 {
     if (s_heartbeat_task_handle) {
         xTaskNotifyGive(s_heartbeat_task_handle);
@@ -128,7 +130,6 @@ void stratum_notify_pool_selection_changed(GlobalState *gs)
 void stratum_task(void *pvParameters)
 {
     GlobalState *GLOBAL_STATE = (GlobalState *)pvParameters;
-    s_global_state = GLOBAL_STATE;
 
     int consecutive_pool_failures = 0;
     int retry_attempts = 0;
@@ -205,16 +206,22 @@ void stratum_task(void *pvParameters)
 
         uint16_t active_idx = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback ? sec_idx : prim_idx;
         stratum_protocol_t protocol = GLOBAL_STATE->SYSTEM_MODULE.pools[active_idx].protocol;
+        const stratum_driver_t *driver = stratum_get_driver(protocol);
 
         s_running_pool_idx = active_idx;
+        s_running_protocol = protocol;
+        s_client_running = true;
         s_should_reconnect = false;
-        esp_err_t err;
+        esp_err_t err = ESP_FAIL;
 
-        if (protocol == STRATUM_PROTOCOL_V2) {
-            err = stratum_v2_run(GLOBAL_STATE, active_idx);
+        if (driver && driver->run) {
+            err = driver->run(GLOBAL_STATE, active_idx);
         } else {
-            err = stratum_v1_run(GLOBAL_STATE, active_idx);
+            ESP_LOGE(TAG, "No driver found for protocol %d", protocol);
+            vTaskDelay(pdMS_TO_TICKS(1000));
         }
+
+        s_client_running = false;
 
         if (err == ESP_OK || s_should_reconnect || GLOBAL_STATE->SYSTEM_MODULE.work_received > 0) {
             // Clean disconnect, mode switch, reconnect requested, or was actively mining
@@ -273,12 +280,12 @@ int stratum_submit_share(GlobalState *GLOBAL_STATE, const asic_job_t *active_job
         return -1;
     }
 
-    int ret;
-    if (active_job->source_type == JOB_TYPE_SV2_STANDARD || active_job->source_type == JOB_TYPE_SV2_EXTENDED) {
-        ret = stratum_v2_submit_share(GLOBAL_STATE, active_job, nonce, rolled_version, sent_time_us);
-    } else {
-        ret = stratum_v1_submit_share(GLOBAL_STATE, active_job, nonce, rolled_version, sent_time_us);
+    const stratum_driver_t *driver = stratum_get_driver_for_job(active_job);
+    if (!driver || !driver->submit_share) {
+        return -1;
     }
+
+    int ret = driver->submit_share(GLOBAL_STATE, active_job, nonce, rolled_version, sent_time_us);
 
     if (ret < 0) {
         ESP_LOGW(TAG, "Failed to submit share to socket (ret: %d, errno %d: %s)", ret, errno, strerror(errno));
