@@ -141,7 +141,7 @@ static void setup_ble_set_status(const char *status)
 
 static uint16_t setup_ble_primary_pool_index(void)
 {
-    return nvs_config_get_u16(NVS_CONFIG_PRIMARY_POOL_INDEX);
+    return 0;
 }
 
 static void setup_ble_json_set_string(cJSON *root, const char *key, const char *value)
