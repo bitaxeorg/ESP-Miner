@@ -1002,7 +1002,10 @@ bool check_settings_and_update(const cJSON * const root, char **redirect_url, Gl
                                           (use_fallback_item != NULL);
 
             if (pool_selection_changed) {
-                GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback = GLOBAL_STATE->SYSTEM_MODULE.use_fallback_stratum;
+                uint16_t sec_idx = GLOBAL_STATE->SYSTEM_MODULE.secondary_pool_index;
+                GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback =
+                    GLOBAL_STATE->SYSTEM_MODULE.use_fallback_stratum &&
+                    stratum_is_pool_configured(GLOBAL_STATE, sec_idx);
                 stratum_notify_pool_selection_changed(GLOBAL_STATE);
             } else {
                 for (int i = 0; i < MAX_POOLS; i++) {
