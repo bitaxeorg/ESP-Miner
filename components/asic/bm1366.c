@@ -264,7 +264,7 @@ uint8_t BM1366_init(GlobalState * GLOBAL_STATE)
 
     do_frequency_transition(GLOBAL_STATE, BM1366_send_hash_frequency);
 
-    float frequency = GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value;
+    float frequency = GLOBAL_STATE->POWER_MANAGEMENT_MODULE.actual_frequency;
     int cores = GLOBAL_STATE->DEVICE_CONFIG.family.asic.core_count;
 
     BM1366_set_nonce_space(1.0, frequency, asic_count, cores);
