@@ -10,9 +10,8 @@ TEST_CASE("Check asic timeout 1x BM1397", "[common]")
     size_t cores = 168;
     size_t version_size = 4;
     float timeout_percent = 0.75;
-    float default_timeout_ms = 20;
 
-    double timeout_ms = calculate_bm_timeout_ms(frequency, asic_count, small_cores, cores, version_size, timeout_percent, default_timeout_ms);
+    double timeout_ms = calculate_bm_timeout_ms(frequency, asic_count, small_cores, cores, version_size, timeout_percent);
     double expected_ms = 27.962;
 
     TEST_ASSERT_FLOAT_WITHIN(0.01, expected_ms, timeout_ms);
@@ -26,27 +25,19 @@ TEST_CASE("Check asic timeout 2x BM1370", "[common]")
     size_t cores = 128;
     size_t version_size = 65536;
     float timeout_percent = 0.5;
-    float default_timeout_ms = 500;
 
-    double timeout_ms = calculate_bm_timeout_ms(frequency, asic_count, small_cores, cores, version_size, timeout_percent, default_timeout_ms);
+    double timeout_ms = calculate_bm_timeout_ms(frequency, asic_count, small_cores, cores, version_size, timeout_percent);
     double expected_ms = 76354.974;
 
     TEST_ASSERT_FLOAT_WITHIN(0.01, expected_ms, timeout_ms);
 }
 
-TEST_CASE("Check default asic timeout 0x BM1370", "[common]")
+TEST_CASE("Check invalid inputs return zero timeout", "[common]")
 {
-    float frequency = 450.0; // MHz
-    size_t asic_count = 0; // 0 chip example
-    size_t small_cores = 2040;
-    size_t cores = 128;
-    size_t version_size = 65536;
-    float timeout_percent = 0.5;
-    float default_timeout_ms = 500;
-
-    double timeout_ms = calculate_bm_timeout_ms(frequency, asic_count, small_cores, cores, version_size, timeout_percent, default_timeout_ms);
-
-    TEST_ASSERT_FLOAT_WITHIN(0.01, default_timeout_ms, timeout_ms);
+    TEST_ASSERT_FLOAT_WITHIN(0.01, 0.0, calculate_bm_timeout_ms(450.0f, 0, 2040, 128, 65536, 0.5f));
+    TEST_ASSERT_FLOAT_WITHIN(0.01, 0.0, calculate_bm_timeout_ms(450.0f, 1, 2040, 0, 65536, 0.5f));
+    TEST_ASSERT_FLOAT_WITHIN(0.01, 0.0, calculate_bm_timeout_ms(450.0f, 1, 64, 128, 65536, 0.5f));
+    TEST_ASSERT_FLOAT_WITHIN(0.01, 0.0, calculate_bm_timeout_ms(0.0f, 1, 2040, 128, 65536, 0.5f));
 }
 
 TEST_CASE("Check asic timeout 3x BM1370", "[common]")
@@ -57,9 +48,8 @@ TEST_CASE("Check asic timeout 3x BM1370", "[common]")
     size_t cores = 128;
     size_t version_size = 256;
     float timeout_percent = 0.5;
-    float default_timeout_ms = 500;
 
-    double timeout_ms = calculate_bm_timeout_ms(frequency, asic_count, small_cores, cores, version_size, timeout_percent, default_timeout_ms);
+    double timeout_ms = calculate_bm_timeout_ms(frequency, asic_count, small_cores, cores, version_size, timeout_percent);
     double expected_ms = 149.131;
 
     TEST_ASSERT_FLOAT_WITHIN(0.01, expected_ms, timeout_ms);
@@ -73,10 +63,18 @@ TEST_CASE("Check max asic timeout 1x BM1370", "[common]")
     size_t cores = 128;
     size_t version_size = 65536;
     float timeout_percent = 1.0;
-    float default_timeout_ms = 500;
 
-    double timeout_ms = calculate_bm_timeout_ms(frequency, asic_count, small_cores, cores, version_size, timeout_percent, default_timeout_ms);
+    double timeout_ms = calculate_bm_timeout_ms(frequency, asic_count, small_cores, cores, version_size, timeout_percent);
     double expected_ms = 305419.897;
 
     TEST_ASSERT_FLOAT_WITHIN(0.01, expected_ms, timeout_ms);
+}
+
+TEST_CASE("Check fixed version clamps serial_versions to one full nonce pass", "[common]")
+{
+    double fixed_ms = calculate_bm_timeout_ms(450.0f, 1, 2040, 128, 1, 1.0f);
+    double sixteen_ms = calculate_bm_timeout_ms(450.0f, 1, 2040, 128, 16, 1.0f);
+
+    TEST_ASSERT_FLOAT_WITHIN(0.01, 74.565, fixed_ms);
+    TEST_ASSERT_FLOAT_WITHIN(0.001, sixteen_ms, fixed_ms);
 }

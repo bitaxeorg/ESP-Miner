@@ -65,9 +65,3 @@ bool mining_nonce_hash(const asic_job_t *job, const uint32_t nonce, const uint32
     asic_job_header(job, nonce, rolled_version, header);
     return double_sha256_bin(header, sizeof(header), hash);
 }
-
-uint32_t increment_bitmask(const uint32_t value, const uint32_t mask)
-{
-    // Carry across gaps in the mask while preserving every unmasked bit.
-    return (value & ~mask) | (((value | ~mask) + 1U) & mask);
-}

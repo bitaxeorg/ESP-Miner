@@ -35,7 +35,7 @@ typedef struct __attribute__((__packed__)) {
 void bm13xx_encode_job_packet(const asic_job_t *job, uint8_t chip_slot,
                               bm13xx_job_packet_t *packet);
 void bm1397_encode_job_packet(const asic_job_t *job, uint8_t chip_slot,
-                              uint8_t software_midstates,
+                              uint8_t packet_midstates,
                               bm1397_job_packet_t *packet);
 
 #define BM13XX_JOB_SLOT_COUNT 16
@@ -63,7 +63,7 @@ static inline uint8_t bm_decode_wire_sub_id(uint8_t wire_byte, uint8_t sub_id_bi
  * and encodes the wire packet. */
 void bm13xx_build_job_packet(asic_job_store_t *store, const asic_job_t *job,
                              bm13xx_job_packet_t *packet);
-void bm1397_build_job_packet(asic_job_store_t *store, uint8_t software_midstates,
+void bm1397_build_job_packet(asic_job_store_t *store, uint8_t packet_midstates,
                              const asic_job_t *job, bm1397_job_packet_t *packet);
 
 /* Job result wire packet decoders: resolves the active job from wire chip_slot,
