@@ -494,7 +494,7 @@ esp_err_t stratum_v2_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
         ESP_LOGE(TAG, "Failed to allocate sv2_conn");
         return ESP_ERR_NO_MEM;
     }
-    conn->version_mask = BIP320_VERSION_ROLLING_MASK;
+    conn->version_mask = BIP323_VERSION_ROLLING_MASK;
 
     pthread_mutex_lock(&s_v2_conn_mutex);
     s_v2_conns[pool_idx] = conn;

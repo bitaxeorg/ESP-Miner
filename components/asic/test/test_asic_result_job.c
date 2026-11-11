@@ -274,3 +274,28 @@ TEST_CASE("BM1397 ignores wrapped nonces per slot across in-flight send_work ove
 
     bm1397_harness_end();
 }
+
+TEST_CASE("BM13xx combines software-rolled BIP323 bits with hardware-rolled BIP320 bits",
+          "[asic][result-job][bip323]")
+{
+    GlobalState *state = bm13xx_harness_begin(&bm13xx_harness_drivers[2]);
+    TEST_ASSERT_EQUAL_UINT8(2, bm13xx_harness_drivers[2].init(state));
+
+    asic_job_t job = make_job(JOB_TYPE_SV2_STANDARD);
+    job.version = 0x200015a4;
+    job.version_mask = BIP323_VERSION_ROLLING_MASK;
+    bm13xx_harness_install_job(2, &job);
+
+    uint8_t wire_job_id = (uint8_t)((2 << 4) | 3);
+    uint8_t response[BM13XX_HARNESS_RESPONSE_SIZE] = {
+        0xaa, 0x55, 0x78, 0x56, 0x34, 0x12, 0x00, wire_job_id, 0xa5, 0x5a, 0x80,
+    };
+    bm13xx_harness_queue_response(response);
+
+    task_result *res = bm13xx_harness_drivers[2].process_work(state);
+    TEST_ASSERT_NOT_NULL(res);
+    TEST_ASSERT_EQUAL_HEX32(0x200015a4, res->job.version);
+    TEST_ASSERT_EQUAL_HEX32(0x200015a4 | (0xa55aU << 13), res->rolled_version);
+
+    bm13xx_harness_end();
+}
