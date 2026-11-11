@@ -579,9 +579,12 @@ esp_err_t stratum_v2_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
         ESP_LOGW(TAG, "No authority pubkey configured, server identity will not be verified");
     }
 
-    if (sv2_noise_handshake(noise_ctx, transport, has_auth ? auth_key : NULL) != 0) {
+    int hs_ret = sv2_noise_handshake(noise_ctx, transport, has_auth ? auth_key : NULL);
+    if (hs_ret != 0) {
         ESP_LOGE(TAG, "Noise handshake failed, reconnecting...");
-        stratum_set_pool_error(GLOBAL_STATE, pool_idx, "Auth failed - check key");
+        // A date failure means the key matched, so don't point the user at it.
+        stratum_set_pool_error(GLOBAL_STATE, pool_idx,
+                               hs_ret == SV2_NOISE_ERR_CERT_DATES ? "Certificate invalid" : "Auth failed - check key");
         goto cleanup;
     }
 

@@ -539,11 +539,11 @@ int sv2_noise_handshake(sv2_noise_ctx_t *ctx, esp_transport_handle_t transport,
         if (s_clock_trusted && now > SV2_CLOCK_SET_AFTER) {
             if ((int64_t) now + SV2_CERT_SKEW_S < (int64_t) valid_from) {
                 ESP_LOGE(TAG, "Server certificate not valid yet (valid_from %lu, clock %lld)", valid_from, (long long) now);
-                return -1;
+                return SV2_NOISE_ERR_CERT_DATES;
             }
             if ((int64_t) now - SV2_CERT_SKEW_S > (int64_t) not_valid_after) {
                 ESP_LOGE(TAG, "Server certificate expired (not_valid_after %lu, clock %lld)", not_valid_after, (long long) now);
-                return -1;
+                return SV2_NOISE_ERR_CERT_DATES;
             }
         } else {
             ESP_LOGW(TAG, "Clock not set by NTP (enable NTP): server certificate dates not checked");
