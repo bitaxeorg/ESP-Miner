@@ -17,6 +17,7 @@
 // BM13xx ASICs program version rolling as a 16-bit field shifted by 13 (version_mask >> 13).
 // This is a strict hardware-compatible subset of the BIP323 mask.
 #define BIP320_VERSION_ROLLING_MASK 0x1fffe000U
+#define BIP323_VERSION_ROLLING_MASK 0x1fffffe0U
 
 extern const int8_t hex_val_table[256];
 

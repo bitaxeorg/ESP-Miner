@@ -22,8 +22,9 @@ typedef struct GlobalState {
             uint16_t asic_count;
             uint8_t voltage_domains;
             struct {
-                bool hardware_version_rolling;
-                uint8_t software_midstates;
+                uint32_t hw_version_mask;
+                uint8_t packet_midstates;
+                uint16_t fixed_timeout_ms;
                 uint16_t difficulty;
                 uint16_t core_count;
             } asic;

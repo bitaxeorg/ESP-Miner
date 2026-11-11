@@ -454,7 +454,7 @@ esp_err_t stratum_v2_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
         return ESP_ERR_NO_MEM;
     }
     conn->pool_idx = (uint8_t)pool_idx;
-    conn->version_mask = BIP320_VERSION_ROLLING_MASK;
+    conn->version_mask = BIP323_VERSION_ROLLING_MASK;
     s_v2_conn = conn;
 
     uint8_t *frame_buf = heap_caps_malloc(SV2_MAX_FRAME_SIZE, MALLOC_CAP_SPIRAM);
