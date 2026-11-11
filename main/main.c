@@ -32,10 +32,18 @@
 #include "setup_ble.h"
 #include "esp_ota_ops.h"
 #include "esp_netif_sntp.h"
+#include "sv2_noise.h"
 
 static GlobalState GLOBAL_STATE;
 
 static const char * TAG = "bitaxe";
+
+// SV2 certificate dates are only judged against a clock NTP has set.
+static void on_ntp_sync(struct timeval * tv)
+{
+    (void) tv;
+    sv2_noise_set_clock_trusted(true);
+}
 
 #define DEFAULT_GPIO_I2C_SDA CONFIG_GPIO_I2C_SDA
 #define DEFAULT_GPIO_I2C_SCL CONFIG_GPIO_I2C_SCL
@@ -217,6 +225,7 @@ void app_main(void)
         config.server_from_dhcp = true;
         config.renew_servers_after_new_IP = true; // replace default with DHCP-provided server(s)
         config.ip_event_to_renew = IP_EVENT_STA_GOT_IP;
+        config.sync_cb = on_ntp_sync;  // also covers a first sync after the wait below
         esp_netif_sntp_init(&config);
 
         int retry = 15;
