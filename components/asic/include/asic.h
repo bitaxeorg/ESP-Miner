@@ -25,7 +25,7 @@ void ASIC_send_job(GlobalState *state, const asic_job_t *job);
 void ASIC_set_version_mask(GlobalState * GLOBAL_STATE, uint32_t mask);
 void ASIC_set_frequency(GlobalState * GLOBAL_STATE);
 void ASIC_set_nonce_space(GlobalState * GLOBAL_STATE);
-double ASIC_get_asic_job_frequency_ms(GlobalState * GLOBAL_STATE);
+float ASIC_get_asic_job_frequency_ms(GlobalState * GLOBAL_STATE);
 void ASIC_read_registers(GlobalState * GLOBAL_STATE);
 esp_err_t ASIC_get_domain_measurement(GlobalState * GLOBAL_STATE, uint8_t asic_nr,
                                       uint8_t domain_nr, asic_domain_measurement_t * measurement);
