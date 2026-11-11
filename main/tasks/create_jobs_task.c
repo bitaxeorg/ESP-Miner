@@ -46,6 +46,7 @@ void create_jobs_task(void *pvParameters)
     uint32_t current_version_mask = 0;
     miner_job_t *current_work = NULL;
     bool current_work_sent = false;
+    bool current_work_decoded = false;
     uint64_t extranonce_2 = 0;
     uint32_t current_version = 0;
     int timeout_ms = ASIC_get_asic_job_frequency_ms(GLOBAL_STATE);
@@ -60,6 +61,11 @@ void create_jobs_task(void *pvParameters)
         BaseType_t notified = xTaskNotifyWait(0, ULONG_MAX, &slot_notify, wait_ticks);
         timeout_ms -= (esp_timer_get_time() - start_time) / 1000;
 
+        if (!GLOBAL_STATE->ASIC_initalized) {
+            current_version_mask = 0;
+            current_work_sent = false;
+        }
+
         if (notified == pdTRUE) {
             miner_job_t *new_work = miner_job_get_slot((size_t)slot_notify);
             ESP_LOGI(TAG, "New Work Activated %s (type %d)", new_work->job_id, new_work->type);
@@ -67,6 +73,7 @@ void create_jobs_task(void *pvParameters)
             GLOBAL_STATE->has_work = true;
             GLOBAL_STATE->active_job_slot_idx = (uint8_t)(slot_notify % MINER_JOB_POOL_SIZE);
             current_work_sent = false;
+            current_work_decoded = false;
             current_version = new_work->version;
 
             if (new_work->version_mask != current_version_mask && GLOBAL_STATE->ASIC_initalized) {
@@ -89,6 +96,7 @@ void create_jobs_task(void *pvParameters)
             if (current_work == NULL || !GLOBAL_STATE->has_work) {
                 current_work = NULL;
                 current_work_sent = false;
+                current_work_decoded = false;
                 vTaskDelay(100 / portTICK_PERIOD_MS);
                 continue;
             }
@@ -96,22 +104,30 @@ void create_jobs_task(void *pvParameters)
                 timeout_ms = ASIC_get_asic_job_frequency_ms(GLOBAL_STATE);
                 continue;
             }
+            if (current_work->version_mask != current_version_mask && GLOBAL_STATE->ASIC_initalized) {
+                ESP_LOGI(TAG, "Set chip version rolls %i", (int)(current_work->version_mask >> 13));
+                ASIC_set_version_mask(GLOBAL_STATE, current_work->version_mask);
+                current_version_mask = current_work->version_mask;
+            }
         }
 
         generate_work_from_miner_job(GLOBAL_STATE, current_work, extranonce_2, current_version);
-        if (!current_work_sent) {
+        if (!current_work_decoded) {
             SYSTEM_decode_and_apply_coinbase(GLOBAL_STATE, current_work);
+            current_work_decoded = true;
         }
-        current_work_sent = true;
+        if (GLOBAL_STATE->ASIC_initalized) {
+            current_work_sent = true;
 
-        if (miner_job_is_rollable(current_work)) {
-            extranonce_2++;
-        } else if (!GLOBAL_STATE->DEVICE_CONFIG.family.asic.hardware_version_rolling) {
-            // Software version rolling for ASICs without hardware version rolling (e.g. BM1397) on SV2 Standard Channel
-            uint32_t mask = (current_work->version_mask != 0) ? current_work->version_mask : BIP320_VERSION_ROLLING_MASK;
-            uint8_t midstates = GLOBAL_STATE->DEVICE_CONFIG.family.asic.software_midstates;
-            for (int i = 0; i < midstates; i++) {
-                current_version = increment_bitmask(current_version, mask);
+            if (miner_job_is_rollable(current_work)) {
+                extranonce_2++;
+            } else if (!GLOBAL_STATE->DEVICE_CONFIG.family.asic.hardware_version_rolling) {
+                // Software version rolling for ASICs without hardware version rolling (e.g. BM1397) on SV2 Standard Channel
+                uint32_t mask = (current_work->version_mask != 0) ? current_work->version_mask : BIP320_VERSION_ROLLING_MASK;
+                uint8_t midstates = GLOBAL_STATE->DEVICE_CONFIG.family.asic.software_midstates;
+                for (int i = 0; i < midstates; i++) {
+                    current_version = increment_bitmask(current_version, mask);
+                }
             }
         }
         timeout_ms = ASIC_get_asic_job_frequency_ms(GLOBAL_STATE);

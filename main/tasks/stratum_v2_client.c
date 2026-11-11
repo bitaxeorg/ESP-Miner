@@ -252,6 +252,9 @@ static void stratum_v2_handle_new_extended_mining_job(GlobalState *GLOBAL_STATE,
 
         GLOBAL_STATE->SYSTEM_MODULE.work_received++;
         stratum_check_primary_handover(GLOBAL_STATE, conn->pool_idx);
+        if (GLOBAL_STATE->SYSTEM_MODULE.pool_difficulty == 0.0) {
+            GLOBAL_STATE->SYSTEM_MODULE.pool_difficulty = target_to_diff(conn->target);
+        }
         SYSTEM_notify_new_ntime(GLOBAL_STATE, job->ntime);
         if (GLOBAL_STATE->create_jobs_task_handle) {
             xTaskNotify(GLOBAL_STATE->create_jobs_task_handle, slot, eSetValueWithOverwrite);
@@ -309,6 +312,9 @@ static void stratum_v2_handle_new_mining_job(GlobalState *GLOBAL_STATE, sv2_conn
 
         GLOBAL_STATE->SYSTEM_MODULE.work_received++;
         stratum_check_primary_handover(GLOBAL_STATE, conn->pool_idx);
+        if (GLOBAL_STATE->SYSTEM_MODULE.pool_difficulty == 0.0) {
+            GLOBAL_STATE->SYSTEM_MODULE.pool_difficulty = target_to_diff(conn->target);
+        }
         SYSTEM_notify_new_ntime(GLOBAL_STATE, job->ntime);
         if (GLOBAL_STATE->create_jobs_task_handle) {
             xTaskNotify(GLOBAL_STATE->create_jobs_task_handle, slot, eSetValueWithOverwrite);
@@ -366,6 +372,9 @@ static void stratum_v2_handle_set_new_prev_hash(GlobalState *GLOBAL_STATE, sv2_c
 
         GLOBAL_STATE->SYSTEM_MODULE.work_received++;
         stratum_check_primary_handover(GLOBAL_STATE, conn->pool_idx);
+        if (GLOBAL_STATE->SYSTEM_MODULE.pool_difficulty == 0.0) {
+            GLOBAL_STATE->SYSTEM_MODULE.pool_difficulty = target_to_diff(conn->target);
+        }
         SYSTEM_notify_new_ntime(GLOBAL_STATE, job->ntime);
         if (GLOBAL_STATE->create_jobs_task_handle) {
             xTaskNotify(GLOBAL_STATE->create_jobs_task_handle, slot, eSetValueWithOverwrite);

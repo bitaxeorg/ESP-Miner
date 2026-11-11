@@ -35,4 +35,7 @@ void stratum_set_pool_error(GlobalState *gs, uint16_t pool_idx, const char *err_
 // Check if primary has received work during fallback and trigger handover by aborting fallback.
 void stratum_check_primary_handover(GlobalState *gs, uint16_t pool_idx);
 
+// Returns true if the given pool index has a non-empty URL and non-zero port.
+bool stratum_is_pool_configured(const GlobalState *gs, uint16_t pool_idx);
+
 #endif /* STRATUM_TASK_H_ */
