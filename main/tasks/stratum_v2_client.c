@@ -358,15 +358,10 @@ static void stratum_v2_handle_set_new_prev_hash(GlobalState *GLOBAL_STATE, sv2_c
         job->clean_jobs = true;
         job->pool_id = conn->pool_idx;
         memcpy(job->pool_target, conn->target, 32);
+        // An extended job keeps the extranonce prefix captured when it arrived:
+        // SetExtranoncePrefix applies only to jobs sent after it (spec 5.3.10).
         if (job->type == JOB_TYPE_SV2_STANDARD) {
             job->version_mask = conn->version_mask;
-        } else if (job->type == JOB_TYPE_SV2_EXTENDED) {
-            job->extranonce1_len = conn->extranonce_prefix_len;
-            if (job->extranonce1_len > sizeof(job->extranonce1)) job->extranonce1_len = sizeof(job->extranonce1);
-            if (job->extranonce1_len > 0) {
-                memcpy(job->extranonce1, conn->extranonce_prefix, job->extranonce1_len);
-            }
-            job->extranonce2_len = conn->extranonce_size;
         }
 
         GLOBAL_STATE->SYSTEM_MODULE.work_received++;
@@ -408,6 +403,44 @@ static void stratum_v2_handle_set_target(GlobalState *GLOBAL_STATE, sv2_conn_t *
 
     ESP_LOGI(TAG, "Set pool difficulty: %g", pdiff);
     difficulty_controller_update(GLOBAL_STATE);
+}
+
+static void stratum_v2_handle_set_extranonce_prefix(sv2_conn_t *conn,
+                                                    const uint8_t *payload, uint32_t len)
+{
+    uint32_t channel_id;
+    uint8_t prefix[SV2_MAX_EXTRANONCE_SIZE];
+    uint8_t prefix_len;
+
+    if (sv2_parse_set_extranonce_prefix(payload, len, &channel_id, prefix, &prefix_len) != 0) {
+        ESP_LOGE(TAG, "Failed to parse SetExtranoncePrefix");
+        return;
+    }
+
+    // Spec 5.3.10: applies to explicitly opened channels only; a client must
+    // ignore it when addressed to a group channel.
+    if (channel_id != conn->channel_id) {
+        ESP_LOGW(TAG, "Ignoring SetExtranoncePrefix for channel %lu (own channel %lu)",
+                 (unsigned long)channel_id, (unsigned long)conn->channel_id);
+        return;
+    }
+
+    // extranonce_size is fixed at channel opening, so the new prefix must
+    // still leave room for it within the B0_32 extranonce.
+    if ((uint32_t)prefix_len + conn->extranonce_size > SV2_MAX_EXTRANONCE_SIZE) {
+        ESP_LOGE(TAG, "Ignoring SetExtranoncePrefix: prefix %u + extranonce_size %u exceeds %u bytes",
+                 prefix_len, conn->extranonce_size, SV2_MAX_EXTRANONCE_SIZE);
+        return;
+    }
+
+    char prefix_hex[SV2_MAX_EXTRANONCE_SIZE * 2 + 1] = {0};
+    bin2hex(prefix, prefix_len, prefix_hex, sizeof(prefix_hex));
+    ESP_LOGI(TAG, "Set extranonce prefix: %s (applies to following jobs)", prefix_hex);
+
+    conn->extranonce_prefix_len = prefix_len;
+    if (prefix_len > 0) {
+        memcpy(conn->extranonce_prefix, prefix, prefix_len);
+    }
 }
 
 esp_err_t stratum_v2_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
@@ -795,6 +828,10 @@ esp_err_t stratum_v2_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
                 stratum_v2_handle_new_extended_mining_job(GLOBAL_STATE, conn, recv_buf, hdr.msg_length);
                 break;
 
+            case SV2_MSG_SET_EXTRANONCE_PREFIX:
+                stratum_v2_handle_set_extranonce_prefix(conn, recv_buf, hdr.msg_length);
+                break;
+
             case SV2_MSG_SET_NEW_PREV_HASH:
                 stratum_v2_handle_set_new_prev_hash(GLOBAL_STATE, conn, recv_buf, hdr.msg_length);
                 break;
@@ -811,13 +848,12 @@ esp_err_t stratum_v2_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
                                  (unsigned long)channel_id, (unsigned long)conn->channel_id);
                         break;
                     }
-                    uint32_t pending = (conn->sequence_number > conn->resolved_shares)
-                                           ? (conn->sequence_number - conn->resolved_shares)
-                                           : 0;
-                    if (accepted_count > pending) {
+                    uint32_t reported_count = accepted_count;
+                    accepted_count = sv2_account_accepted_shares(
+                        conn->sequence_number, &conn->resolved_shares, accepted_count);
+                    if (reported_count > accepted_count) {
                         ESP_LOGW(TAG, "Clamping accepted_count (%lu) to pending shares (%lu)",
-                                 (unsigned long)accepted_count, (unsigned long)pending);
-                        accepted_count = pending;
+                                 (unsigned long)reported_count, (unsigned long)accepted_count);
                     }
                     float response_time_ms = stratum_timing_calculate_ms(&s_v2_timings[pool_idx], last_sequence_number, esp_timer_get_time());
                     if (response_time_ms >= 0) {
@@ -828,10 +864,6 @@ esp_err_t stratum_v2_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
                     }
                     for (uint32_t i = 0; i < accepted_count; i++) {
                         SYSTEM_notify_accepted_share(GLOBAL_STATE);
-                    }
-                    uint32_t resolved = last_sequence_number + 1;
-                    if (resolved > conn->resolved_shares) {
-                        conn->resolved_shares = resolved;
                     }
                 }
                 break;
@@ -848,12 +880,15 @@ esp_err_t stratum_v2_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
                                  (unsigned long)channel_id, (unsigned long)conn->channel_id);
                         break;
                     }
+                    // A reply must refer to a sequence sent on this connection.
+                    if (!sv2_account_rejected_share(
+                            conn->sequence_number, &conn->resolved_shares, seq_num)) {
+                        ESP_LOGW(TAG, "Dropping SubmitSharesError for unsent sequence %lu (sent %lu)",
+                                 (unsigned long)seq_num, (unsigned long)conn->sequence_number);
+                        break;
+                    }
                     ESP_LOGW(TAG, "Share rejected: %s", error_code);
                     SYSTEM_notify_rejected_share(GLOBAL_STATE, error_code);
-                    uint32_t resolved = seq_num + 1;
-                    if (resolved > conn->resolved_shares) {
-                        conn->resolved_shares = resolved;
-                    }
                 }
                 break;
             }

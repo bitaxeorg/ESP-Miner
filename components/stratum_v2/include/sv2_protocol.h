@@ -27,6 +27,7 @@
 #define SV2_MSG_SUBMIT_SHARES_EXTENDED                  0x1b
 #define SV2_MSG_SUBMIT_SHARES_SUCCESS                   0x1c
 #define SV2_MSG_SUBMIT_SHARES_ERROR                     0x1d
+#define SV2_MSG_SET_EXTRANONCE_PREFIX                   0x19
 #define SV2_MSG_SET_NEW_PREV_HASH                       0x20
 #define SV2_MSG_SET_TARGET                              0x21
 
@@ -171,6 +172,12 @@ int sv2_parse_set_new_prev_hash(const uint8_t *payload, uint32_t len,
                                 uint8_t prev_hash[32],
                                 uint32_t *min_ntime, uint32_t *nbits);
 
+// Parse SetExtranoncePrefix: channel_id U32 + extranonce_prefix B0_32.
+int sv2_parse_set_extranonce_prefix(const uint8_t *payload, uint32_t len,
+                                    uint32_t *channel_id,
+                                    uint8_t *extranonce_prefix,
+                                    uint8_t *extranonce_prefix_len);
+
 int sv2_parse_set_target(const uint8_t *payload, uint32_t len,
                          uint32_t *channel_id, uint8_t max_target[32]);
 
@@ -198,5 +205,28 @@ int sv2_parse_open_extended_channel_success(const uint8_t *payload, uint32_t len
 int sv2_parse_new_extended_mining_job(const uint8_t *payload, uint32_t len,
                                       uint32_t *channel_id_out, miner_job_t *job_out,
                                       bool *has_min_ntime_out, bool *version_rolling_allowed_out);
+
+// Account resolved shares by count. Sequence IDs identify individual replies,
+// while SubmitShares.Success carries a number of newly accepted shares.
+static inline uint32_t sv2_account_accepted_shares(uint32_t submitted,
+                                                    uint32_t *resolved,
+                                                    uint32_t accepted)
+{
+    if (!resolved) return 0;
+    uint32_t pending = submitted > *resolved ? submitted - *resolved : 0;
+    if (accepted > pending) accepted = pending;
+    *resolved += accepted;
+    return accepted;
+}
+
+// A pool cannot reject a share that this connection has not submitted.
+static inline bool sv2_account_rejected_share(uint32_t submitted,
+                                              uint32_t *resolved,
+                                              uint32_t sequence_number)
+{
+    if (!resolved || sequence_number >= submitted) return false;
+    if (*resolved < submitted) (*resolved)++;
+    return true;
+}
 
 #endif /* SV2_PROTOCOL_H */
