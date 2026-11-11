@@ -164,7 +164,9 @@ void coinbase_decode_address_from_scriptpubkey(const uint8_t *script, size_t scr
 // array holds, so keep the user's own output and the largest ones and aggregate the rest.
 // Zero-value outputs (OP_RETURN / witness commitment) are never evicted; they are dropped
 // instead of aggregated because they are not payout recipients.
-static void coinbase_store_output(mining_notification_result_t *result, const char *address,
+static void coinbase_store_output(mining_notification_result_t *result,
+                                  const uint8_t *script_ptr, size_t script_len,
+                                  const char *bech32_hrp, bool is_testnet,
                                   uint64_t value_satoshis, bool is_user_output) {
     int idx = result->output_count;
 
@@ -195,7 +197,10 @@ static void coinbase_store_output(mining_notification_result_t *result, const ch
         result->output_count++;
     }
 
-    snprintf(result->outputs[idx].address, sizeof(result->outputs[idx].address), "%s", address);
+    coinbase_decode_address_from_scriptpubkey(script_ptr, script_len,
+                                              result->outputs[idx].address,
+                                              sizeof(result->outputs[idx].address),
+                                              bech32_hrp, is_testnet);
     result->outputs[idx].value_satoshis = value_satoshis;
     result->outputs[idx].is_user_output = is_user_output;
 }
@@ -524,10 +529,8 @@ static esp_err_t parse_coinbase_suffix(const miner_job_t *job,
                 result->user_value_satoshis += value_satoshis;
             }
 
-            char output_address[MAX_ADDRESS_STRING_LEN];
-            coinbase_decode_address_from_scriptpubkey(script_ptr, script_len, output_address, MAX_ADDRESS_STRING_LEN, bech32_hrp, is_testnet);
-
-            coinbase_store_output(result, output_address, value_satoshis, is_user_output);
+            coinbase_store_output(result, script_ptr, (size_t)script_len,
+                                  bech32_hrp, is_testnet, value_satoshis, is_user_output);
         }
 
         offset += script_len;

@@ -10,7 +10,7 @@
 typedef mining_job_source_t miner_job_type_t;
 
 #define MAX_COINBASE_PREFIX_LEN 1024
-#define MAX_COINBASE_SUFFIX_LEN 64512
+#define MAX_COINBASE_SUFFIX_LEN 1000000
 #define MAX_EXTRANONCE_2_LEN 32
 #define MAX_MERKLE_BRANCHES 32
 #define MAX_JOB_ID_LEN ASIC_JOB_ID_LEN
@@ -45,7 +45,7 @@ typedef struct {
     uint8_t         *coinbase_prefix;
     uint16_t         coinbase_prefix_len;
     uint8_t         *coinbase_suffix;
-    uint16_t         coinbase_suffix_len;
+    uint32_t         coinbase_suffix_len;
 
     // Pre-computed Merkle root (for SV2 Standard)
     uint8_t          merkle_root[32];
@@ -54,6 +54,8 @@ typedef struct {
 // Pre-allocated ring buffer pool helpers
 void miner_job_pool_init(void);
 miner_job_t *miner_job_get_slot(size_t index);
+// Suffix buffers must be heap-owned; resizing preserves the pointer on failure.
+bool miner_job_resize_coinbase_suffix(miner_job_t *job, size_t length);
 
 static inline bool miner_job_is_rollable(const miner_job_t *job)
 {

@@ -11,6 +11,12 @@
 #define MAX_POOL_MESSAGE_LEN 256
 #define STRATUM_V1_MAX_JSON_LINE_SIZE 16384
 
+typedef enum {
+    STRATUM_V1_RX_OK = 0,
+    STRATUM_V1_RX_PARSE_ERROR,
+    STRATUM_V1_RX_TRANSPORT_ERROR,
+} stratum_v1_rx_status_t;
+
 typedef enum
 {
     METHOD_UNKNOWN,
@@ -89,6 +95,11 @@ esp_transport_handle_t STRATUM_V1_transport_init(tls_mode tls, const char * cert
 bool STRATUM_V1_initialize_buffer(void);
 
 char *STRATUM_V1_receive_jsonrpc_line(esp_transport_handle_t transport);
+
+stratum_v1_rx_status_t STRATUM_V1_receive_message(esp_transport_handle_t transport,
+                                                  StratumApiV1Message *message,
+                                                  miner_job_t *job,
+                                                  int64_t *receive_time_us);
 
 int STRATUM_V1_subscribe(esp_transport_handle_t transport, int send_uid, const char * model);
 

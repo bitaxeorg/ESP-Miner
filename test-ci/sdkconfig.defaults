@@ -4,3 +4,10 @@ CONFIG_ESP_TASK_WDT=n
 # same stack budget as the firmware's job and result tasks.
 CONFIG_ESP_MAIN_TASK_STACK_SIZE=8192
 CONFIG_FREERTOS_WATCHPOINT_END_OF_STACK=y
+
+# Exercise large Stratum jobs with QEMU's emulated Quad PSRAM (-m 4).
+CONFIG_SPIRAM=y
+CONFIG_SPIRAM_MODE_QUAD=y
+CONFIG_SPIRAM_SPEED_40M=y
+# QEMU's SHA DMA cannot read PSRAM buffers; exercise PSA's software SHA instead.
+CONFIG_MBEDTLS_HARDWARE_SHA=n

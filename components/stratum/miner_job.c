@@ -9,21 +9,24 @@
 
 static miner_job_t s_job_pool[MINER_JOB_POOL_SIZE];
 
+bool miner_job_resize_coinbase_suffix(miner_job_t *job, size_t length)
+{
+    if (!job || length > MAX_COINBASE_SUFFIX_LEN) return false;
+    uint8_t *buffer = heap_caps_realloc(job->coinbase_suffix, length ? length : 1,
+                                        MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    if (!buffer) return false;
+    job->coinbase_suffix = buffer;
+    return true;
+}
+
 void miner_job_pool_init(void)
 {
     for (size_t i = 0; i < MINER_JOB_POOL_SIZE; i++) {
         if (!s_job_pool[i].coinbase_prefix) {
-            s_job_pool[i].coinbase_prefix = heap_caps_calloc(1, MAX_COINBASE_PREFIX_LEN, MALLOC_CAP_SPIRAM);
-            if (!s_job_pool[i].coinbase_prefix) {
-                s_job_pool[i].coinbase_prefix = calloc(1, MAX_COINBASE_PREFIX_LEN);
-            }
+            s_job_pool[i].coinbase_prefix = heap_caps_calloc(
+                1, MAX_COINBASE_PREFIX_LEN, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
         }
-        if (!s_job_pool[i].coinbase_suffix) {
-            s_job_pool[i].coinbase_suffix = heap_caps_calloc(1, MAX_COINBASE_SUFFIX_LEN, MALLOC_CAP_SPIRAM);
-            if (!s_job_pool[i].coinbase_suffix) {
-                s_job_pool[i].coinbase_suffix = calloc(1, 2048);
-            }
-        }
+        miner_job_resize_coinbase_suffix(&s_job_pool[i], 2048);
         uint8_t *p_buf = s_job_pool[i].coinbase_prefix;
         uint8_t *s_buf = s_job_pool[i].coinbase_suffix;
         memset(&s_job_pool[i], 0, sizeof(miner_job_t));
