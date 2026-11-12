@@ -72,6 +72,10 @@ typedef struct StratumApiV1Message
 
 typedef struct sv1_conn {
     esp_transport_handle_t transport;
+    char *json_rpc_buffer;
+    size_t json_rpc_buffer_size;
+    size_t json_rpc_buffer_len;
+    uint16_t pool_idx;
     int send_uid;
     char user[256];
     uint8_t pool_target[32];
@@ -86,9 +90,10 @@ typedef struct sv1_conn {
 
 esp_transport_handle_t STRATUM_V1_transport_init(tls_mode tls, const char * cert);
 
-bool STRATUM_V1_initialize_buffer(void);
+bool STRATUM_V1_initialize_conn_buffer(sv1_conn_t *conn);
+void STRATUM_V1_free_conn_buffer(sv1_conn_t *conn);
 
-char *STRATUM_V1_receive_jsonrpc_line(esp_transport_handle_t transport);
+char *STRATUM_V1_receive_jsonrpc_line(sv1_conn_t *conn);
 
 int STRATUM_V1_subscribe(esp_transport_handle_t transport, int send_uid, const char * model);
 

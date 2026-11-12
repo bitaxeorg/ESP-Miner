@@ -986,27 +986,34 @@ bool check_settings_and_update(const cJSON * const root, char **redirect_url, Gl
         }
 
         cJSON *use_fallback_item = cJSON_GetObjectItem(root, "useFallbackStratum");
-        bool pool_selection_changed = (cJSON_GetObjectItem(root, "primaryPoolIndex") != NULL) ||
-                                      (cJSON_GetObjectItem(root, "secondaryPoolIndex") != NULL) ||
-                                      (use_fallback_item != NULL);
-        if (pools_item != NULL || pool_selection_changed) {
+        bool has_selection_fields = (cJSON_GetObjectItem(root, "primaryPoolIndex") != NULL) ||
+                                    (cJSON_GetObjectItem(root, "secondaryPoolIndex") != NULL) ||
+                                    (use_fallback_item != NULL);
+        if (pools_item != NULL || has_selection_fields) {
+            uint16_t old_prim = GLOBAL_STATE->SYSTEM_MODULE.primary_pool_index;
+            uint16_t old_sec = GLOBAL_STATE->SYSTEM_MODULE.secondary_pool_index;
+            bool old_use_fallback = GLOBAL_STATE->SYSTEM_MODULE.use_fallback_stratum;
+
             GLOBAL_STATE->SYSTEM_MODULE.primary_pool_error[0] = '\0';
             SYSTEM_reload_pool_config(GLOBAL_STATE);
 
-            if (use_fallback_item) {
-                GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback = GLOBAL_STATE->SYSTEM_MODULE.use_fallback_stratum;
-            } else if (cJSON_GetObjectItem(root, "primaryPoolIndex") != NULL && !GLOBAL_STATE->SYSTEM_MODULE.use_fallback_stratum) {
-                GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback = false;
-            }
-
-            for (int i = 0; i < MAX_POOLS; i++) {
-                if (modified_pools[i]) {
-                    stratum_notify_pool_modified(GLOBAL_STATE, i);
-                }
-            }
+            bool pool_selection_changed = (GLOBAL_STATE->SYSTEM_MODULE.primary_pool_index != old_prim) ||
+                                          (GLOBAL_STATE->SYSTEM_MODULE.secondary_pool_index != old_sec) ||
+                                          (GLOBAL_STATE->SYSTEM_MODULE.use_fallback_stratum != old_use_fallback) ||
+                                          (use_fallback_item != NULL);
 
             if (pool_selection_changed) {
+                uint16_t sec_idx = GLOBAL_STATE->SYSTEM_MODULE.secondary_pool_index;
+                GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback =
+                    GLOBAL_STATE->SYSTEM_MODULE.use_fallback_stratum &&
+                    stratum_is_pool_configured(GLOBAL_STATE, sec_idx);
                 stratum_notify_pool_selection_changed(GLOBAL_STATE);
+            } else {
+                for (int i = 0; i < MAX_POOLS; i++) {
+                    if (modified_pools[i]) {
+                        stratum_notify_pool_modified(GLOBAL_STATE, i);
+                    }
+                }
             }
         }
     }
