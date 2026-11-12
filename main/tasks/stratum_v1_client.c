@@ -479,7 +479,8 @@ esp_err_t stratum_v1_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
             }
         }
 
-        ESP_LOGI(TAG, "rx: %s", line);
+        size_t line_len = strlen(line);
+        ESP_LOGI(TAG, "rx (%zu bytes): %.512s%s", line_len, line, line_len > 512 ? "..." : "");
         free(line);
         STRATUM_V1_reset_message(&v1_msg);
         if (reconnect_requested) {

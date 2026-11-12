@@ -1,5 +1,9 @@
 #include "unity.h"
 #include "miner_job.h"
+#include <stdlib.h>
+#include <string.h>
+#include "esp_psram.h"
+#include "esp_heap_caps.h"
 
 TEST_CASE("miner_job_get_slot indexing and buffer validity", "[stratum]")
 {
@@ -48,4 +52,45 @@ TEST_CASE("miner_job_is_rollable validation", "[stratum]")
     job->extranonce2_len = 4;
     job->coinbase_prefix_len = 10;
     TEST_ASSERT_TRUE(miner_job_is_rollable(job));
+}
+
+TEST_CASE("coinbase suffix resize preserves storage on rejected size", "[stratum]")
+{
+    miner_job_t job = {0};
+    TEST_ASSERT_TRUE(miner_job_resize_coinbase_suffix(&job, 32));
+    memset(job.coinbase_suffix, 0xa5, 32);
+    uint8_t *original = job.coinbase_suffix;
+    TEST_ASSERT_FALSE(miner_job_resize_coinbase_suffix(&job, MAX_COINBASE_SUFFIX_LEN + 1U));
+    TEST_ASSERT_EQUAL_PTR(original, job.coinbase_suffix);
+    TEST_ASSERT_EQUAL_HEX8(0xa5, job.coinbase_suffix[31]);
+    TEST_ASSERT_TRUE(miner_job_resize_coinbase_suffix(&job, 4096));
+    TEST_ASSERT_EQUAL_HEX8(0xa5, job.coinbase_suffix[31]);
+    job.coinbase_suffix[4095] = 0x5a;
+    TEST_ASSERT_TRUE(miner_job_resize_coinbase_suffix(&job, 16));
+    TEST_ASSERT_EQUAL_HEX8(0xa5, job.coinbase_suffix[15]);
+    free(job.coinbase_suffix);
+}
+
+TEST_CASE("coinbase suffix allocation failure preserves job and permits recovery", "[stratum]")
+{
+    if (!esp_psram_is_initialized()) TEST_IGNORE_MESSAGE("PSRAM allocation failure test");
+    miner_job_t job = {0};
+    TEST_ASSERT_TRUE(miner_job_resize_coinbase_suffix(&job, 32));
+    memset(job.coinbase_suffix, 0xa5, 32);
+    uint8_t *original = job.coinbase_suffix;
+    void *held[128];
+    size_t count = 0;
+    while (count < sizeof(held) / sizeof(held[0])) {
+        void *block = heap_caps_malloc(256 * 1024, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+        if (!block) break;
+        held[count++] = block;
+    }
+    bool resized = miner_job_resize_coinbase_suffix(&job, MAX_COINBASE_SUFFIX_LEN);
+    while (count > 0) free(held[--count]);
+    TEST_ASSERT_FALSE(resized);
+    TEST_ASSERT_EQUAL_PTR(original, job.coinbase_suffix);
+    TEST_ASSERT_EQUAL_HEX8(0xa5, job.coinbase_suffix[31]);
+    TEST_ASSERT_TRUE(miner_job_resize_coinbase_suffix(&job, MAX_COINBASE_SUFFIX_LEN));
+    TEST_ASSERT_EQUAL_HEX8(0xa5, job.coinbase_suffix[31]);
+    free(job.coinbase_suffix);
 }

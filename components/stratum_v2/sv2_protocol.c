@@ -497,6 +497,12 @@ int sv2_parse_new_extended_mining_job(const uint8_t *payload, uint32_t len,
     if ((uint32_t)pos + suffix_len > len) return -1;
     const uint8_t *suffix_data = payload + pos;
 
+    if (prefix_len > MAX_COINBASE_PREFIX_LEN || (prefix_len > 0 && !job_out->coinbase_prefix) ||
+        !miner_job_resize_coinbase_suffix(job_out, suffix_len)) {
+        ESP_LOGE(TAG, "Cannot allocate SV2 coinbase buffers");
+        return -1;
+    }
+
     uint8_t *p_buf = job_out->coinbase_prefix;
     uint8_t *s_buf = job_out->coinbase_suffix;
     memset(job_out, 0, sizeof(miner_job_t));
@@ -513,19 +519,11 @@ int sv2_parse_new_extended_mining_job(const uint8_t *payload, uint32_t len,
         memcpy(job_out->merkle_path[i], merkle_path[i], 32);
     }
 
-    if (prefix_len > MAX_COINBASE_PREFIX_LEN || (prefix_len > 0 && !job_out->coinbase_prefix)) {
-        ESP_LOGE(TAG, "SV2 coinbase prefix length %u exceeds maximum %d", prefix_len, MAX_COINBASE_PREFIX_LEN);
-        return -1;
-    }
     if (prefix_len > 0) {
         memcpy(job_out->coinbase_prefix, prefix_data, prefix_len);
     }
     job_out->coinbase_prefix_len = prefix_len;
 
-    if (suffix_len > MAX_COINBASE_SUFFIX_LEN || (suffix_len > 0 && !job_out->coinbase_suffix)) {
-        ESP_LOGE(TAG, "SV2 coinbase suffix length %u exceeds maximum %d", suffix_len, MAX_COINBASE_SUFFIX_LEN);
-        return -1;
-    }
     if (suffix_len > 0) {
         memcpy(job_out->coinbase_suffix, suffix_data, suffix_len);
     }

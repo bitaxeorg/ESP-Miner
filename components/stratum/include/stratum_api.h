@@ -9,7 +9,8 @@
 
 #define MAX_REQUEST_IDS 1024
 #define MAX_POOL_MESSAGE_LEN 256
-#define STRATUM_V1_MAX_JSON_LINE_SIZE 16384
+// Hex-encoded coinbase plus prefix, Merkle branches and JSON framing.
+#define STRATUM_V1_MAX_JSON_LINE_SIZE (2U * MAX_COINBASE_SUFFIX_LEN + 8192U)
 
 typedef enum
 {
