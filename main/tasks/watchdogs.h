@@ -10,7 +10,7 @@ typedef struct {
     uint32_t asic_reinits;      // carried over watchdog restarts
     uint32_t asic_restarts;
     uint32_t pool_reconnects;
-    char last_trigger[64];      // empty until one fires
+    char last_trigger[96];      // empty until one fires
 } watchdog_stats_t;
 
 // Every result frame from the chain, from the ASIC result task

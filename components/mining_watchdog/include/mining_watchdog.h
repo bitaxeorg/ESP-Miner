@@ -15,6 +15,7 @@
 #define WD_ASIC_MAX_RECOVERIES    3                   // per hour
 #define WD_ASIC_BUDGET_RESET_MS   (60 * 60 * 1000)    // an hour without a recovery restores the budget
 #define WD_STEP_CAP_MS            1000                // a long gap between ticks counts as one second
+#define WD_ASIC_FROZEN_MS         (3 * 60 * 1000)     // 1 min hashrate not changing at all while mining
 
 #define WD_POOL_NO_WORK_MS        (5 * 60 * 1000)     // pools send work at least every 30-60 s
 #define WD_POOL_NO_REPLY_MS       (3 * 60 * 1000)     // a submitted share with no reply at all
@@ -26,10 +27,20 @@ typedef enum {
     WD_ASIC_GIVE_UP,    // recovery budget used up
 } wd_asic_action_t;
 
+typedef enum {
+    WD_ASIC_REASON_NONE = 0,
+    WD_ASIC_REASON_NO_RESULTS,      // no result frames from the chain
+    WD_ASIC_REASON_FROZEN_HASHRATE, // the 1 min hashrate stopped changing
+} wd_asic_reason_t;
+
 typedef struct {
     uint64_t last_ms;
     uint32_t last_results;
     uint32_t silent_ms;
+    float last_hashrate;
+    uint32_t frozen_ms;
+    wd_asic_reason_t reason;        // what fired the last action
+    bool hashrate_since_recovery;
     uint8_t recoveries;             // used from the hourly budget
     uint64_t last_recovery_ms;
     wd_asic_action_t last_action;
@@ -40,6 +51,7 @@ typedef struct {
     bool running;       // chain up at its target clock; not paused, overheated or in self-test
     bool has_work;      // the pool has given work to hash
     uint32_t results;   // running count of results from the chain
+    float hashrate_1m;  // compared exactly: while hashing it moves every second
     uint32_t window_ms; // from wd_asic_window_ms(); 0 disables the check
 } wd_asic_input_t;
 
@@ -58,7 +70,8 @@ typedef struct {
     uint64_t unanswered_since_ms;   // 0: no share waiting for a reply
 } wd_pool_t;
 
-// recoveries and last_action carry over a restart (kept in RTC memory by the caller)
+// recoveries and last_action carry over a restart (kept in RTC memory by the caller).
+// After an action, wd->reason says which signal fired it.
 void wd_asic_init(wd_asic_t *wd, uint64_t now_ms, uint8_t recoveries, wd_asic_action_t last_action);
 wd_asic_action_t wd_asic_step(wd_asic_t *wd, uint64_t now_ms, const wd_asic_input_t *in);
 
