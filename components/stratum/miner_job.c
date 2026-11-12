@@ -1,12 +1,8 @@
 #include "miner_job.h"
-#include "stratum_api.h"
-#include "utils.h"
 #include <string.h>
 #include <pthread.h>
 #include <stdlib.h>
-#include "esp_log.h"
 #include "esp_heap_caps.h"
-#include "esp_psram.h"
 
 static miner_job_pool_t s_default_job_pool;
 
@@ -14,11 +10,8 @@ void miner_job_pool_init_instance(miner_job_pool_t *pool)
 {
     if (!pool) return;
 
-    bool has_psram = esp_psram_is_initialized();
     if (!pool->slots) {
-        if (has_psram) {
-            pool->slots = heap_caps_calloc(MINER_JOB_POOL_SIZE, sizeof(miner_job_t), MALLOC_CAP_SPIRAM);
-        }
+        pool->slots = heap_caps_calloc(MINER_JOB_POOL_SIZE, sizeof(miner_job_t), MALLOC_CAP_SPIRAM);
         if (!pool->slots) {
             pool->slots = calloc(MINER_JOB_POOL_SIZE, sizeof(miner_job_t));
         }
@@ -29,17 +22,13 @@ void miner_job_pool_init_instance(miner_job_pool_t *pool)
 
     for (size_t i = 0; i < MINER_JOB_POOL_SIZE; i++) {
         if (!pool->slots[i].coinbase_prefix) {
-            if (has_psram) {
-                pool->slots[i].coinbase_prefix = heap_caps_calloc(1, MAX_COINBASE_PREFIX_LEN, MALLOC_CAP_SPIRAM);
-            }
+            pool->slots[i].coinbase_prefix = heap_caps_calloc(1, MAX_COINBASE_PREFIX_LEN, MALLOC_CAP_SPIRAM);
             if (!pool->slots[i].coinbase_prefix) {
                 pool->slots[i].coinbase_prefix = calloc(1, MAX_COINBASE_PREFIX_LEN);
             }
         }
         if (!pool->slots[i].coinbase_suffix) {
-            if (has_psram) {
-                pool->slots[i].coinbase_suffix = heap_caps_calloc(1, MAX_COINBASE_SUFFIX_LEN, MALLOC_CAP_SPIRAM);
-            }
+            pool->slots[i].coinbase_suffix = heap_caps_calloc(1, MAX_COINBASE_SUFFIX_LEN, MALLOC_CAP_SPIRAM);
             if (!pool->slots[i].coinbase_suffix) {
                 pool->slots[i].coinbase_suffix = calloc(1, 2048);
             }
