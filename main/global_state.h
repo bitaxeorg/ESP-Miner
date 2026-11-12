@@ -13,7 +13,6 @@
 #include "device_config.h"
 #include "display.h"
 #include "scoreboard.h"
-#include "esp_transport.h"
 #include "system.h"
 #include "pool.h"
 

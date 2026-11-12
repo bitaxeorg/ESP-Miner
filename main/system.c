@@ -251,6 +251,9 @@ void SYSTEM_init_system(GlobalState * GLOBAL_STATE)
 
     // load primary and secondary pool index selectors and fallback preference
     SYSTEM_reload_pool_config(GLOBAL_STATE);
+    const PoolConfig *sec_pool = &module->pools[module->secondary_pool_index];
+    module->is_using_fallback = module->use_fallback_stratum &&
+        (sec_pool->url != NULL && sec_pool->url[0] != '\0' && sec_pool->port != 0);
 
     // Initialize overheat_mode
     module->overheat_mode = nvs_config_get_bool(NVS_CONFIG_OVERHEAT_MODE);

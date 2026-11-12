@@ -135,17 +135,30 @@ void stratum_notify_pool_modified(GlobalState *gs, uint16_t pool_idx)
 {
     if (!gs || pool_idx >= MAX_POOLS) return;
 
+    bool was_unavailable = gs->SYSTEM_MODULE.pools_unavailable;
+    uint16_t prim_idx = gs->SYSTEM_MODULE.primary_pool_index;
+    uint16_t sec_idx = gs->SYSTEM_MODULE.secondary_pool_index;
+
     POOL_clear_status(gs, pool_idx);
     gs->SYSTEM_MODULE.pools_unavailable = false;
 
     stratum_abort_pool(pool_idx);
 
-    if (pool_idx == gs->SYSTEM_MODULE.primary_pool_index &&
-        gs->SYSTEM_MODULE.is_using_fallback &&
-        !gs->SYSTEM_MODULE.use_fallback_stratum) {
-        if (s_primary_task_handle) {
-            xTaskNotifyGive(s_primary_task_handle);
-        }
+    bool wake_primary = false;
+    if (pool_idx == prim_idx && !gs->SYSTEM_MODULE.use_fallback_stratum &&
+        (gs->SYSTEM_MODULE.is_using_fallback || was_unavailable)) {
+        wake_primary = true;
+    } else if (pool_idx == sec_idx && s_fallback_task_handle == NULL &&
+               (gs->SYSTEM_MODULE.use_fallback_stratum || was_unavailable)) {
+        wake_primary = true;
+    }
+
+    if (wake_primary && s_primary_task_handle) {
+        xTaskNotifyGive(s_primary_task_handle);
+    }
+
+    if (pool_idx == sec_idx && was_unavailable && s_fallback_task_handle) {
+        xTaskNotifyGive(s_fallback_task_handle);
     }
 }
 
@@ -248,6 +261,7 @@ void stratum_task(void *pvParameters)
 
         // If primary was probing while fallback is active and failed to recover, sleep before next probe
         if (err != ESP_OK && is_primary && GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback) {
+            start_fallback_if_needed(GLOBAL_STATE);
             ESP_LOGI(TAG, "Primary pool %u probe failed, waiting %d seconds...",
                      pool_idx, RECOVERY_PROBE_INTERVAL_MS / 1000);
             ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(RECOVERY_PROBE_INTERVAL_MS));
