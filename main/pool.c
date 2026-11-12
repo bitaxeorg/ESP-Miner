@@ -28,6 +28,29 @@ PoolSession *POOL_get_active_session(GlobalState *gs)
     return &gs->SYSTEM_MODULE.pool_sessions[(idx < MAX_POOLS) ? idx : 0];
 }
 
+miner_job_t *POOL_get_job_slot(GlobalState *gs, uint16_t pool_idx, size_t index)
+{
+    PoolSession *session = get_pool_session(gs, pool_idx);
+    if (!session) return NULL;
+    return miner_job_pool_get_slot(&session->job_pool, index);
+}
+
+miner_job_t *POOL_resolve_notified_job(GlobalState *gs, uint32_t notification_value)
+{
+    if ((notification_value & POOL_JOB_NOTIFY_FLAG) != 0) {
+        uint16_t pool_idx = (uint16_t)((notification_value >> 8) & 0xFF);
+        size_t slot = (size_t)(notification_value & 0xFF);
+        PoolSession *session = get_pool_session(gs, pool_idx);
+        if (!session) return NULL;
+        miner_job_t *job = miner_job_pool_get_slot(&session->job_pool, slot);
+        if (job) {
+            session->active_job_slot_idx = (uint8_t)(slot % MINER_JOB_POOL_SIZE);
+        }
+        return job;
+    }
+    return miner_job_get_slot((size_t)notification_value);
+}
+
 void POOL_timing_record(GlobalState *gs, uint16_t pool_idx, uint32_t id, uint64_t submit_time_us)
 {
     PoolSession *session = get_pool_session(gs, pool_idx);
@@ -190,7 +213,11 @@ void POOL_reset_session(GlobalState * GLOBAL_STATE, uint16_t pool_idx)
 
     PoolSession *session = get_pool_session(GLOBAL_STATE, pool_idx);
     if (!session) return;
+    miner_job_pool_t saved_job_pool = session->job_pool;
+    uint8_t saved_active_slot = session->active_job_slot_idx;
     memset(session, 0, sizeof(*session));
+    session->job_pool = saved_job_pool;
+    session->active_job_slot_idx = saved_active_slot;
 
     bool is_active_pool = (!GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback && pool_idx == GLOBAL_STATE->SYSTEM_MODULE.primary_pool_index) ||
                           (GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback && pool_idx == GLOBAL_STATE->SYSTEM_MODULE.secondary_pool_index);

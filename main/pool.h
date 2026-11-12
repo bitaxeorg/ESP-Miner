@@ -3,9 +3,12 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include <stddef.h>
+#include "miner_job.h"
 #include "stratum_timing.h"
 
 #define MAX_POOLS 8
+#define POOL_JOB_NOTIFY_FLAG (1UL << 30)
 
 typedef struct RejectedReasonStat
 {
@@ -33,11 +36,20 @@ typedef struct PoolSession
     char pool_error[64];
     char pool_banner[128];
     stratum_timing_tracker_t timing;
+    miner_job_pool_t job_pool;
+    volatile uint8_t active_job_slot_idx;
 } PoolSession;
 
 typedef struct GlobalState GlobalState;
 
+static inline uint32_t POOL_encode_job_notification(uint16_t pool_idx, uint8_t slot)
+{
+    return POOL_JOB_NOTIFY_FLAG | (((uint32_t)(pool_idx & 0xFF)) << 8) | ((uint32_t)(slot % MINER_JOB_POOL_SIZE));
+}
+
 PoolSession *POOL_get_active_session(GlobalState *gs);
+miner_job_t *POOL_get_job_slot(GlobalState *gs, uint16_t pool_idx, size_t index);
+miner_job_t *POOL_resolve_notified_job(GlobalState *gs, uint32_t notification_value);
 
 void POOL_notify_submitted_share(GlobalState *gs, uint16_t pool_idx);
 void POOL_notify_accepted_share(GlobalState *gs, uint16_t pool_idx);

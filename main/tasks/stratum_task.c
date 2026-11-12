@@ -68,9 +68,9 @@ bool stratum_is_pool_configured(const GlobalState *gs, uint16_t pool_idx)
     return (pool->url != NULL && pool->url[0] != '\0' && pool->port != 0);
 }
 
-void stratum_check_primary_handover(GlobalState *gs, uint16_t pool_idx)
+bool stratum_check_primary_handover(GlobalState *gs, uint16_t pool_idx)
 {
-    if (!gs) return;
+    if (!gs) return false;
     if (pool_idx == gs->SYSTEM_MODULE.primary_pool_index &&
         !gs->SYSTEM_MODULE.use_fallback_stratum) {
         if (gs->SYSTEM_MODULE.is_using_fallback) {
@@ -82,11 +82,15 @@ void stratum_check_primary_handover(GlobalState *gs, uint16_t pool_idx)
         }
         gs->SYSTEM_MODULE.pools_unavailable = false;
         POOL_set_error(gs, pool_idx, NULL);
-    } else if (pool_idx == gs->SYSTEM_MODULE.secondary_pool_index &&
-               gs->SYSTEM_MODULE.is_using_fallback) {
+        return true;
+    }
+    if (pool_idx == gs->SYSTEM_MODULE.secondary_pool_index &&
+        gs->SYSTEM_MODULE.is_using_fallback) {
         gs->SYSTEM_MODULE.pools_unavailable = false;
         POOL_set_error(gs, pool_idx, NULL);
+        return true;
     }
+    return false;
 }
 
 static esp_err_t run_pool_session(GlobalState *gs, uint16_t pool_idx)

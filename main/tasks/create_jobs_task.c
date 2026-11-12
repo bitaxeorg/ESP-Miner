@@ -67,7 +67,10 @@ void create_jobs_task(void *pvParameters)
         }
 
         if (notified == pdTRUE) {
-            miner_job_t *new_work = miner_job_get_slot((size_t)slot_notify);
+            miner_job_t *new_work = POOL_resolve_notified_job(GLOBAL_STATE, slot_notify);
+            if (!new_work) {
+                continue;
+            }
             ESP_LOGI(TAG, "New Work Activated %s (type %d)", new_work->job_id, new_work->type);
             current_work = new_work;
             GLOBAL_STATE->has_work = true;

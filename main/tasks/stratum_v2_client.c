@@ -195,7 +195,11 @@ static void stratum_v2_handle_new_extended_mining_job(GlobalState *GLOBAL_STATE,
     uint32_t job_id = (uint32_t)payload[4] | ((uint32_t)payload[5] << 8) |
                       ((uint32_t)payload[6] << 16) | ((uint32_t)payload[7] << 24);
     uint8_t slot = (uint8_t)(job_id % MINER_JOB_POOL_SIZE);
-    miner_job_t *job = miner_job_get_slot(slot);
+    miner_job_t *job = POOL_get_job_slot(GLOBAL_STATE, pool_idx, slot);
+    if (!job) {
+        ESP_LOGE(TAG, "Failed to allocate job slot for pool %u", pool_idx);
+        return;
+    }
     uint32_t channel_id = 0;
     bool has_min_ntime = false;
     bool version_rolling_allowed = false;
@@ -236,13 +240,17 @@ static void stratum_v2_handle_new_extended_mining_job(GlobalState *GLOBAL_STATE,
         job->clean_jobs = is_first_job;
 
         POOL_notify_work_received(GLOBAL_STATE, pool_idx);
-        stratum_check_primary_handover(GLOBAL_STATE, pool_idx);
+        bool is_active_pool = stratum_check_primary_handover(GLOBAL_STATE, pool_idx);
         if (GLOBAL_STATE->SYSTEM_MODULE.pool_sessions[pool_idx].pool_difficulty == 0.0) {
             POOL_set_difficulty(GLOBAL_STATE, pool_idx, target_to_diff(conn->target));
         }
-        SYSTEM_notify_new_ntime(GLOBAL_STATE, job->ntime);
-        if (GLOBAL_STATE->create_jobs_task_handle) {
-            xTaskNotify(GLOBAL_STATE->create_jobs_task_handle, slot, eSetValueWithOverwrite);
+        if (is_active_pool) {
+            SYSTEM_notify_new_ntime(GLOBAL_STATE, job->ntime);
+            if (GLOBAL_STATE->create_jobs_task_handle) {
+                xTaskNotify(GLOBAL_STATE->create_jobs_task_handle,
+                            POOL_encode_job_notification(pool_idx, slot),
+                            eSetValueWithOverwrite);
+            }
         }
     }
 }
@@ -268,7 +276,11 @@ static void stratum_v2_handle_new_mining_job(GlobalState *GLOBAL_STATE, uint16_t
     }
 
     uint8_t slot = (uint8_t)(job_id % MINER_JOB_POOL_SIZE);
-    miner_job_t *job = miner_job_get_slot(slot);
+    miner_job_t *job = POOL_get_job_slot(GLOBAL_STATE, pool_idx, slot);
+    if (!job) {
+        ESP_LOGE(TAG, "Failed to allocate job slot for pool %u", pool_idx);
+        return;
+    }
     uint8_t *p_buf = job->coinbase_prefix;
     uint8_t *s_buf = job->coinbase_suffix;
     memset(job, 0, sizeof(miner_job_t));
@@ -296,13 +308,17 @@ static void stratum_v2_handle_new_mining_job(GlobalState *GLOBAL_STATE, uint16_t
         job->clean_jobs = is_first_job;
 
         POOL_notify_work_received(GLOBAL_STATE, pool_idx);
-        stratum_check_primary_handover(GLOBAL_STATE, pool_idx);
+        bool is_active_pool = stratum_check_primary_handover(GLOBAL_STATE, pool_idx);
         if (GLOBAL_STATE->SYSTEM_MODULE.pool_sessions[pool_idx].pool_difficulty == 0.0) {
             POOL_set_difficulty(GLOBAL_STATE, pool_idx, target_to_diff(conn->target));
         }
-        SYSTEM_notify_new_ntime(GLOBAL_STATE, job->ntime);
-        if (GLOBAL_STATE->create_jobs_task_handle) {
-            xTaskNotify(GLOBAL_STATE->create_jobs_task_handle, slot, eSetValueWithOverwrite);
+        if (is_active_pool) {
+            SYSTEM_notify_new_ntime(GLOBAL_STATE, job->ntime);
+            if (GLOBAL_STATE->create_jobs_task_handle) {
+                xTaskNotify(GLOBAL_STATE->create_jobs_task_handle,
+                            POOL_encode_job_notification(pool_idx, slot),
+                            eSetValueWithOverwrite);
+            }
         }
     }
 }
@@ -336,7 +352,11 @@ static void stratum_v2_handle_set_new_prev_hash(GlobalState *GLOBAL_STATE, uint1
     conn->has_prev_hash = true;
 
     uint8_t slot = (uint8_t)(job_id % MINER_JOB_POOL_SIZE);
-    miner_job_t *job = miner_job_get_slot(slot);
+    miner_job_t *job = POOL_get_job_slot(GLOBAL_STATE, pool_idx, slot);
+    if (!job) {
+        ESP_LOGE(TAG, "Failed to allocate job slot for pool %u", pool_idx);
+        return;
+    }
 
     if ((conn->pending_jobs_valid & (1U << slot)) &&
         (uint32_t)strtoul(job->job_id, NULL, 10) == job_id) {
@@ -356,13 +376,17 @@ static void stratum_v2_handle_set_new_prev_hash(GlobalState *GLOBAL_STATE, uint1
         }
 
         POOL_notify_work_received(GLOBAL_STATE, pool_idx);
-        stratum_check_primary_handover(GLOBAL_STATE, pool_idx);
+        bool is_active_pool = stratum_check_primary_handover(GLOBAL_STATE, pool_idx);
         if (GLOBAL_STATE->SYSTEM_MODULE.pool_sessions[pool_idx].pool_difficulty == 0.0) {
             POOL_set_difficulty(GLOBAL_STATE, pool_idx, target_to_diff(conn->target));
         }
-        SYSTEM_notify_new_ntime(GLOBAL_STATE, job->ntime);
-        if (GLOBAL_STATE->create_jobs_task_handle) {
-            xTaskNotify(GLOBAL_STATE->create_jobs_task_handle, slot, eSetValueWithOverwrite);
+        if (is_active_pool) {
+            SYSTEM_notify_new_ntime(GLOBAL_STATE, job->ntime);
+            if (GLOBAL_STATE->create_jobs_task_handle) {
+                xTaskNotify(GLOBAL_STATE->create_jobs_task_handle,
+                            POOL_encode_job_notification(pool_idx, slot),
+                            eSetValueWithOverwrite);
+            }
         }
     } else {
         ESP_LOGW(TAG, "SetNewPrevHash for unknown job_id %lu", (unsigned long)job_id);

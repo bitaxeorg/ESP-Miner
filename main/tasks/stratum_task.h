@@ -33,7 +33,8 @@ int stratum_submit_share(GlobalState *GLOBAL_STATE, const asic_job_t *active_job
 void stratum_set_pool_error(GlobalState *gs, uint16_t pool_idx, const char *err_msg);
 
 // Check if primary has received work during fallback and trigger handover by aborting fallback.
-void stratum_check_primary_handover(GlobalState *gs, uint16_t pool_idx);
+// Returns true if pool_idx is the currently active pool and should push work to the ASIC job task.
+bool stratum_check_primary_handover(GlobalState *gs, uint16_t pool_idx);
 
 // Returns true if the given pool index has a non-empty URL and non-zero port.
 bool stratum_is_pool_configured(const GlobalState *gs, uint16_t pool_idx);

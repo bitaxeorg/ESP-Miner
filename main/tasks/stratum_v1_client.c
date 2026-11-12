@@ -295,8 +295,13 @@ esp_err_t stratum_v1_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
         int64_t receive_time_us = esp_timer_get_time();
         bool reconnect_requested = false;
 
-        uint8_t target_slot = (GLOBAL_STATE->active_job_slot_idx + 1) % 2;
-        miner_job_t *target_job = miner_job_get_slot(target_slot);
+        uint8_t target_slot = (GLOBAL_STATE->SYSTEM_MODULE.pool_sessions[pool_idx].active_job_slot_idx + 1) % 2;
+        miner_job_t *target_job = POOL_get_job_slot(GLOBAL_STATE, pool_idx, target_slot);
+        if (!target_job) {
+            ESP_LOGE(TAG, "Failed to allocate job slot for pool %u", pool_idx);
+            free(line);
+            continue;
+        }
 
         if (!STRATUM_V1_parse(&v1_msg, line, target_job)) {
             ESP_LOGE(TAG, "Failed to parse Stratum message, ignoring");
@@ -322,8 +327,7 @@ esp_err_t stratum_v1_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
                     ESP_LOGW(TAG, "Ignoring duplicate notify for job %s", target_job->job_id);
                 } else {
                     POOL_notify_work_received(GLOBAL_STATE, pool_idx);
-                    stratum_check_primary_handover(GLOBAL_STATE, pool_idx);
-                    SYSTEM_notify_new_ntime(GLOBAL_STATE, target_job->ntime);
+                    bool is_active_pool = stratum_check_primary_handover(GLOBAL_STATE, pool_idx);
 
                     target_job->pool_id = (uint8_t)pool_idx;
                     memcpy(target_job->pool_target, conn->pool_target, 32);
@@ -337,8 +341,13 @@ esp_err_t stratum_v1_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
                     }
                     target_job->extranonce2_len = conn->extranonce2_len;
 
-                    if (GLOBAL_STATE->create_jobs_task_handle) {
-                        xTaskNotify(GLOBAL_STATE->create_jobs_task_handle, target_slot, eSetValueWithOverwrite);
+                    if (is_active_pool) {
+                        SYSTEM_notify_new_ntime(GLOBAL_STATE, target_job->ntime);
+                        if (GLOBAL_STATE->create_jobs_task_handle) {
+                            xTaskNotify(GLOBAL_STATE->create_jobs_task_handle,
+                                        POOL_encode_job_notification(pool_idx, target_slot),
+                                        eSetValueWithOverwrite);
+                        }
                     }
                 }
                 break;
