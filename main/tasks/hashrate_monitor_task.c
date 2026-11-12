@@ -15,7 +15,7 @@
 #define HASHRATE_UNIT 0x100000uLL // Hashrate register unit (2^20 hashes)
 
 #define POLL_RATE 1000
-#define HASHRATE_1M_SIZE (60000 / POLL_RATE)  // 12
+#define HASHRATE_1M_SIZE (60000 / POLL_RATE)  // 60 one-second samples
 #define HASHRATE_10M_SIZE 10
 #define HASHRATE_1H_SIZE 6
 #define DIV_10M (HASHRATE_1M_SIZE)
@@ -108,9 +108,23 @@ static float calculate_avg_nan_safe(const float arr[], int size) {
     return (count > 0) ? (sum / count) : 0.0f;
 }
 
-static void update_hashrate_averages(SystemModule * SYSTEM_MODULE)
+float hashrate_monitor_get_asic_rate(void *state, uint8_t asic_nr)
 {
-    hashrate_1m[poll_count % HASHRATE_1M_SIZE] = SYSTEM_MODULE->current_hashrate;
+    asic_domain_measurement_t measurement = {0};
+    ASIC_get_asic_measurement(state, asic_nr, &measurement);
+    return measurement.hashrate;
+}
+
+float hashrate_monitor_get_domain_rate(void *state, uint8_t asic_nr, uint8_t domain_nr)
+{
+    asic_domain_measurement_t measurement = {0};
+    ASIC_get_domain_measurement(state, asic_nr, domain_nr, &measurement);
+    return measurement.hashrate;
+}
+
+static void update_hashrate_averages(SystemModule * SYSTEM_MODULE, float interval_hashrate)
+{
+    hashrate_1m[poll_count % HASHRATE_1M_SIZE] = interval_hashrate;
     SYSTEM_MODULE->hashrate_1m = calculate_avg_nan_safe(hashrate_1m, HASHRATE_1M_SIZE);
 
     int hashrate_10m_blend = poll_count % HASHRATE_1M_SIZE;
@@ -154,17 +168,30 @@ void hashrate_monitor_task(void *pvParameters)
     HASHRATE_MONITOR_MODULE->total_measurement = heap_caps_malloc(asic_count * sizeof(measurement_t), MALLOC_CAP_SPIRAM);
     measurement_t* data = heap_caps_malloc(asic_count * hash_domains * sizeof(measurement_t), MALLOC_CAP_SPIRAM);
     HASHRATE_MONITOR_MODULE->domain_measurements = heap_caps_malloc(asic_count * sizeof(measurement_t*), MALLOC_CAP_SPIRAM);
+    HASHRATE_MONITOR_MODULE->error_measurement = heap_caps_malloc(asic_count * sizeof(measurement_t), MALLOC_CAP_SPIRAM);
+    if (!HASHRATE_MONITOR_MODULE->total_measurement || !data || !HASHRATE_MONITOR_MODULE->domain_measurements ||
+        !HASHRATE_MONITOR_MODULE->error_measurement) {
+        heap_caps_free(HASHRATE_MONITOR_MODULE->total_measurement);
+        heap_caps_free(data);
+        heap_caps_free(HASHRATE_MONITOR_MODULE->domain_measurements);
+        heap_caps_free(HASHRATE_MONITOR_MODULE->error_measurement);
+        HASHRATE_MONITOR_MODULE->total_measurement = NULL;
+        HASHRATE_MONITOR_MODULE->domain_measurements = NULL;
+        HASHRATE_MONITOR_MODULE->error_measurement = NULL;
+        ESP_LOGE(TAG, "Hashrate monitor allocation failed");
+        vTaskDelete(NULL);
+        return;
+    }
     for (size_t asic_nr = 0; asic_nr < asic_count; asic_nr++) {
         HASHRATE_MONITOR_MODULE->domain_measurements[asic_nr] = data + (asic_nr * hash_domains);
     }
-    HASHRATE_MONITOR_MODULE->error_measurement = heap_caps_malloc(asic_count * sizeof(measurement_t), MALLOC_CAP_SPIRAM);
 
     pthread_mutex_init(&HASHRATE_MONITOR_MODULE->lock, NULL);
-    HASHRATE_MONITOR_MODULE->is_initialized = true;
-
-    hashrate_monitor_reset_measurements(GLOBAL_STATE);
-
+    memset(HASHRATE_MONITOR_MODULE->total_measurement, 0, asic_count * sizeof(measurement_t));
+    memset(data, 0, asic_count * hash_domains * sizeof(measurement_t));
+    memset(HASHRATE_MONITOR_MODULE->error_measurement, 0, asic_count * sizeof(measurement_t));
     init_averages();
+    atomic_store_explicit(&HASHRATE_MONITOR_MODULE->is_initialized, true, memory_order_release);
 
     bool was_asic_initialized = false;
     TickType_t taskWakeTime = xTaskGetTickCount();
@@ -180,6 +207,7 @@ void hashrate_monitor_task(void *pvParameters)
         }
         was_asic_initialized = is_asic_initialized;
 
+        float interval_hashrate = 0;
         if (is_asic_initialized) {
             ASIC_read_registers(GLOBAL_STATE);
             vTaskDelay(100 / portTICK_PERIOD_MS);
@@ -189,15 +217,20 @@ void hashrate_monitor_task(void *pvParameters)
             float error_hashrate = sum_hashrates(HASHRATE_MONITOR_MODULE->error_measurement, asic_count);
             pthread_mutex_unlock(&HASHRATE_MONITOR_MODULE->lock);
 
-            SYSTEM_MODULE->current_hashrate = current_hashrate;
+            interval_hashrate = current_hashrate;
             SYSTEM_MODULE->error_percentage = current_hashrate > 0 ? error_hashrate / current_hashrate * 100.f : 0;
-
-            if (current_hashrate > 0.0f) update_hashrate_averages(SYSTEM_MODULE);
-        } else {
-            SYSTEM_MODULE->current_hashrate = 0;
         }
 
-        SYSTEM_noinit_update(SYSTEM_MODULE);
+        float reported_hashrate = 0;
+        if (is_asic_initialized && !SYSTEM_MODULE->mining_paused) {
+            for (int asic = 0; asic < asic_count; ++asic) {
+                reported_hashrate += hashrate_monitor_get_asic_rate(GLOBAL_STATE, asic);
+            }
+        }
+        SYSTEM_MODULE->current_hashrate = reported_hashrate;
+        update_hashrate_averages(SYSTEM_MODULE, interval_hashrate);
+
+        SYSTEM_noinit_update(SYSTEM_MODULE, interval_hashrate);
 
         vTaskDelayUntil(&taskWakeTime, POLL_RATE / portTICK_PERIOD_MS);
     }

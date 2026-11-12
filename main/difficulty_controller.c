@@ -28,7 +28,9 @@ void difficulty_controller_update(GlobalState * GLOBAL_STATE)
         if (freq <= 0.0f) {
             freq = (float)GLOBAL_STATE->DEVICE_CONFIG.family.asic.default_frequency_mhz;
         }
-        expected_ghs = freq * GLOBAL_STATE->DEVICE_CONFIG.family.asic.small_core_count * GLOBAL_STATE->DEVICE_CONFIG.family.asic_count / 1000.0f;
+        const AsicConfig *asic = &GLOBAL_STATE->DEVICE_CONFIG.family.asic;
+        expected_ghs = calculate_expected_hashrate_ghs(freq, GLOBAL_STATE->DEVICE_CONFIG.family.asic_count,
+                                                    asic->small_core_count, asic->hashes_per_clock);
     }
 
     double interval_s = (GLOBAL_STATE->target_share_interval_s > 0.0)

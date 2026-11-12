@@ -56,7 +56,7 @@ typedef struct {
 
 typedef struct SystemModule
 {
-    float current_hashrate;
+    float current_hashrate; // Trailing 60-second average, including zero intervals.
     float hashrate_1m;
     float hashrate_10m;
     float hashrate_1h;

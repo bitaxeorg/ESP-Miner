@@ -77,6 +77,7 @@ int count_asic_chips_with_id_alias(uint16_t asic_count, uint16_t chip_id, uint16
 esp_err_t receive_work(uint8_t * buffer, int buffer_size, uint64_t *out_timestamp_us);
 void get_difficulty_mask(uint8_t difficulty_power, uint8_t *job_difficulty_mask);
 uint8_t calculate_effective_asic_difficulty(double expected_ghs, double interval_s, double pool_difficulty);
+float calculate_expected_hashrate_ghs(float frequency_mhz, size_t asic_count, size_t small_cores, float hashes_per_clock);
 double calculate_bm_timeout_ms(float frequency_mhz, size_t asic_count, size_t small_cores, size_t cores, size_t version_size, float timeout_percent, double default_time_ms);
 
 #endif /* ASIC_COMMON_H_ */

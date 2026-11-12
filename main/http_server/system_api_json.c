@@ -258,7 +258,8 @@ static void system_api_add_hashrate_monitor(yyjson_mut_doc *doc, yyjson_mut_val 
 
     for (int i = 0; i < asic_count; i++) {
         yyjson_mut_val *asic = yyjson_mut_arr_add_obj(doc, asics);
-        yyjson_mut_obj_add_float(doc, asic, "total", g->HASHRATE_MONITOR_MODULE.total_measurement[i].hashrate);
+        float total_hashrate = hashrate_monitor_get_asic_rate(g, i);
+        yyjson_mut_obj_add_float(doc, asic, "total", total_hashrate);
         yyjson_mut_obj_add_uint(doc, asic, "errorCount", g->HASHRATE_MONITOR_MODULE.error_measurement[i].value);
         yyjson_mut_val *domains = yyjson_mut_obj_add_arr(doc, asic, "domains");
         for (int j = 0; j < hash_domains; j++) {

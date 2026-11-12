@@ -682,7 +682,7 @@ static esp_err_t ensure_overheat_mode_config() {
     return ESP_OK;
 }
 
-void SYSTEM_noinit_update(SystemModule * SYSTEM_MODULE)
+void SYSTEM_noinit_update(SystemModule * SYSTEM_MODULE, float interval_hashrate_ghs)
 {
     uint64_t current_time_ms = esp_timer_get_time() / 1000;
     
@@ -705,7 +705,7 @@ void SYSTEM_noinit_update(SystemModule * SYSTEM_MODULE)
     noinit_state.total_uptime = total_uptime_at_system_start + SYSTEM_MODULE->uptime_seconds;
     
     // Update cumulative hashes: hashrate (GH/s) × milliseconds × 1e6 = raw hashes
-    uint64_t hashes_done = elapsed_ms * 1e6 * SYSTEM_MODULE->current_hashrate;
+    uint64_t hashes_done = elapsed_ms * 1e6 * interval_hashrate_ghs;
     uint64_t new_low = noinit_state.cumulative_hashes_low + hashes_done;
     if (new_low < noinit_state.cumulative_hashes_low) {
         noinit_state.cumulative_hashes_high++;
