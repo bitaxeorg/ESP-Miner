@@ -11,6 +11,7 @@
 #include "freertos/task.h"
 #include "scoreboard.h"
 #include "self_test.h"
+#include "watchdogs.h"
 
 static const char *TAG = "asic_result";
 
@@ -43,6 +44,8 @@ void ASIC_result_task(void *pvParameters)
             ESP_LOGE(TAG, "Failed to compute nonce hash, discarding result");
             continue;
         }
+
+        WATCHDOGS_note_asic_result();
 
         if (GLOBAL_STATE->SELF_TEST_MODULE.is_active) {
             self_test_record_nonce(GLOBAL_STATE, hash_result);
