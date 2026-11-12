@@ -1,6 +1,5 @@
 #include "miner_job.h"
 #include <string.h>
-#include <pthread.h>
 #include <stdlib.h>
 #include "esp_heap_caps.h"
 

@@ -30,7 +30,6 @@ typedef struct GlobalState {
         } family;
     } DEVICE_CONFIG;
     asic_job_store_t job_store;
-    bool has_work;
     struct {
         float frequency_value;
         float actual_frequency;

@@ -139,7 +139,6 @@ typedef struct GlobalState
     double target_share_interval_s;
 
     bool ASIC_initalized;
-    bool has_work;
     bool psram_is_available;
     bool filesystem_is_available;
 
