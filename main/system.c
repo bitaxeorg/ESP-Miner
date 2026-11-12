@@ -590,12 +590,12 @@ void SYSTEM_noinit_update(SystemModule * SYSTEM_MODULE)
     }
 
     uint64_t elapsed_ms = current_time_ms - last_update_time_ms;
-    last_update_time_ms = current_time_ms;
     
     // Only update if at least 1 second has passed
     if (elapsed_ms < 1000) {
         return;
     }
+    last_update_time_ms = current_time_ms;
     
     SYSTEM_MODULE->uptime_seconds = (esp_timer_get_time() - SYSTEM_MODULE->start_time_us) / 1000000;
     noinit_state.total_uptime = total_uptime_at_system_start + SYSTEM_MODULE->uptime_seconds;
