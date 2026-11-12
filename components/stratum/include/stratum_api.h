@@ -75,7 +75,6 @@ typedef struct sv1_conn {
     char *json_rpc_buffer;
     size_t json_rpc_buffer_size;
     size_t json_rpc_buffer_len;
-    uint16_t pool_idx;
     int send_uid;
     char user[256];
     uint8_t pool_target[32];

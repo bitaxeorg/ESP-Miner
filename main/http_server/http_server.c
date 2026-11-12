@@ -994,7 +994,6 @@ bool check_settings_and_update(const cJSON * const root, char **redirect_url, Gl
             uint16_t old_sec = GLOBAL_STATE->SYSTEM_MODULE.secondary_pool_index;
             bool old_use_fallback = GLOBAL_STATE->SYSTEM_MODULE.use_fallback_stratum;
 
-            GLOBAL_STATE->SYSTEM_MODULE.primary_pool_error[0] = '\0';
             SYSTEM_reload_pool_config(GLOBAL_STATE);
 
             bool pool_selection_changed = (GLOBAL_STATE->SYSTEM_MODULE.primary_pool_index != old_prim) ||

@@ -13,8 +13,8 @@
 #include "device_config.h"
 #include "display.h"
 #include "scoreboard.h"
-#include "esp_transport.h"
 #include "system.h"
+#include "pool.h"
 
 typedef struct PoolConfig
 {
@@ -37,13 +37,6 @@ typedef struct PoolConfig
 #define DIFF_STRING_SIZE 10
 #define MAX_BLOCK_SIGNALS 8
 #define MAX_BLOCK_SIGNAL_LEN 16
-#define MAX_POOLS 8
-
-typedef struct RejectedReasonStat
-{
-    char message[64];
-    uint32_t count;
-} RejectedReasonStat;
 
 typedef struct {
     const esp_partition_t *part;
@@ -62,13 +55,6 @@ typedef struct SystemModule
     float hashrate_1h;
     float error_percentage;
     int64_t start_time_us;
-    uint64_t shares_submitted;
-    uint64_t shares_accepted;
-    uint64_t shares_rejected;
-    uint16_t shares_pending;
-    uint64_t work_received;
-    RejectedReasonStat rejected_reason_stats[10];
-    int rejected_reason_stats_count;
     int screen_page;
     uint64_t best_nonce_diff;
     char best_diff_string[DIFF_STRING_SIZE];
@@ -85,22 +71,13 @@ typedef struct SystemModule
     bool is_connected;
     int identify_mode_time_ms;
     PoolConfig pools[MAX_POOLS];
+    PoolSession pool_sessions[MAX_POOLS];
     uint16_t primary_pool_index;
     uint16_t secondary_pool_index;
     bool use_fallback_stratum;
     bool is_using_fallback;
-    float response_time;
-    float response_time_min;
-    float response_time_max;
-    float last_response_time_min;
-    float last_response_time_max;
-    uint16_t response_share_batch;
     float process_time;
     float cpu_usage;
-    double pool_difficulty;
-    char pool_connection_info[64];
-    char primary_pool_error[64];
-    char pool_banner[128];
     bool overheat_mode;
     bool mining_paused;
     bool pools_unavailable;

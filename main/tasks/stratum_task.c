@@ -58,15 +58,7 @@ bool stratum_reconnect_requested(void)
 
 void stratum_set_pool_error(GlobalState *gs, uint16_t pool_idx, const char *err_msg)
 {
-    if (!gs) return;
-    if (gs->SYSTEM_MODULE.is_using_fallback &&
-        pool_idx == gs->SYSTEM_MODULE.primary_pool_index) {
-        strlcpy(gs->SYSTEM_MODULE.primary_pool_error, err_msg,
-                sizeof(gs->SYSTEM_MODULE.primary_pool_error));
-    } else {
-        strlcpy(gs->SYSTEM_MODULE.pool_connection_info, err_msg,
-                sizeof(gs->SYSTEM_MODULE.pool_connection_info));
-    }
+    POOL_set_error(gs, pool_idx, err_msg);
 }
 
 bool stratum_is_pool_configured(const GlobalState *gs, uint16_t pool_idx)
@@ -76,24 +68,29 @@ bool stratum_is_pool_configured(const GlobalState *gs, uint16_t pool_idx)
     return (pool->url != NULL && pool->url[0] != '\0' && pool->port != 0);
 }
 
-void stratum_check_primary_handover(GlobalState *gs, uint16_t pool_idx)
+bool stratum_check_primary_handover(GlobalState *gs, uint16_t pool_idx)
 {
-    if (!gs) return;
+    if (!gs) return false;
     if (pool_idx == gs->SYSTEM_MODULE.primary_pool_index &&
         !gs->SYSTEM_MODULE.use_fallback_stratum) {
         if (gs->SYSTEM_MODULE.is_using_fallback) {
             ESP_LOGI(TAG, "Primary pool %u received work! Switching from fallback.", pool_idx);
             uint16_t sec_idx = gs->SYSTEM_MODULE.secondary_pool_index;
             stratum_abort_pool(sec_idx);
-            SYSTEM_reset_pool_session(gs);
+            POOL_reset_session(gs, sec_idx);
             gs->SYSTEM_MODULE.is_using_fallback = false;
         }
         gs->SYSTEM_MODULE.pools_unavailable = false;
-        gs->SYSTEM_MODULE.primary_pool_error[0] = '\0';
-    } else if (pool_idx == gs->SYSTEM_MODULE.secondary_pool_index &&
-               gs->SYSTEM_MODULE.is_using_fallback) {
-        gs->SYSTEM_MODULE.pools_unavailable = false;
+        POOL_set_error(gs, pool_idx, NULL);
+        return true;
     }
+    if (pool_idx == gs->SYSTEM_MODULE.secondary_pool_index &&
+        gs->SYSTEM_MODULE.is_using_fallback) {
+        gs->SYSTEM_MODULE.pools_unavailable = false;
+        POOL_set_error(gs, pool_idx, NULL);
+        return true;
+    }
+    return false;
 }
 
 static esp_err_t run_pool_session(GlobalState *gs, uint16_t pool_idx)
@@ -138,18 +135,30 @@ void stratum_notify_pool_modified(GlobalState *gs, uint16_t pool_idx)
 {
     if (!gs || pool_idx >= MAX_POOLS) return;
 
-    gs->SYSTEM_MODULE.primary_pool_error[0] = '\0';
-    gs->SYSTEM_MODULE.pool_banner[0] = '\0';
+    bool was_unavailable = gs->SYSTEM_MODULE.pools_unavailable;
+    uint16_t prim_idx = gs->SYSTEM_MODULE.primary_pool_index;
+    uint16_t sec_idx = gs->SYSTEM_MODULE.secondary_pool_index;
+
+    POOL_clear_status(gs, pool_idx);
     gs->SYSTEM_MODULE.pools_unavailable = false;
 
     stratum_abort_pool(pool_idx);
 
-    if (pool_idx == gs->SYSTEM_MODULE.primary_pool_index &&
-        gs->SYSTEM_MODULE.is_using_fallback &&
-        !gs->SYSTEM_MODULE.use_fallback_stratum) {
-        if (s_primary_task_handle) {
-            xTaskNotifyGive(s_primary_task_handle);
-        }
+    bool wake_primary = false;
+    if (pool_idx == prim_idx && !gs->SYSTEM_MODULE.use_fallback_stratum &&
+        (gs->SYSTEM_MODULE.is_using_fallback || was_unavailable)) {
+        wake_primary = true;
+    } else if (pool_idx == sec_idx && s_fallback_task_handle == NULL &&
+               (gs->SYSTEM_MODULE.use_fallback_stratum || was_unavailable)) {
+        wake_primary = true;
+    }
+
+    if (wake_primary && s_primary_task_handle) {
+        xTaskNotifyGive(s_primary_task_handle);
+    }
+
+    if (pool_idx == sec_idx && was_unavailable && s_fallback_task_handle) {
+        xTaskNotifyGive(s_fallback_task_handle);
     }
 }
 
@@ -158,10 +167,10 @@ void stratum_notify_pool_selection_changed(GlobalState *gs)
     if (!gs) return;
 
     stratum_abort_connection();
-    SYSTEM_reset_pool_session(gs);
 
-    gs->SYSTEM_MODULE.primary_pool_error[0] = '\0';
-    gs->SYSTEM_MODULE.pool_banner[0] = '\0';
+    for (int i = 0; i < MAX_POOLS; i++) {
+        POOL_reset_session(gs, i);
+    }
     gs->SYSTEM_MODULE.pools_unavailable = false;
 
     if (s_primary_task_handle) {
@@ -206,17 +215,18 @@ void stratum_task(void *pvParameters)
 
         // If force fallback is toggled on, Primary steps down and sleeps
         if (is_primary && GLOBAL_STATE->SYSTEM_MODULE.use_fallback_stratum) {
-            stratum_abort_pool(GLOBAL_STATE->SYSTEM_MODULE.primary_pool_index);
+            uint16_t prim_idx = GLOBAL_STATE->SYSTEM_MODULE.primary_pool_index;
             uint16_t sec_idx = GLOBAL_STATE->SYSTEM_MODULE.secondary_pool_index;
+            stratum_abort_pool(prim_idx);
             if (stratum_is_pool_configured(GLOBAL_STATE, sec_idx)) {
                 if (!GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback) {
-                    SYSTEM_reset_pool_session(GLOBAL_STATE);
+                    POOL_reset_session(GLOBAL_STATE, prim_idx);
                     GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback = true;
                 }
                 start_fallback_if_needed(GLOBAL_STATE);
             } else {
                 if (GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback) {
-                    SYSTEM_reset_pool_session(GLOBAL_STATE);
+                    POOL_reset_session(GLOBAL_STATE, sec_idx);
                     GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback = false;
                 }
                 GLOBAL_STATE->SYSTEM_MODULE.pools_unavailable = true;
@@ -241,6 +251,7 @@ void stratum_task(void *pvParameters)
         }
 
         ESP_LOGI(TAG, "%s worker running pool %u (%s)", is_primary ? "Primary" : "Fallback", pool_idx, pool->url);
+        uint64_t work_before = GLOBAL_STATE->SYSTEM_MODULE.pool_sessions[pool_idx].work_received;
         esp_err_t err = run_pool_session(GLOBAL_STATE, pool_idx);
 
         // Check if fallback should exit after session unblocks
@@ -250,21 +261,17 @@ void stratum_task(void *pvParameters)
 
         // If primary was probing while fallback is active and failed to recover, sleep before next probe
         if (err != ESP_OK && is_primary && GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback) {
+            start_fallback_if_needed(GLOBAL_STATE);
             ESP_LOGI(TAG, "Primary pool %u probe failed, waiting %d seconds...",
                      pool_idx, RECOVERY_PROBE_INTERVAL_MS / 1000);
             ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(RECOVERY_PROBE_INTERVAL_MS));
             continue;
         }
 
-        if (err == ESP_OK || GLOBAL_STATE->SYSTEM_MODULE.work_received > 0) {
+        bool session_had_work = (GLOBAL_STATE->SYSTEM_MODULE.pool_sessions[pool_idx].work_received > work_before);
+        if (err == ESP_OK || session_had_work) {
             retry_attempts = 0;
-            if (is_primary && GLOBAL_STATE->SYSTEM_MODULE.work_received > 0 && !GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback) {
-                GLOBAL_STATE->SYSTEM_MODULE.primary_pool_error[0] = '\0';
-            }
-            if (!is_primary || !GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback) {
-                GLOBAL_STATE->SYSTEM_MODULE.work_received = 0;
-                SYSTEM_reset_pool_session(GLOBAL_STATE);
-            }
+            POOL_reset_session(GLOBAL_STATE, pool_idx);
         } else {
 
             retry_attempts++;
@@ -275,12 +282,9 @@ void stratum_task(void *pvParameters)
                 retry_attempts = 0;
 
                 if (is_primary) {
+                    POOL_set_error(GLOBAL_STATE, pool_idx, GLOBAL_STATE->SYSTEM_MODULE.pool_sessions[pool_idx].pool_connection_info);
                     uint16_t sec_idx = GLOBAL_STATE->SYSTEM_MODULE.secondary_pool_index;
                     if (stratum_is_pool_configured(GLOBAL_STATE, sec_idx)) {
-                        strlcpy(GLOBAL_STATE->SYSTEM_MODULE.primary_pool_error,
-                                GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info,
-                                sizeof(GLOBAL_STATE->SYSTEM_MODULE.primary_pool_error));
-
                         GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback = true;
                         start_fallback_if_needed(GLOBAL_STATE);
                     } else {

@@ -18,13 +18,11 @@
 #include <esp_heap_caps.h>
 #include "esp_transport_ssl.h"
 #include "freertos/task.h"
-#include "stratum_timing.h"
 #include "difficulty_controller.h"
 static const char *TAG = "stratum_v1";
 
 static sv1_conn_t *s_v1_conns[MAX_POOLS] = {0};
 static pthread_mutex_t s_v1_conn_mutex = PTHREAD_MUTEX_INITIALIZER;
-static stratum_timing_tracker_t s_v1_timings[MAX_POOLS] = {0};
 static bool add_active_job_id(char active_job_ids[][MAX_JOB_ID_LEN], int *count, const char *job_id)
 {
     for (int i = 0; i < *count; i++) {
@@ -108,11 +106,11 @@ int stratum_v1_submit_share(GlobalState *GLOBAL_STATE, const asic_job_t *active_
         &now);
 
     if (ret >= 0) {
-        stratum_timing_record(&s_v1_timings[active_job->pool_id], (uint32_t)uid, now);
+        POOL_timing_record(GLOBAL_STATE, active_job->pool_id, (uint32_t)uid, now);
         if (sent_time_us) {
             *sent_time_us = now;
         }
-        SYSTEM_notify_submitted_share(GLOBAL_STATE);
+        POOL_notify_submitted_share(GLOBAL_STATE, active_job->pool_id);
     }
     pthread_mutex_unlock(&s_v1_conn_mutex);
     return ret;
@@ -138,15 +136,7 @@ void stratum_v1_close_connection(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
     pthread_mutex_lock(&s_v1_conn_mutex);
     sv1_conn_t *conn = s_v1_conns[pool_idx];
     s_v1_conns[pool_idx] = NULL;
-
-    stratum_timing_reset(&s_v1_timings[pool_idx]);
     pthread_mutex_unlock(&s_v1_conn_mutex);
-
-    bool is_active_pool = (!GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback && pool_idx == GLOBAL_STATE->SYSTEM_MODULE.primary_pool_index) ||
-                          (GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback && pool_idx == GLOBAL_STATE->SYSTEM_MODULE.secondary_pool_index);
-    if (is_active_pool) {
-        SYSTEM_reset_pool_session(GLOBAL_STATE);
-    }
 
     if (conn != NULL) {
         if (conn->transport != NULL) {
@@ -196,7 +186,6 @@ esp_err_t stratum_v1_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
         ESP_LOGE(TAG, "Failed to allocate sv1_conn");
         return ESP_ERR_NO_MEM;
     }
-    conn->pool_idx = pool_idx;
     conn->send_uid = 1;
     strlcpy(conn->user, username, sizeof(conn->user));
     diff_to_target(1.0, conn->pool_target);
@@ -211,8 +200,6 @@ esp_err_t stratum_v1_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
     pthread_mutex_lock(&s_v1_conn_mutex);
     s_v1_conns[pool_idx] = conn;
     pthread_mutex_unlock(&s_v1_conn_mutex);
-
-    GLOBAL_STATE->SYSTEM_MODULE.pool_banner[0] = '\0';
 
     stratum_connection_info_t conn_info;
     if (stratum_socket_resolve(stratum_url, port, &conn_info) != ESP_OK) {
@@ -255,11 +242,9 @@ esp_err_t stratum_v1_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
 
     const char *protocol = (conn_info.addr_family == AF_INET6) ? "IPv6" : "IPv4";
     const char *tls_status = (tls == BUNDLED_CRT) ? " (TLS)" : (tls == CUSTOM_CRT) ? " (TLS Cert)" : "";
-    if (!GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback || pool_idx != GLOBAL_STATE->SYSTEM_MODULE.primary_pool_index) {
-        snprintf(GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info,
-                 sizeof(GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info),
-                 "%s%s", protocol, tls_status);
-    }
+    char conn_str[64];
+    snprintf(conn_str, sizeof(conn_str), "%s%s", protocol, tls_status);
+    POOL_set_connection_info(GLOBAL_STATE, pool_idx, conn_str);
 
     stratum_v1_reset_uid(conn);
 
@@ -310,8 +295,13 @@ esp_err_t stratum_v1_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
         int64_t receive_time_us = esp_timer_get_time();
         bool reconnect_requested = false;
 
-        uint8_t target_slot = (GLOBAL_STATE->active_job_slot_idx + 1) % 2;
-        miner_job_t *target_job = miner_job_get_slot(target_slot);
+        uint8_t target_slot = (GLOBAL_STATE->SYSTEM_MODULE.pool_sessions[pool_idx].active_job_slot_idx + 1) % 2;
+        miner_job_t *target_job = POOL_get_job_slot(GLOBAL_STATE, pool_idx, target_slot);
+        if (!target_job) {
+            ESP_LOGE(TAG, "Failed to allocate job slot for pool %u", pool_idx);
+            free(line);
+            continue;
+        }
 
         if (!STRATUM_V1_parse(&v1_msg, line, target_job)) {
             ESP_LOGE(TAG, "Failed to parse Stratum message, ignoring");
@@ -336,14 +326,13 @@ esp_err_t stratum_v1_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
                 if (is_duplicate) {
                     ESP_LOGW(TAG, "Ignoring duplicate notify for job %s", target_job->job_id);
                 } else {
-                    GLOBAL_STATE->SYSTEM_MODULE.work_received++;
-                    stratum_check_primary_handover(GLOBAL_STATE, conn->pool_idx);
-                    SYSTEM_notify_new_ntime(GLOBAL_STATE, target_job->ntime);
+                    POOL_notify_work_received(GLOBAL_STATE, pool_idx);
+                    bool is_active_pool = stratum_check_primary_handover(GLOBAL_STATE, pool_idx);
 
                     target_job->pool_id = (uint8_t)pool_idx;
                     memcpy(target_job->pool_target, conn->pool_target, 32);
-                    if (GLOBAL_STATE->SYSTEM_MODULE.pool_difficulty == 0.0) {
-                        GLOBAL_STATE->SYSTEM_MODULE.pool_difficulty = target_to_diff(conn->pool_target);
+                    if (GLOBAL_STATE->SYSTEM_MODULE.pool_sessions[pool_idx].pool_difficulty == 0.0) {
+                        POOL_set_difficulty(GLOBAL_STATE, pool_idx, target_to_diff(conn->pool_target));
                     }
                     target_job->version_mask = conn->version_mask;
                     target_job->extranonce1_len = conn->extranonce1_len;
@@ -352,8 +341,13 @@ esp_err_t stratum_v1_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
                     }
                     target_job->extranonce2_len = conn->extranonce2_len;
 
-                    if (GLOBAL_STATE->create_jobs_task_handle) {
-                        xTaskNotify(GLOBAL_STATE->create_jobs_task_handle, target_slot, eSetValueWithOverwrite);
+                    if (is_active_pool) {
+                        SYSTEM_notify_new_ntime(GLOBAL_STATE, target_job->ntime);
+                        if (GLOBAL_STATE->create_jobs_task_handle) {
+                            xTaskNotify(GLOBAL_STATE->create_jobs_task_handle,
+                                        POOL_encode_job_notification(pool_idx, target_slot),
+                                        eSetValueWithOverwrite);
+                        }
                     }
                 }
                 break;
@@ -363,7 +357,7 @@ esp_err_t stratum_v1_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
                 double requested_diff = v1_msg.new_difficulty;
                 diff_to_target(requested_diff, conn->pool_target);
                 ESP_LOGI(TAG, "Set pool difficulty: %.2f", requested_diff);
-                GLOBAL_STATE->SYSTEM_MODULE.pool_difficulty = requested_diff;
+                POOL_set_difficulty(GLOBAL_STATE, pool_idx, requested_diff);
                 difficulty_controller_update(GLOBAL_STATE);
                 break;
             }
@@ -417,9 +411,7 @@ esp_err_t stratum_v1_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
 
             case CLIENT_SHOW_MESSAGE:
                 if (v1_msg.show_message) {
-                    strlcpy(GLOBAL_STATE->SYSTEM_MODULE.pool_banner,
-                            v1_msg.show_message,
-                            sizeof(GLOBAL_STATE->SYSTEM_MODULE.pool_banner));
+                    POOL_set_banner(GLOBAL_STATE, pool_idx, v1_msg.show_message);
                 }
                 break;
 
@@ -465,22 +457,22 @@ esp_err_t stratum_v1_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
                         }
                     }
                 } else if (v1_msg.message_id > 0) {
-                    float response_time_ms = stratum_timing_calculate_ms(&s_v1_timings[pool_idx], (uint32_t)v1_msg.message_id, (uint64_t)receive_time_us);
+                    float response_time_ms = POOL_timing_calculate_ms(GLOBAL_STATE, pool_idx, (uint32_t)v1_msg.message_id, (uint64_t)receive_time_us);
                     if (v1_msg.response_success) {
                         if (response_time_ms >= 0) {
                             ESP_LOGI(TAG, "message result accepted");
                             ESP_LOGI(TAG, "Stratum response time: %.1f ms", response_time_ms);
-                            SYSTEM_record_response_time(GLOBAL_STATE, response_time_ms, 1);
+                            POOL_record_response_time(GLOBAL_STATE, pool_idx, response_time_ms, 1);
                         } else {
                             ESP_LOGI(TAG, "message result accepted");
                         }
-                        SYSTEM_notify_accepted_share(GLOBAL_STATE);
+                        POOL_notify_accepted_share(GLOBAL_STATE, pool_idx);
                     } else {
                         ESP_LOGW(TAG, "message result rejected: %s", v1_msg.error_str);
                         if (response_time_ms >= 0) {
-                            SYSTEM_record_response_time(GLOBAL_STATE, response_time_ms, 1);
+                            POOL_record_response_time(GLOBAL_STATE, pool_idx, response_time_ms, 1);
                         }
-                        SYSTEM_notify_rejected_share(GLOBAL_STATE, v1_msg.error_str);
+                        POOL_notify_rejected_share(GLOBAL_STATE, pool_idx, v1_msg.error_str);
                     }
                 } else {
                     ESP_LOGW(TAG, "Received result with invalid message_id: %d", v1_msg.message_id);
