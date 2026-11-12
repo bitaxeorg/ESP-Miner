@@ -40,40 +40,63 @@ wd_asic_action_t wd_asic_step(wd_asic_t *wd, uint64_t now_ms, const wd_asic_inpu
         wd->recoveries = 0;
     }
 
-    if (in->results != wd->last_results) {
+    // Each signal has its own clock, held while there is no work and reset
+    // when the chain isn't running
+    bool new_results = in->results != wd->last_results;
+    if (new_results) {
         wd->last_results = in->results;
         wd->silent_ms = 0;
         wd->results_since_recovery = true;
-        return WD_ASIC_NONE;
+    }
+    bool hashrate_moved = in->hashrate_1m != wd->last_hashrate;
+    if (hashrate_moved) {
+        wd->last_hashrate = in->hashrate_1m;
+        wd->frozen_ms = 0;
+        wd->hashrate_since_recovery = true;
     }
 
-    if (!in->running || in->window_ms == 0) {
+    if (!in->running) {
         wd->silent_ms = 0;
+        wd->frozen_ms = 0;
         return WD_ASIC_NONE;
     }
-
-    // No work from the pool: nothing to return, hold the count where it is
     if (!in->has_work) {
         return WD_ASIC_NONE;
     }
 
-    wd->silent_ms += dt;
-    if (wd->silent_ms < in->window_ms) {
+    if (in->window_ms != 0 && !new_results) {
+        wd->silent_ms += dt;
+    }
+    if (!hashrate_moved) {
+        wd->frozen_ms += dt;
+    }
+
+    wd_asic_reason_t reason;
+    if (in->window_ms != 0 && wd->silent_ms >= in->window_ms) {
+        reason = WD_ASIC_REASON_NO_RESULTS;
+    } else if (wd->frozen_ms >= WD_ASIC_FROZEN_MS) {
+        reason = WD_ASIC_REASON_FROZEN_HASHRATE;
+    } else {
         return WD_ASIC_NONE;
     }
     wd->silent_ms = 0;
+    wd->frozen_ms = 0;
 
     if (wd->recoveries >= WD_ASIC_MAX_RECOVERIES) {
+        wd->reason = reason;
         return WD_ASIC_GIVE_UP;
     }
     wd->recoveries++;
     wd->last_recovery_ms = now_ms;
 
-    wd_asic_action_t action = (wd->last_action == WD_ASIC_REINIT && !wd->results_since_recovery)
-                                  ? WD_ASIC_RESTART
-                                  : WD_ASIC_REINIT;
+    // Escalate when the signal that caused the last re-init never moved again
+    bool helped = wd->reason == WD_ASIC_REASON_FROZEN_HASHRATE ? wd->hashrate_since_recovery
+                                                              : wd->results_since_recovery;
+    wd_asic_action_t action = (wd->last_action == WD_ASIC_REINIT && !helped) ? WD_ASIC_RESTART : WD_ASIC_REINIT;
     wd->last_action = action;
+    wd->reason = reason;
     wd->results_since_recovery = false;
+    wd->hashrate_since_recovery = false;
     return action;
 }
 

@@ -44,6 +44,7 @@ TEST_CASE("Results keep the ASIC watchdog quiet", "[mining-watchdog]")
     for (int i = 0; i < 600; i++) {
         now += 1000;
         if (i % 60 == 0) in.results++;
+        in.hashrate_1m += 0.01f;
         TEST_ASSERT_EQUAL(WD_ASIC_NONE, wd_asic_step(&wd, now, &in));
     }
 }
@@ -91,6 +92,7 @@ TEST_CASE("Budget comes back after an hour without recoveries", "[mining-watchdo
     for (int i = 0; i < 3600; i++) {
         now += 1000;
         in.results++;
+        in.hashrate_1m += 0.01f;
         wd_asic_step(&wd, now, &in);
     }
     TEST_ASSERT_EQUAL_UINT8(0, wd.recoveries);
@@ -118,6 +120,78 @@ TEST_CASE("No work, pause or ramp don't count as silence", "[mining-watchdog]")
     // A long gap between ticks (overheat cool-down) counts as one second
     now += 10 * 60 * 1000;
     TEST_ASSERT_EQUAL(WD_ASIC_NONE, wd_asic_step(&wd, now, &in));
+}
+
+// Results keep coming but the 1 min hashrate holds the exact same value
+static wd_asic_action_t run_frozen(wd_asic_t *wd, uint64_t *now, uint32_t ms, wd_asic_input_t *in)
+{
+    for (uint32_t t = 0; t < ms; t += 1000) {
+        *now += 1000;
+        in->results++;
+        wd_asic_action_t a = wd_asic_step(wd, *now, in);
+        if (a != WD_ASIC_NONE) return a;
+    }
+    return WD_ASIC_NONE;
+}
+
+TEST_CASE("Frozen 1 min hashrate triggers after three minutes", "[mining-watchdog]")
+{
+    wd_asic_t wd;
+    uint64_t now = START_MS;
+    wd_asic_init(&wd, now, 0, WD_ASIC_NONE);
+    wd_asic_input_t in = {.running = true, .has_work = true, .hashrate_1m = 1234.5f, .window_ms = 150000};
+    wd_asic_step(&wd, now, &in);
+
+    TEST_ASSERT_EQUAL(WD_ASIC_NONE, run_frozen(&wd, &now, WD_ASIC_FROZEN_MS - 1000, &in));
+    TEST_ASSERT_EQUAL(WD_ASIC_REINIT, run_frozen(&wd, &now, 1000, &in));
+    TEST_ASSERT_EQUAL(WD_ASIC_REASON_FROZEN_HASHRATE, wd.reason);
+
+    // Still frozen after the re-init: restart
+    TEST_ASSERT_EQUAL(WD_ASIC_RESTART, run_frozen(&wd, &now, WD_ASIC_FROZEN_MS, &in));
+    TEST_ASSERT_EQUAL(WD_ASIC_REASON_FROZEN_HASHRATE, wd.reason);
+}
+
+TEST_CASE("Frozen hashrate that moves again after a re-init is not escalated", "[mining-watchdog]")
+{
+    wd_asic_t wd;
+    uint64_t now = START_MS;
+    wd_asic_init(&wd, now, 0, WD_ASIC_NONE);
+    wd_asic_input_t in = {.running = true, .has_work = true, .hashrate_1m = 500.0f, .window_ms = 150000};
+    wd_asic_step(&wd, now, &in);
+    TEST_ASSERT_EQUAL(WD_ASIC_REINIT, run_frozen(&wd, &now, WD_ASIC_FROZEN_MS, &in));
+    in.hashrate_1m = 510.0f;
+    TEST_ASSERT_EQUAL(WD_ASIC_REINIT, run_frozen(&wd, &now, WD_ASIC_FROZEN_MS + 1000, &in));
+}
+
+TEST_CASE("Frozen hashrate is held without work and reset when not running", "[mining-watchdog]")
+{
+    wd_asic_t wd;
+    uint64_t now = START_MS;
+    wd_asic_init(&wd, now, 0, WD_ASIC_NONE);
+    wd_asic_input_t in = {.running = true, .has_work = true, .hashrate_1m = 800.0f, .window_ms = 150000};
+    wd_asic_step(&wd, now, &in);
+
+    TEST_ASSERT_EQUAL(WD_ASIC_NONE, run_frozen(&wd, &now, 120000, &in));
+    in.has_work = false;
+    TEST_ASSERT_EQUAL(WD_ASIC_NONE, run_frozen(&wd, &now, 600000, &in));
+    in.has_work = true;
+    TEST_ASSERT_EQUAL(WD_ASIC_REINIT, run_frozen(&wd, &now, 60000, &in));
+
+    in.running = false;
+    TEST_ASSERT_EQUAL(WD_ASIC_NONE, run_frozen(&wd, &now, 600000, &in));
+    in.running = true;
+    TEST_ASSERT_EQUAL(WD_ASIC_NONE, run_frozen(&wd, &now, WD_ASIC_FROZEN_MS - 1000, &in));
+}
+
+TEST_CASE("No results is reported over a frozen hashrate", "[mining-watchdog]")
+{
+    wd_asic_t wd;
+    uint64_t now = START_MS;
+    wd_asic_init(&wd, now, 0, WD_ASIC_NONE);
+    wd_asic_input_t in = {.running = true, .has_work = true, .hashrate_1m = 800.0f, .window_ms = 150000};
+    wd_asic_step(&wd, now, &in);
+    TEST_ASSERT_EQUAL(WD_ASIC_REINIT, run_asic(&wd, &now, 150000, &in));
+    TEST_ASSERT_EQUAL(WD_ASIC_REASON_NO_RESULTS, wd.reason);
 }
 
 TEST_CASE("Pool without new work triggers after five minutes", "[mining-watchdog]")

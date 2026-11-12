@@ -59,7 +59,7 @@ void WATCHDOGS_init(GlobalState * GLOBAL_STATE)
     stats.asic_restarts = noinit.asic_restarts;
     if (noinit.restarted) {
         noinit.restarted = false;
-        snprintf(stats.last_trigger, sizeof(stats.last_trigger), "ASIC: restarted, no results after re-init");
+        snprintf(stats.last_trigger, sizeof(stats.last_trigger), "ASIC: restarted, re-init didn't help");
     }
     wd_asic_init(&asic_wd, now_ms(), noinit.recoveries, (wd_asic_action_t) noinit.last_action);
     wd_pool_init(&pool_wd);
@@ -117,27 +117,39 @@ wd_asic_action_t WATCHDOGS_tick(GlobalState * GLOBAL_STATE)
                 && !sys->overheat_mode && !sys->hardware_fault && !sys->pools_unavailable && at_target_frequency(power),
         .has_work = GLOBAL_STATE->has_work,
         .results = asic_results,
+        .hashrate_1m = sys->hashrate_1m,
         .window_ms = wd_asic_window_ms(power->expected_hashrate, GLOBAL_STATE->current_difficulty_power),
     };
     wd_asic_action_t action = wd_asic_step(&asic_wd, now, &in);
     noinit.recoveries = asic_wd.recoveries;
     noinit.last_action = asic_wd.last_action;
 
+    if (action == WD_ASIC_NONE) {
+        return action;
+    }
+
+    // Say which signal fired, so field reports show which one catches it
+    char signal[64];
+    if (asic_wd.reason == WD_ASIC_REASON_FROZEN_HASHRATE) {
+        snprintf(signal, sizeof(signal), "1m hashrate frozen at %.2f GH/s for %d s", in.hashrate_1m,
+                 WD_ASIC_FROZEN_MS / 1000);
+    } else {
+        snprintf(signal, sizeof(signal), "no results for %lu s", (unsigned long) (in.window_ms / 1000));
+    }
+
     switch (action) {
         case WD_ASIC_REINIT:
             stats.asic_reinits = ++noinit.asic_reinits;
-            ESP_LOGW(TAG, "No results from the ASIC chain for %lu s, re-initialising (recovery %u of %d this hour)",
-                     (unsigned long) (in.window_ms / 1000), asic_wd.recoveries, WD_ASIC_MAX_RECOVERIES);
-            snprintf(stats.last_trigger, sizeof(stats.last_trigger), "ASIC: no results for %lu s, re-initialised",
-                     (unsigned long) (in.window_ms / 1000));
+            ESP_LOGW(TAG, "ASIC chain: %s, re-initialising (recovery %u of %d this hour)", signal,
+                     asic_wd.recoveries, WD_ASIC_MAX_RECOVERIES);
+            snprintf(stats.last_trigger, sizeof(stats.last_trigger), "ASIC: %s, re-initialised", signal);
             break;
         case WD_ASIC_RESTART:
-            ESP_LOGE(TAG, "Still no results from the ASIC chain after a re-init, restarting");
+            ESP_LOGE(TAG, "ASIC chain: %s again after a re-init, restarting", signal);
             break;
         case WD_ASIC_GIVE_UP:
-            ESP_LOGE(TAG, "No results from the ASIC chain and %d recoveries used this hour, stopping",
-                     WD_ASIC_MAX_RECOVERIES);
-            snprintf(stats.last_trigger, sizeof(stats.last_trigger), "ASIC: no results, recoveries used up");
+            ESP_LOGE(TAG, "ASIC chain: %s and %d recoveries used this hour, stopping", signal, WD_ASIC_MAX_RECOVERIES);
+            snprintf(stats.last_trigger, sizeof(stats.last_trigger), "ASIC: %s, recoveries used up", signal);
             break;
         default:
             break;
