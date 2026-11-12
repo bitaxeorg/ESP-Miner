@@ -47,6 +47,7 @@ SRCS
     "./tasks/create_jobs_task.c"
     "./tasks/asic_result_task.c"
     "./tasks/power_management_task.c"
+    "./tasks/watchdogs.c"
     "./tasks/statistics_task.c"
     "./tasks/scoreboard.c"
     "./tasks/hashrate_monitor_task.c"
@@ -79,6 +80,7 @@ INCLUDE_DIRS
 
 REQUIRES
     "asic"
+    "mining_watchdog"
     "connect"
     "dns_server"
     "stratum"

@@ -335,6 +335,10 @@ components:
         - vrTemp
         - wifiStatus
         - wifiRSSI
+        - asicWatchdogReinits
+        - asicWatchdogRestarts
+        - poolWatchdogReconnects
+        - watchdogLastTrigger
         - displayTimeout
         - statsFrequency
         - blockHeight
@@ -676,6 +680,18 @@ components:
         wifiRSSI:
           type: number
           description: WiFi signal strength
+        asicWatchdogReinits:
+          type: integer
+          description: Times the ASIC chain was re-initialised because it stopped returning results (kept over the watchdog's own restarts)
+        asicWatchdogRestarts:
+          type: integer
+          description: Restarts because a re-init didn't bring results back (kept over restarts, lost on power cycle)
+        poolWatchdogReconnects:
+          type: integer
+          description: Times the pool was dropped for sending no work or no share replies since boot
+        watchdogLastTrigger:
+          type: string
+          description: What the last watchdog trigger was, empty if none
         displayTimeout:
           type: number
           description: Turn off display after timeout
