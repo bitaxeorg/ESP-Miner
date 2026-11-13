@@ -17,6 +17,7 @@
 #include "statistics_task.h"
 #include "asic.h"
 #include "yyjson_utils.h"
+#include "watchdogs.h"
 
 static const char *get_reset_reason_str(esp_reset_reason_t reason)
 {
@@ -108,6 +109,12 @@ static void system_api_add_telemetry(yyjson_mut_doc *doc, yyjson_mut_val *root, 
     int8_t rssi = -90;
     get_wifi_current_rssi(&rssi);
     yyjson_mut_obj_add_int(doc, root, "wifiRSSI", rssi);
+
+    const watchdog_stats_t *wd = WATCHDOGS_get_stats();
+    yyjson_mut_obj_add_uint(doc, root, "asicWatchdogReinits", wd->asic_reinits);
+    yyjson_mut_obj_add_uint(doc, root, "asicWatchdogRestarts", wd->asic_restarts);
+    yyjson_mut_obj_add_uint(doc, root, "poolWatchdogReconnects", wd->pool_reconnects);
+    yyjson_mut_obj_add_strcpy(doc, root, "watchdogLastTrigger", wd->last_trigger);
 
     // Faults
     if (g->SYSTEM_MODULE.power_fault > 0) {

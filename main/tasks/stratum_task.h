@@ -21,6 +21,9 @@ void stratum_notify_pool_selection_changed(GlobalState *gs);
 
 // Abort active stratum connection immediately for the given pool.
 void stratum_abort_pool(uint16_t pool_idx);
+// The pool watchdog saw no work or no share replies: drop the connection and
+// count it as a failed attempt, so the fallback pool takes over
+void stratum_report_stalled_pool(uint16_t pool_idx);
 
 // Abort active stratum connection immediately across all pools.
 void stratum_abort_connection(void);

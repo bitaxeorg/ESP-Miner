@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -12,6 +13,8 @@
 #include "asic_reset.h"
 #include "difficulty_controller.h"
 #include "driver/uart.h"
+#include "esp_system.h"
+#include "watchdogs.h"
 
 #define POLL_RATE 100
 #define MAX_TEMP 90.0
@@ -126,6 +129,8 @@ void POWER_MANAGEMENT_task(void * pvParameters)
     float last_known_asic_frequency = 0.0;
     bool is_paused = false;
 
+    WATCHDOGS_init(GLOBAL_STATE);
+
     while (1) {
         if (GLOBAL_STATE->SELF_TEST_MODULE.is_finished) {
             ESP_LOGI(TAG, "Stopped");
@@ -149,6 +154,26 @@ void POWER_MANAGEMENT_task(void * pvParameters)
         } else if (!wants_stop && is_paused) {
             mining_start(GLOBAL_STATE);
             is_paused = false;
+        }
+
+        // Runs while paused too, so the pool watchdog sees the pause
+        switch (WATCHDOGS_tick(GLOBAL_STATE)) {
+            case WD_ASIC_REINIT:
+                mining_stop(GLOBAL_STATE);
+                mining_start(GLOBAL_STATE);
+                break;
+            case WD_ASIC_RESTART:
+                WATCHDOGS_before_restart();
+                mining_stop(GLOBAL_STATE);
+                esp_restart();
+                break;
+            case WD_ASIC_GIVE_UP:
+                sys_module->hardware_fault = true;
+                snprintf(sys_module->hardware_fault_msg, sizeof(sys_module->hardware_fault_msg),
+                         "ASIC chain stopped returning results");
+                break;
+            default:
+                break;
         }
 
         // If we've paused or have a hardware fault, skip doing anything else
