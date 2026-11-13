@@ -351,7 +351,18 @@ components:
         - statsLimit
         - partitions
         - useCustomWWW
+        - otaButtonRequired
+        - otaUnlockRemaining
       properties:
+        otaButtonRequired:
+          type: integer
+          enum: [0, 1]
+          description: Whether a physical BOOT button press is required for OTA uploads and firmware activation (enabled by default)
+        otaUnlockRemaining:
+          type: integer
+          minimum: 0
+          maximum: 120
+          description: Seconds remaining in the physical button unlock window; zero means locked when protection is enabled
         ASICModel:
           type: string
           description: ASIC model identifier
@@ -1048,6 +1059,12 @@ components:
           enum: [0, 1]
           examples:
             - 0
+        otaButtonRequired:
+          type: integer
+          enum: [0, 1]
+          description: Require a physical BOOT button press for OTA uploads and firmware activation. Disabling requires an active button unlock window; enabling locks immediately.
+          examples:
+            - 1
         invertscreen:
           type: integer
           description: Whether to invert screen colors (0=normal, 1=inverted)
@@ -1298,6 +1315,8 @@ paths:
           description: Invalid partition label
         '401':
           description: Unauthorized - Client not in allowed network range
+        '403':
+          description: OTA is locked; briefly press the BOOT button to unlock for 120 seconds
         '500':
           description: Internal server error
 
@@ -1410,6 +1429,8 @@ paths:
           description: Invalid settings provided
         '401':
           description: Unauthorized - Client not in allowed network range
+        '403':
+          description: OTA protection cannot be disabled without a physical button unlock
         '500':
           description: Internal server error
 
@@ -1438,6 +1459,8 @@ paths:
           description: Invalid firmware file
         '401':
           description: Unauthorized - Client not in allowed network range
+        '403':
+          description: OTA is locked; briefly press the BOOT button to unlock for 120 seconds
         '500':
           description: Internal server error
 
@@ -1466,5 +1489,7 @@ paths:
           description: Invalid web interface file
         '401':
           description: Unauthorized - Client not in allowed network range
+        '403':
+          description: OTA is locked; briefly press the BOOT button to unlock for 120 seconds
         '500':
           description: Internal server error

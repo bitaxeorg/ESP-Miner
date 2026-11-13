@@ -37,6 +37,8 @@ import { LayoutService } from 'src/app/layout/service/app.layout.service';
 import { SystemInfo as ISystemInfo, SystemStatistics as ISystemStatistics } from 'src/app/generated/models';
 
 const mockSystemInfo: ISystemInfo = {
+  otaButtonRequired: 1,
+  otaUnlockRemaining: 0,
   ASICModel: 'BM1370',
   apEnabled: 0,
   autofanspeed: 1,

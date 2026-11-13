@@ -35,6 +35,7 @@ export class UpdateComponent {
   public latestEspMinerAsset$: Observable<any>;
 
   public info$: Observable<SystemInfo>;
+  public otaLocked = true;
 
   @ViewChild('firmwareUpload') firmwareUpload!: ElementRef<HTMLInputElement>;
   @ViewChild('websiteUpload') websiteUpload!: ElementRef<HTMLInputElement>;
@@ -73,6 +74,7 @@ export class UpdateComponent {
 
     // Reload page if firmware version changes
     this.liveDataService.info$.subscribe(info => {
+      this.otaLocked = info.otaButtonRequired !== 0 && !(info.otaUnlockRemaining > 0);
       if (this.currentVersion === undefined) {
         this.currentVersion = info.version;
       } else if (info.version !== this.currentVersion) {
@@ -107,6 +109,11 @@ export class UpdateComponent {
 
     if (file.name != 'esp-miner.bin') {
       this.toastrService.error('Incorrect file, looking for esp-miner.bin.');
+      return;
+    }
+
+    if (this.otaLocked) {
+      this.toastrService.error('Press the BOOT button to unlock OTA for 120 seconds.');
       return;
     }
 
@@ -154,6 +161,11 @@ export class UpdateComponent {
 
     if (file.name != 'www.bin') {
       this.toastrService.error('Incorrect file, looking for www.bin.');
+      return;
+    }
+
+    if (this.otaLocked) {
+      this.toastrService.error('Press the BOOT button to unlock OTA for 120 seconds.');
       return;
     }
 
@@ -286,6 +298,10 @@ export class UpdateComponent {
   }
 
   public switchPartition(label: string): void {
+    if (this.otaLocked) {
+      this.toastrService.error('Press the BOOT button to unlock firmware activation for 120 seconds.');
+      return;
+    }
     if (confirm(`Set ${label} as the next boot partition? The device will restart to apply this change.`)) {
       this.systemService.switchBootPartition(label).subscribe({
         next: (resp) => {
@@ -323,6 +339,20 @@ export class UpdateComponent {
       },
       error: (err) => {
         this.toastrService.error(`Failed to change Web UI source. ${getHttpErrorMessage(err)}`);
+      }
+    });
+  }
+
+  public toggleOtaButtonRequired(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const checked = input.checked;
+    input.checked = !checked;
+    this.systemService.updateSystem('', { otaButtonRequired: checked ? 1 : 0 }).subscribe({
+      next: () => {
+        this.toastrService.success(checked ? 'OTA button protection enabled.' : 'OTA button protection disabled. Remote updates are allowed.');
+      },
+      error: (err) => {
+        this.toastrService.error(`Failed to change OTA protection. ${getHttpErrorMessage(err)}`);
       }
     });
   }

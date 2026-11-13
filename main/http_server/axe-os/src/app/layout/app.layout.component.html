@@ -7,6 +7,13 @@
   }
   <div class="layout-main-container">
     <div class="layout-main">
+      @if ((info$ | async)?.otaButtonRequired === 0) {
+        <div role="alert" class="sticky top-topbar z-20 mb-4 flex flex-wrap items-center gap-2 rounded border border-orange-500/40 bg-bg-card p-3 text-orange-500">
+          <i class="pi pi-exclamation-triangle" aria-hidden="true"></i>
+          <span>Button protection is off. Remote updates are allowed.</span>
+          <a routerLink="/update" class="underline font-medium">Enable protection on the Update page</a>
+        </div>
+      }
       <router-outlet></router-outlet>
     </div>
     <app-footer></app-footer>
