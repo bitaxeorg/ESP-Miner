@@ -8,13 +8,16 @@
 #include <string.h>
 #include <sys/param.h>
 
-#define BUFFER_SIZE 1024
+#define INITIAL_JSON_BUFFER_SIZE 1024U
+#define RX_READ_BUFFER_SIZE 16384U
+#define INITIAL_COINB2_CAPACITY 32768U
 #define JSON_RPC_BUFFER_LIMIT (STRATUM_V1_MAX_JSON_LINE_SIZE + 2U)
 #define STRATUM_V1_COINB2_STREAM_THRESHOLD 4096U
 
 static const char *TAG = "stratum_rx_stream";
 
 static char *json_rpc_buffer = NULL;
+static char *s_rx_read_buffer = NULL;
 static size_t json_rpc_buffer_size = 0;
 static size_t json_rpc_buffer_len = 0;
 
@@ -61,15 +64,24 @@ bool stratum_rx_stream_init(void)
     reset_rx_line_state();
     free(json_rpc_buffer);
     json_rpc_buffer = NULL;
+    free(s_rx_read_buffer);
+    s_rx_read_buffer = NULL;
     json_rpc_buffer_size = 0;
     json_rpc_buffer_len = 0;
 
-    json_rpc_buffer = heap_caps_malloc(BUFFER_SIZE, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    json_rpc_buffer = heap_caps_malloc(INITIAL_JSON_BUFFER_SIZE, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     if (json_rpc_buffer == NULL) {
         ESP_LOGE(TAG, "Failed to allocate memory for JSON-RPC buffer");
         return false;
     }
-    json_rpc_buffer_size = BUFFER_SIZE;
+    s_rx_read_buffer = heap_caps_malloc(RX_READ_BUFFER_SIZE, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    if (s_rx_read_buffer == NULL) {
+        ESP_LOGE(TAG, "Failed to allocate memory for Stratum RX chunk buffer");
+        free(json_rpc_buffer);
+        json_rpc_buffer = NULL;
+        return false;
+    }
+    json_rpc_buffer_size = INITIAL_JSON_BUFFER_SIZE;
     json_rpc_buffer[0] = '\0';
 
     return true;
@@ -121,7 +133,7 @@ static bool stream_coinb2_hex_bytes(const char *data, size_t len)
     size_t total_hex = (s_rx_hex_carry != '\0' ? 1U : 0U) + len;
     size_t new_bytes = total_hex / 2U;
     if (s_rx_suffix_len + new_bytes > s_rx_suffix_capacity) {
-        size_t new_cap = s_rx_suffix_capacity ? s_rx_suffix_capacity : 4096U;
+        size_t new_cap = s_rx_suffix_capacity ? s_rx_suffix_capacity : INITIAL_COINB2_CAPACITY;
         while (new_cap < s_rx_suffix_len + new_bytes && new_cap < MAX_COINBASE_SUFFIX_LEN) {
             new_cap = MIN(new_cap * 2U, (size_t)MAX_COINBASE_SUFFIX_LEN);
         }
@@ -376,14 +388,13 @@ bool stratum_rx_stream_read_line(esp_transport_handle_t transport,
                                  size_t *out_line_len,
                                  size_t *out_raw_len)
 {
-    if (json_rpc_buffer == NULL) {
+    if (json_rpc_buffer == NULL || s_rx_read_buffer == NULL) {
         if (!stratum_rx_stream_init()) {
             return false;
         }
     }
     reset_rx_line_state();
 
-    char recv_buffer[BUFFER_SIZE];
     int nbytes;
 
     char *newline_pos = memchr(json_rpc_buffer, '\n', json_rpc_buffer_len);
@@ -396,14 +407,11 @@ bool stratum_rx_stream_read_line(esp_transport_handle_t transport,
             }
         }
 
-        size_t receive_size = sizeof(recv_buffer);
-        if (!s_rx_streaming_coinb2) {
-            size_t receive_capacity =
-                (STRATUM_V1_MAX_JSON_LINE_SIZE + 1U) - json_rpc_buffer_len;
-            receive_size = MIN(sizeof(recv_buffer), receive_capacity);
-        }
+        size_t receive_capacity =
+            (STRATUM_V1_MAX_JSON_LINE_SIZE + 1U) - json_rpc_buffer_len;
+        size_t receive_size = MIN((size_t)RX_READ_BUFFER_SIZE, receive_capacity);
 
-        nbytes = esp_transport_read(transport, recv_buffer, receive_size,
+        nbytes = esp_transport_read(transport, s_rx_read_buffer, receive_size,
                                     TRANSPORT_TIMEOUT_MS);
         if (nbytes < 0) {
             const char *err_str;
@@ -426,13 +434,13 @@ bool stratum_rx_stream_read_line(esp_transport_handle_t transport,
             return false;
         }
         if (nbytes > 0) {
-            if (memchr(recv_buffer, '\0', (size_t)nbytes) != NULL) {
+            if (memchr(s_rx_read_buffer, '\0', (size_t)nbytes) != NULL) {
                 ESP_LOGE(TAG, "JSON-RPC stream contains an embedded NUL byte");
                 reset_json_rpc_buffer();
                 return false;
             }
 
-            const char *chunk_ptr = recv_buffer;
+            const char *chunk_ptr = s_rx_read_buffer;
             size_t chunk_len = (size_t)nbytes;
 
             if (s_rx_streaming_coinb2) {
