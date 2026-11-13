@@ -240,7 +240,8 @@ TEST_CASE("result task preserves thresholds self test and repeated delivery",
 {
     run_result_case((result_case_t) {.self_test = true});
     TEST_ASSERT_EQUAL_UINT32(1, fixture_self_tests);
-    TEST_ASSERT_EQUAL_UINT32(1, fixture_watchdog_results);
+    // Counted after the submit path, which self-test results never reach
+    TEST_ASSERT_EQUAL_UINT32(0, fixture_watchdog_results);
     TEST_ASSERT_EQUAL_UINT32(
         0, fixture_submissions + fixture_scores + fixture_notifications);
 

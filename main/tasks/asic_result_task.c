@@ -45,8 +45,6 @@ void ASIC_result_task(void *pvParameters)
             continue;
         }
 
-        WATCHDOGS_note_asic_result();
-
         if (GLOBAL_STATE->SELF_TEST_MODULE.is_active) {
             self_test_record_nonce(GLOBAL_STATE, hash_result);
             continue;
@@ -70,6 +68,7 @@ void ASIC_result_task(void *pvParameters)
         }
 
         // 3. Telemetry & Display (deferred after submission)
+        WATCHDOGS_note_asic_result();
         double nonce_diff = target_to_diff(hash_result);
 
         SYSTEM_notify_found_nonce(GLOBAL_STATE, nonce_diff, is_block);
