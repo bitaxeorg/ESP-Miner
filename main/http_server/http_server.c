@@ -43,6 +43,7 @@
 #include "websocket.h"
 #include "websocket_log.h"
 #include "websocket_api.h"
+#include "http_auth.h"
 #include "system_api_json.h"
 #include "log_buffer.h"
 #include "utils.h"
@@ -444,6 +445,10 @@ static esp_err_t rest_api_wrapper(httpd_req_t * req)
         return ESP_OK;
     }
 
+    if (http_auth_validate(req) != ESP_OK) {
+        return ESP_OK;
+    }
+
     esp_err_t (*handler)(httpd_req_t *) = (esp_err_t (*)(httpd_req_t *))req->user_ctx;
     return handler(req);
 }
@@ -470,6 +475,10 @@ static esp_err_t rest_recovery_handler(httpd_req_t * req)
 {
     if (is_network_allowed(req) != ESP_OK) {
         return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+    }
+
+    if (http_auth_validate(req) != ESP_OK) {
+        return ESP_OK;
     }
 
     extern const unsigned char recovery_page_start[] asm("_binary_recovery_page_html_start");
