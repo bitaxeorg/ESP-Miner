@@ -512,10 +512,11 @@ void SYSTEM_decode_and_apply_coinbase(GlobalState * GLOBAL_STATE, const miner_jo
 
 
     ESP_LOGI(TAG, "Coinbase outputs: %d, total value: %llu%s",
-             result->output_count, result->total_value_satoshis,
+             result->total_output_count, result->total_value_satoshis,
              result->decode_coinbase_tx ? " sats" : "");
 
-    if (result->output_count != GLOBAL_STATE->coinbase.output_count ||
+    if (result->total_output_count != GLOBAL_STATE->coinbase.total_output_count ||
+        result->output_count != GLOBAL_STATE->coinbase.output_count ||
         result->others_count != GLOBAL_STATE->coinbase.others_count ||
         result->others_value_satoshis != GLOBAL_STATE->coinbase.others_value_satoshis ||
         memcmp(result->outputs, GLOBAL_STATE->coinbase.outputs, sizeof(coinbase_output_t) * result->output_count) != 0) {

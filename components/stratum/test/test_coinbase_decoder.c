@@ -431,6 +431,7 @@ TEST_CASE("Coinbase outputs beyond capacity are aggregated", "[coinbase_decoder]
 
     // The array stays full, the two smallest non-user outputs (1000 and 2000 sat) are aggregated
     TEST_ASSERT_EQUAL_INT(MAX_COINBASE_TX_OUTPUTS, result.output_count);
+    TEST_ASSERT_EQUAL_INT(8, result.total_output_count);
     TEST_ASSERT_EQUAL_INT(2, result.others_count);
     TEST_ASSERT_TRUE(3000 == result.others_value_satoshis);
 
