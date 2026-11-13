@@ -98,9 +98,21 @@ void create_jobs_task(void *pvParameters)
             }
         }
 
+        int64_t work_start_us = !current_work_sent ? esp_timer_get_time() : 0;
         generate_work_from_miner_job(GLOBAL_STATE, current_work, extranonce_2, current_version);
         if (!current_work_sent) {
+            int64_t asic_done_us = esp_timer_get_time();
             SYSTEM_decode_and_apply_coinbase(GLOBAL_STATE, current_work);
+            int64_t decode_done_us = esp_timer_get_time();
+            if (current_work->type == JOB_TYPE_V1) {
+                float rx_ms = current_work->rx_time_us / 1000.0f;
+                float parse_ms = current_work->parse_time_us / 1000.0f;
+                float asic_ms = (asic_done_us - work_start_us) / 1000.0f;
+                float coinbase_ms = (decode_done_us - asic_done_us) / 1000.0f;
+                float total_ms = parse_ms + asic_ms + coinbase_ms;
+                ESP_LOGI(TAG, "mining.notify (%s) processed in %.2f ms (parse: %.2f ms, job+asic: %.2f ms, coinbase: %.2f ms, rx: %.2f ms)",
+                         current_work->job_id, total_ms, parse_ms, asic_ms, coinbase_ms, rx_ms);
+            }
         }
         current_work_sent = true;
 

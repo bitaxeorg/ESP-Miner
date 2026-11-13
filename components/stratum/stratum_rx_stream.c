@@ -4,6 +4,7 @@
 #include "utils.h"
 #include "esp_log.h"
 #include "esp_heap_caps.h"
+#include "esp_timer.h"
 #include <stdlib.h>
 #include <string.h>
 #include <sys/param.h>
@@ -30,6 +31,7 @@ static bool s_rx_coinb2_checked = false;
 static bool s_rx_suffix_valid = false;
 static bool s_rx_suffix_error = false;
 static char s_rx_hex_carry = '\0';
+static int64_t s_rx_line_start_us = 0;
 
 static void discard_coinb2(void)
 {
@@ -47,6 +49,7 @@ static void reset_rx_line_state(void)
     s_rx_suffix_error = false;
     s_rx_hex_carry = '\0';
     s_rx_coinb2_hex_count = 0;
+    s_rx_line_start_us = 0;
     discard_coinb2();
 }
 
@@ -394,6 +397,9 @@ bool stratum_rx_stream_read_line(esp_transport_handle_t transport,
         }
     }
     reset_rx_line_state();
+    if (json_rpc_buffer_len > 0) {
+        s_rx_line_start_us = esp_timer_get_time();
+    }
 
     int nbytes;
 
@@ -434,6 +440,9 @@ bool stratum_rx_stream_read_line(esp_transport_handle_t transport,
             return false;
         }
         if (nbytes > 0) {
+            if (s_rx_line_start_us == 0) {
+                s_rx_line_start_us = esp_timer_get_time();
+            }
             if (memchr(s_rx_read_buffer, '\0', (size_t)nbytes) != NULL) {
                 ESP_LOGE(TAG, "JSON-RPC stream contains an embedded NUL byte");
                 reset_json_rpc_buffer();
@@ -576,5 +585,10 @@ uint8_t *stratum_rx_stream_take_coinb2(size_t *out_len)
         *out_len = len;
     }
     return result;
+}
+
+int64_t stratum_rx_stream_line_start_us(void)
+{
+    return s_rx_line_start_us;
 }
 

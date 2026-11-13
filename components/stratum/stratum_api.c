@@ -108,12 +108,25 @@ stratum_v1_rx_status_t STRATUM_V1_receive_message(esp_transport_handle_t transpo
         return STRATUM_V1_RX_TRANSPORT_ERROR;
     }
 
+    int64_t parse_start_us = esp_timer_get_time();
+    int64_t rx_start_us = stratum_rx_stream_line_start_us();
     if (receive_time_us != NULL) {
-        *receive_time_us = esp_timer_get_time();
+        *receive_time_us = parse_start_us;
     }
 
     bool parsed = STRATUM_V1_parse(message, line_buf, job);
+    int64_t parse_done_us = esp_timer_get_time();
     if (parsed) {
+        if (message->method == MINING_NOTIFY && job != NULL) {
+            if (rx_start_us > 0 && parse_start_us >= rx_start_us) {
+                int64_t rx_dt = parse_start_us - rx_start_us;
+                job->rx_time_us = (rx_dt > UINT32_MAX) ? UINT32_MAX : (uint32_t)rx_dt;
+            }
+            if (parse_done_us >= parse_start_us) {
+                int64_t parse_dt = parse_done_us - parse_start_us;
+                job->parse_time_us = (parse_dt > UINT32_MAX) ? UINT32_MAX : (uint32_t)parse_dt;
+            }
+        }
         ESP_LOGI(TAG, "rx (%zu bytes): %.512s%s", raw_len, line_buf,
                  raw_len > 512U ? "..." : "");
     }

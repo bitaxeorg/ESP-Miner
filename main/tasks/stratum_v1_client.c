@@ -313,6 +313,7 @@ esp_err_t stratum_v1_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
                 break;
 
             case MINING_NOTIFY: {
+                int64_t notify_start_us = esp_timer_get_time();
                 bool is_duplicate = false;
                 if (target_job->job_id[0] != '\0') {
                     if (target_job->clean_jobs) {
@@ -338,6 +339,11 @@ esp_err_t stratum_v1_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
                         memcpy(target_job->extranonce1, s_v1_conn->extranonce1, s_v1_conn->extranonce1_len);
                     }
                     target_job->extranonce2_len = s_v1_conn->extranonce2_len;
+                    int64_t notify_dt = esp_timer_get_time() - notify_start_us;
+                    if (notify_dt > 0) {
+                        uint64_t total_parse = (uint64_t)target_job->parse_time_us + (uint64_t)notify_dt;
+                        target_job->parse_time_us = (total_parse > UINT32_MAX) ? UINT32_MAX : (uint32_t)total_parse;
+                    }
                     last_notified_slot = target_slot;
                     next_slot = (uint8_t)((target_slot + 1U) % 3U);
 

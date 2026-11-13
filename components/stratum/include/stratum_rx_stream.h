@@ -19,5 +19,7 @@ bool stratum_rx_stream_has_coinb2(const char *c2_str, size_t *out_len);
 
 uint8_t *stratum_rx_stream_take_coinb2(size_t *out_len);
 
+int64_t stratum_rx_stream_line_start_us(void);
+
 #endif // STRATUM_RX_STREAM_H
 

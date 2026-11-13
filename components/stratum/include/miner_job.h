@@ -49,6 +49,10 @@ typedef struct {
 
     // Pre-computed Merkle root (for SV2 Standard)
     uint8_t          merkle_root[32];
+
+    // Timing diagnostics (microseconds)
+    uint32_t         rx_time_us;
+    uint32_t         parse_time_us;
 } miner_job_t;
 
 // Pre-allocated ring buffer pool helpers
