@@ -287,7 +287,10 @@ void BAP_send_subscription_update(GlobalState *state) {
                     case BAP_PARAM_SHARES:
                         {
                             char shares_ar_str[64];
-                            snprintf(shares_ar_str, sizeof(shares_ar_str), "%" PRIu64 "/%" PRIu64, state->SYSTEM_MODULE.shares_accepted, state->SYSTEM_MODULE.shares_rejected);
+                            PoolSession *session = POOL_get_active_session(state);
+                            uint64_t accepted = session ? session->shares_accepted : 0;
+                            uint64_t rejected = session ? session->shares_rejected : 0;
+                            snprintf(shares_ar_str, sizeof(shares_ar_str), "%" PRIu64 "/%" PRIu64, accepted, rejected);
                             BAP_send_if_changed("shares", shares_ar_str, last_values.shares, sizeof(last_values.shares), &last_values_valid.shares);
                             
                         }
