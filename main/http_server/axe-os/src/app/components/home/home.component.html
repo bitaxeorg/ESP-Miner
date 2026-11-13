@@ -614,8 +614,10 @@
               @for (row of sparklineAsicRows; track row.id) {
                 <div class="sparkline-row flex gap-1.5 flex-1 h-full min-w-0">
                   @for (cell of row.cells; track cell.id) {
-                    <div class="sparkline-cell flex-1 min-w-0 h-full" [appTooltip]="cell.tooltip" tooltipPosition="top">
-                      <div class="absolute bottom-0.5 left-1 z-0 text-[10px] leading-none font-medium text-secondary truncate select-none pointer-events-none max-w-[calc(100%-8px)]">
+                    <div class="sparkline-cell flex-1 min-w-0 h-full" [class.stalled]="cell.stalled" [appTooltip]="cell.tooltip" tooltipPosition="top">
+                      <div class="absolute bottom-0.5 left-1 z-0 text-[10px] leading-none font-medium truncate select-none pointer-events-none max-w-[calc(100%-8px)]"
+                        [class.text-secondary]="!cell.stalled"
+                        [class.text-red-500]="cell.stalled">
                         {{ cell.hashrate }}
                       </div>
                       <svg class="sparkline-svg w-full h-full" [attr.viewBox]="sparklineViewBox" preserveAspectRatio="none">

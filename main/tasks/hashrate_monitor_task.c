@@ -3,6 +3,7 @@
 #include <esp_heap_caps.h>
 #include <math.h>
 #include "esp_log.h"
+#include "esp_timer.h"
 #include "global_state.h"
 #include "system.h"
 #include "asic_common.h"
@@ -20,6 +21,7 @@
 #define HASHRATE_1H_SIZE 6
 #define DIV_10M (HASHRATE_1M_SIZE)
 #define DIV_1H (HASHRATE_10M_SIZE * DIV_10M)
+#define DOMAIN_STALL_POLLS 30
 
 static unsigned long poll_count = 0;
 static float hashrate_1m[HASHRATE_1M_SIZE];
@@ -56,8 +58,39 @@ void hashrate_monitor_reset_measurements(void *pvParameters)
     pthread_mutex_lock(&HASHRATE_MONITOR_MODULE->lock);
     memset(HASHRATE_MONITOR_MODULE->total_measurement, 0, asic_count * sizeof(measurement_t));
     memset(HASHRATE_MONITOR_MODULE->domain_measurements[0], 0, asic_count * hash_domains * sizeof(measurement_t));
+    memset(HASHRATE_MONITOR_MODULE->domain_stall_counts[0], 0, asic_count * hash_domains * sizeof(uint8_t));
+    memset(HASHRATE_MONITOR_MODULE->domain_stalled[0], 0, asic_count * hash_domains * sizeof(bool));
     memset(HASHRATE_MONITOR_MODULE->error_measurement, 0, asic_count * sizeof(measurement_t));
     pthread_mutex_unlock(&HASHRATE_MONITOR_MODULE->lock);
+}
+
+bool hashrate_monitor_has_stalled_domains(void *pvParameters, int *stalled_count_out)
+{
+    GlobalState * GLOBAL_STATE = (GlobalState *)pvParameters;
+    if (!GLOBAL_STATE || !GLOBAL_STATE->HASHRATE_MONITOR_MODULE.is_initialized) {
+        if (stalled_count_out) *stalled_count_out = 0;
+        return false;
+    }
+
+    HashrateMonitorModule * monitor = &GLOBAL_STATE->HASHRATE_MONITOR_MODULE;
+    int asic_count = GLOBAL_STATE->DEVICE_CONFIG.family.asic_count;
+    int hash_domains = GLOBAL_STATE->DEVICE_CONFIG.family.asic.hash_domains;
+    int count = 0;
+
+    pthread_mutex_lock(&monitor->lock);
+    for (int i = 0; i < asic_count; i++) {
+        for (int j = 0; j < hash_domains; j++) {
+            if (monitor->domain_stalled[i][j]) {
+                count++;
+            }
+        }
+    }
+    pthread_mutex_unlock(&monitor->lock);
+
+    if (stalled_count_out) {
+        *stalled_count_out = count;
+    }
+    return count > 0;
 }
 
 void update_hashrate(measurement_t * measurement, uint32_t value)
@@ -86,6 +119,33 @@ void update_hash_counter(measurement_t * measurement, uint32_t value, uint64_t t
 
     measurement->value = value;
     measurement->time_us = time_us;
+}
+
+static void update_domain_hash_counter(HashrateMonitorModule *module, uint8_t asic_nr, uint8_t domain_nr, uint32_t value, uint64_t time_us)
+{
+    measurement_t *measurement = &module->domain_measurements[asic_nr][domain_nr];
+    uint32_t previous_value = measurement->value;
+    uint64_t previous_time_us = measurement->time_us;
+
+    update_hash_counter(measurement, value, time_us);
+
+    if (previous_time_us == 0 || measurement->time_us == previous_time_us) {
+        return;
+    }
+
+    if (value == previous_value) {
+        if (module->domain_stall_counts[asic_nr][domain_nr] < DOMAIN_STALL_POLLS) {
+            module->domain_stall_counts[asic_nr][domain_nr]++;
+        }
+    } else {
+        module->domain_stall_counts[asic_nr][domain_nr] = 0;
+        module->domain_stalled[asic_nr][domain_nr] = false;
+    }
+
+    if (module->domain_stall_counts[asic_nr][domain_nr] >= DOMAIN_STALL_POLLS && !module->domain_stalled[asic_nr][domain_nr]) {
+        ESP_LOGW(TAG, "ASIC %d domain %d hash counter stalled", asic_nr, domain_nr);
+        module->domain_stalled[asic_nr][domain_nr] = true;
+    }
 }
 
 static void init_averages()
@@ -154,8 +214,14 @@ void hashrate_monitor_task(void *pvParameters)
     HASHRATE_MONITOR_MODULE->total_measurement = heap_caps_malloc(asic_count * sizeof(measurement_t), MALLOC_CAP_SPIRAM);
     measurement_t* data = heap_caps_malloc(asic_count * hash_domains * sizeof(measurement_t), MALLOC_CAP_SPIRAM);
     HASHRATE_MONITOR_MODULE->domain_measurements = heap_caps_malloc(asic_count * sizeof(measurement_t*), MALLOC_CAP_SPIRAM);
+    uint8_t* stall_count_data = heap_caps_malloc(asic_count * hash_domains * sizeof(uint8_t), MALLOC_CAP_SPIRAM);
+    HASHRATE_MONITOR_MODULE->domain_stall_counts = heap_caps_malloc(asic_count * sizeof(uint8_t*), MALLOC_CAP_SPIRAM);
+    bool* stalled_data = heap_caps_malloc(asic_count * hash_domains * sizeof(bool), MALLOC_CAP_SPIRAM);
+    HASHRATE_MONITOR_MODULE->domain_stalled = heap_caps_malloc(asic_count * sizeof(bool*), MALLOC_CAP_SPIRAM);
     for (size_t asic_nr = 0; asic_nr < asic_count; asic_nr++) {
         HASHRATE_MONITOR_MODULE->domain_measurements[asic_nr] = data + (asic_nr * hash_domains);
+        HASHRATE_MONITOR_MODULE->domain_stall_counts[asic_nr] = stall_count_data + (asic_nr * hash_domains);
+        HASHRATE_MONITOR_MODULE->domain_stalled[asic_nr] = stalled_data + (asic_nr * hash_domains);
     }
     HASHRATE_MONITOR_MODULE->error_measurement = heap_caps_malloc(asic_count * sizeof(measurement_t), MALLOC_CAP_SPIRAM);
 
@@ -167,6 +233,7 @@ void hashrate_monitor_task(void *pvParameters)
     init_averages();
 
     bool was_asic_initialized = false;
+    TickType_t asic_initialized_ticks = xTaskGetTickCount();
     TickType_t taskWakeTime = xTaskGetTickCount();
     while (1) {
         bool is_asic_initialized = GLOBAL_STATE->ASIC_initalized;
@@ -178,6 +245,9 @@ void hashrate_monitor_task(void *pvParameters)
             // which would cause a hashrate spike when resuming.
             hashrate_monitor_reset_measurements(GLOBAL_STATE);
         }
+        if (!was_asic_initialized && is_asic_initialized) {
+            asic_initialized_ticks = xTaskGetTickCount();
+        }
         was_asic_initialized = is_asic_initialized;
 
         if (is_asic_initialized) {
@@ -187,6 +257,35 @@ void hashrate_monitor_task(void *pvParameters)
             pthread_mutex_lock(&HASHRATE_MONITOR_MODULE->lock);
             float current_hashrate = sum_hashrates(HASHRATE_MONITOR_MODULE->total_measurement, asic_count);
             float error_hashrate = sum_hashrates(HASHRATE_MONITOR_MODULE->error_measurement, asic_count);
+
+            uint64_t now_us = esp_timer_get_time();
+            uint64_t stall_timeout_us = (uint64_t)DOMAIN_STALL_POLLS * 1000000ULL;
+            bool check_unresponsive = !GLOBAL_STATE->SELF_TEST_MODULE.is_active &&
+                                      !SYSTEM_MODULE->mining_paused &&
+                                      ((xTaskGetTickCount() - asic_initialized_ticks) * portTICK_PERIOD_MS >= 15000);
+
+            if (check_unresponsive) {
+                for (int i = 0; i < asic_count; i++) {
+                    for (int j = 0; j < hash_domains; j++) {
+                        measurement_t *m = &HASHRATE_MONITOR_MODULE->domain_measurements[i][j];
+                        if (m->time_us == 0) {
+                            if (HASHRATE_MONITOR_MODULE->domain_stall_counts[i][j] < DOMAIN_STALL_POLLS) {
+                                HASHRATE_MONITOR_MODULE->domain_stall_counts[i][j]++;
+                            }
+                        } else if (now_us > m->time_us && (now_us - m->time_us) >= stall_timeout_us) {
+                            HASHRATE_MONITOR_MODULE->domain_stall_counts[i][j] = DOMAIN_STALL_POLLS;
+                        }
+
+                        if (HASHRATE_MONITOR_MODULE->domain_stall_counts[i][j] >= DOMAIN_STALL_POLLS) {
+                            m->hashrate = 0.0f;
+                            if (!HASHRATE_MONITOR_MODULE->domain_stalled[i][j]) {
+                                ESP_LOGW(TAG, "ASIC %d domain %d unresponsive / stalled", i, j);
+                                HASHRATE_MONITOR_MODULE->domain_stalled[i][j] = true;
+                            }
+                        }
+                    }
+                }
+            }
             pthread_mutex_unlock(&HASHRATE_MONITOR_MODULE->lock);
 
             SYSTEM_MODULE->current_hashrate = current_hashrate;
@@ -235,7 +334,7 @@ void hashrate_monitor_register_read(void *pvParameters, register_type_t register
         case REGISTER_DOMAIN_7_COUNT: {
             uint8_t domain_idx = register_type - REGISTER_DOMAIN_0_COUNT;
             if (domain_idx < GLOBAL_STATE->DEVICE_CONFIG.family.asic.hash_domains) {
-                update_hash_counter(&HASHRATE_MONITOR_MODULE->domain_measurements[asic_nr][domain_idx], value, timestamp_us);
+                update_domain_hash_counter(HASHRATE_MONITOR_MODULE, asic_nr, domain_idx, value, timestamp_us);
             }
             break;
         }
