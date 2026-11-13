@@ -17,6 +17,7 @@ import { DiffSuffixPipe } from 'src/app/pipes/diff-suffix.pipe';
 import { DateAgoPipe } from 'src/app/pipes/date-ago.pipe';
 import { AddressPipe } from 'src/app/pipes/address.pipe';
 import { SatsPipe } from 'src/app/pipes/sats.pipe';
+import { TranslatePipe } from 'src/app/i18n/translate.pipe';
 
 describe('SwarmComponent', () => {
   let component: SwarmComponent;
@@ -36,6 +37,7 @@ describe('SwarmComponent', () => {
         DateAgoPipe,
         AddressPipe,
         SatsPipe,
+        TranslatePipe,
         SwarmComponent,
         ModalComponent,
         TooltipTextIconComponent
@@ -65,12 +67,12 @@ describe('SwarmComponent', () => {
 
   it('uses each peer\'s own presets for low and normal frequencies', () => {
     expect(component.getDeviceNotification({ frequency: 150, frequencyOptions: [100, 200] })).toBeUndefined();
-    expect(component.getDeviceNotification({ frequency: 150, frequencyOptions: [200, 300] })?.msg).toBe('Frequency Low');
+    expect(component.getDeviceNotification({ frequency: 150, frequencyOptions: [200, 300] })?.msg).toBe('Low frequency');
   });
 
   it('does not guess a minimum for a legacy peer or hide higher-priority faults', () => {
     expect(component.getDeviceNotification({ frequency: 100 })).toBeUndefined();
-    expect(component.getDeviceNotification({ frequency: 0 })?.msg).toBe('Frequency Low');
+    expect(component.getDeviceNotification({ frequency: 0 })?.msg).toBe('Low frequency');
     expect(component.getDeviceNotification({ frequency: 100, frequencyOptions: [200], overheat_mode: 1 })?.msg).toBe('Overheated');
     expect(component.getDeviceNotification({ frequency: 100, frequencyOptions: [200], miningPaused: true })?.msg).toBe('Paused');
   });

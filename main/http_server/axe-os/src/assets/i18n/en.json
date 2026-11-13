@@ -1,0 +1,570 @@
+{
+  "nav": {
+    "menu": "Menu",
+    "dashboard": "Dashboard",
+    "swarm": "Swarm",
+    "logs": "Logs",
+    "system": "System",
+    "pool": "Pool",
+    "scoreboard": "Scoreboard",
+    "network": "Network",
+    "theme": "Theme",
+    "settings": "Settings",
+    "update": "Update",
+    "whitepaper": "Whitepaper"
+  },
+  "actions": {
+    "restart": "Restart",
+    "identify": "Identify",
+    "identify_device": "Identify device",
+    "disable_overheat_mode": "Disable Overheat Mode",
+    "disable_overclock_mode": "Disable Overclock Mode",
+    "save": "Save",
+    "scan_wifi": "Scan Wi-Fi",
+    "open_pool_dashboard": "Open pool dashboard",
+    "open_pool_dashboard_new_tab": "Open pool dashboard in new tab",
+    "choose_certificate": "Choose a certificate file",
+    "show_advanced_options": "Show Advanced Options",
+    "hide_advanced_options": "Hide Advanced Options",
+    "check": "Check",
+    "continue": "Continue",
+    "cancel": "Cancel",
+    "browse": "Browse",
+    "start": "Start",
+    "stop": "Stop",
+    "clear": "Clear",
+    "list_view": "List view",
+    "grid_view": "Grid view",
+    "auto_scan": "Auto-scan",
+    "scanning": "Scanning…",
+    "refresh": "Refresh",
+    "refreshing": "Refreshing…",
+    "add": "Add",
+    "edit": "Edit",
+    "remove": "Remove",
+    "clear_logs": "Clear Logs",
+    "minimize": "Minimize",
+    "maximize": "Maximize",
+    "close": "Close",
+    "verify": "Verify",
+    "download_logs": "Download Logs",
+    "dismiss": "Dismiss",
+    "pause_mining": "Pause Mining",
+    "resume_mining": "Resume Mining"
+  },
+  "common": {
+    "app_name": "AxeOS",
+    "hostname": "Hostname",
+    "ip": "IP",
+    "version": "Version",
+    "uptime": "Uptime",
+    "sensitive_data_hidden": "Sensitive data hidden",
+    "sensitive_data_visible": "Sensitive data visible",
+    "wifi_rssi": "Wi-Fi RSSI: {value} dBm",
+    "no_value": "--",
+    "filter": "Filter",
+    "total_devices": "Total devices",
+    "add_device_by_ip": "Add device by IP",
+    "this_device": "This device",
+    "other": "Other",
+    "default": "Default",
+    "custom": "Custom",
+    "error": "Error",
+    "expected": "Expected",
+    "average": "Average",
+    "url": "URL",
+    "user": "User",
+    "warning": "Warning",
+    "password": "Password",
+    "dont_show_again": "Don't show again",
+    "scrolling": "Scrolling",
+    "logs": "Logs",
+    "message": "Message",
+    "mode": "Mode",
+    "amount": "Amount",
+    "actions": "Actions",
+    "active": "Active",
+    "total_uptime": "Total Uptime",
+    "tls": "TLS",
+    "restart_device_confirm": "Are you sure you want to restart the device?",
+    "address": "Address",
+    "paused": "Paused"
+  },
+  "messages": {
+    "restart_required": "You must restart this device after saving for changes to take effect.",
+    "network_saved": "Saved network settings",
+    "settings_saved": "Saved settings",
+    "settings_saved_for": "Saved settings for {uri}",
+    "device_restarted": "Device restarted",
+    "device_restarted_at": "Device at {uri} restarted",
+    "device_already_in_swarm": "Device already in swarm",
+    "device_at": "Device at {ip}",
+    "restart_soon": "Restarting soon",
+    "identify_signal_sent": "Identify signal sent",
+    "power_fault_unavailable": "Not available - Power fault",
+    "block_found": "Today is your lucky day! Your device has found a block 🎉",
+    "block_found_title": "Block found 🎉",
+    "block_found_short": "Block found",
+    "danger_low_voltage": "Danger: Low Voltage",
+    "danger_high_temperature": "Danger: High Temperature",
+    "pool_changed_restart": "Pool changed and device restarted",
+    "pool_saved": "Saved pool settings",
+    "pool_saved_for": "Saved pool settings for {uri}",
+    "default_btc_address_warning_prefix": "You are using the default factory Bitcoin address. Please change the",
+    "default_btc_address_warning_suffix": "field to your own Bitcoin address to receive mining rewards.",
+    "release_check_notice_prefix": "Please note, this will connect to",
+    "release_check_notice_suffix": "to check for the latest release.",
+    "firmware_updated": "Firmware updated. Device has been successfully restarted.",
+    "no_matches": "No matches",
+    "swarm_empty": "No devices found",
+    "overheated_short": "Overheated",
+    "power_fault_short": "Power fault",
+    "frequency_low_short": "Low frequency",
+    "fallback_pool_short": "Fallback pool",
+    "device_overheated": "Device has overheated - See settings",
+    "power_fault_check": "{fault} Check your Power Supply.",
+    "frequency_low": "Device frequency is set low - See settings",
+    "fallback_pool": "Using fallback pool - Share stats reset. Check Pool Settings and / or reboot Device.",
+    "block_found_dismissed": "Block found notification dismissed"
+  },
+  "errors": {
+    "save_failed": "Could not save. {error}",
+    "save_failed_for": "Could not save settings for {uri}. {error}",
+    "restart_failed": "Could not restart. {error}",
+    "wifi_scan_failed": "Failed to scan Wi-Fi networks",
+    "error_title": "Error",
+    "chart_source_save_failed": "Could not save chart source. {error}",
+    "pool_change_failed": "Error during pool change or device restart: {error}",
+    "device_unreachable": "Unable to reach the device",
+    "device_unreachable_for": "Unable to reach the device for {duration}",
+    "pool_save_failed": "Could not save pool settings. {error}",
+    "pool_save_failed_for": "Could not save pool settings for {uri}. {error}",
+    "restart_failed_for": "Failed to restart device at {uri}. {error}",
+    "certificate_read_failed": "Failed to read certificate file",
+    "invalid_certificate": "Please enter a valid SSL/TLS certificate",
+    "incorrect_file": "Incorrect file, looking for {expected}.",
+    "unknown_error": "Unknown error occurred",
+    "request_timeout": "Request timed out",
+    "device_info_failed": "Could not load device info. {error}",
+    "device_action_failed": "Action failed: {action}",
+    "device_action_failed_detail": "Action failed: {action}. {error}",
+    "websocket_connection_failed": "Error opening websocket connection",
+    "identify_failed": "Could not identify device. {error}",
+    "redirect_failed": "Failed to redirect due to invalid URL.",
+    "mining_state_failed": "Failed to change mining state",
+    "pool_delete_active": "Cannot delete a pool that is currently selected as primary or fallback."
+  },
+  "settings": {
+    "title": "Settings",
+    "network": {
+      "title": "Network Configuration",
+      "hostname_help": "Name of the device on your local network",
+      "wifi_ssid": "Wi-Fi SSID",
+      "wifi_password": "Wi-Fi Password",
+      "wifi_password_placeholder": "Enter Wi-Fi password",
+      "select_wifi_title": "Select Wi-Fi Network"
+    },
+    "theme": {
+      "title": "Theme Configuration",
+      "color_scheme": "Color Scheme",
+      "dark": "Dark",
+      "light": "Light",
+      "theme_colors": "Theme Colors"
+    },
+    "ui": {
+      "title": "UI",
+      "language": "Language",
+      "languages": {
+        "en": "English",
+        "de": "German",
+        "es": "Spanish"
+      }
+    },
+    "pool": {
+      "title": "Pool Configuration",
+      "fallback_title": "Fallback Pool Configuration",
+      "stratum_host": "Stratum Host",
+      "stratum_port": "Stratum Port",
+      "suggested_difficulty": "Suggested Difficulty",
+      "suggested_difficulty_help": "Used to indicate a preference for share difficulty to the pool. Servers are not required to honour this request, even if they support the stratum method. (0 to disable)",
+      "extranonce_subscribe": "Enable Extranonce Subscribe",
+      "extranonce_subscribe_help": "Indicates to the server that the client supports the mining.set_extranonce method. Required by some pools, check the pool documentation.",
+      "connection_security": "Connection Security",
+      "certificate": "Certificate",
+      "certificate_placeholder": "Enter or choose a certificate file (.pem, .crt, .cer)",
+      "tls_none": "No TLS",
+      "tls_system": "TLS (System certificate)",
+      "tls_custom": "TLS (Custom CA certificate)",
+      "active_selection": "Active Pool Selection",
+      "primary_pool": "Primary Pool",
+      "fallback_pool": "Fallback Pool",
+      "configurations": "Pool Configurations",
+      "delete_pool": "Delete Pool",
+      "stratum_protocol": "Stratum Protocol",
+      "stratum_protocol_help": "Select Stratum protocol version. Note: Not all pools support Stratum V2.",
+      "sv2_channel_type": "SV2 Channel Type",
+      "sv2_channel_type_help": "Extended Channels are recommended for external pools — the pool sends the coinbase template so the miner can verify it. Standard Channels should only be used with a locally deployed SV2 node or JD client.",
+      "sv2_authority_pubkey": "SV2 Authority Pubkey",
+      "sv2_authority_pubkey_help": "The pool operator provides this key to prove you are connecting to the real pool and not an impersonator. Without it, the connection is still encrypted but a man-in-the-middle attack could redirect your hashrate.",
+      "sv2_authority_pubkey_placeholder": "Enter base58-encoded authority public key (optional, e.g., 9auqWEzQ...)",
+      "require_authentication": "Require Authentication",
+      "require_authentication_help": "Refuse to connect unless the server certificate is verified against the Authority Pubkey above. Protects against the man-in-the-middle redirect described for the Authority Pubkey. When enabled without a key set, the miner will not connect.",
+      "decode_coinbase_tx": "Decode Coinbase Tx",
+      "decode_coinbase_tx_help": "Enable decoding of the coinbase transaction to show payout addresses. Disable when mining on non-Bitcoin chains.",
+      "share_warning": "Share Warning",
+      "share_warning_help": "Warn on the dashboard when your share of the coinbase reward is low. Disable for pools that pay miners directly through many coinbase outputs."
+    },
+    "device": {
+      "custom_settings_warning": "Custom settings can cause damage and system instability. Only change these settings if you understand the risks of running outside designed parameters.",
+      "frequency": "Frequency",
+      "core_voltage": "Core Voltage",
+      "overheat_reset_hint": "Reset Frequency and Voltage before clicking this button.",
+      "automatic_fan_control": "Automatic Fan Control",
+      "target_temperature": "Target Temperature",
+      "minimum_fan_speed": "Minimum Fan Speed",
+      "fan_speed": "Fan Speed",
+      "danger_overheating": "Danger: Could Cause Overheating",
+      "s19_simulator": "S19 Simulator",
+      "overclock_reset_tooltip": "Return to safe preset values only",
+      "display": {
+        "title": "Display",
+        "label": "Display",
+        "type": "Type",
+        "rotation": "Rotation",
+        "sleep": "Sleep",
+        "always_off": "Always Off",
+        "always_on": "Always On",
+        "timeout": "Timeout: {time}",
+        "invert_colors": "Invert Display Colors",
+        "none": "None"
+      },
+      "stats": {
+        "title": "Statistics",
+        "data_logging": "Data Logging",
+        "disabled": "Disabled",
+        "log_data": "Log Data",
+        "every_for": "Every {every} for {duration}"
+      }
+    }
+  },
+  "miner": {
+    "hashrate": "Hashrate",
+    "efficiency": "Efficiency",
+    "shares": "Shares",
+    "shares_accepted": "Shares accepted",
+    "shares_rejected": "Shares rejected",
+    "rejected": "rejected",
+    "total_hashrate": "Total hashrate",
+    "total_power": "Total power",
+    "best_difficulty": "Best Difficulty",
+    "best_diff": "Best diff",
+    "all_time_best": "all-time best",
+    "session_best": "session best",
+    "best_session_diff": "Session best",
+    "chance_to_find_block": "Chance to find a Block",
+    "power": "Power",
+    "input_voltage": "Input Voltage",
+    "asic_frequency": "ASIC Frequency",
+    "asic_voltage_measured": "Measured ASIC Voltage",
+    "heat": "Heat",
+    "temp": "Temp",
+    "asic_temperature": "ASIC Temperature",
+    "asic_temperature_1": "ASIC Temperature 1",
+    "asic_temperature_2": "ASIC Temperature 2",
+    "voltage_regulator_temperature": "Voltage Regulator Temperature",
+    "fan": "Fan",
+    "fan_speed": "Fan Speed",
+    "fan_rpm": "Fan RPM",
+    "fan_1_rpm": "Fan 1 RPM",
+    "fan_2_rpm": "Fan 2 RPM",
+    "pool": "Pool",
+    "pool_primary": "Primary",
+    "pool_fallback": "Fallback",
+    "pool_response_time": "Time",
+    "pool_response_time_help": "Time it takes for the pool to respond to a share",
+    "difficulty": "Difficulty",
+    "pool_diff": "Pool diff",
+    "block_header": "Block Header",
+    "block_height": "Height",
+    "scriptsig": "Scriptsig",
+    "hashrate_registers": "Hashrate Registers",
+    "asic": "ASIC",
+    "domain": "Domain",
+    "domains": "Domains",
+    "asic_error_count": "Error count: {count}",
+    "asic_error_count_with_index": "ASIC {index} - Error count: {count}",
+    "misc": "Misc",
+    "hashes": "Hashes",
+    "hashes_help": "Approximate number of your total accumulated hashes (personal mining effort).",
+    "hashes_total_tooltip": "{count} total hashes",
+    "work_received": "Work Received",
+    "pool_response_batched": "batched ×{count}",
+    "pool_response_batched_help": "The pool acknowledged {count} shares in one batch; the time reflects the most recent share, so it may include the pool's batching window",
+    "coinbase_value": "Value",
+    "coinbase_value_help": "Total value of transaction outputs in BTC. For non-bitcoin chains, disable 'Decode Coinbase Tx' in Advanced Pool Options.",
+    "coinbase_outputs": "Outputs",
+    "coinbase_your_payout": "Your payout address",
+    "coinbase_others_help": "Further payout outputs, not listed individually",
+    "coinbase_other_recipient": "other recipient",
+    "coinbase_other_recipients": "other recipients",
+    "coinbase_fee": "Fee",
+    "coinbase_fee_help": "Percentage of the bitcoin block reward that will be paid out to the pool if you find a block.",
+    "coinbase_share": "Share",
+    "coinbase_share_help": "Percentage of the bitcoin block reward that will be paid out to your address if you find a block.",
+    "hash_error_help": "Hash error percentage as reported by the ASIC. A small amount of errors every few seconds is normal. Frequency changes, agressive overclocking, undervoltage or a bad power supply can significantly increase the error rate."
+  },
+  "device": {
+    "system": {
+      "title": "System",
+      "device_model": "Device Model",
+      "other": "Other",
+      "board_version": "Board Version",
+      "asic_type": "ASIC Type",
+      "uptime": "Uptime",
+      "reset_reason": "Reset Reason",
+      "wifi_ssid": "Wi-Fi SSID",
+      "wifi_status": "Wi-Fi Status",
+      "wifi_rssi": {
+        "label": "Wi-Fi RSSI",
+        "excellent": "Excellent",
+        "good": "Good",
+        "fair": "Fair",
+        "weak": "Weak"
+      },
+      "wifi_ipv4": "Wi-Fi IPv4",
+      "wifi_ipv6": "Wi-Fi IPv6",
+      "mac_address": "MAC Address",
+      "free_heap": "Free Heap Memory",
+      "free_heap_internal": "• Internal",
+      "free_heap_spiram": "• Spiram",
+      "firmware_version": "Firmware Version",
+      "axeos_version": "AxeOS Version",
+      "idf_version": "ESP-IDF Version"
+    },
+    "update": {
+      "title": "Update",
+      "current_version": "Current Version",
+      "latest_release": "Latest Release",
+      "privacy_warning_title": "Privacy Warning",
+      "release_notes": "Release Notes",
+      "axeos": "Update AxeOS",
+      "firmware": "Update Firmware",
+      "firmware_integrity": "Firmware Integrity",
+      "firmware_integrity_help": "Compares the SHA-256 of the running firmware with the official esp-miner.bin of the same release.",
+      "checksum_computing": "Computing checksum...",
+      "checksum_matches_prefix": "Matches the official",
+      "checksum_matches_suffix": "release",
+      "checksum_mismatch_prefix": "Does not match the official",
+      "checksum_mismatch_suffix": "release",
+      "no_release_found": "No official release found for {version}. This is likely a development or custom build.",
+      "no_digest": "The {version} release does not provide a checksum for esp-miner.bin.",
+      "device_checksum": "Device ({partition}):",
+      "release_checksum": "Release",
+      "custom_frontend": "Custom Frontend",
+      "enable_custom_www": "Enable custom web UI",
+      "custom_www_restart_hint": "* A device restart is required to apply this change.",
+      "custom_www_incompatible_hint_prefix": "If an incompatible custom UI is loaded, visit",
+      "custom_www_incompatible_hint_suffix": "to disable Custom Frontend",
+      "upload_custom_www": "Upload Custom UI",
+      "installed_firmware": "Installed Firmware",
+      "partition": "Partition",
+      "build_time": "Build time",
+      "space": "Space",
+      "activate": "Activate",
+      "updating_target": "Updating {target}",
+      "restart_device": "Restart Device"
+    },
+    "network": {
+      "time_sync": "Enable Time Sync",
+      "time_sync_help": "Your device will sync with a DHCP-provided NTP server, or the nearest if not provided"
+    }
+  },
+  "units": {},
+  "chart": {
+    "hashrate": "Hashrate",
+    "hashrate_1m": "Hashrate 1m",
+    "hashrate_10m": "Hashrate 10m",
+    "hashrate_1h": "Hashrate 1h",
+    "asicTemp": "ASIC Temp",
+    "errorPercentage": "Error %",
+    "vrTemp": "VR Temp",
+    "asicVoltage": "ASIC Voltage",
+    "voltage": "Voltage",
+    "power": "Power",
+    "current": "Current",
+    "fanSpeed": "Fan Speed",
+    "fanRpm": "Fan RPM",
+    "fan2Rpm": "Fan 2 RPM",
+    "wifiRssi": "Wi-Fi RSSI",
+    "freeHeap": "Free Heap",
+    "responseTime": "Response Time",
+    "none": "None"
+  },
+  "logs": {
+    "realtime_title": "Realtime Logs",
+    "case_sensitive_filter": "Case-sensitive filter"
+  },
+  "share_rejection": {
+    "Above target": {
+      "label": "Above target",
+      "explanation": "The submitted share does not meet the minimum required difficulty."
+    },
+    "Authorization validation error": {
+      "label": "Authorization validation error",
+      "explanation": "The credentials provided by the miner were incorrect or not authorized."
+    },
+    "Configuration validation error": {
+      "label": "Configuration validation error",
+      "explanation": "Invalid mining configuration or settings sent by the miner."
+    },
+    "Difficulty too low": {
+      "label": "Difficulty too low",
+      "explanation": "{{share_rejection.difficulty-too-low.explanation}}"
+    },
+    "difficulty-too-low": {
+      "label": "Difficulty too low",
+      "explanation": "The submitted share does not meet the minimum required difficulty."
+    },
+    "Duplicate": {
+      "label": "Duplicate",
+      "explanation": "This share has already been submitted."
+    },
+    "Duplicate share": {
+      "label": "Duplicate share",
+      "explanation": "{{share_rejection.Duplicate.explanation}}"
+    },
+    "Invalid array size": {
+      "label": "Invalid array size",
+      "explanation": "The JSON array parameters had an unexpected size."
+    },
+    "Invalid authorization message": {
+      "explanation": "The miner's mining.authorize request was malformed."
+    },
+    "Invalid Bitcoin address": {
+      "explanation": "The submitted username is not a valid Bitcoin address."
+    },
+    "Invalid configuration message": {
+      "explanation": "The miner's mining.configure request was malformed."
+    },
+    "Invalid JobID": {
+      "label": "Invalid JobID",
+      "explanation": "{{share_rejection.invalid-job-id.explanation}}"
+    },
+    "Invalid mining submit message": {
+      "explanation": "The mining.submit request was malformed."
+    },
+    "Invalid nonce2 length": {
+      "label": "Invalid nonce2 length",
+      "explanation": "The nonce2 value does not match the expected length for this mining job."
+    },
+    "Invalid subscription message": {
+      "explanation": "The miner's mining.subscribe request was malformed."
+    },
+    "Invalid suggest difficulty message": {
+      "explanation": "The mining.suggest_difficulty request was malformed."
+    },
+    "Invalid version mask": {
+      "label": "Invalid version mask",
+      "explanation": "The version mask provided was invalid for this job."
+    },
+    "invalid-channel-id": {
+      "explanation": "The SV2 channel ID in the share submission is not known to the pool."
+    },
+    "invalid-job-id": {
+      "label": "Invalid JobID",
+      "explanation": "The job ID in the submission was not recognized or is no longer valid."
+    },
+    "Job not found": {
+      "label": "Job not found",
+      "explanation": "{{share_rejection.invalid-job-id.explanation}}"
+    },
+    "Mining Submit validation error": {
+      "label": "Mining Submit validation error",
+      "explanation": "The submitted mining work was invalid or improperly formatted."
+    },
+    "No job_id": {
+      "label": "No job_id",
+      "explanation": "The submission did not specify a job ID."
+    },
+    "No nonce": {
+      "label": "No nonce",
+      "explanation": "The share submission was missing a nonce value."
+    },
+    "No nonce2": {
+      "label": "No nonce2",
+      "explanation": "The submission did not include the nonce2 value."
+    },
+    "No ntime": {
+      "label": "No ntime",
+      "explanation": "The submission was missing the network time (ntime)."
+    },
+    "No username": {
+      "label": "No username",
+      "explanation": "The submission was missing a username (worker name)."
+    },
+    "Not subscribed": {
+      "explanation": "This connection has not subscribed — submit mining.subscribe first."
+    },
+    "Ntime out of range": {
+      "label": "Ntime out of range",
+      "explanation": "The provided ntime value was outside the allowed range."
+    },
+    "Params not array": {
+      "label": "Params not array",
+      "explanation": "The parameters field was not formatted as a JSON array."
+    },
+    "Stale": {
+      "label": "Stale",
+      "explanation": "While this share was being submitted, the network had already found a new block, making this share invalid."
+    },
+    "stale": {
+      "label": "{{share_rejection.Stale.label}}",
+      "explanation": "{{share_rejection.Stale.explanation}}"
+    },
+    "stale-share": {
+      "label": "{{share_rejection.Stale.label}}",
+      "explanation": "{{share_rejection.Stale.explanation}}"
+    },
+    "Subscription validation error": {
+      "label": "Subscription validation error",
+      "explanation": "The miner's subscription request was invalid or malformed."
+    },
+    "Suggest difficulty is disabled for this connection": {
+      "explanation": "This pool port does not allow miners to suggest a difficulty."
+    },
+    "Suggest difficulty validation error": {
+      "label": "Suggest difficulty validation error",
+      "explanation": "An invalid difficulty value was suggested by the miner."
+    },
+    "Unauthorized worker": {
+      "explanation": "This worker has not been authorized — submit mining.authorize first."
+    },
+    "Valid": {
+      "label": "Valid",
+      "explanation": "This is not a rejection reason - it indicates a valid share."
+    },
+    "Worker mismatch": {
+      "label": "Worker mismatch",
+      "explanation": "The worker name sent does not match the expected or authenticated worker."
+    }
+  },
+  "widgets": {
+    "title": "Widgets"
+  },
+  "layout": {
+    "edit": "Edit Layout",
+    "save": "Save Layout",
+    "reset": "Reset Layout",
+    "standard_width": "Standard Width",
+    "wide_view": "Wide View"
+  },
+  "scoreboard": {
+    "rank": "Rank",
+    "difficulty": "Difficulty",
+    "job_id": "Job ID",
+    "extranonce2": "ExtraNonce2",
+    "time": "Time",
+    "nonce": "Nonce",
+    "version_bits": "Version Bits"
+  }
+}

@@ -13,11 +13,13 @@ import { TooltipDirective } from '../directives/tooltip.directive';
 import { WifiIconComponent } from '../components/wifi-icon/wifi-icon.component';
 import { CheckboxComponent } from '../components/checkbox/checkbox.component';
 import { FormsModule } from '@angular/forms';
+import { I18nService } from 'src/app/i18n/i18n.service';
+import { TranslatePipe } from 'src/app/i18n/translate.pipe';
 
 @Component({
   selector: 'app-topbar',
   templateUrl: './app.topbar.component.html',
-  imports: [RouterLink, TooltipDirective, WifiIconComponent, CheckboxComponent, FormsModule, AsyncPipe]
+  imports: [RouterLink, TooltipDirective, WifiIconComponent, CheckboxComponent, FormsModule, AsyncPipe, TranslatePipe]
 })
 export class AppTopBarComponent implements OnInit, OnDestroy {
   private destroy$ = new Subject<void>();
@@ -38,6 +40,7 @@ export class AppTopBarComponent implements OnInit, OnDestroy {
     private toastr: ToastrService,
     private sensitiveData: SensitiveData,
     public dashboardEdit: DashboardEditService,
+    private i18n: I18nService,
   ) {
     this.info$ = this.liveDataService.info$;
   }
@@ -75,15 +78,15 @@ export class AppTopBarComponent implements OnInit, OnDestroy {
         this.isMiningPaused = newPausedState;
         this.toastr.success(response.message);
       },
-      error: () => this.toastr.error('Failed to change mining state')
+      error: () => this.toastr.error(this.i18n.t('errors.mining_state_failed'))
     });
   }
 
   public restart() {
-    if (confirm('Are you sure you want to restart the device?')) {
+    if (confirm(this.i18n.t('common.restart_device_confirm'))) {
       this.systemService.restart().subscribe({
-        next: () => this.toastr.success('Device restarted'),
-        error: () => this.toastr.error('Restart failed')
+        next: () => this.toastr.success(this.i18n.t('messages.device_restarted')),
+        error: () => this.toastr.error(this.i18n.t('errors.restart_failed', { error: '' }))
       });
     }
   }

@@ -16,6 +16,8 @@ import { EditComponent } from '../edit/edit.component';
 import { DateAgoPipe } from '../../pipes/date-ago.pipe';
 import { HashSuffixPipe } from '../../pipes/hash-suffix.pipe';
 import { DiffSuffixPipe } from '../../pipes/diff-suffix.pipe';
+import { I18nService } from 'src/app/i18n/i18n.service';
+import { TranslatePipe } from 'src/app/i18n/translate.pipe';
 
 const SWARM_DATA = 'SWARM_DATA';
 const SWARM_VERSION = 'SWARM_VERSION';
@@ -66,7 +68,7 @@ type SwarmDevice = {
   selector: 'app-swarm',
   templateUrl: './swarm.component.html',
   styleUrls: ['./swarm.component.scss'],
-  imports: [FormsModule, TooltipDirective, ReactiveFormsModule, SliderComponent, ModalComponent, EditComponent, DecimalPipe, DateAgoPipe, HashSuffixPipe, DiffSuffixPipe]
+  imports: [FormsModule, TooltipDirective, ReactiveFormsModule, SliderComponent, ModalComponent, EditComponent, DecimalPipe, DateAgoPipe, HashSuffixPipe, DiffSuffixPipe, TranslatePipe]
 })
 export class SwarmComponent implements OnInit, OnDestroy {
 
@@ -129,7 +131,8 @@ export class SwarmComponent implements OnInit, OnDestroy {
     private localStorageService: LocalStorageService,
     public layoutService: LayoutService,
     private systemService: SystemApiService,
-    private httpClient: HttpClient
+    private httpClient: HttpClient,
+    private i18n: I18nService
   ) {
 
     this.form = this.fb.group({
@@ -412,7 +415,7 @@ private isIpAddress(value: string): boolean {
           return of({ _corsError: 401 });
         }
         if (error.name === 'TimeoutError') {
-          this.toastr.error(`Request timed out - device at ${address} did not respond.`, `Device at ${address}`);
+          this.toastr.error(this.i18n.t('errors.request_timeout'), this.i18n.t('messages.device_at', { ip: address }));
           return of(null);
         }
         throw error;
@@ -440,7 +443,10 @@ private isIpAddress(value: string): boolean {
       const { info, asic, ipv4 } = result;
 
       if (ipv4 && this.swarm.some(item => item.connectionAddress === ipv4)) {
-        this.toastr.warning('Device already added to the swarm.', `Device at ${address}`);
+        this.toastr.warning(
+          this.i18n.t('messages.device_already_in_swarm'),
+          this.i18n.t('messages.device_at', { ip: address })
+        );
         return;
       }
 
@@ -466,7 +472,7 @@ private isIpAddress(value: string): boolean {
   }
 
   public postAction(device: any, action: string) {
-    if (action === 'restart' && !confirm('Are you sure you want to restart the device?')) {
+    if (action === 'restart' && !confirm(this.i18n.t('common.restart_device_confirm'))) {
       return;
     }
     this.httpClient.post(`http://${device.connectionAddress}/api/system/${action}`, {}, { responseType: 'text' }).pipe(
@@ -474,25 +480,25 @@ private isIpAddress(value: string): boolean {
       catchError(error => {
         if ((action === 'restart' || action === 'identify') && (error.status === 200 || error.status === 0 || error.name === 'HttpErrorResponse' || error.statusText === 'Unknown Error')) {
           if (action === 'restart') {
-            return of('System will restart shortly');
+            return of(this.i18n.t('messages.restart_soon'));
           } else {
-            return of('Identify signal sent - device should say "Hi!"');
+            return of(this.i18n.t('messages.identify_signal_sent'));
           }
         }
-        let errorMsg = `Failed to ${action} device at ${this.getDeviceDisplayName(device)}`;
+        let errorMsg = this.i18n.t('errors.device_action_failed', { action: this.getActionLabel(action) });
         if (error.name === 'TimeoutError') {
-          errorMsg = 'Request timed out';
+          errorMsg = this.i18n.t('errors.request_timeout');
         } else if (error.message) {
-          errorMsg += `: ${error.message}`;
+          errorMsg = this.i18n.t('errors.device_action_failed_detail', { action: this.getActionLabel(action), error: error.message });
         }
-        this.toastr.error(errorMsg, `Device at ${this.getDeviceDisplayName(device)}`);
+        this.toastr.error(errorMsg, this.i18n.t('messages.device_at', { ip: this.getDeviceDisplayName(device) }));
         return of(null);
       })
     ).subscribe((res: any) => {
       if (res !== null) {
         let message = res;
         try { message = JSON.parse(res)?.message ?? res; } catch {}
-        this.toastr.success(message, `Device at ${this.getDeviceDisplayName(device)}`);
+        this.toastr.success(message, this.i18n.t('messages.device_at', { ip: this.getDeviceDisplayName(device) }));
         this.refreshList(false);
       }
     });
@@ -505,8 +511,11 @@ private isIpAddress(value: string): boolean {
   }
 
   public refreshErrorHandler = (error: any, address: string) => {
-    const errorMessage = error?.message || error?.statusText || error?.toString() || 'Unknown error';
-    this.toastr.error(`Failed to get info: ${errorMessage}`, `Device at ${address}`);
+    const errorMessage = error?.message || error?.statusText || error?.toString() || this.i18n.t('errors.unknown_error');
+    this.toastr.error(
+      this.i18n.t('errors.device_info_failed', { error: errorMessage }),
+      this.i18n.t('messages.device_at', { ip: address })
+    );
     const existingDevice = this.swarm.find(axeOs => axeOs.connectionAddress === address);
     return of({
       ...existingDevice,
@@ -652,7 +661,7 @@ private isIpAddress(value: string): boolean {
       if (data.boardVersion[0] == "6") return "Gamma";
       if (data.boardVersion[0] == "8") return "GammaTurbo";
     }
-    return 'Other';
+    return this.i18n.t('common.other');
   }
 
   private deriveSwarmColor(deviceModel: string): string {
@@ -711,7 +720,7 @@ private isIpAddress(value: string): boolean {
   }
 
   public stringifyDeviceLabel(data: any): string {
-    const model = data.deviceModel || 'Other';
+    const model = data.deviceModel || this.i18n.t('common.other');
     const asicCountPart = data.asicCount > 1 ? data.asicCount + 'x ' : '';
     const asicModel = data.ASICModel || '';
 
@@ -724,27 +733,28 @@ private isIpAddress(value: string): boolean {
   }
 
   get sortOptions() {
+    const t = (key: string) => this.i18n.t(key);
     return [
-      { label: 'Hostname', value: { sortField: 'hostname', sortDirection: 'desc' } },
-      { label: 'Hostname', value: { sortField: 'hostname', sortDirection: 'asc' } },
+      { label: t('common.hostname'), value: { sortField: 'hostname', sortDirection: 'desc' } },
+      { label: t('common.hostname'), value: { sortField: 'hostname', sortDirection: 'asc' } },
       { label: 'Address', value: { sortField: 'address', sortDirection: 'desc' } },
       { label: 'Address', value: { sortField: 'address', sortDirection: 'asc' } },
-      { label: 'Hashrate', value: { sortField: 'hashRate', sortDirection: 'desc' } },
-      { label: 'Hashrate', value: { sortField: 'hashRate', sortDirection: 'asc' } },
-      { label: 'Shares', value: { sortField: 'sharesAccepted', sortDirection: 'desc' } },
-      { label: 'Shares', value: { sortField: 'sharesAccepted', sortDirection: 'asc' } },
-      { label: 'Best Diff', value: { sortField: 'bestDiff', sortDirection: 'desc' } },
-      { label: 'Best Diff', value: { sortField: 'bestDiff', sortDirection: 'asc' } },
-      { label: 'Uptime', value: { sortField: 'uptimeSeconds', sortDirection: 'desc' } },
-      { label: 'Uptime', value: { sortField: 'uptimeSeconds', sortDirection: 'asc' } },
-      { label: 'Power', value: { sortField: 'power', sortDirection: 'desc' } },
-      { label: 'Power', value: { sortField: 'power', sortDirection: 'asc' } },
-      { label: 'Temp', value: { sortField: 'temp', sortDirection: 'desc' } },
-      { label: 'Temp', value: { sortField: 'temp', sortDirection: 'asc' } },
-      { label: 'Pool Diff', value: { sortField: 'poolDifficulty', sortDirection: 'desc' } },
-      { label: 'Pool Diff', value: { sortField: 'poolDifficulty', sortDirection: 'asc' } },
-      { label: 'Version', value: { sortField: 'version', sortDirection: 'desc' } },
-      { label: 'Version', value: { sortField: 'version', sortDirection: 'asc' } },
+      { label: t('miner.hashrate'), value: { sortField: 'hashRate', sortDirection: 'desc' } },
+      { label: t('miner.hashrate'), value: { sortField: 'hashRate', sortDirection: 'asc' } },
+      { label: t('miner.shares'), value: { sortField: 'sharesAccepted', sortDirection: 'desc' } },
+      { label: t('miner.shares'), value: { sortField: 'sharesAccepted', sortDirection: 'asc' } },
+      { label: t('miner.best_diff'), value: { sortField: 'bestDiff', sortDirection: 'desc' } },
+      { label: t('miner.best_diff'), value: { sortField: 'bestDiff', sortDirection: 'asc' } },
+      { label: t('common.uptime'), value: { sortField: 'uptimeSeconds', sortDirection: 'desc' } },
+      { label: t('common.uptime'), value: { sortField: 'uptimeSeconds', sortDirection: 'asc' } },
+      { label: t('miner.power'), value: { sortField: 'power', sortDirection: 'desc' } },
+      { label: t('miner.power'), value: { sortField: 'power', sortDirection: 'asc' } },
+      { label: t('miner.temp'), value: { sortField: 'temp', sortDirection: 'desc' } },
+      { label: t('miner.temp'), value: { sortField: 'temp', sortDirection: 'asc' } },
+      { label: t('miner.pool_diff'), value: { sortField: 'poolDifficulty', sortDirection: 'desc' } },
+      { label: t('miner.pool_diff'), value: { sortField: 'poolDifficulty', sortDirection: 'asc' } },
+      { label: t('common.version'), value: { sortField: 'version', sortDirection: 'desc' } },
+      { label: t('common.version'), value: { sortField: 'version', sortDirection: 'asc' } },
     ];
   }
 
@@ -771,19 +781,30 @@ return this.swarm.filter(axe =>
   getDeviceNotification(axe: any): { color: string; msg: string } | undefined {
     switch (true) {
       case !!axe.miningPaused:
-        return { color: 'yellow', msg: 'Paused' };
+        return { color: 'yellow', msg: this.i18n.t('common.paused') };
       case axe.overheat_mode === 1:
-        return { color: 'red', msg: 'Overheated' };
+        return { color: 'red', msg: this.i18n.t('messages.overheated_short') };
       case !!axe.power_fault:
-        return { color: 'red', msg: 'Power Fault' };
+        return { color: 'red', msg: this.i18n.t('messages.power_fault_short') };
       case isFrequencyLow(axe.frequency, axe.frequencyOptions):
-        return { color: 'orange', msg: 'Frequency Low' };
+        return { color: 'orange', msg: this.i18n.t('messages.frequency_low_short') };
       case axe.isUsingFallbackStratum === 1:
-        return { color: 'orange', msg: 'Fallback Pool' };
+        return { color: 'orange', msg: this.i18n.t('messages.fallback_pool_short') };
       case axe.showNewBlock === 1:
-        return { color: 'green', msg: 'Block found' };
+        return { color: 'green', msg: this.i18n.t('messages.block_found_short') };
       default:
         return undefined;
+    }
+  }
+
+  private getActionLabel(action: string): string {
+    switch (action) {
+      case 'restart':
+        return this.i18n.t('actions.restart');
+      case 'identify':
+        return this.i18n.t('actions.identify');
+      default:
+        return action;
     }
   }
 

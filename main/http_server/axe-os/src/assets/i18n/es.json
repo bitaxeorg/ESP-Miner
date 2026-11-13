@@ -1,0 +1,570 @@
+{
+  "nav": {
+    "menu": "Menú",
+    "dashboard": "Panel",
+    "swarm": "Swarm",
+    "logs": "Logs",
+    "system": "Sistema",
+    "pool": "Pool",
+    "scoreboard": "Scoreboard",
+    "network": "Red",
+    "theme": "Tema",
+    "settings": "Ajustes",
+    "update": "Actualización",
+    "whitepaper": "Whitepaper"
+  },
+  "actions": {
+    "restart": "Reiniciar",
+    "identify": "Identificar",
+    "identify_device": "Identificar dispositivo",
+    "disable_overheat_mode": "Desactivar sobrecalentamiento",
+    "disable_overclock_mode": "Desactivar overclock",
+    "save": "Guardar",
+    "scan_wifi": "Escanear Wi-Fi",
+    "open_pool_dashboard": "Abrir panel del pool",
+    "open_pool_dashboard_new_tab": "Abrir panel del pool en nueva pestaña",
+    "choose_certificate": "Elegir certificado",
+    "show_advanced_options": "Mostrar opciones avanzadas",
+    "hide_advanced_options": "Ocultar opciones avanzadas",
+    "check": "Comprobar",
+    "continue": "Continuar",
+    "cancel": "Cancelar",
+    "browse": "Buscar",
+    "start": "Iniciar",
+    "stop": "Detener",
+    "clear": "Limpiar",
+    "list_view": "Vista de lista",
+    "grid_view": "Vista de cuadrícula",
+    "auto_scan": "Autoescaneo",
+    "scanning": "Escaneando…",
+    "refresh": "Actualizar",
+    "refreshing": "Actualizando…",
+    "add": "Añadir",
+    "edit": "Editar",
+    "remove": "Eliminar",
+    "clear_logs": "Borrar logs",
+    "minimize": "Minimizar",
+    "maximize": "Maximizar",
+    "close": "Close",
+    "verify": "Verify",
+    "download_logs": "Download Logs",
+    "dismiss": "Dismiss",
+    "pause_mining": "Pause Mining",
+    "resume_mining": "Resume Mining"
+  },
+  "common": {
+    "app_name": "AxeOS",
+    "hostname": "Hostname",
+    "ip": "IP",
+    "version": "Versión",
+    "uptime": "Tiempo de actividad",
+    "sensitive_data_hidden": "Datos sensibles ocultos",
+    "sensitive_data_visible": "Datos sensibles visibles",
+    "wifi_rssi": "Wi-Fi RSSI: {value} dBm",
+    "no_value": "--",
+    "filter": "Filtro",
+    "total_devices": "Total de dispositivos",
+    "add_device_by_ip": "Añadir dispositivo por IP",
+    "this_device": "Este dispositivo",
+    "other": "Otro",
+    "default": "Predeterminado",
+    "custom": "Personalizado",
+    "error": "Error",
+    "expected": "Esperado",
+    "average": "Promedio",
+    "url": "URL",
+    "user": "Usuario",
+    "warning": "Advertencia",
+    "password": "Contraseña",
+    "dont_show_again": "No volver a mostrar",
+    "scrolling": "Desplazamiento",
+    "logs": "Logs",
+    "message": "Message",
+    "mode": "Mode",
+    "amount": "Amount",
+    "actions": "Actions",
+    "active": "Active",
+    "total_uptime": "Total Uptime",
+    "tls": "TLS",
+    "restart_device_confirm": "Are you sure you want to restart the device?",
+    "address": "Address",
+    "paused": "Paused"
+  },
+  "messages": {
+    "restart_required": "Debes reiniciar el dispositivo después de guardar.",
+    "network_saved": "Ajustes de red guardados",
+    "settings_saved": "Ajustes guardados",
+    "settings_saved_for": "Ajustes guardados para {uri}",
+    "device_restarted": "Dispositivo reiniciado",
+    "device_restarted_at": "Dispositivo en {uri} reiniciado",
+    "device_already_in_swarm": "El dispositivo ya está en el swarm",
+    "device_at": "Dispositivo en {ip}",
+    "restart_soon": "Reiniciando…",
+    "identify_signal_sent": "Señal de identificación enviada",
+    "power_fault_unavailable": "No disponible: fallo de energía",
+    "block_found": "¡Hoy es tu día de suerte! Tu dispositivo encontró un bloque 🎉",
+    "block_found_title": "Bloque encontrado 🎉",
+    "block_found_short": "Bloque encontrado",
+    "danger_low_voltage": "Peligro: voltaje bajo",
+    "danger_high_temperature": "Peligro: temperatura alta",
+    "pool_changed_restart": "Pool cambiado y dispositivo reiniciado",
+    "pool_saved": "Ajustes del pool guardados",
+    "pool_saved_for": "Ajustes del pool guardados para {uri}",
+    "default_btc_address_warning_prefix": "Estás usando la dirección de Bitcoin de fábrica. Cambia el campo",
+    "default_btc_address_warning_suffix": "por tu propia dirección de Bitcoin para recibir recompensas.",
+    "release_check_notice_prefix": "Ten en cuenta que esto se conectará a",
+    "release_check_notice_suffix": "para buscar el último lanzamiento.",
+    "device_overheated": "El dispositivo se sobrecalentó; revisa ajustes",
+    "power_fault_check": "{fault} Revisa la fuente de alimentación.",
+    "frequency_low": "La frecuencia del dispositivo es baja; revisa ajustes",
+    "fallback_pool": "Pool de respaldo activo; estadísticas de shares reiniciadas. Revisa el pool o reinicia el dispositivo.",
+    "firmware_updated": "Firmware actualizado. El dispositivo se reinició correctamente.",
+    "no_matches": "Sin coincidencias",
+    "swarm_empty": "No se encontraron dispositivos",
+    "overheated_short": "Sobrecalentado",
+    "power_fault_short": "Fallo de alimentación",
+    "frequency_low_short": "Frecuencia baja",
+    "fallback_pool_short": "Pool de respaldo",
+    "block_found_dismissed": "Block found notification dismissed"
+  },
+  "errors": {
+    "save_failed": "No se pudo guardar. {error}",
+    "save_failed_for": "No se pudieron guardar los ajustes para {uri}. {error}",
+    "restart_failed": "No se pudo reiniciar. {error}",
+    "wifi_scan_failed": "Error al escanear Wi-Fi",
+    "error_title": "Error",
+    "chart_source_save_failed": "No se pudo guardar la fuente del gráfico. {error}",
+    "pool_change_failed": "Error al cambiar el pool o reiniciar: {error}",
+    "device_unreachable": "No se puede contactar el dispositivo",
+    "device_unreachable_for": "No se puede contactar el dispositivo desde hace {duration}",
+    "pool_save_failed": "No se pudieron guardar los ajustes del pool. {error}",
+    "pool_save_failed_for": "No se pudieron guardar los ajustes del pool para {uri}. {error}",
+    "restart_failed_for": "No se pudo reiniciar el dispositivo en {uri}. {error}",
+    "certificate_read_failed": "No se pudo leer el archivo de certificado",
+    "invalid_certificate": "Introduce un certificado SSL/TLS válido",
+    "incorrect_file": "Archivo incorrecto, se esperaba {expected}.",
+    "unknown_error": "Error desconocido",
+    "request_timeout": "Tiempo de espera agotado",
+    "device_info_failed": "No se pudo cargar la información del dispositivo. {error}",
+    "device_action_failed": "Acción fallida: {action}",
+    "device_action_failed_detail": "Acción fallida: {action}. {error}",
+    "websocket_connection_failed": "Error al abrir la conexión WebSocket",
+    "identify_failed": "No se pudo identificar el dispositivo. {error}",
+    "redirect_failed": "Failed to redirect due to invalid URL.",
+    "mining_state_failed": "Failed to change mining state",
+    "pool_delete_active": "Cannot delete a pool that is currently selected as primary or fallback."
+  },
+  "settings": {
+    "title": "Ajustes",
+    "network": {
+      "title": "Configuración de red",
+      "hostname_help": "Nombre del dispositivo en tu red local",
+      "wifi_ssid": "SSID de Wi-Fi",
+      "wifi_password": "Contraseña de Wi-Fi",
+      "wifi_password_placeholder": "Introduce la contraseña de Wi-Fi",
+      "select_wifi_title": "Seleccionar red Wi-Fi"
+    },
+    "theme": {
+      "title": "Configuración de tema",
+      "color_scheme": "Esquema de color",
+      "dark": "Oscuro",
+      "light": "Claro",
+      "theme_colors": "Colores del tema"
+    },
+    "ui": {
+      "title": "UI",
+      "language": "Idioma",
+      "languages": {
+        "en": "Inglés",
+        "de": "Alemán",
+        "es": "Español"
+      }
+    },
+    "pool": {
+      "title": "Configuración del pool",
+      "fallback_title": "Configuración del pool de respaldo",
+      "stratum_host": "Host Stratum",
+      "stratum_port": "Puerto Stratum",
+      "suggested_difficulty": "Dificultad sugerida",
+      "suggested_difficulty_help": "Indica una preferencia de dificultad al pool. Los servidores no están obligados a respetarla. (0 para desactivar)",
+      "extranonce_subscribe": "Activar Extranonce Subscribe",
+      "extranonce_subscribe_help": "Indica al servidor que el cliente soporta mining.set_extranonce. Necesario en algunos pools.",
+      "connection_security": "Seguridad de conexión",
+      "certificate": "Certificado",
+      "certificate_placeholder": "Introduce o elige un certificado (.pem, .crt, .cer)",
+      "tls_none": "Sin TLS",
+      "tls_system": "TLS (certificado del sistema)",
+      "tls_custom": "TLS (CA personalizada)",
+      "active_selection": "Active Pool Selection",
+      "primary_pool": "Primary Pool",
+      "fallback_pool": "Fallback Pool",
+      "configurations": "Pool Configurations",
+      "delete_pool": "Delete Pool",
+      "stratum_protocol": "Stratum Protocol",
+      "stratum_protocol_help": "Select Stratum protocol version. Note: Not all pools support Stratum V2.",
+      "sv2_channel_type": "SV2 Channel Type",
+      "sv2_channel_type_help": "Extended Channels are recommended for external pools — the pool sends the coinbase template so the miner can verify it. Standard Channels should only be used with a locally deployed SV2 node or JD client.",
+      "sv2_authority_pubkey": "SV2 Authority Pubkey",
+      "sv2_authority_pubkey_help": "The pool operator provides this key to prove you are connecting to the real pool and not an impersonator. Without it, the connection is still encrypted but a man-in-the-middle attack could redirect your hashrate.",
+      "sv2_authority_pubkey_placeholder": "Enter base58-encoded authority public key (optional, e.g., 9auqWEzQ...)",
+      "require_authentication": "Require Authentication",
+      "require_authentication_help": "Refuse to connect unless the server certificate is verified against the Authority Pubkey above. Protects against the man-in-the-middle redirect described for the Authority Pubkey. When enabled without a key set, the miner will not connect.",
+      "decode_coinbase_tx": "Decode Coinbase Tx",
+      "decode_coinbase_tx_help": "Enable decoding of the coinbase transaction to show payout addresses. Disable when mining on non-Bitcoin chains.",
+      "share_warning": "Share Warning",
+      "share_warning_help": "Warn on the dashboard when your share of the coinbase reward is low. Disable for pools that pay miners directly through many coinbase outputs."
+    },
+    "device": {
+      "custom_settings_warning": "Los ajustes personalizados pueden causar daños e inestabilidad. Modifícalos solo si entiendes los riesgos.",
+      "frequency": "Frecuencia",
+      "core_voltage": "Voltaje del core",
+      "overheat_reset_hint": "Restablece Frecuencia y Voltaje antes de pulsar.",
+      "automatic_fan_control": "Control automático del ventilador",
+      "target_temperature": "Temperatura objetivo",
+      "minimum_fan_speed": "Vel. mín. ventilador",
+      "fan_speed": "Vel. ventilador",
+      "danger_overheating": "Peligro: puede sobrecalentar",
+      "s19_simulator": "Simulador S19",
+      "overclock_reset_tooltip": "Volver solo a valores seguros predefinidos",
+      "display": {
+        "title": "Pantalla",
+        "label": "Pantalla",
+        "type": "Tipo",
+        "rotation": "Rotación",
+        "sleep": "Reposo",
+        "always_off": "Siempre apagada",
+        "always_on": "Siempre encendida",
+        "timeout": "Espera: {time}",
+        "invert_colors": "Invertir colores de pantalla",
+        "none": "Sin pantalla"
+      },
+      "stats": {
+        "title": "Estadísticas",
+        "data_logging": "Registro de datos",
+        "disabled": "Desactivado",
+        "log_data": "Registrar datos",
+        "every_for": "Cada {every} durante {duration}"
+      }
+    }
+  },
+  "miner": {
+    "hashrate": "Tasa de hash",
+    "efficiency": "Eficiencia",
+    "shares": "Shares",
+    "shares_accepted": "Shares aceptadas",
+    "shares_rejected": "Shares rechazadas",
+    "rejected": "rechazadas",
+    "total_hashrate": "Hashrate total",
+    "total_power": "Potencia total",
+    "best_difficulty": "Mejor dificultad",
+    "best_diff": "Mejor diff",
+    "all_time_best": "mejor histórico",
+    "session_best": "mejor sesión",
+    "best_session_diff": "Mejor sesión",
+    "chance_to_find_block": "Probabilidad de encontrar un bloque",
+    "power": "Potencia",
+    "input_voltage": "Voltaje de entrada",
+    "asic_frequency": "Frecuencia ASIC",
+    "asic_voltage_measured": "Voltaje ASIC (medido)",
+    "heat": "Temperatura",
+    "temp": "Temp.",
+    "asic_temperature": "Temperatura ASIC",
+    "asic_temperature_1": "Temperatura ASIC 1",
+    "asic_temperature_2": "Temperatura ASIC 2",
+    "voltage_regulator_temperature": "Temp. regulador",
+    "fan": "Ventilador",
+    "fan_speed": "Vel. ventilador",
+    "fan_rpm": "RPM ventilador",
+    "fan_1_rpm": "RPM ventilador 1",
+    "fan_2_rpm": "RPM ventilador 2",
+    "pool": "Pool",
+    "pool_primary": "Principal",
+    "pool_fallback": "Respaldo",
+    "pool_response_time": "Tiempo",
+    "pool_response_time_help": "Tiempo que tarda el pool en responder a un share",
+    "difficulty": "Dificultad",
+    "pool_diff": "Diff pool",
+    "block_header": "Cabecera de bloque",
+    "block_height": "Altura",
+    "scriptsig": "Scriptsig",
+    "hashrate_registers": "Registros de hashrate",
+    "asic": "ASIC",
+    "domain": "Dominio",
+    "domains": "Dominios",
+    "asic_error_count": "Conteo de errores: {count}",
+    "asic_error_count_with_index": "ASIC {index} - Conteo de errores: {count}",
+    "misc": "Misc",
+    "hashes": "Hashes",
+    "hashes_help": "Approximate number of your total accumulated hashes (personal mining effort).",
+    "hashes_total_tooltip": "{count} total hashes",
+    "work_received": "Work Received",
+    "pool_response_batched": "batched ×{count}",
+    "pool_response_batched_help": "The pool acknowledged {count} shares in one batch; the time reflects the most recent share, so it may include the pool's batching window",
+    "coinbase_value": "Value",
+    "coinbase_value_help": "Total value of transaction outputs in BTC. For non-bitcoin chains, disable 'Decode Coinbase Tx' in Advanced Pool Options.",
+    "coinbase_outputs": "Outputs",
+    "coinbase_your_payout": "Your payout address",
+    "coinbase_others_help": "Further payout outputs, not listed individually",
+    "coinbase_other_recipient": "other recipient",
+    "coinbase_other_recipients": "other recipients",
+    "coinbase_fee": "Fee",
+    "coinbase_fee_help": "Percentage of the bitcoin block reward that will be paid out to the pool if you find a block.",
+    "coinbase_share": "Share",
+    "coinbase_share_help": "Percentage of the bitcoin block reward that will be paid out to your address if you find a block.",
+    "hash_error_help": "Hash error percentage as reported by the ASIC. A small amount of errors every few seconds is normal. Frequency changes, agressive overclocking, undervoltage or a bad power supply can significantly increase the error rate."
+  },
+  "device": {
+    "system": {
+      "title": "Sistema",
+      "device_model": "Modelo del dispositivo",
+      "other": "Otro",
+      "board_version": "Versión de placa",
+      "asic_type": "Tipo de ASIC",
+      "uptime": "Tiempo activo",
+      "reset_reason": "Motivo de reinicio",
+      "wifi_ssid": "SSID de Wi-Fi",
+      "wifi_status": "Estado de Wi-Fi",
+      "wifi_rssi": {
+        "label": "Wi-Fi RSSI",
+        "excellent": "Excelente",
+        "good": "Bueno",
+        "fair": "Regular",
+        "weak": "Débil"
+      },
+      "wifi_ipv4": "Wi-Fi IPv4",
+      "wifi_ipv6": "Wi-Fi IPv6",
+      "mac_address": "Dirección MAC",
+      "free_heap": "Memoria heap libre",
+      "free_heap_internal": "• Interna",
+      "free_heap_spiram": "• SPIRAM",
+      "firmware_version": "Versión de firmware",
+      "axeos_version": "Versión de AxeOS",
+      "idf_version": "Versión de ESP-IDF"
+    },
+    "update": {
+      "title": "Actualización",
+      "current_version": "Versión actual",
+      "latest_release": "Último lanzamiento",
+      "privacy_warning_title": "Aviso de privacidad",
+      "release_notes": "Notas de versión",
+      "axeos": "Actualizar AxeOS",
+      "firmware": "Actualizar firmware",
+      "firmware_integrity": "Firmware Integrity",
+      "firmware_integrity_help": "Compares the SHA-256 of the running firmware with the official esp-miner.bin of the same release.",
+      "checksum_computing": "Computing checksum...",
+      "checksum_matches_prefix": "Matches the official",
+      "checksum_matches_suffix": "release",
+      "checksum_mismatch_prefix": "Does not match the official",
+      "checksum_mismatch_suffix": "release",
+      "no_release_found": "No official release found for {version}. This is likely a development or custom build.",
+      "no_digest": "The {version} release does not provide a checksum for esp-miner.bin.",
+      "device_checksum": "Device ({partition}):",
+      "release_checksum": "Release",
+      "custom_frontend": "Custom Frontend",
+      "enable_custom_www": "Enable custom web UI",
+      "custom_www_restart_hint": "* A device restart is required to apply this change.",
+      "custom_www_incompatible_hint_prefix": "If an incompatible custom UI is loaded, visit",
+      "custom_www_incompatible_hint_suffix": "to disable Custom Frontend",
+      "upload_custom_www": "Upload Custom UI",
+      "installed_firmware": "Installed Firmware",
+      "partition": "Partition",
+      "build_time": "Build time",
+      "space": "Space",
+      "activate": "Activate",
+      "updating_target": "Updating {target}",
+      "restart_device": "Restart Device"
+    },
+    "network": {
+      "time_sync": "Enable Time Sync",
+      "time_sync_help": "Your device will sync with a DHCP-provided NTP server, or the nearest if not provided"
+    }
+  },
+  "units": {},
+  "chart": {
+    "hashrate": "Tasa de hash",
+    "hashrate_1m": "Tasa de hash 1m",
+    "hashrate_10m": "Tasa de hash 10m",
+    "hashrate_1h": "Tasa de hash 1h",
+    "asicTemp": "Temp. ASIC",
+    "errorPercentage": "Error %",
+    "vrTemp": "Temp. VR",
+    "asicVoltage": "Voltaje ASIC",
+    "voltage": "Voltaje",
+    "power": "Potencia",
+    "current": "Corriente",
+    "fanSpeed": "Vel. ventilador",
+    "fanRpm": "RPM ventilador",
+    "fan2Rpm": "RPM ventilador 2",
+    "wifiRssi": "Wi-Fi RSSI",
+    "freeHeap": "Heap libre",
+    "responseTime": "Tiempo de respuesta",
+    "none": "Ninguno"
+  },
+  "logs": {
+    "realtime_title": "Logs en tiempo real",
+    "case_sensitive_filter": "Filtro con distinción de mayúsculas"
+  },
+  "share_rejection": {
+    "Above target": {
+      "label": "Dificultad demasiado baja",
+      "explanation": "El Share enviado no cumple la dificultad mínima requerida."
+    },
+    "Authorization validation error": {
+      "label": "Autorización inválida",
+      "explanation": "Las credenciales proporcionadas por el minero eran incorrectas o no estaban autorizadas."
+    },
+    "Configuration validation error": {
+      "label": "Configuración inválida",
+      "explanation": "El minero envió una configuración o ajustes de minería inválidos."
+    },
+    "Difficulty too low": {
+      "label": "Dificultad demasiado baja",
+      "explanation": "{{share_rejection.difficulty-too-low.explanation}}"
+    },
+    "difficulty-too-low": {
+      "label": "Dificultad demasiado baja",
+      "explanation": "El Share enviado no cumple la dificultad mínima requerida."
+    },
+    "Duplicate": {
+      "label": "Duplicado",
+      "explanation": "Este Share ya se había enviado."
+    },
+    "Duplicate share": {
+      "label": "Share duplicado",
+      "explanation": "Este Share ya se había enviado."
+    },
+    "Invalid array size": {
+      "label": "Tamaño de array inválido",
+      "explanation": "Los parámetros del array JSON tenían un tamaño inesperado."
+    },
+    "Invalid authorization message": {
+      "explanation": "The miner's mining.authorize request was malformed."
+    },
+    "Invalid Bitcoin address": {
+      "explanation": "The submitted username is not a valid Bitcoin address."
+    },
+    "Invalid configuration message": {
+      "explanation": "The miner's mining.configure request was malformed."
+    },
+    "Invalid JobID": {
+      "label": "JobID inválido",
+      "explanation": "El ID de trabajo en la entrega no se reconoció o ya no es válido."
+    },
+    "Invalid mining submit message": {
+      "explanation": "The mining.submit request was malformed."
+    },
+    "Invalid nonce2 length": {
+      "label": "Longitud de nonce2 inválida",
+      "explanation": "El valor de nonce2 no coincide con la longitud esperada para este trabajo de minería."
+    },
+    "Invalid subscription message": {
+      "explanation": "The miner's mining.subscribe request was malformed."
+    },
+    "Invalid suggest difficulty message": {
+      "explanation": "The mining.suggest_difficulty request was malformed."
+    },
+    "Invalid version mask": {
+      "label": "Máscara de versión inválida",
+      "explanation": "La máscara de versión proporcionada era inválida para este trabajo."
+    },
+    "invalid-channel-id": {
+      "explanation": "The SV2 channel ID in the share submission is not known to the pool."
+    },
+    "invalid-job-id": {
+      "label": "JobID inválido",
+      "explanation": "El ID de trabajo en la entrega no se reconoció o ya no es válido."
+    },
+    "Job not found": {
+      "label": "Trabajo no encontrado",
+      "explanation": "{{share_rejection.invalid-job-id.explanation}}"
+    },
+    "Mining Submit validation error": {
+      "label": "Envío de minería inválido",
+      "explanation": "El trabajo de minería enviado era inválido o estaba mal formateado."
+    },
+    "No job_id": {
+      "label": "Sin job_id",
+      "explanation": "La entrega no especificó un ID de trabajo."
+    },
+    "No nonce": {
+      "label": "Sin nonce",
+      "explanation": "A la entrega del Share le faltaba un valor nonce."
+    },
+    "No nonce2": {
+      "label": "Sin nonce2",
+      "explanation": "La entrega no incluía el valor nonce2."
+    },
+    "No ntime": {
+      "label": "Sin ntime",
+      "explanation": "A la entrega le faltaba la hora de red (ntime)."
+    },
+    "No username": {
+      "label": "Sin usuario",
+      "explanation": "A la entrega le faltaba el nombre de usuario (nombre de worker)."
+    },
+    "Not subscribed": {
+      "explanation": "This connection has not subscribed — submit mining.subscribe first."
+    },
+    "Ntime out of range": {
+      "label": "Ntime fuera de rango",
+      "explanation": "El valor ntime proporcionado estaba fuera del rango permitido."
+    },
+    "Params not array": {
+      "label": "Parámetros no son array",
+      "explanation": "El campo de parámetros no estaba formateado como un array JSON."
+    },
+    "Stale": {
+      "label": "Stale",
+      "explanation": "Mientras se enviaba este Share, la red ya había encontrado un nuevo bloque, por lo que el Share es inválido."
+    },
+    "stale": {
+      "label": "{{share_rejection.Stale.label}}",
+      "explanation": "{{share_rejection.Stale.explanation}}"
+    },
+    "stale-share": {
+      "label": "{{share_rejection.Stale.label}}",
+      "explanation": "{{share_rejection.Stale.explanation}}"
+    },
+    "Subscription validation error": {
+      "label": "Suscripción inválida",
+      "explanation": "La solicitud de suscripción del minero era inválida o malformada."
+    },
+    "Suggest difficulty is disabled for this connection": {
+      "explanation": "This pool port does not allow miners to suggest a difficulty."
+    },
+    "Suggest difficulty validation error": {
+      "label": "Sugerencia de dificultad inválida",
+      "explanation": "El minero sugirió un valor de dificultad inválido."
+    },
+    "Unauthorized worker": {
+      "explanation": "This worker has not been authorized — submit mining.authorize first."
+    },
+    "Valid": {
+      "label": "Válido",
+      "explanation": "Esto no es un motivo de rechazo - indica un Share válido."
+    },
+    "Worker mismatch": {
+      "label": "Worker no coincide",
+      "explanation": "El nombre del worker enviado no coincide con el worker esperado o autenticado."
+    }
+  },
+  "widgets": {
+    "title": "Widgets"
+  },
+  "layout": {
+    "edit": "Edit Layout",
+    "save": "Save Layout",
+    "reset": "Reset Layout",
+    "standard_width": "Standard Width",
+    "wide_view": "Wide View"
+  },
+  "scoreboard": {
+    "rank": "Rank",
+    "difficulty": "Difficulty",
+    "job_id": "Job ID",
+    "extranonce2": "ExtraNonce2",
+    "time": "Time",
+    "nonce": "Nonce",
+    "version_bits": "Version Bits"
+  }
+}
