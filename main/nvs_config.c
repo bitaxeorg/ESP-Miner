@@ -36,8 +36,8 @@
 
 #define FALLBACK_KEY_ASICFREQUENCY "asicfrequency"  // Since v2.10.0 (https://github.com/bitaxeorg/ESP-Miner/pull/1051)
 #define FALLBACK_KEY_FANSPEED "fanspeed"            // Since v2.11.0 (https://github.com/bitaxeorg/ESP-Miner/pull/1331)
-#define FALLBACK_KEY_PRIMARY_POOL_INDEX "prim_idx"  // Replaced by position-as-priority (slot 0 = primary)
-#define FALLBACK_KEY_SECONDARY_POOL_INDEX "sec_idx" // Replaced by position-as-priority (slot 1 = fallback)
+#define FALLBACK_KEY_PRIMARY_POOL_INDEX "prim_idx"  // Since v2.16.0 (https://github.com/bitaxeorg/ESP-Miner/pull/2062)
+#define FALLBACK_KEY_SECONDARY_POOL_INDEX "sec_idx"
 
 typedef struct {
     NvsConfigKey key;
