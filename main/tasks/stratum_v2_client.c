@@ -424,8 +424,8 @@ esp_err_t stratum_v2_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
     conn->version_mask = BIP320_VERSION_ROLLING_MASK;
     s_v2_conn = conn;
 
-    uint8_t *frame_buf = heap_caps_malloc(SV2_MAX_FRAME_SIZE, MALLOC_CAP_SPIRAM);
-    uint8_t *recv_buf = heap_caps_malloc(SV2_MAX_FRAME_SIZE, MALLOC_CAP_SPIRAM);
+    uint8_t *frame_buf = heap_caps_malloc(SV2_MAX_SEND_FRAME_SIZE, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    uint8_t *recv_buf = heap_caps_malloc(SV2_MAX_RECV_FRAME_SIZE, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
 
     if (!frame_buf || !recv_buf) {
         ESP_LOGE(TAG, "Failed to allocate frame buffers");
@@ -545,7 +545,7 @@ esp_err_t stratum_v2_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
         ESP_LOGI(TAG, "Sending SetupConnection (vendor=bitaxe, hw=%s, channel=%s)",
                  device_model ? device_model : "",
                  sv2_channel_type_to_string(channel_type));
-        int frame_len = sv2_build_setup_connection(frame_buf, SV2_MAX_FRAME_SIZE,
+        int frame_len = sv2_build_setup_connection(frame_buf, SV2_MAX_SEND_FRAME_SIZE,
                                                    stratum_url, port,
                                                    "bitaxe", device_model ? device_model : "",
                                                    "", "", setup_flags);
@@ -563,7 +563,7 @@ esp_err_t stratum_v2_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
     // 2. Receive SetupConnectionSuccess
     {
         if (sv2_noise_recv(noise_ctx, transport, hdr_buf, recv_buf,
-                           SV2_MAX_FRAME_SIZE, &payload_len) != 0) {
+                           SV2_MAX_RECV_FRAME_SIZE, &payload_len) != 0) {
             ESP_LOGE(TAG, "Failed to receive SetupConnectionSuccess");
             snprintf(GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info,
                      sizeof(GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info), "Pool not responding");
@@ -617,11 +617,11 @@ esp_err_t stratum_v2_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
 
         if (channel_type == SV2_CHANNEL_EXTENDED) {
             ESP_LOGI(TAG, "Opening extended mining channel (user=%s)", user[0] ? user : "(empty)");
-            frame_len = sv2_build_open_extended_mining_channel(frame_buf, SV2_MAX_FRAME_SIZE,
-                                                                1, user, hash_rate, SV2_MIN_EXTRANONCE_SIZE);
+            frame_len = sv2_build_open_extended_mining_channel(frame_buf, SV2_MAX_SEND_FRAME_SIZE,
+                                                               1, user, hash_rate, SV2_MIN_EXTRANONCE_SIZE);
         } else {
             ESP_LOGI(TAG, "Opening standard mining channel (user=%s)", user[0] ? user : "(empty)");
-            frame_len = sv2_build_open_standard_mining_channel(frame_buf, SV2_MAX_FRAME_SIZE,
+            frame_len = sv2_build_open_standard_mining_channel(frame_buf, SV2_MAX_SEND_FRAME_SIZE,
                                                                 1, user, hash_rate);
         }
 
@@ -639,7 +639,7 @@ esp_err_t stratum_v2_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
     // 4. Receive OpenMiningChannelSuccess
     {
         if (sv2_noise_recv(noise_ctx, transport, hdr_buf, recv_buf,
-                           SV2_MAX_FRAME_SIZE, &payload_len) != 0) {
+                           SV2_MAX_RECV_FRAME_SIZE, &payload_len) != 0) {
             ESP_LOGE(TAG, "Failed to receive OpenChannelSuccess");
             snprintf(GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info,
                      sizeof(GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info), "Pool not responding");
@@ -749,7 +749,7 @@ esp_err_t stratum_v2_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
         }
 
         if (sv2_noise_recv(noise_ctx, transport, hdr_buf, recv_buf,
-                           SV2_MAX_FRAME_SIZE, &payload_len) != 0) {
+                           SV2_MAX_RECV_FRAME_SIZE, &payload_len) != 0) {
             if (stratum_reconnect_requested()) {
                 ESP_LOGI(TAG, "Reconnect requested during recv");
                 run_result = ESP_OK;
@@ -915,10 +915,8 @@ bool stratum_v2_probe_pool(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
         return false;
     }
 
-    uint8_t *frame_buf = heap_caps_malloc(SV2_PROBE_BUFFER_SIZE, MALLOC_CAP_SPIRAM);
-    if (!frame_buf) frame_buf = malloc(SV2_PROBE_BUFFER_SIZE);
-    uint8_t *recv_buf = heap_caps_malloc(SV2_PROBE_BUFFER_SIZE, MALLOC_CAP_SPIRAM);
-    if (!recv_buf) recv_buf = malloc(SV2_PROBE_BUFFER_SIZE);
+    uint8_t *frame_buf = heap_caps_malloc(SV2_PROBE_BUFFER_SIZE, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    uint8_t *recv_buf = heap_caps_malloc(SV2_PROBE_BUFFER_SIZE, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
 
     if (!frame_buf || !recv_buf) {
         free(frame_buf);

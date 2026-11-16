@@ -143,6 +143,47 @@ TEST_CASE("SV2 parse new extended mining job direct decoding", "[sv2]")
     free(job.coinbase_suffix);
 }
 
+TEST_CASE("SV2 accepts a protocol-max coinbase suffix", "[sv2]")
+{
+    const size_t suffix_len = SV2_MAX_COINBASE_SUFFIX_LEN;
+    const size_t payload_cap = suffix_len + 64;
+    uint8_t *payload = malloc(payload_cap);
+    TEST_ASSERT_NOT_NULL(payload);
+    memset(payload, 0, payload_cap);
+
+    int pos = 0;
+    payload[pos++] = 5; pos += 3;               // channel_id = 5
+    payload[pos++] = 12; pos += 3;              // job_id = 12
+    payload[pos++] = 0;                         // future job, no min_ntime
+    payload[pos++] = 0; payload[pos++] = 0; payload[pos++] = 0; payload[pos++] = 0x20; // version
+    payload[pos++] = 1;                         // version rolling allowed
+    payload[pos++] = 0;                         // merkle path count = 0
+    payload[pos++] = 0; payload[pos++] = 0;     // prefix len = 0
+    payload[pos++] = (uint8_t)(suffix_len & 0xff);
+    payload[pos++] = (uint8_t)(suffix_len >> 8);
+    memset(payload + pos, 0x5a, suffix_len);
+    pos += (int)suffix_len;
+
+    miner_job_t job;
+    memset(&job, 0, sizeof(job));
+
+    int res = sv2_parse_new_extended_mining_job(payload, (uint32_t)pos, NULL, &job, NULL, NULL);
+    TEST_ASSERT_EQUAL(0, res);
+    TEST_ASSERT_NOT_NULL(job.coinbase_suffix);
+    TEST_ASSERT_EQUAL_UINT32((uint32_t)suffix_len, job.coinbase_suffix_len);
+    TEST_ASSERT_EQUAL_HEX8(0x5a, job.coinbase_suffix[0]);
+    TEST_ASSERT_EQUAL_HEX8(0x5a, job.coinbase_suffix[suffix_len - 1]);
+
+    // Truncated follow-up payload must fail without wiping the existing slot.
+    TEST_ASSERT_EQUAL(-1, sv2_parse_new_extended_mining_job(payload, (uint32_t)pos - 1U, NULL, &job, NULL, NULL));
+    TEST_ASSERT_EQUAL_STRING("12", job.job_id);
+    TEST_ASSERT_EQUAL_UINT32((uint32_t)suffix_len, job.coinbase_suffix_len);
+    TEST_ASSERT_EQUAL_HEX8(0x5a, job.coinbase_suffix[suffix_len - 1]);
+
+    free(payload);
+    free(job.coinbase_suffix);
+}
+
 TEST_CASE("SV2 setup requires version rolling", "[sv2]")
 {
     uint32_t standard_flags = sv2_setup_flags_for_channel(SV2_CHANNEL_STANDARD);
