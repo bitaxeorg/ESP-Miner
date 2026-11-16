@@ -535,7 +535,7 @@ void self_test_task(void * pvParameters)
     STRATUM_V1_parse(&msg, difficulty_json, NULL);
     if (msg.method == MINING_SET_DIFFICULTY) {
         mock_diff = msg.new_difficulty;
-        GLOBAL_STATE->SYSTEM_MODULE.pool_difficulty = mock_diff;
+        POOL_set_difficulty(GLOBAL_STATE, 0, (double)mock_diff);
         ESP_LOGI(TAG, "Self-test: Applied mock difficulty %lu", (unsigned long)mock_diff);
     }
 
