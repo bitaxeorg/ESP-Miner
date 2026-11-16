@@ -325,8 +325,14 @@ static void stratum_v2_handle_set_new_prev_hash(GlobalState *GLOBAL_STATE, sv2_c
     uint8_t slot = (uint8_t)(job_id % MINER_JOB_POOL_SIZE);
     miner_job_t *job = miner_job_get_slot(slot);
 
-    if ((conn->pending_jobs_valid & (1U << slot)) &&
-        (uint32_t)strtoul(job->job_id, NULL, 10) == job_id) {
+    // SetNewPrevHash invalidates every queued future job except the one it
+    // references (SV2 spec 5.3.17), whether or not that job is still in a slot.
+    bool job_valid = (conn->pending_jobs_valid & (1U << slot)) &&
+                     (uint32_t)strtoul(job->job_id, NULL, 10) == job_id;
+    conn->pending_jobs_valid = 0;
+
+    if (job_valid) {
+        conn->pending_jobs_valid = (uint16_t)(1U << slot);
         clear_active_job_ids(conn->active_job_ids, &conn->active_job_ids_count);
         add_active_job_id(conn->active_job_ids, &conn->active_job_ids_count, job_id);
 
