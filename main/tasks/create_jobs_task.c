@@ -84,8 +84,6 @@ void create_jobs_task(void *pvParameters)
                 current_version_mask = new_work->version_mask;
             }
 
-
-
             if (!current_work->clean_jobs) {
                 // Staged job for next cycle, let current ASIC cycle finish
                 continue;
