@@ -23,16 +23,16 @@ ESP-Miner is the firmware powering the Bitaxe open-source Bitcoin ASIC miners. I
 ## Build Instructions
 
 ### 1. Firmware (Main Project)
-The project uses the standard ESP-IDF build system. Ensure you are using ESP-IDF v6.0.2.
+The project uses the standard ESP-IDF build system. Ensure you are using ESP-IDF v6.0.3.
 
 **Prerequisites:**
-- ESP-IDF v6.0.2 environment sourced.
+- ESP-IDF v6.0.3 environment sourced.
 - Node.js (v22+) and npm for the frontend bundle.
 
 **Commands:**
 ```bash
 # Source the environment
-. ~/esp/v6.0.2/esp-idf/export.sh
+. ~/esp/v6.0.3/esp-idf/export.sh
 
 # Build the project (automatically builds Axe-OS and generates binaries)
 idf.py build

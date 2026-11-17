@@ -13,6 +13,7 @@ dependencies.lock
 
 # Production folder
 build/
+build-*/
 **/build/
 !build/config
 build/config/*
