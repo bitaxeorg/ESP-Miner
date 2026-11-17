@@ -9,6 +9,7 @@
 #include "../../main/global_state.h"
 #include "../../main/display_driver.h"
 #include "../../main/nvs_config.h"
+#include "../../main/pool.h"
 
 typedef enum {
     DISPLAY_WORKS,
@@ -60,6 +61,11 @@ static esp_err_t headless_get_rssi(int8_t * rssi)
 {
     *rssi = -60;
     return ESP_OK;
+}
+
+static PoolSession * headless_active_session(GlobalState * state)
+{
+    return NULL;
 }
 
 static esp_err_t headless_lvgl_init(const lvgl_port_cfg_t * config)
@@ -195,9 +201,11 @@ const lv_font_t ui_font_AngelWish40 = {0};
 #undef TAG
 #define nvs_config_get_i32 headless_get_i32
 #define get_wifi_current_rssi headless_get_rssi
+#define POOL_get_active_session headless_active_session
 #define TAG headless_screen_tag
 #include "../../main/screen.c"
 #undef TAG
+#undef POOL_get_active_session
 #define gpio_config headless_gpio_config
 #define gpio_isr_handler_add headless_add_gpio_handler
 #define TAG headless_input_tag
