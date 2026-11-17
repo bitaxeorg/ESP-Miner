@@ -92,3 +92,33 @@ TEST_CASE("coinbase suffix allocation failure preserves job and permits recovery
     TEST_ASSERT_EQUAL_HEX8(0xa5, job.coinbase_suffix[31]);
     free(job.coinbase_suffix);
 }
+
+TEST_CASE("miner_job_pool_t isolates slots across pool sessions", "[stratum]")
+{
+    miner_job_pool_t primary_pool = {0};
+    miner_job_pool_t fallback_pool = {0};
+
+    miner_job_t *p0 = miner_job_pool_get_slot(&primary_pool, 0);
+    miner_job_t *f0 = miner_job_pool_get_slot(&fallback_pool, 0);
+
+    TEST_ASSERT_NOT_NULL(p0);
+    TEST_ASSERT_NOT_NULL(f0);
+    TEST_ASSERT_NOT_EQUAL(p0, f0);
+    TEST_ASSERT_NOT_EQUAL(p0->coinbase_prefix, f0->coinbase_prefix);
+    TEST_ASSERT_NOT_EQUAL(p0->coinbase_suffix, f0->coinbase_suffix);
+
+    p0->pool_id = 0;
+    p0->coinbase_prefix[0] = 0xAA;
+    f0->pool_id = 1;
+    f0->coinbase_prefix[0] = 0x55;
+
+    TEST_ASSERT_EQUAL_UINT8(0, p0->pool_id);
+    TEST_ASSERT_EQUAL_HEX8(0xAA, p0->coinbase_prefix[0]);
+    TEST_ASSERT_EQUAL_UINT8(1, f0->pool_id);
+    TEST_ASSERT_EQUAL_HEX8(0x55, f0->coinbase_prefix[0]);
+
+    miner_job_pool_free(&primary_pool);
+    miner_job_pool_free(&fallback_pool);
+    TEST_ASSERT_NULL(primary_pool.slots);
+    TEST_ASSERT_NULL(fallback_pool.slots);
+}

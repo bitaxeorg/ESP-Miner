@@ -1,5 +1,6 @@
 #include "bm13xx_test_harness.h"
 #include "bm1397_test_harness.h"
+#include "bm_job_packet.h"
 #include "global_state.h"
 #include "mining.h"
 #include "utils.h"
@@ -160,4 +161,116 @@ TEST_CASE("BM1366 and BM1397 reject response job IDs outside the active slots",
             bm13xx_harness_end();
         }
     }
+}
+
+TEST_CASE("BM1397 software rolled starting_version decodes rolled_version and computes correct version_bits",
+          "[asic][bm1397][result-job]")
+{
+    GlobalState *state = bm1397_harness_begin();
+    TEST_ASSERT_EQUAL_UINT8(2, bm1397_harness_driver.init(state));
+
+    asic_job_t job = make_job(JOB_TYPE_V1);
+    job.version = 0x207D8000;      // Software-rolled version for this midstate batch
+    job.version_mask = BIP320_VERSION_ROLLING_MASK;
+    bm1397_harness_install_job(0, &job);
+
+    // Wire chip slot encodes slot 0 and midstate index 1
+    // (slot << 2) | midstate_index: (0 << 2) | 1 = 1
+    uint8_t wire_chip_slot = 1;
+    queue_response(true, wire_chip_slot, 0xFC7BDA94);
+
+    task_result *res = bm1397_harness_driver.process_work(state);
+    TEST_ASSERT_NOT_NULL(res);
+    TEST_ASSERT_EQUAL_HEX32(0xFC7BDA94, res->nonce);
+    // Rolled version should be packet version incremented by midstate index 1: 0x207D8000 -> 0x207DA000
+    TEST_ASSERT_EQUAL_HEX32(0x207DA000, res->rolled_version);
+    // Packet job version
+    TEST_ASSERT_EQUAL_HEX32(0x207D8000, res->job.version);
+
+    // BIP-320 version bits submitted to pool: rolled_version & version_mask
+    uint32_t version_bits = res->rolled_version & res->job.version_mask;
+    TEST_ASSERT_EQUAL_HEX32(0x007DA000, version_bits);
+
+    // Pool verification check with base job template version (e.g. 0x207C8000):
+    // (pool_template_version & ~mask) | (version_bits & mask) == rolled_version
+    uint32_t pool_template_version = 0x207C8000;
+    uint32_t pool_reconstructed = (pool_template_version & ~job.version_mask) | (version_bits & job.version_mask);
+    TEST_ASSERT_EQUAL_HEX32(res->rolled_version, pool_reconstructed);
+
+    bm1397_harness_end();
+}
+
+TEST_CASE("BM1397 ignores wrapped nonces per slot across in-flight send_work overlap and slot reuse",
+          "[asic][bm1397][result-job]")
+{
+    GlobalState *state = bm1397_harness_begin();
+    TEST_ASSERT_EQUAL_UINT8(2, bm1397_harness_driver.init(state));
+    bm1397_harness_clear_packets();
+
+    asic_job_t job_a = make_job(JOB_TYPE_V1);
+    bm1397_harness_driver.send_work(state, &job_a);
+    uint8_t job_id_a = bm1397_harness_packet(0)->bytes[4];
+
+    const uint32_t nonce_1 = 0x11223344;
+    const uint32_t nonce_2 = 0x55667788;
+    const uint32_t nonce_3 = 0x99AABBCC;
+
+    // First pass on job_a: nonce_1 and nonce_2 are both accepted
+    queue_response(true, job_id_a, nonce_1);
+    task_result *res = bm1397_harness_driver.process_work(state);
+    TEST_ASSERT_NOT_NULL(res);
+    TEST_ASSERT_EQUAL_HEX32(nonce_1, res->nonce);
+
+    queue_response(true, job_id_a, nonce_2);
+    res = bm1397_harness_driver.process_work(state);
+    TEST_ASSERT_NOT_NULL(res);
+    TEST_ASSERT_EQUAL_HEX32(nonce_2, res->nonce);
+
+    // Next job_b is queued via send_work BEFORE job_a's wrapped responses finish arriving
+    bm1397_harness_clear_packets();
+    asic_job_t job_b = make_job(JOB_TYPE_V1);
+    job_b.ntime = 0x64658bd9;
+    bm1397_harness_driver.send_work(state, &job_b);
+    uint8_t job_id_b = bm1397_harness_packet(0)->bytes[4];
+
+    // Late wrapped responses on job_a still match job_a's first_nonce and get dropped
+    queue_response(true, job_id_a, nonce_1);
+    TEST_ASSERT_NULL(bm1397_harness_driver.process_work(state));
+
+    queue_response(true, job_id_a, nonce_2);
+    TEST_ASSERT_NULL(bm1397_harness_driver.process_work(state));
+
+    queue_response(true, job_id_a, nonce_3);
+    TEST_ASSERT_NULL(bm1397_harness_driver.process_work(state));
+
+    // Meanwhile, the same nonces on job_b are accepted independently
+    queue_response(true, job_id_b, nonce_1);
+    res = bm1397_harness_driver.process_work(state);
+    TEST_ASSERT_NOT_NULL(res);
+    TEST_ASSERT_EQUAL_HEX32(nonce_1, res->nonce);
+    TEST_ASSERT_EQUAL_HEX32(job_b.ntime, res->job.ntime);
+
+    queue_response(true, job_id_b, nonce_2);
+    res = bm1397_harness_driver.process_work(state);
+    TEST_ASSERT_NOT_NULL(res);
+    TEST_ASSERT_EQUAL_HEX32(nonce_2, res->nonce);
+
+    // Reclaiming job_a's slot 32 jobs later resets its wrap state
+    uint8_t reclaimed_id = 0;
+    asic_job_t job_reclaimed = make_job(JOB_TYPE_V1);
+    job_reclaimed.ntime = 0x64658bda;
+    for (int i = 0; i < BM1397_JOB_SLOT_COUNT - 1; ++i) {
+        bm1397_harness_clear_packets();
+        bm1397_harness_driver.send_work(state, &job_reclaimed);
+        reclaimed_id = bm1397_harness_packet(0)->bytes[4];
+    }
+    TEST_ASSERT_EQUAL_HEX8(job_id_a, reclaimed_id);
+
+    queue_response(true, reclaimed_id, nonce_1);
+    res = bm1397_harness_driver.process_work(state);
+    TEST_ASSERT_NOT_NULL(res);
+    TEST_ASSERT_EQUAL_HEX32(nonce_1, res->nonce);
+    TEST_ASSERT_EQUAL_HEX32(job_reclaimed.ntime, res->job.ntime);
+
+    bm1397_harness_end();
 }
