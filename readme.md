@@ -235,7 +235,7 @@ If multiple devices attempt to use the same hostname, ESP-Miner automatically re
 
 ### API Authentication
 
-If an administration password is set on the device (`axeosPassword` in settings), authentication is required for all state-changing endpoints (POST, PATCH, PUT). If read-only authentication is also enabled (`authReadRequired` set to true), GET endpoints and WebSockets will also require authentication.
+If an administration password is set on the device (`axeosPassword` in settings), authentication is required for all state-changing endpoints (POST, PATCH, PUT, DELETE). If read-only authentication is also enabled (`authReadRequired` set to true), GET endpoints and WebSockets will also require authentication.
 
 Authentication uses standard HTTP Basic Authentication. The username is ignored (so you can pass any username or leave it empty, and use the configured password).
 
@@ -252,7 +252,7 @@ curl -u :your-password -X POST http://YOUR-BITAXE-IP/api/system/restart
 # Update settings
 curl -u :your-password -X PATCH http://YOUR-BITAXE-IP/api/system \
      -H "Content-Type: application/json" \
-     -d '{"fanspeed": 100}'
+     -d '{"manualFanSpeed": 100}'
 ```
 
 #### WebSockets with authentication:
@@ -261,7 +261,7 @@ For WebSocket endpoints, pass the credentials as a base64-encoded `username:pass
 
 ```bash
 # Connect using websocat (where base64 encoded credentials are: echo -n ":your-password" | base64)
-websocat "ws://YOUR-BITAXE-IP/api/ws?auth=eW91ci1wYXNzd29yZA=="
+websocat "ws://YOUR-BITAXE-IP/api/ws?auth=OnlvdXItcGFzc3dvcmQ="
 ```
 
 ## Administration

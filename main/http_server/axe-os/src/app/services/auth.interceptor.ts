@@ -1,35 +1,52 @@
-import { HttpInterceptorFn } from '@angular/common/http';
+import { HttpEvent, HttpHandlerFn, HttpInterceptorFn, HttpRequest } from '@angular/common/http';
 import { inject } from '@angular/core';
-import { AuthService } from './auth.service';
+import { Observable, throwError } from 'rxjs';
 import { catchError, switchMap } from 'rxjs/operators';
-import { throwError } from 'rxjs';
+import { AuthService } from './auth.service';
 
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
+  if (!isAxeOsApiRequest(req.url)) {
+    return next(req);
+  }
+
   const authService = inject(AuthService);
-  const host = getRequestHost(req.url);
+  const host = authService.getHostFromUrl(req.url);
   const token = authService.getCredentials(host);
 
-  let authReq = req;
-  if (token) {
-    authReq = req.clone({
-      headers: req.headers.set('Authorization', `Basic ${token}`)
-    });
+  return sendWithAuth(req, next, authService, host, token);
+};
+
+function sendWithAuth(
+  req: HttpRequest<unknown>,
+  next: HttpHandlerFn,
+  authService: AuthService,
+  host: string,
+  attemptedToken: string | null
+): Observable<HttpEvent<unknown>> {
+  let headers = req.headers.set('X-Requested-With', 'XMLHttpRequest');
+  if (attemptedToken) {
+    headers = headers.set('Authorization', `Basic ${attemptedToken}`);
+  } else if (req.method !== 'GET' && !authService.isReadAuthRequired(host)) {
+    headers = headers.set('Authorization', 'Basic locked');
   }
+  const authReq = req.clone({ headers });
 
   return next(authReq).pipe(
     catchError((error) => {
       if (error.status === 401) {
-        if (token) {
+        const currentToken = authService.getCredentials(host);
+        if (currentToken && currentToken !== attemptedToken) {
+          return sendWithAuth(req, next, authService, host, currentToken);
+        }
+
+        if (attemptedToken && currentToken === attemptedToken) {
           authService.clearCredentials(host);
         }
 
-        return authService.prompt(host, token ? 'Invalid username or password' : '').pipe(
+        return authService.prompt(host, attemptedToken ? 'Invalid password' : '').pipe(
           switchMap((newToken) => {
             if (newToken) {
-              const retriedReq = req.clone({
-                headers: req.headers.set('Authorization', `Basic ${newToken}`)
-              });
-              return next(retriedReq);
+              return sendWithAuth(req, next, authService, host, newToken);
             }
             return throwError(() => error);
           })
@@ -38,16 +55,18 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
       return throwError(() => error);
     })
   );
-};
+}
 
-function getRequestHost(url: string): string {
+function isAxeOsApiRequest(url: string): boolean {
+  if (url.startsWith('/api/')) {
+    return true;
+  }
   if (url.startsWith('http://') || url.startsWith('https://')) {
     try {
-      const parsed = new URL(url);
-      return parsed.host;
-    } catch (e) {
-      return window.location.host;
+      return new URL(url).pathname.startsWith('/api/');
+    } catch {
+      return false;
     }
   }
-  return window.location.host;
+  return false;
 }

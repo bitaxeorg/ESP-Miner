@@ -63,11 +63,24 @@
         <label for="axeosPassword" class="w-full md:w-2/12 font-medium">
           <tooltip-text-icon
             text="AxeOS Password"
-            tooltip="Enter password to protect against unauthorized configuration changes. Leave empty to keep current or disable auth"
+            tooltip="Protect configuration changes with a password. Clear the field and save to disable authentication"
           />
         </label>
         <div class="w-full md:w-10/12">
-          <input class="input-text w-full" id="axeosPassword" formControlName="axeosPassword" type="password" placeholder="Leave empty to keep current or disable auth" />
+          <div class="relative w-full">
+            <input
+              class="input-text w-full pr-10"
+              id="axeosPassword"
+              formControlName="axeosPassword"
+              [type]="showAxeosPassword ? 'text' : 'password'"
+              [placeholder]="authEnabled ? 'Clear and save to disable authentication' : 'Enter password to enable authentication'" />
+            @if (form.get('axeosPassword')?.dirty) {
+              <span class="absolute inset-y-0 right-0 flex items-center pr-3 cursor-pointer text-secondary hover:text-main"
+                (click)="toggleAxeosPasswordVisibility()">
+                <i class="pi {{!showAxeosPassword ? 'pi-eye' : 'pi-eye-slash'}}"></i>
+              </span>
+            }
+          </div>
         </div>
       </div>
 

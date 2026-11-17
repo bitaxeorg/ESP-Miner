@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, ViewChild, ElementRef } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Subscription } from 'rxjs';
 import { AuthService } from '../../services/auth.service';
@@ -13,8 +13,9 @@ export class LoginModalComponent implements OnInit, OnDestroy {
   public isVisible = false;
   public host = '';
   public error = '';
-  public username = 'admin';
   public password = '';
+
+  @ViewChild('passwordInput') private passwordInput?: ElementRef<HTMLInputElement>;
 
   private sub?: Subscription;
 
@@ -26,7 +27,8 @@ export class LoginModalComponent implements OnInit, OnDestroy {
         this.host = state.host;
         this.error = state.error || '';
         this.isVisible = true;
-        this.password = ''; // clear password on new prompt
+        this.password = '';
+        setTimeout(() => this.passwordInput?.nativeElement.focus());
       } else {
         this.isVisible = false;
       }
@@ -43,10 +45,7 @@ export class LoginModalComponent implements OnInit, OnDestroy {
 
   public onSubmit(): void {
     if (this.password) {
-      this.authService.submitPrompt({
-        username: this.username,
-        password: this.password
-      });
+      this.authService.submitPrompt(this.password);
     }
   }
 }

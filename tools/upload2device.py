@@ -109,6 +109,9 @@ def _verify_auth(ip: str, password: str | None = None) -> bool:
         if resp.status_code == 401:
             print(f"[FAIL] Authentication failed for {ip}: HTTP 401 – {resp.text[:100]}", file=sys.stderr)
             return False
+        if not resp.ok:
+            print(f"[FAIL] Pre-check failed for {ip}: HTTP {resp.status_code} – {resp.text[:100]}", file=sys.stderr)
+            return False
         return True
     except RequestException as e:
         print(f"[ERROR] Connection to {ip} failed: {e}", file=sys.stderr)

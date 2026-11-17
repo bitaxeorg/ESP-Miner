@@ -1,11 +1,12 @@
 import { Component, ElementRef, Input, ViewChild, OnInit, OnDestroy } from '@angular/core';
-import { Observable, Subject, takeUntil } from 'rxjs';
+import { EMPTY, Observable, Subject, switchMap, takeUntil } from 'rxjs';
 import { ToastrService } from 'ngx-toastr';
 import { SystemApiService } from 'src/app/services/system.service';
 import { LiveDataService } from 'src/app/services/live-data.service';
 import { LayoutService } from './service/app.layout.service';
 import { SensitiveData } from 'src/app/services/sensitive-data.service';
 import { DashboardEditService } from 'src/app/services/dashboard-edit.service';
+import { AuthService } from 'src/app/services/auth.service';
 import { SystemInfo as ISystemInfo } from 'src/app/generated/models';
 import { RouterLink } from '@angular/router';
 import { AsyncPipe } from '@angular/common';
@@ -25,6 +26,7 @@ export class AppTopBarComponent implements OnInit, OnDestroy {
   public info$: Observable<ISystemInfo>;
   public sensitiveDataHidden: boolean = false;
   public isMiningPaused: boolean = false;
+  public isAuthenticated: boolean = false;
   public isWidgetPanelOpen = false;
 
   @Input() isAPMode: boolean = false;
@@ -35,6 +37,7 @@ export class AppTopBarComponent implements OnInit, OnDestroy {
     public layoutService: LayoutService,
     private systemService: SystemApiService,
     private liveDataService: LiveDataService,
+    private authService: AuthService,
     private toastr: ToastrService,
     private sensitiveData: SensitiveData,
     public dashboardEdit: DashboardEditService,
@@ -43,6 +46,16 @@ export class AppTopBarComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit() {
+    const host = window.location.host;
+    this.isAuthenticated = !!this.authService.getCredentials(host);
+    this.authService.credentialsChanged$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((changedHost: string) => {
+        if (changedHost === host) {
+          this.isAuthenticated = !!this.authService.getCredentials(host);
+        }
+      });
+
     this.sensitiveData.hidden
       .pipe(takeUntil(this.destroy$))
       .subscribe((hidden: boolean) => {
@@ -84,6 +97,36 @@ export class AppTopBarComponent implements OnInit, OnDestroy {
       this.systemService.restart().subscribe({
         next: () => this.toastr.success('Device restarted'),
         error: () => this.toastr.error('Restart failed')
+      });
+    }
+  }
+
+  public isUnlocked(info: ISystemInfo): boolean {
+    return this.isAuthenticated || info.authReadRequired === 1;
+  }
+
+  public toggleAuth(info: ISystemInfo) {
+    const host = window.location.host;
+    if (this.isUnlocked(info)) {
+      this.authService.clearCredentials(host);
+      if (info.authReadRequired === 1) {
+        const xhr = new XMLHttpRequest();
+        xhr.open('GET', '/', true, 'logout', 'logout');
+        xhr.onloadend = () => window.location.reload();
+        xhr.send();
+      } else {
+        this.toastr.info('Session locked');
+      }
+    } else {
+      this.authService.prompt(host).pipe(
+        switchMap((token) => token ? this.systemService.updateSystem('', {}) : EMPTY)
+      ).subscribe({
+        next: () => this.toastr.success('Unlocked'),
+        error: (err) => {
+          if (err?.status !== 401) {
+            this.toastr.error('Authentication check failed');
+          }
+        }
       });
     }
   }

@@ -177,6 +177,7 @@ void websocket_init(httpd_handle_t server)
 esp_err_t websocket_pre_handshake(httpd_req_t *req)
 {
     if (is_network_allowed(req) != ESP_OK) {
+        httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
         return ESP_FAIL;
     }
 
