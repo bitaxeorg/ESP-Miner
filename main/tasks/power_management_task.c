@@ -11,6 +11,7 @@
 #include "asic_init.h"
 #include "asic_reset.h"
 #include "difficulty_controller.h"
+#include "safety_monitor.h"
 #include "driver/uart.h"
 
 #define POLL_RATE 100
@@ -247,6 +248,8 @@ void POWER_MANAGEMENT_task(void * pvParameters)
             VCORE_set_voltage(GLOBAL_STATE, (double) core_voltage / 1000.0);
             last_core_voltage = core_voltage;
         }
+
+        SAFETY_check(GLOBAL_STATE, core_voltage);
 
         if (asic_frequency != last_asic_frequency) {
             ESP_LOGI(TAG, "New ASIC frequency requested: %g MHz (current: %g MHz)", asic_frequency, last_asic_frequency);
