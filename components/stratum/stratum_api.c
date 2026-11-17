@@ -27,6 +27,7 @@
 #include <sys/param.h>
 
 #define BUFFER_SIZE 1024
+#define JSON_RPC_BUFFER_LIMIT (STRATUM_V1_MAX_JSON_LINE_SIZE + 2U)
 #define BITCOIN_GENESIS_NTIME 1231006505
 #define MAX_ERROR_MSG_LEN 256
 static const char * TAG = "stratum_api";
