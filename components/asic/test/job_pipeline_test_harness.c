@@ -97,7 +97,9 @@ static void spy_decode_coinbase(GlobalState *state, const miner_job_t *job)
 #define ASIC_set_version_mask spy_asic_set_version_mask
 #define ASIC_get_asic_job_frequency_ms stub_asic_get_job_frequency
 #define SYSTEM_decode_and_apply_coinbase spy_decode_coinbase
+#define POOL_resolve_notified_job(gs, notify) miner_job_get_slot((size_t)(notify))
 #include "../../../main/tasks/create_jobs_task.c"
+#undef POOL_resolve_notified_job
 #undef SYSTEM_decode_and_apply_coinbase
 #undef ASIC_get_asic_job_frequency_ms
 #undef ASIC_set_version_mask
