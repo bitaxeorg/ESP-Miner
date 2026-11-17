@@ -219,7 +219,6 @@ TEST_CASE("BM1373 version mask writes retry without changing command bytes",
 TEST_CASE("BM13xx rolled version reaches SV1 and SV2 share messages byte exact",
           "[asic][version-rolling][stratum][characterization]")
 {
-    TEST_ASSERT_TRUE(STRATUM_V1_initialize_buffer());
     for (size_t d = 0; d < BM13XX_HARNESS_DRIVER_COUNT; d++) {
         const bm13xx_harness_driver_t *driver = &bm13xx_harness_drivers[d];
         GlobalState *state = bm13xx_harness_begin(driver);

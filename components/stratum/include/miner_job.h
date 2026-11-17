@@ -55,7 +55,16 @@ typedef struct {
     uint32_t         parse_time_us;
 } miner_job_t;
 
-// Pre-allocated ring buffer pool helpers
+typedef struct {
+    miner_job_t *slots;
+} miner_job_pool_t;
+
+// Per-instance ring buffer pool helpers
+void miner_job_pool_init_instance(miner_job_pool_t *pool);
+miner_job_t *miner_job_pool_get_slot(miner_job_pool_t *pool, size_t index);
+void miner_job_pool_free(miner_job_pool_t *pool);
+
+// Default ring buffer pool helpers
 void miner_job_pool_init(void);
 miner_job_t *miner_job_get_slot(size_t index);
 // Suffix buffers must be heap-owned; resizing preserves the pointer on failure.
