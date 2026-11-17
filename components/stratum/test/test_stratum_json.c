@@ -1,5 +1,6 @@
 #include "unity.h"
 #include "stratum_api.h"
+#include "stratum_rx_stream.h"
 #include <string.h>
 #include <sys/param.h>
 #include "esp_heap_caps.h"
@@ -828,7 +829,7 @@ TEST_CASE("Mine fragmented jobs with 110 1800 and 10000 coinbase payouts", "[str
     miner_job_t job = {0};
     StratumApiV1Message message = {0};
     StratumApiV1Message reply_msg = {0};
-    TEST_ASSERT_TRUE(STRATUM_V1_initialize_buffer());
+    TEST_ASSERT_TRUE(stratum_rx_stream_init());
     for (size_t n = 0; n < sizeof(counts) / sizeof(counts[0]); ++n) {
         char *data = make_payout_notify(counts[n]);
         mock_transport_data_t mock = {.data = data, .length = strlen(data), .max_chunk = 733};
@@ -879,14 +880,16 @@ TEST_CASE("Receive reconnect clears a truncated large line", "[stratum][security
     mock_transport_data_t mock = {.data = data, .length = sizeof(data), .max_chunk = 731};
     esp_transport_handle_t transport = create_mock_transport(&mock);
     TEST_ASSERT_NOT_NULL(transport);
-    TEST_ASSERT_TRUE(STRATUM_V1_initialize_buffer());
-    TEST_ASSERT_NULL(STRATUM_V1_receive_jsonrpc_line(transport));
-    TEST_ASSERT_TRUE(STRATUM_V1_initialize_buffer());
+    sv1_conn_t conn = { .transport = transport };
+    TEST_ASSERT_TRUE(STRATUM_V1_initialize_conn_buffer(&conn));
+    TEST_ASSERT_NULL(STRATUM_V1_receive_jsonrpc_line(&conn));
+    TEST_ASSERT_TRUE(STRATUM_V1_initialize_conn_buffer(&conn));
     mock.data = "{}\n";
     mock.length = 3;
     mock.offset = 0;
-    char *line = STRATUM_V1_receive_jsonrpc_line(transport);
+    char *line = STRATUM_V1_receive_jsonrpc_line(&conn);
     TEST_ASSERT_EQUAL_STRING("{}", line);
     free(line);
+    STRATUM_V1_free_conn_buffer(&conn);
     esp_transport_destroy(transport);
 }
