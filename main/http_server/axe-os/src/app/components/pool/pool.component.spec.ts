@@ -100,6 +100,11 @@ describe('PoolComponent', () => {
     expect(component.form.get('primaryPoolIndex')?.value).toBe(0);
     expect(component.form.get('secondaryPoolIndex')?.value).toBe(1);
     expect(component.poolsArray.length).toBe(2);
+
+    const headerLabels = fixture.debugElement.queryAll(By.css('.font-bold.text-lg'));
+    expect(headerLabels.length).toBe(2);
+    expect(headerLabels[0].nativeElement.textContent.trim()).toBe('pool0.com:3333');
+    expect(headerLabels[1].nativeElement.textContent.trim()).toBe('pool1.com:3333');
   });
 
   it('should save modified pool details with position-as-priority', () => {

@@ -16,32 +16,24 @@
         @for (poolControl of poolsArray.controls; track poolControl; let i = $index) {
           <div [formGroupName]="i" class="border border-surface bg-bg-card rounded shadow hover:shadow-md transition-shadow duration-200 overflow-hidden">
             <!-- Card Header -->
-            <div class="flex justify-between items-center p-3 cursor-pointer bg-bg-hover border-b border-surface" (click)="toggleCard(i)">
-              <div class="flex items-center gap-2">
-                <i class="pi mr-1 text-secondary transition-transform duration-200" [class]="activeCardIndex === i ? 'pi-chevron-up' : 'pi-chevron-down'" style="font-size: 0.9rem;"></i>
-                <span class="font-bold text-lg text-main">Pool {{ i + 1 }}</span>
+            <div class="flex justify-between items-center p-3 cursor-pointer bg-bg-hover border-b border-surface gap-2" (click)="toggleCard(i)">
+              <div class="flex items-center gap-2 min-w-0">
+                <i class="pi mr-1 text-secondary transition-transform duration-200 shrink-0" [class]="activeCardIndex === i ? 'pi-chevron-up' : 'pi-chevron-down'" style="font-size: 0.9rem;"></i>
+                @if (poolControl.get('stratumURL')?.value?.trim()) {
+                  <span class="font-bold text-lg text-main truncate">{{ poolControl.get('stratumURL')?.value.trim() }}{{ poolControl.get('stratumPort')?.value != null && poolControl.get('stratumPort')?.value !== '' ? ':' + poolControl.get('stratumPort')?.value : '' }}</span>
+                } @else {
+                  <span class="text-lg text-secondary/60 font-normal italic truncate">(not configured)</span>
+                }
                 <!-- Status / Protocol Badges -->
-                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-blue-500 text-white">{{ getProtocolLabel(poolControl.get('stratumProtocol')?.value) }}</span>
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-blue-500 text-white shrink-0">{{ getProtocolLabel(poolControl.get('stratumProtocol')?.value) }}</span>
                 @if (i === 0) {
-                  <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-green-500 text-white">Primary</span>
+                  <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-green-500 text-white shrink-0">Primary</span>
                 }
                 @if (i === 1) {
-                  <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-amber-500 text-white">Fallback</span>
-                }
-
-                <!-- Quick Summary when collapsed -->
-                @if (activeCardIndex !== i && poolControl.get('stratumURL')?.value) {
-                  <span class="text-sm text-secondary ml-2 font-medium">
-                    {{ poolControl.get('stratumURL')?.value }}:{{ poolControl.get('stratumPort')?.value }}
-                  </span>
-                }
-                @if (activeCardIndex !== i && !poolControl.get('stratumURL')?.value) {
-                  <span class="text-sm text-secondary/60 ml-2 font-normal italic">
-                    (not configured)
-                  </span>
+                  <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-amber-500 text-white shrink-0">Fallback</span>
                 }
               </div>
-              <div class="flex items-center gap-1">
+              <div class="flex items-center gap-1 shrink-0">
                 <button
                   type="button"
                   class="btn btn-secondary border-none p-1 text-secondary hover:text-main bg-transparent disabled:opacity-30 disabled:cursor-not-allowed"
