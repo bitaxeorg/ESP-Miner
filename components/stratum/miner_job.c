@@ -28,7 +28,7 @@ void miner_job_pool_init_instance(miner_job_pool_t *pool)
             }
         }
         if (!pool->slots[i].coinbase_suffix) {
-            pool->slots[i].coinbase_suffix = heap_caps_calloc(1, MAX_COINBASE_SUFFIX_LEN, MALLOC_CAP_SPIRAM);
+            pool->slots[i].coinbase_suffix = heap_caps_calloc(1, 2048, MALLOC_CAP_SPIRAM);
             if (!pool->slots[i].coinbase_suffix) {
                 pool->slots[i].coinbase_suffix = calloc(1, 2048);
             }
