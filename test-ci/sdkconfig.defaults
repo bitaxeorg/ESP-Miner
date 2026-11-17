@@ -1,5 +1,8 @@
 CONFIG_ESP_INT_WDT=n
 CONFIG_ESP_TASK_WDT=n
+CONFIG_SPIRAM=y
+# QEMU esp32s3 GDMA SHA peripheral does not support external PSRAM buffers
+CONFIG_MBEDTLS_HARDWARE_SHA=n
 # Unity runs job fixtures and production hashing on the main task; use the
 # same stack budget as the firmware's job and result tasks.
 CONFIG_ESP_MAIN_TASK_STACK_SIZE=8192

@@ -29,7 +29,8 @@ void difficulty_controller_update(GlobalState * GLOBAL_STATE)
                             ? GLOBAL_STATE->target_share_interval_s
                             : DEFAULT_SHARE_INTERVAL_S;
 
-    double pool_diff = GLOBAL_STATE->SYSTEM_MODULE.pool_difficulty;
+    PoolSession *session = POOL_get_active_session(GLOBAL_STATE);
+    double pool_diff = session ? session->pool_difficulty : 0.0;
     uint8_t eff_power = calculate_effective_asic_difficulty(expected_ghs, (float)interval_s, pool_diff);
     uint8_t power_to_apply = 0;
 
