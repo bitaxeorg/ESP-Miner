@@ -251,6 +251,11 @@
                       </label>
                       <div class="w-full md:w-10/12">
                         <input class="input-text" [id]="'stratumSuggestedDifficulty_' + poolControl.get('id')?.value" formControlName="stratumSuggestedDifficulty" type="number" />
+                        @if (asicDifficulty > 0 && poolControl.get('stratumSuggestedDifficulty')?.value > 0 && poolControl.get('stratumSuggestedDifficulty')?.value < asicDifficulty) {
+                          <small class="block text-orange-600 mt-2">
+                            Below current ASIC difficulty ({{asicDifficulty}}). Shares below {{asicDifficulty}} are filtered by the ASIC, which may under-report pool hashrate if the pool honors this value.
+                          </small>
+                        }
                       </div>
                     </div>
 
