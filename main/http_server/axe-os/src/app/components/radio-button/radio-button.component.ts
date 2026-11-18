@@ -41,7 +41,7 @@ export class RadioButtonComponent implements ControlValueAccessor {
 
   @Output() onClick = new EventEmitter<any>();
 
-  public checked: boolean = false;
+  @Input() public checked: boolean = false;
   public disabled: boolean = false;
 
   private onChangeCallback: (_: any) => void = () => {};
