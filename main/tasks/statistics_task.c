@@ -196,7 +196,8 @@ void statistics_task(void * pvParameters)
     SystemModule * sys_module = &GLOBAL_STATE->SYSTEM_MODULE;
     PowerManagementModule * power_management = &GLOBAL_STATE->POWER_MANAGEMENT_MODULE;
     struct StatisticsData statsData = {};
-    uint64_t last_shares_count = sys_module->shares_accepted + sys_module->shares_rejected;
+    PoolSession *session = POOL_get_active_session(GLOBAL_STATE);
+    uint64_t last_shares_count = session ? (session->shares_accepted + session->shares_rejected) : 0;
 
     TickType_t taskWakeTime = xTaskGetTickCount();
 
@@ -229,25 +230,30 @@ void statistics_task(void * pvParameters)
                 snprintf(statsData.tokens[SRC_WIFI_RSSI], STATS_TOKEN_LEN, "%d", (int)wifiRSSI);
                 snprintf(statsData.tokens[SRC_FREE_HEAP], STATS_TOKEN_LEN, "%" PRIu32, esp_get_free_heap_size());
 
-                uint64_t current_shares = sys_module->shares_accepted + sys_module->shares_rejected;
-                if (current_shares != last_shares_count && sys_module->response_time > 0.0f) {
-                    statsData.responseTimeMin = sys_module->response_time_min > 0.0f ? sys_module->response_time_min : sys_module->response_time;
-                    statsData.responseTimeMax = sys_module->response_time_max > 0.0f ? sys_module->response_time_max : sys_module->response_time;
-                    sys_module->last_response_time_min = statsData.responseTimeMin;
-                    sys_module->last_response_time_max = statsData.responseTimeMax;
+                PoolSession *active_session = POOL_get_active_session(GLOBAL_STATE);
+                uint64_t current_shares = active_session ? (active_session->shares_accepted + active_session->shares_rejected) : 0;
+                if (active_session && current_shares != last_shares_count && active_session->response_time > 0.0f) {
+                    statsData.responseTimeMin = active_session->response_time_min > 0.0f ? active_session->response_time_min : active_session->response_time;
+                    statsData.responseTimeMax = active_session->response_time_max > 0.0f ? active_session->response_time_max : active_session->response_time;
+                    active_session->last_response_time_min = statsData.responseTimeMin;
+                    active_session->last_response_time_max = statsData.responseTimeMax;
                     snprintf(statsData.tokens[SRC_RESPONSE_TIME_MIN], STATS_TOKEN_LEN, "%.2f", statsData.responseTimeMin);
                     snprintf(statsData.tokens[SRC_RESPONSE_TIME_MAX], STATS_TOKEN_LEN, "%.2f", statsData.responseTimeMax);
                 } else {
                     statsData.responseTimeMin = 0.0f;
                     statsData.responseTimeMax = 0.0f;
-                    sys_module->last_response_time_min = 0.0f;
-                    sys_module->last_response_time_max = 0.0f;
+                    if (active_session) {
+                        active_session->last_response_time_min = 0.0f;
+                        active_session->last_response_time_max = 0.0f;
+                    }
                     strcpy(statsData.tokens[SRC_RESPONSE_TIME_MIN], "null");
                     strcpy(statsData.tokens[SRC_RESPONSE_TIME_MAX], "null");
                 }
                 last_shares_count = current_shares;
-                sys_module->response_time_min = 0.0f;
-                sys_module->response_time_max = 0.0f;
+                if (active_session) {
+                    active_session->response_time_min = 0.0f;
+                    active_session->response_time_max = 0.0f;
+                }
 
                 addStatisticData(&statsData, configStatsFrequency);
             }
