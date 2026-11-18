@@ -5,6 +5,7 @@
  *****************************************************************************/
 
 #include "stratum_api.h"
+#include "stratum_rx_stream.h"
 #include "stratum_socket.h"
 #include "yyjson.h"
 #include "esp_log.h"
@@ -213,6 +214,44 @@ char * STRATUM_V1_receive_jsonrpc_line(sv1_conn_t *conn)
     return line;
 }
 
+stratum_v1_rx_status_t STRATUM_V1_receive_message(esp_transport_handle_t transport,
+                                                  StratumApiV1Message *message,
+                                                  miner_job_t *job,
+                                                  int64_t *receive_time_us)
+{
+    const char *line_buf = NULL;
+    size_t line_len = 0;
+    size_t raw_len = 0;
+    if (!stratum_rx_stream_read_line(transport, &line_buf, &line_len, &raw_len)) {
+        return STRATUM_V1_RX_TRANSPORT_ERROR;
+    }
+
+    int64_t parse_start_us = esp_timer_get_time();
+    int64_t rx_start_us = stratum_rx_stream_line_start_us();
+    if (receive_time_us != NULL) {
+        *receive_time_us = parse_start_us;
+    }
+
+    bool parsed = STRATUM_V1_parse(message, line_buf, job);
+    int64_t parse_done_us = esp_timer_get_time();
+    if (parsed) {
+        if (message->method == MINING_NOTIFY && job != NULL) {
+            if (rx_start_us > 0 && parse_start_us >= rx_start_us) {
+                int64_t rx_dt = parse_start_us - rx_start_us;
+                job->rx_time_us = (rx_dt > UINT32_MAX) ? UINT32_MAX : (uint32_t)rx_dt;
+            }
+            if (parse_done_us >= parse_start_us) {
+                int64_t parse_dt = parse_done_us - parse_start_us;
+                job->parse_time_us = (parse_dt > UINT32_MAX) ? UINT32_MAX : (uint32_t)parse_dt;
+            }
+        }
+        ESP_LOGI(TAG, "rx (%zu bytes): %.512s%s", raw_len, line_buf,
+                 raw_len > 512U ? "..." : "");
+    }
+    stratum_rx_stream_consume_line(line_len);
+    return parsed ? STRATUM_V1_RX_OK : STRATUM_V1_RX_PARSE_ERROR;
+}
+
 void STRATUM_V1_reset_message(StratumApiV1Message *message)
 {
     if (message->error_str) {
@@ -297,8 +336,14 @@ static bool parse_mining_notify(yyjson_val *root, miner_job_t *job)
     }
 
     const char *job_id_str = yyjson_get_str(job_id_item);
-    if (job_id_str[0] == '\0') {
+    size_t job_id_len = strlen(job_id_str);
+    if (job_id_len == 0) {
         ESP_LOGE(TAG, "Empty job_id in mining.notify");
+        return false;
+    }
+    if (job_id_len >= sizeof(job->job_id)) {
+        ESP_LOGE(TAG, "Invalid job_id length in mining.notify (expected < %zu, got %zu)",
+                 sizeof(job->job_id), job_id_len);
         return false;
     }
 
@@ -318,9 +363,19 @@ static bool parse_mining_notify(yyjson_val *root, miner_job_t *job)
 
     const char *c2_str = yyjson_get_str(c2_item);
     size_t c2_str_len = strlen(c2_str);
-    if (c2_str_len == 0 || (c2_str_len % 2) != 0) {
-        ESP_LOGE(TAG, "Invalid coinbase_2 hex length in mining.notify: %zu", c2_str_len);
-        return false;
+    size_t c2_len = 0;
+    bool streamed_c2 = stratum_rx_stream_has_coinb2(c2_str, &c2_len);
+    if (streamed_c2) {
+        if (c2_len == 0) {
+            ESP_LOGE(TAG, "Empty streamed coinbase_2 in mining.notify");
+            return false;
+        }
+    } else {
+        if (c2_str_len == 0 || (c2_str_len % 2) != 0) {
+            ESP_LOGE(TAG, "Invalid coinbase_2 hex length in mining.notify: %zu", c2_str_len);
+            return false;
+        }
+        c2_len = c2_str_len / 2;
     }
 
     const char *version_str = yyjson_get_str(version_item);
@@ -349,14 +404,63 @@ static bool parse_mining_notify(yyjson_val *root, miner_job_t *job)
         return false;
     }
 
+    size_t count = yyjson_arr_size(merkle_branch);
+    if (count > MAX_MERKLE_BRANCHES) {
+        ESP_LOGE(TAG, "Too many Merkle branches: %zu", count);
+        return false;
+    }
+    for (size_t i = 0; i < count; i++) {
+        yyjson_val *branch = yyjson_arr_get(merkle_branch, i);
+        if (!branch || !yyjson_is_str(branch) || strlen(yyjson_get_str(branch)) != 64) {
+            ESP_LOGE(TAG, "Invalid Merkle branch at index %zu", i);
+            return false;
+        }
+    }
+
+    uint32_t version = (uint32_t)strtoul(version_str, NULL, 16);
+    uint32_t nbits = (uint32_t)strtoul(nbits_str, NULL, 16);
+    uint32_t ntime = (uint32_t)strtoul(ntime_str, NULL, 16);
+
+    if (nbits == 0) {
+        ESP_LOGW(TAG, "Rejecting notify with zero nbits");
+        return false;
+    }
+
+    if (ntime < BITCOIN_GENESIS_NTIME) {
+        ESP_LOGW(TAG, "Rejecting notify with pre-genesis ntime: %" PRIu32, ntime);
+        return false;
+    }
+
+    time_t now = time(NULL);
+    if (now > 1704067200) { // Check future bound if NTP synced
+        if (ntime > (uint32_t)now + 7200) {
+            ESP_LOGW(TAG, "Rejecting notify with ntime too far in future: %" PRIu32 " (now: %ld)",
+                     ntime, (long)now);
+            return false;
+        }
+    }
+
+    size_t c1_len = c1_str_len / 2;
+    if (c1_len > MAX_COINBASE_PREFIX_LEN || c2_len > MAX_COINBASE_SUFFIX_LEN) {
+        ESP_LOGE(TAG, "Coinbase exceeds supported size: prefix=%zu, suffix=%zu", c1_len, c2_len);
+        return false;
+    }
     if (!job->coinbase_prefix) {
-        job->coinbase_prefix = heap_caps_calloc(1, MAX_COINBASE_PREFIX_LEN, MALLOC_CAP_SPIRAM);
-        if (!job->coinbase_prefix) job->coinbase_prefix = calloc(1, MAX_COINBASE_PREFIX_LEN);
+        job->coinbase_prefix = heap_caps_calloc(1, MAX_COINBASE_PREFIX_LEN,
+                                                MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     }
-    if (!job->coinbase_suffix) {
-        job->coinbase_suffix = heap_caps_calloc(1, MAX_COINBASE_SUFFIX_LEN, MALLOC_CAP_SPIRAM);
-        if (!job->coinbase_suffix) job->coinbase_suffix = calloc(1, 2048);
+    if (!job->coinbase_prefix) {
+        ESP_LOGE(TAG, "Failed to allocate coinbase prefix buffer");
+        return false;
     }
+    if (streamed_c2) {
+        free(job->coinbase_suffix);
+        job->coinbase_suffix = stratum_rx_stream_take_coinb2(NULL);
+    } else if (!miner_job_resize_coinbase_suffix(job, c2_len)) {
+        ESP_LOGE(TAG, "Failed to allocate coinbase buffers (suffix=%zu bytes)", c2_len);
+        return false;
+    }
+
     uint8_t *p_buf = job->coinbase_prefix;
     uint8_t *s_buf = job->coinbase_suffix;
     memset(job, 0, sizeof(miner_job_t));
@@ -364,70 +468,29 @@ static bool parse_mining_notify(yyjson_val *root, miner_job_t *job)
     job->coinbase_suffix = s_buf;
     job->type = JOB_TYPE_V1;
 
-    if (strlen(job_id_str) >= sizeof(job->job_id)) {
-        ESP_LOGE(TAG, "Invalid job_id length in mining.notify (expected < %zu, got %zu)",
-                 sizeof(job->job_id), strlen(job_id_str));
-        return false;
-    }
     strlcpy(job->job_id, job_id_str, sizeof(job->job_id));
 
     hex2bin(prev_hash_str, job->prev_hash, 32);
     reverse_endianness_per_word(job->prev_hash);
 
-    size_t c1_len = c1_str_len / 2;
-    if (c1_len > MAX_COINBASE_PREFIX_LEN) {
-        ESP_LOGE(TAG, "coinbase_1 length %zu exceeds maximum %d in mining.notify", c1_len, MAX_COINBASE_PREFIX_LEN);
-        return false;
-    }
     hex2bin(c1_str, job->coinbase_prefix, c1_len);
     job->coinbase_prefix_len = (uint16_t)c1_len;
 
-    size_t c2_len = c2_str_len / 2;
-    if (c2_len > MAX_COINBASE_SUFFIX_LEN) {
-        ESP_LOGE(TAG, "coinbase_2 length %zu exceeds maximum %d in mining.notify", c2_len, MAX_COINBASE_SUFFIX_LEN);
-        return false;
+    if (!streamed_c2) {
+        hex2bin(c2_str, job->coinbase_suffix, c2_len);
     }
-    hex2bin(c2_str, job->coinbase_suffix, c2_len);
-    job->coinbase_suffix_len = (uint16_t)c2_len;
+    job->coinbase_suffix_len = (uint32_t)c2_len;
 
-    size_t count = yyjson_arr_size(merkle_branch);
-    if (count > MAX_MERKLE_BRANCHES) {
-        ESP_LOGE(TAG, "Too many Merkle branches: %zu", count);
-        return false;
-    }
     job->merkle_path_count = (uint8_t)count;
     for (size_t i = 0; i < count; i++) {
         yyjson_val *branch = yyjson_arr_get(merkle_branch, i);
-        if (!branch || !yyjson_is_str(branch) || strlen(yyjson_get_str(branch)) != 64) {
-            ESP_LOGE(TAG, "Invalid Merkle branch at index %zu", i);
-            return false;
-        }
         hex2bin(yyjson_get_str(branch), job->merkle_path[i], 32);
     }
 
-    job->version = strtoul(version_str, NULL, 16);
-    job->nbits = strtoul(nbits_str, NULL, 16);
-    job->ntime = strtoul(ntime_str, NULL, 16);
+    job->version = version;
+    job->nbits = nbits;
+    job->ntime = ntime;
     job->clean_jobs = yyjson_is_true(yyjson_arr_get(params, params_count - 1));
-
-    if (job->nbits == 0) {
-        ESP_LOGW(TAG, "Rejecting notify with zero nbits");
-        return false;
-    }
-
-    if (job->ntime < BITCOIN_GENESIS_NTIME) {
-        ESP_LOGW(TAG, "Rejecting notify with pre-genesis ntime: %" PRIu32, job->ntime);
-        return false;
-    }
-
-    time_t now = time(NULL);
-    if (now > 1704067200) { // Check future bound if NTP synced
-        if (job->ntime > (uint32_t)now + 7200) {
-            ESP_LOGW(TAG, "Rejecting notify with ntime too far in future: %" PRIu32 " (now: %ld)",
-                     job->ntime, (long)now);
-            return false;
-        }
-    }
 
     ESP_LOGD(TAG, "Parsed mining.notify: job_id=%s, clean_jobs=%d", job->job_id, job->clean_jobs);
     return true;
@@ -686,14 +749,14 @@ bool STRATUM_V1_parse(StratumApiV1Message *message, const char *stratum_json, mi
 
     yyjson_doc *doc = yyjson_read(stratum_json, json_length, YYJSON_READ_NOFLAG);
     if (!doc) {
-        ESP_LOGE(TAG, "JSON-RPC message is not valid JSON: %s", stratum_json);
+        ESP_LOGE(TAG, "Cannot parse JSON-RPC message (%zu bytes)", json_length);
         message->method = METHOD_UNKNOWN;
         return false;
     }
 
     yyjson_val *root = yyjson_doc_get_root(doc);
     if (!yyjson_is_obj(root)) {
-        ESP_LOGE(TAG, "JSON-RPC message is not a valid JSON object: %s", stratum_json);
+        ESP_LOGE(TAG, "JSON-RPC message is not a valid JSON object");
         message->method = METHOD_UNKNOWN;
         yyjson_doc_free(doc);
         return false;
