@@ -16,7 +16,7 @@
 #include "libbase58.h"
 #include "device_config.h"
 #include "esp_heap_caps.h"
-
+#include "power_management_task.h"
 
 #include <string.h>
 #include <stdlib.h>
@@ -532,8 +532,15 @@ esp_err_t stratum_v2_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
 
     int64_t connect_start_us = esp_timer_get_time();
 
-    esp_err_t ret = esp_transport_connect(transport, conn_info.host_ip, port, TRANSPORT_TIMEOUT_MS);
-    if (ret != ESP_OK) {
+    esp_err_t ret = stratum_socket_connect_async(transport, conn_info.host_ip, port,
+                                                 TRANSPORT_TIMEOUT_MS, stratum_reconnect_requested);
+    if (ret == ESP_ERR_INVALID_STATE) {
+        ESP_LOGI(TAG, "Shutdown/reconnect requested during connection attempt");
+        esp_transport_close(transport);
+        esp_transport_destroy(transport);
+        run_result = ESP_ERR_INVALID_STATE;
+        goto cleanup;
+    } else if (ret != ESP_OK) {
         ESP_LOGE(TAG, "TCP connect failed to %s:%d (%s) (err %d)", stratum_url, port, conn_info.host_ip, ret);
         stratum_set_pool_error(GLOBAL_STATE, pool_idx, "Pool unreachable");
         esp_transport_close(transport);
@@ -642,8 +649,7 @@ esp_err_t stratum_v2_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
 
     // 3. Send OpenMiningChannel
     {
-        float expected_gh = GLOBAL_STATE->POWER_MANAGEMENT_MODULE.expected_hashrate;
-        float hash_rate = (expected_gh > 0.0f) ? (expected_gh * 1e9f) : 1e12f;
+        float hash_rate = POWER_MANAGEMENT_get_nominal_hashrate(GLOBAL_STATE) * 1e9;
         int frame_len;
 
         if (channel_type == SV2_CHANNEL_EXTENDED) {

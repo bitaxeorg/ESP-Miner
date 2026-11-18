@@ -63,6 +63,8 @@ static uint8_t mining_start(GlobalState * GLOBAL_STATE)
 {
     ESP_LOGI(TAG, "Starting mining");
 
+    POWER_MANAGEMENT_init_frequency(GLOBAL_STATE);
+
     // Restore voltage from NVS
     uint16_t voltage = nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE);
     VCORE_set_voltage(GLOBAL_STATE, (double) voltage / 1000.0);
@@ -74,7 +76,6 @@ static uint8_t mining_start(GlobalState * GLOBAL_STATE)
     uart_flush(UART_NUM_1);
     vTaskDelay(100 / portTICK_PERIOD_MS);
 
-    POWER_MANAGEMENT_init_frequency(GLOBAL_STATE);
     // Stabilization delay of 2000ms prevents race conditions where tasks are
     // just starting to use the ASIC while power management tries to change frequency
     uint8_t chip_count = asic_initialize(GLOBAL_STATE, ASIC_INIT_RECOVERY, 2000);
@@ -91,6 +92,20 @@ static uint8_t mining_start(GlobalState * GLOBAL_STATE)
 static float expected_hashrate(GlobalState * GLOBAL_STATE)
 {
     return GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value * GLOBAL_STATE->DEVICE_CONFIG.family.asic.small_core_count * GLOBAL_STATE->DEVICE_CONFIG.family.asic_count / 1000.0;
+}
+
+float POWER_MANAGEMENT_get_nominal_hashrate(const GlobalState * GLOBAL_STATE)
+{
+    if (GLOBAL_STATE->POWER_MANAGEMENT_MODULE.expected_hashrate > 0.0f) {
+        return GLOBAL_STATE->POWER_MANAGEMENT_MODULE.expected_hashrate;
+    }
+
+    float freq = nvs_config_get_float(NVS_CONFIG_ASIC_FREQUENCY);
+    if (freq <= 0.0f) {
+        freq = (float)GLOBAL_STATE->DEVICE_CONFIG.family.asic.default_frequency_mhz;
+    }
+
+    return (freq * (float)GLOBAL_STATE->DEVICE_CONFIG.family.asic.small_core_count * (float)GLOBAL_STATE->DEVICE_CONFIG.family.asic_count) / 1000.0f;
 }
 
 void POWER_MANAGEMENT_init_frequency(GlobalState * GLOBAL_STATE)

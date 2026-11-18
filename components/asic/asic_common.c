@@ -12,6 +12,7 @@
 #include "esp_log.h"
 #include "crc.h"
 #include "esp_timer.h"
+#include "utils.h"
 
 #define PREAMBLE 0xAA55
 
@@ -225,32 +226,32 @@ uint8_t calculate_effective_asic_difficulty(double expected_ghs)
     return (uint8_t)(log2(raw_diff / 1.5) + 1);
 }
 
-double calculate_bm_timeout_ms(float frequency_mhz, size_t asic_count, size_t small_cores, size_t cores, size_t version_size, float timeout_percent, double default_time_ms)
+float calculate_bm_timeout_ms(float frequency_mhz, size_t asic_count, size_t small_cores, size_t cores, size_t version_size, float timeout_percent, float default_time_ms)
 {
     if (asic_count <= 0)
         return default_time_ms;
 
     // Round up to the nearest power of 2 some asic constants
-    int cores_up = _next_power_of_two((int)cores);
-    int small_cores_up = _next_power_of_two((int)small_cores);
-    int asic_count_up = _next_power_of_two((int)asic_count);
+    int cores_up = _next_power_of_two(cores);
+    int small_cores_up = _next_power_of_two(small_cores);
+    int asic_count_up = _next_power_of_two(asic_count);
 
-    if ((small_cores_up < cores_up) || (frequency_mhz <= 0.0f))
+    if (small_cores_up < cores_up || frequency_mhz <= 0.0f)
         return default_time_ms;
 
     // Calulate the time to scan the full nonce * version space
     // effectively how many iterations we have to do
     // First we remove the paralell nonces/versions
     // then we end up with `time = space / frequency`
-    double midstates = (double)small_cores_up / (double)cores_up;
-    double serial_versions = (double)version_size / midstates;
-    double serial_nonces = (double)NONCE_SPACE / (double)cores_up / (double)asic_count_up;
-    double fullspace_timeout_ms = serial_versions * serial_nonces / ((double)frequency_mhz * 1000.0);
+    float midstates = (float)small_cores_up / cores_up;
+    float serial_versions = version_size / midstates;
+    float serial_nonces = NONCE_SPACE / cores_up / asic_count_up;
+    float fullspace_timeout_ms = serial_versions * serial_nonces / (frequency_mhz * 1000.0f);
 
-    if (!(fullspace_timeout_ms > 0.0))
+    if (fullspace_timeout_ms <= 0.0f)
         return default_time_ms;
 
-    return (double)timeout_percent * fullspace_timeout_ms;
+    return timeout_percent * fullspace_timeout_ms;
 }
 
 bool bm13xx_decode_job_result(asic_job_store_t *store,
@@ -276,8 +277,8 @@ bool bm13xx_decode_job_result(asic_job_store_t *store,
     uint8_t asic_nr = (uint8_t)(((nonce_h >> 17) & 0xff) / address_interval);
     uint8_t core_id = (uint8_t)((nonce_h >> 25) & 0x7f);
     uint32_t version_bits = ((uint32_t)ntohs(wire_version) << 13);
-
-    result->rolled_version = result->job.version | version_bits;
+    uint32_t mask = result->job.version_mask & BIP320_VERSION_ROLLING_MASK;
+    result->rolled_version = (result->job.version & ~mask) | (version_bits & mask);
     result->nonce = wire_nonce;
     result->asic_nr = asic_nr;
     result->core_id = core_id;
