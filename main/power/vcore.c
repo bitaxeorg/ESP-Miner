@@ -20,6 +20,28 @@
 static const char *TAG = "vcore";
 static bool vcore_initialized = false;
 
+// StarMiner LT-01 (Gamma 601 clone, 12 V input): same output stage as the official
+// Gamma DEFAULT profile, but the TPS546 UV/OV thresholds are set for a 12 V rail.
+// Kept here (not in power/TPS546.c) so the board-support diff stays at 4 files;
+// move next to TPS546_CONFIG_DEFAULT when this goes upstream.
+const TPS546_CONFIG TPS546_CONFIG_GAMMA_V2 = {
+    .TPS546_INIT_PHASE = TPS546_INIT_PHASE_SINGLE,
+    .TPS546_INIT_VIN_ON = 11.0,
+    .TPS546_INIT_VIN_OFF = 10.5,
+    .TPS546_INIT_VIN_UV_WARN_LIMIT = 11.0,
+    .TPS546_INIT_VIN_OV_FAULT_LIMIT = 14.0,
+    .TPS546_INIT_SCALE_LOOP = 0.25,
+    .TPS546_INIT_VOUT_MIN = 1,
+    .TPS546_INIT_VOUT_MAX = 2,
+    .TPS546_INIT_VOUT_COMMAND = 1.2,
+    .TPS546_INIT_IOUT_OC_WARN_LIMIT = 25.00,
+    .TPS546_INIT_IOUT_OC_FAULT_LIMIT = 30.00,
+    .TPS546_INIT_STACK_CONFIG = TPS546_SINGLE_PHASE_STACK_CONFIG,
+    .TPS546_INIT_SYNC_CONFIG = 0x10,
+    .TPS546_INIT_FREQUENCY = TPS546_DEFAULT_FREQUENCY,
+    .TPS546_INIT_COMPENSATION_CONFIG = {0},
+};
+
 static void log_tps546_config(const FamilyConfig *family, const TPS546_CONFIG *config)
 {
     ESP_LOGI(TAG, "Selected TPS546 config for family=%s id=%d voltage_domains=%u",
