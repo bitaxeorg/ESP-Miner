@@ -127,8 +127,8 @@ TEST_CASE("SV1 notify produces expected Bitmain job fields",
     job_pipeline_harness_result_t result;
     job_pipeline_harness_run(
         (job_pipeline_harness_config_t) {
-            .hardware_version_rolling = false,
-            .software_midstates = 4,
+            .hw_version_mask = 0,
+            .packet_midstates = 4,
             .asic_initialized = true,
             .job_frequency_ms = 1,
         },
@@ -258,8 +258,8 @@ TEST_CASE("SV2 standard messages produce expected Bitmain job fields",
     job_pipeline_harness_result_t result;
     job_pipeline_harness_run(
         (job_pipeline_harness_config_t) {
-            .hardware_version_rolling = true,
-            .software_midstates = 0,
+            .hw_version_mask = BIP320_VERSION_ROLLING_MASK,
+            .packet_midstates = 1,
             .asic_initialized = true,
             .job_frequency_ms = 1,
         },
@@ -285,8 +285,8 @@ TEST_CASE("SV2 standard messages produce expected Bitmain job fields",
     };
     job_pipeline_harness_run(
         (job_pipeline_harness_config_t) {
-            .hardware_version_rolling = false,
-            .software_midstates = 4,
+            .hw_version_mask = 0,
+            .packet_midstates = 4,
             .asic_initialized = true,
             .job_frequency_ms = 1,
         },
@@ -326,8 +326,8 @@ TEST_CASE("SV2 standard messages produce expected Bitmain job fields",
     };
     job_pipeline_harness_run(
         (job_pipeline_harness_config_t) {
-            .hardware_version_rolling = true,
-            .software_midstates = 0,
+            .hw_version_mask = BIP320_VERSION_ROLLING_MASK,
+            .packet_midstates = 1,
             .asic_initialized = false,
             .job_frequency_ms = 1,
         },
@@ -419,8 +419,8 @@ TEST_CASE("SV2 extended messages roll extranonce into the ASIC job byte exact",
     job_pipeline_harness_result_t result;
     job_pipeline_harness_run(
         (job_pipeline_harness_config_t) {
-            .hardware_version_rolling = true,
-            .software_midstates = 0,
+            .hw_version_mask = BIP320_VERSION_ROLLING_MASK,
+            .packet_midstates = 1,
             .asic_initialized = true,
             .job_frequency_ms = 1,
         },
@@ -485,14 +485,17 @@ TEST_CASE("job task harness preserves idle and staged work behavior",
     job_pipeline_harness_result_t result;
     job_pipeline_harness_run(
         (job_pipeline_harness_config_t) {
-            .hardware_version_rolling = true,
-            .software_midstates = 0,
+            .hw_version_mask = BIP320_VERSION_ROLLING_MASK,
+            .packet_midstates = 1,
             .asic_initialized = true,
-            .job_frequency_ms = 1,
+            .job_frequency_ms = 5000,
         },
         events, sizeof(events) / sizeof(events[0]), &result);
 
-    TEST_ASSERT_EQUAL_UINT32(1, result.delay_count);
+    TEST_ASSERT_EQUAL_UINT32(3, result.wait_count);
+    TEST_ASSERT_EQUAL_UINT32(portMAX_DELAY, result.wait_ticks[0]);
+    TEST_ASSERT_EQUAL_UINT32(portMAX_DELAY, result.wait_ticks[1]);
+    TEST_ASSERT_EQUAL_UINT32(portMAX_DELAY, result.wait_ticks[2]);
     TEST_ASSERT_EQUAL_UINT32(1, result.job_count);
     TEST_ASSERT_EQUAL_UINT32(1, result.coinbase_decode_count);
     TEST_ASSERT_EQUAL_UINT32(0, result.version_mask_count);
@@ -520,8 +523,8 @@ TEST_CASE("job task harness rejects oversized extranonce work",
     job_pipeline_harness_result_t result;
     job_pipeline_harness_run(
         (job_pipeline_harness_config_t) {
-            .hardware_version_rolling = true,
-            .software_midstates = 0,
+            .hw_version_mask = BIP320_VERSION_ROLLING_MASK,
+            .packet_midstates = 1,
             .asic_initialized = true,
             .job_frequency_ms = 1,
         },
@@ -566,7 +569,8 @@ TEST_CASE("job task preserves maximum accepted metadata and detached ownership",
     };
     job_pipeline_harness_result_t result;
     job_pipeline_harness_run((job_pipeline_harness_config_t) {
-        .hardware_version_rolling = true,
+        .hw_version_mask = BIP320_VERSION_ROLLING_MASK,
+        .packet_midstates = 1,
         .asic_initialized = true,
         .job_frequency_ms = 1,
     }, events, sizeof(events) / sizeof(events[0]), &result);
@@ -601,7 +605,8 @@ TEST_CASE("zero-length extranonce waits for new work and preserves owned metadat
     job_pipeline_harness_result_t result;
     job_pipeline_harness_run(
         (job_pipeline_harness_config_t) {
-            .hardware_version_rolling = true,
+            .hw_version_mask = BIP320_VERSION_ROLLING_MASK,
+        .packet_midstates = 1,
             .asic_initialized = true,
             .job_frequency_ms = 1,
         }, events, sizeof(events) / sizeof(events[0]), &result);
@@ -633,7 +638,8 @@ TEST_CASE("large coinbase job streams hashing and retains extranonce order",
     job_pipeline_harness_result_t result;
     job_pipeline_harness_run(
         (job_pipeline_harness_config_t) {
-            .hardware_version_rolling = true,
+            .hw_version_mask = BIP320_VERSION_ROLLING_MASK,
+        .packet_midstates = 1,
             .asic_initialized = true,
             .job_frequency_ms = 1,
         }, events, sizeof(events) / sizeof(events[0]), &result);
@@ -661,7 +667,8 @@ TEST_CASE("coinbase hash failures skip sending work and permit the next cycle",
         job_pipeline_harness_result_t result;
         job_pipeline_harness_run(
             (job_pipeline_harness_config_t) {
-                .hardware_version_rolling = true,
+                .hw_version_mask = BIP320_VERSION_ROLLING_MASK,
+        .packet_midstates = 1,
                 .asic_initialized = true,
                 .job_frequency_ms = 1,
                 .hash_failure_at = failure_at,
@@ -704,8 +711,8 @@ TEST_CASE("BM1397 rolls version instead of extranonce2 on rollable jobs until ex
     job_pipeline_harness_result_t result;
     job_pipeline_harness_run(
         (job_pipeline_harness_config_t) {
-            .hardware_version_rolling = false,
-            .software_midstates = 4,
+            .hw_version_mask = 0,
+            .packet_midstates = 4,
             .asic_initialized = true,
             .job_frequency_ms = 1,
         }, events, sizeof(events) / sizeof(events[0]), &result);
@@ -735,8 +742,8 @@ TEST_CASE("BM1397 rolls version instead of extranonce2 on rollable jobs until ex
     };
     job_pipeline_harness_run(
         (job_pipeline_harness_config_t) {
-            .hardware_version_rolling = false,
-            .software_midstates = 4,
+            .hw_version_mask = 0,
+            .packet_midstates = 4,
             .asic_initialized = true,
             .job_frequency_ms = 1,
         }, exhaust_events, sizeof(exhaust_events) / sizeof(exhaust_events[0]), &result);
@@ -746,5 +753,130 @@ TEST_CASE("BM1397 rolls version instead of extranonce2 on rollable jobs until ex
     // After 4 versions are exhausted, extranonce2 rolls to 1
     TEST_ASSERT_EQUAL_STRING("0100000000000000", result.jobs[1]->extranonce2);
     TEST_ASSERT_EQUAL_HEX32(0x20000004, result.jobs[1]->version);
+    job_pipeline_harness_result_free(&result);
+}
+
+static void init_test_sv1_slot(size_t slot, const char *id, bool clean_jobs)
+{
+    miner_job_t *job = miner_job_get_slot(slot);
+    (void)snprintf(job->job_id, sizeof(job->job_id), "%s", id);
+    job->type = JOB_TYPE_V1;
+    job->version = 0x20000004;
+    job->version_mask = BIP320_VERSION_ROLLING_MASK;
+    job->clean_jobs = clean_jobs;
+    job->ntime = 0x64658bd8 + (uint32_t)slot;
+    job->nbits = 0x1705dd01;
+    diff_to_target(256.0, job->pool_target);
+    job->extranonce2_len = 4;
+    job->coinbase_prefix_len = 1;
+    job->coinbase_prefix[0] = (uint8_t)(0x10 + slot);
+    job->coinbase_suffix_len = 1;
+    job->coinbase_suffix[0] = 0x02;
+}
+
+TEST_CASE("clean_jobs false sends immediately after 1s and coalesces bursts under 1s",
+          "[mining][job-task][throttle]")
+{
+    miner_job_pool_init();
+    init_test_sv1_slot(0, "job-0", false);
+    init_test_sv1_slot(1, "job-1", false);
+    init_test_sv1_slot(2, "job-2", false);
+    init_test_sv1_slot(3, "job-3", false);
+    init_test_sv1_slot(4, "job-4", true);
+
+    const job_pipeline_harness_event_t events[] = {
+        { .type = JOB_PIPELINE_HARNESS_NOTIFY, .slot = 0, .advance_ms = 0 },
+        { .type = JOB_PIPELINE_HARNESS_NOTIFY, .slot = 1, .advance_ms = 200 },
+        { .type = JOB_PIPELINE_HARNESS_NOTIFY, .slot = 2, .advance_ms = 300 },
+        { .type = JOB_PIPELINE_HARNESS_TIMEOUT, .advance_ms = 500 },
+        { .type = JOB_PIPELINE_HARNESS_NOTIFY, .slot = 3, .advance_ms = 1200 },
+        { .type = JOB_PIPELINE_HARNESS_NOTIFY, .slot = 4, .advance_ms = 100 },
+    };
+
+    job_pipeline_harness_result_t result;
+    job_pipeline_harness_run(
+        (job_pipeline_harness_config_t) {
+            .hw_version_mask = BIP320_VERSION_ROLLING_MASK,
+            .packet_midstates = 1,
+            .asic_initialized = true,
+            .job_frequency_ms = 5000,
+        }, events, sizeof(events) / sizeof(events[0]), &result);
+
+    TEST_ASSERT_EQUAL_UINT32(4, result.job_count);
+    TEST_ASSERT_EQUAL_STRING("job-0", result.jobs[0]->job_id);
+    TEST_ASSERT_EQUAL_STRING("job-2", result.jobs[1]->job_id);
+    TEST_ASSERT_EQUAL_STRING("job-3", result.jobs[2]->job_id);
+    TEST_ASSERT_EQUAL_STRING("job-4", result.jobs[3]->job_id);
+
+    TEST_ASSERT_EQUAL_UINT32(portMAX_DELAY, result.wait_ticks[0]);
+    TEST_ASSERT_EQUAL_UINT32(pdMS_TO_TICKS(5000), result.wait_ticks[1]);
+    TEST_ASSERT_EQUAL_UINT32(pdMS_TO_TICKS(800), result.wait_ticks[2]);
+    TEST_ASSERT_EQUAL_UINT32(pdMS_TO_TICKS(500), result.wait_ticks[3]);
+    TEST_ASSERT_EQUAL_UINT32(pdMS_TO_TICKS(5000), result.wait_ticks[4]);
+    TEST_ASSERT_EQUAL_UINT32(pdMS_TO_TICKS(5000), result.wait_ticks[5]);
+
+    job_pipeline_harness_result_free(&result);
+}
+
+TEST_CASE("BM13xx rolls BIP323 software bits on SV2 standard and sleeps when exhausted",
+          "[mining][job-task][bip323]")
+{
+    miner_job_pool_init();
+    miner_job_t *job = miner_job_get_slot(0);
+    uint8_t *prefix_buffer = job->coinbase_prefix;
+    uint8_t *suffix_buffer = job->coinbase_suffix;
+    memset(job, 0, sizeof(*job));
+    job->coinbase_prefix = prefix_buffer;
+    job->coinbase_suffix = suffix_buffer;
+    job->type = JOB_TYPE_SV2_STANDARD;
+    (void)snprintf(job->job_id, sizeof(job->job_id), "sv2-bip323");
+    job->version = 0x20000004;
+    job->version_mask = BIP323_VERSION_ROLLING_MASK;
+    job->ntime = 0x64658bd8;
+    job->nbits = 0x1705dd01;
+    job->clean_jobs = true;
+    diff_to_target(512.0, job->pool_target);
+    memset(job->prev_hash, 0x11, sizeof(job->prev_hash));
+    memset(job->merkle_root, 0x22, sizeof(job->merkle_root));
+
+    const job_pipeline_harness_event_t events[] = {
+        { .type = JOB_PIPELINE_HARNESS_NOTIFY, .slot = 0, .advance_ms = 0 },
+        { .type = JOB_PIPELINE_HARNESS_TIMEOUT, .advance_ms = 5000 },
+        { .type = JOB_PIPELINE_HARNESS_TIMEOUT, .advance_ms = 5000 },
+    };
+
+    job_pipeline_harness_result_t result;
+    job_pipeline_harness_run(
+        (job_pipeline_harness_config_t) {
+            .hw_version_mask = BIP320_VERSION_ROLLING_MASK,
+            .packet_midstates = 1,
+            .asic_initialized = true,
+            .job_frequency_ms = 5000,
+        }, events, sizeof(events) / sizeof(events[0]), &result);
+
+    TEST_ASSERT_EQUAL_UINT32(3, result.job_count);
+    TEST_ASSERT_EQUAL_HEX32(0x20000004, result.jobs[0]->version);
+    TEST_ASSERT_EQUAL_HEX32(0x20000024, result.jobs[1]->version);
+    TEST_ASSERT_EQUAL_HEX32(0x20000044, result.jobs[2]->version);
+    job_pipeline_harness_result_free(&result);
+
+    job->version_mask = BIP320_VERSION_ROLLING_MASK | 0x00000020U;
+    const job_pipeline_harness_event_t exhaust_events[] = {
+        { .type = JOB_PIPELINE_HARNESS_NOTIFY, .slot = 0, .advance_ms = 0 },
+        { .type = JOB_PIPELINE_HARNESS_TIMEOUT, .advance_ms = 5000 },
+        { .type = JOB_PIPELINE_HARNESS_TIMEOUT, .advance_ms = 5000 },
+    };
+    job_pipeline_harness_run(
+        (job_pipeline_harness_config_t) {
+            .hw_version_mask = BIP320_VERSION_ROLLING_MASK,
+            .packet_midstates = 1,
+            .asic_initialized = true,
+            .job_frequency_ms = 5000,
+        }, exhaust_events, sizeof(exhaust_events) / sizeof(exhaust_events[0]), &result);
+
+    TEST_ASSERT_EQUAL_UINT32(2, result.job_count);
+    TEST_ASSERT_EQUAL_HEX32(0x20000004, result.jobs[0]->version);
+    TEST_ASSERT_EQUAL_HEX32(0x20000024, result.jobs[1]->version);
+    TEST_ASSERT_EQUAL_UINT32(portMAX_DELAY, result.wait_ticks[2]);
     job_pipeline_harness_result_free(&result);
 }

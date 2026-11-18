@@ -261,7 +261,7 @@ void BM1397_send_work(GlobalState * GLOBAL_STATE, const asic_job_t * next_job)
 {
     bm1397_job_packet_t job;
     bm1397_build_job_packet(&GLOBAL_STATE->job_store,
-                           GLOBAL_STATE->DEVICE_CONFIG.family.asic.software_midstates,
+                           GLOBAL_STATE->DEVICE_CONFIG.family.asic.packet_midstates,
                            next_job, &job);
     uint8_t slot = bm_decode_wire_job_slot(job.chip_slot, BM1397_TX_SLOT_SHIFT);
     if (slot < BM1397_JOB_SLOT_COUNT) {

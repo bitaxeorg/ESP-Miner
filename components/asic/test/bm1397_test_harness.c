@@ -27,7 +27,7 @@ GlobalState *bm1397_harness_begin(void)
     fixture_state = (GlobalState) {
         .DEVICE_CONFIG.family.asic_count = 2,
         .DEVICE_CONFIG.family.asic.core_count = 672,
-        .DEVICE_CONFIG.family.asic.software_midstates = 4,
+        .DEVICE_CONFIG.family.asic.packet_midstates = 4,
         .POWER_MANAGEMENT_MODULE.frequency_value = 200.0f,
     };
     bm13xx_init_job_slots(&fixture_state.job_store, BM1397_JOB_SLOT_COUNT);
