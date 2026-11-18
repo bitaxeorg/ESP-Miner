@@ -12,6 +12,7 @@
 #include "global_state.h"
 #include "serial.h"
 #include "unity.h"
+#include "utils.h"
 
 const bm13xx_harness_driver_t
     bm13xx_harness_drivers[BM13XX_HARNESS_DRIVER_COUNT] = {
@@ -111,6 +112,7 @@ void bm13xx_harness_set_job(uint32_t version, bool valid, bool present)
     if (present) {
         fixture_state.job_store.entries[JOB_SLOT].job = (asic_job_t){
             .version = version,
+            .version_mask = BIP320_VERSION_ROLLING_MASK,
         };
         fixture_state.job_store.entries[JOB_SLOT].is_valid = valid;
     } else {
