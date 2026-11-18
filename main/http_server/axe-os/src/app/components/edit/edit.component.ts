@@ -1,7 +1,7 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { getHttpErrorMessage } from 'src/app/utils/error-handler';
 import { Component, Input, OnInit, OnDestroy, OnChanges, SimpleChanges } from '@angular/core';
-import { FormBuilder, FormGroup, FormControl, Validators, ReactiveFormsModule } from '@angular/forms';
+import { FormBuilder, FormGroup, FormControl, Validators, ReactiveFormsModule, FormsModule } from '@angular/forms';
 import { ToastrService } from 'ngx-toastr';
 import { forkJoin, startWith, Subject, takeUntil, pairwise, BehaviorSubject, Observable, first } from 'rxjs';
 import { LoadingService } from 'src/app/services/loading.service';
@@ -14,6 +14,14 @@ import { SelectOption } from '../../models/select-option.model';
 import { TooltipDirective } from '../../directives/tooltip.directive';
 import { CheckboxComponent } from '../checkbox/checkbox.component';
 import { SliderComponent } from '../slider/slider.component';
+import { I18nService, Locale } from 'src/app/i18n/i18n.service';
+import { TranslatePipe } from 'src/app/i18n/translate.pipe';
+
+type LanguageOption = {
+  label: string;
+  value: Locale;
+};
+
 
 const DISPLAY_TIMEOUT_STEPS = [0, 1, 2, 5, 15, 30, 60, 60 * 2, 60 * 4, 60* 8, -1];
 const STATS_FREQUENCY_STEPS = [0, 1, 2, 5, 10, 30, 60, 60 * 2, 60 * 6, 60 * 14, 60 * 28, 60 * 60];
@@ -24,11 +32,13 @@ const STATS_FREQUENCY_STEPS = [0, 1, 2, 5, 10, 30, 60, 60 * 2, 60 * 6, 60 * 14, 
     standalone: true,
     imports: [
         ReactiveFormsModule,
+        FormsModule,
         CheckboxComponent,
         DropdownComponent,
         SliderComponent,
         TooltipDirective,
         DateAgoPipe,
+        TranslatePipe,
     ]
 })
 
@@ -53,11 +63,16 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
 
   private destroy$ = new Subject<void>();
 
-  public displays = ["NONE", "SSD1306 (128x32)", "SSD1309 (128x64)", "SH1107 (64x128)", "SH1107 (128x128)"];
+  public readonly displays = ["NONE", "SSD1306 (128x32)", "SSD1309 (128x64)", "SH1107 (64x128)", "SH1107 (128x128)"];
   public rotations = [0, 90, 180, 270];
   public displayTimeoutControl: FormControl;
   public statsFrequencyControl: FormControl;
   public statsLimit: number = 720;
+
+  public selectedLocale: Locale = this.i18n.locale;
+  private currentLocale: Locale = this.i18n.locale;
+  private localeDirty = false;
+  private localeDirtyMarksForm = false;
 
   constructor(
     private fb: FormBuilder,
@@ -66,6 +81,7 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
     private toastr: ToastrService,
     private loadingService: LoadingService,
     private route: ActivatedRoute,
+    private i18n: I18nService,
   ) {
     // Check URL parameter for settings unlock
     this.route.queryParams.subscribe(params => {
@@ -127,6 +143,16 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
 
   ngOnInit(): void {
     this.loadDeviceSettings();
+
+    this.i18n.locale$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(locale => {
+        this.currentLocale = locale;
+        if (!this.localeDirty) {
+          this.selectedLocale = locale;
+        }
+        this.updateLocaleDirty();
+      });
   }
 
   ngOnChanges(changes: SimpleChanges): void {
@@ -245,6 +271,63 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
     this.destroy$.complete();
   }
 
+  public onSaveClick() {
+    if (this.localeDirty) {
+      this.currentLocale = this.selectedLocale;
+      this.updateLocaleDirty();
+      this.i18n.setLocale(this.selectedLocale);
+    }
+    this.updateSystem();
+  }
+
+  public onLanguageChange(locale: Locale) {
+    this.selectedLocale = locale;
+    this.updateLocaleDirty();
+  }
+
+  private updateLocaleDirty() {
+    const wasDirty = this.localeDirty;
+    this.localeDirty = this.selectedLocale !== this.currentLocale;
+
+    if (this.localeDirty && !wasDirty) {
+      this.markFormDirtyForLocale();
+    } else if (!this.localeDirty && wasDirty) {
+      this.clearFormDirtyForLocale();
+    }
+  }
+
+  private markFormDirtyForLocale() {
+    if (!this.form) {
+      return;
+    }
+    if (!this.form.dirty) {
+      this.localeDirtyMarksForm = true;
+      this.form.markAsDirty();
+    } else {
+      this.localeDirtyMarksForm = false;
+    }
+  }
+
+  private clearFormDirtyForLocale() {
+    if (!this.form) {
+      this.localeDirtyMarksForm = false;
+      return;
+    }
+
+    if (this.localeDirtyMarksForm && !Object.values(this.form.controls).some(control => control.dirty)) {
+      this.form.markAsPristine();
+    }
+    this.localeDirtyMarksForm = false;
+  }
+
+  get languageOptions(): LanguageOption[] {
+    return [
+      { value: 'en', label: this.i18n.t('settings.ui.languages.en') },
+      { value: 'de', label: this.i18n.t('settings.ui.languages.de') },
+      { value: 'es', label: this.i18n.t('settings.ui.languages.es') }
+    ];
+  }
+
   public updateSystem() {
     const form = this.form.getRawValue();
 
@@ -260,16 +343,20 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
       .pipe(this.loadingService.lockUIUntilComplete())
       .subscribe({
         next: () => {
-          const successMessage = this.uri ? `Saved settings for ${this.uri}` : 'Saved settings';
+          const successMessage = this.uri
+            ? this.i18n.t('messages.settings_saved_for', { uri: this.uri })
+            : this.i18n.t('messages.settings_saved');
           if (restartRequired) {
-            this.toastr.warning('You must restart this device after saving for changes to take effect.');
+            this.toastr.warning(this.i18n.t('messages.restart_required'));
           }
           this.toastr.success(successMessage);
           this.form.markAsPristine();
           this.savedChanges = restartAlreadyPending || restartRequired;
         },
         error: (err: HttpErrorResponse) => {
-          const errorMessage = `Could not save settings. ${getHttpErrorMessage(err, this.uri)}`;
+          const errorMessage = this.uri
+            ? this.i18n.t('errors.save_failed_for', { uri: this.uri, error: err.message })
+            : this.i18n.t('errors.save_failed', { error: err.message });
           this.toastr.error(errorMessage);
           this.savedChanges = restartAlreadyPending;
         }
@@ -300,12 +387,16 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
       .pipe(this.loadingService.lockUIUntilComplete())
       .subscribe({
         next: () => {
-          const successMessage = this.uri ? `Device at ${this.uri} restarted` : 'Device restarted';
+          const successMessage = this.uri
+            ? this.i18n.t('messages.device_restarted_at', { uri: this.uri })
+            : this.i18n.t('messages.device_restarted');
           this.toastr.success(successMessage);
           this.savedChanges = false;
         },
         error: (err: HttpErrorResponse) => {
-          const errorMessage = `Failed to restart device. ${getHttpErrorMessage(err, this.uri)}`;
+          const errorMessage = this.uri
+            ? this.i18n.t('errors.restart_failed_for', { uri: this.uri, error: err.message })
+            : this.i18n.t('errors.restart_failed', { error: err.message });
           this.toastr.error(errorMessage);
         }
       });
@@ -317,7 +408,10 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
   }
 
   get displayOptions(): SelectOption[] {
-    return this.displays.map(display => ({ name: display, value: display }));
+    return this.displays.map(value => ({
+      name: value === 'NONE' ? this.i18n.t('settings.device.display.none') : value,
+      value
+    }));
   }
 
   get isDisplayConfigurable(): boolean {
@@ -327,6 +421,7 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
   get rotationOptions(): SelectOption[] {
     return this.rotations.map(rotation => ({ name: `${rotation}°`, value: rotation }));
   }
+
 
   get displayTimeoutMaxSteps(): number {
     return DISPLAY_TIMEOUT_STEPS.length - 1;
@@ -349,10 +444,13 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
       return [];
     }
 
+    const defaultLabel = this.i18n.t('common.default');
+    const customLabel = this.i18n.t('common.custom');
+
     // Convert options from API to select format
     const options = apiOptions.map(option => {
       return {
-        name: defaultValue === option ? `${option} (Default)` : `${option}`,
+        name: defaultValue === option ? `${option} (${defaultLabel})` : `${option}`,
         value: option
       };
     });
@@ -363,7 +461,7 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
     // If current field value exists and isn't in the options
     if (currentValue && !options.some(opt => opt.value === currentValue)) {
       options.push({
-        name: `${currentValue} (Custom)`,
+        name: `${currentValue} (${customLabel})`,
         value: currentValue
       });
       // Sort options by value

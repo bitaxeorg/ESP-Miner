@@ -11,6 +11,7 @@ import { getHttpErrorMessage } from 'src/app/utils/error-handler';
 import { of, throwError } from 'rxjs';
 import { SystemApiService } from 'src/app/services/system.service';
 import { GithubRelease, GithubUpdateService } from 'src/app/services/github-update.service';
+import { TranslatePipe } from 'src/app/i18n/translate.pipe';
 
 describe('UpdateComponent', () => {
   let component: UpdateComponent;
@@ -18,7 +19,7 @@ describe('UpdateComponent', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      imports: [CheckboxComponent, ProgressbarComponent, FormsModule, UpdateComponent, ModalComponent],
+      imports: [CheckboxComponent, ProgressbarComponent, FormsModule, UpdateComponent, ModalComponent, TranslatePipe],
       providers: [provideHttpClient(), provideToastr()]
     });
     fixture = TestBed.createComponent(UpdateComponent);

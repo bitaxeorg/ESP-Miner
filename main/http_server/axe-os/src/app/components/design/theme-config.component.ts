@@ -5,6 +5,7 @@ import { LayoutService } from '../../layout/service/app.layout.service';
 import { ThemeService } from '../../services/theme.service';
 import { RadioButtonComponent } from '../radio-button/radio-button.component';
 import { FormsModule } from '@angular/forms';
+import { TranslatePipe } from 'src/app/i18n/translate.pipe';
 
 interface ThemeOption {
   name: string;
@@ -15,7 +16,7 @@ interface ThemeOption {
   selector: 'app-theme-config',
   templateUrl: './theme-config.component.html',
   styleUrls: ['./design-component.scss'],
-  imports: [RadioButtonComponent, FormsModule]
+  imports: [RadioButtonComponent, FormsModule, TranslatePipe]
 })
 export class ThemeConfigComponent implements OnInit {
   selectedScheme: string;
