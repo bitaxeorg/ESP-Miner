@@ -34,7 +34,6 @@
 #include "utils.h"
 #include "self_test.h"
 #include "filesystem.h"
-#include "embedded_web_ui.h"
 #include "hashrate_monitor_task.h"
 #include "coinbase_decoder.h"
 #include "sv2_protocol.h"
@@ -202,16 +201,13 @@ void SYSTEM_init_system(GlobalState * GLOBAL_STATE)
     SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
 
     module->screen_page = 0;
-    module->shares_submitted = 0;
-    module->shares_accepted = 0;
-    module->shares_rejected = 0;
-    module->shares_pending = 0;
     module->best_nonce_diff = nvs_config_get_u64(NVS_CONFIG_BEST_DIFF);
     module->best_session_nonce_diff = 0;
     module->start_time_us = esp_timer_get_time();
     module->lastClockSync = 0;
     module->block_found = 0;
     module->show_new_block = false;
+    module->current_difficulty_power = 0;
 
     if (noinit_state.sentinel != NOINIT_SENTINEL_VALUE) {
         noinit_state.sentinel = NOINIT_SENTINEL_VALUE;
@@ -249,16 +245,15 @@ void SYSTEM_init_system(GlobalState * GLOBAL_STATE)
         module->pools[i].pass = NULL;
         module->pools[i].cert = NULL;
         module->pools[i].sv2_authority_pubkey = NULL;
-        SYSTEM_load_pool_from_nvs(GLOBAL_STATE, i);
+        POOL_reset_session(GLOBAL_STATE, i);
+        SYSTEM_load_pool_from_nvs(GLOBAL_STATE, i, NULL);
     }
 
     // load primary and secondary pool index selectors and fallback preference
     SYSTEM_reload_pool_config(GLOBAL_STATE);
-
-    // Initialize pool connection info
-    strcpy(module->pool_connection_info, "Not Connected");
-    module->primary_pool_error[0] = '\0';
-    module->pool_banner[0] = '\0';
+    const PoolConfig *sec_pool = &module->pools[module->secondary_pool_index];
+    module->is_using_fallback = module->use_fallback_stratum &&
+        (sec_pool->url != NULL && sec_pool->url[0] != '\0' && sec_pool->port != 0);
 
     // Initialize overheat_mode
     module->overheat_mode = nvs_config_get_bool(NVS_CONFIG_OVERHEAT_MODE);
@@ -276,7 +271,6 @@ void SYSTEM_init_system(GlobalState * GLOBAL_STATE)
 
     // Initialize mutexes and job slots
     ASIC_init_job_slots(GLOBAL_STATE);
-    pthread_mutex_init(&GLOBAL_STATE->transport_mutex, NULL);
     GLOBAL_STATE->has_work = false;
 }
 
@@ -405,7 +399,7 @@ esp_err_t SYSTEM_init_peripherals(GlobalState * GLOBAL_STATE) {
     return ESP_OK;
 }
 
-static void clean_jobs_queue(GlobalState * GLOBAL_STATE)
+void SYSTEM_clean_jobs_queue(GlobalState * GLOBAL_STATE)
 {
     ESP_LOGI(TAG, "Clean Jobs: invalidating active jobs");
 
@@ -416,66 +410,6 @@ static void clean_jobs_queue(GlobalState * GLOBAL_STATE)
     hashrate_monitor_reset_measurements(GLOBAL_STATE);
 }
 
-static inline void update_pending_shares(SystemModule *module)
-{
-    uint64_t resolved = module->shares_accepted + module->shares_rejected;
-    uint64_t pending = (module->shares_submitted > resolved) ? (module->shares_submitted - resolved) : 0;
-    module->shares_pending = (uint16_t)(pending > UINT16_MAX ? UINT16_MAX : pending);
-}
-
-void SYSTEM_notify_submitted_share(GlobalState * GLOBAL_STATE)
-{
-    if (!GLOBAL_STATE) return;
-
-    SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
-    module->shares_submitted++;
-    update_pending_shares(module);
-}
-
-void SYSTEM_notify_accepted_share(GlobalState * GLOBAL_STATE)
-{
-    if (!GLOBAL_STATE) return;
-
-    SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
-    module->shares_accepted++;
-    update_pending_shares(module);
-}
-
-static int compare_rejected_reason_stats(const void *a, const void *b) {
-    const RejectedReasonStat *ea = a;
-    const RejectedReasonStat *eb = b;
-    return (eb->count > ea->count) - (ea->count > eb->count);
-}
-
-void SYSTEM_notify_rejected_share(GlobalState * GLOBAL_STATE, char * error_msg)
-{
-    if (!GLOBAL_STATE) return;
-
-    SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
-    module->shares_rejected++;
-    update_pending_shares(module);
-
-    for (int i = 0; i < module->rejected_reason_stats_count; i++) {
-        if (strncmp(module->rejected_reason_stats[i].message, error_msg, sizeof(module->rejected_reason_stats[i].message) - 1) == 0) {
-            module->rejected_reason_stats[i].count++;
-            return;
-        }
-    }
-
-    if (module->rejected_reason_stats_count < (int)(sizeof(module->rejected_reason_stats) / sizeof(module->rejected_reason_stats[0]))) {
-        strncpy(module->rejected_reason_stats[module->rejected_reason_stats_count].message, 
-                error_msg, 
-                sizeof(module->rejected_reason_stats[module->rejected_reason_stats_count].message) - 1);
-        module->rejected_reason_stats[module->rejected_reason_stats_count].message[sizeof(module->rejected_reason_stats[module->rejected_reason_stats_count].message) - 1] = '\0'; // Ensure null termination
-        module->rejected_reason_stats[module->rejected_reason_stats_count].count = 1;
-        module->rejected_reason_stats_count++;
-    }
-
-    if (module->rejected_reason_stats_count > 1) {
-        qsort(module->rejected_reason_stats, module->rejected_reason_stats_count, 
-            sizeof(module->rejected_reason_stats[0]), compare_rejected_reason_stats);
-    }    
-}
 void SYSTEM_notify_new_ntime(GlobalState * GLOBAL_STATE, uint32_t ntime)
 {
     SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
@@ -508,45 +442,6 @@ void SYSTEM_reset_coinbase_ui_state(GlobalState * GLOBAL_STATE)
     GLOBAL_STATE->block_signals_count = 0;
 }
 
-void SYSTEM_reset_pool_session(GlobalState * GLOBAL_STATE)
-{
-    if (!GLOBAL_STATE) return;
-
-    SystemModule *module = &GLOBAL_STATE->SYSTEM_MODULE;
-    for (int i = 0; i < module->rejected_reason_stats_count; i++) {
-        module->rejected_reason_stats[i].count = 0;
-        module->rejected_reason_stats[i].message[0] = '\0';
-    }
-    module->rejected_reason_stats_count = 0;
-    module->shares_submitted = 0;
-    module->shares_accepted = 0;
-    module->shares_rejected = 0;
-    module->shares_pending = 0;
-    module->response_time = 0.0f;
-    module->response_time_min = 0.0f;
-    module->response_time_max = 0.0f;
-    module->last_response_time_min = 0.0f;
-    module->last_response_time_max = 0.0f;
-    module->response_share_batch = 0;
-    module->pool_difficulty = 0.0;
-
-    clean_jobs_queue(GLOBAL_STATE);
-    SYSTEM_reset_coinbase_ui_state(GLOBAL_STATE);
-}
-
-void SYSTEM_record_response_time(GlobalState * GLOBAL_STATE, float response_time_ms, uint16_t batch_count)
-{
-    if (!GLOBAL_STATE || response_time_ms <= 0.0f) return;
-    SystemModule *module = &GLOBAL_STATE->SYSTEM_MODULE;
-    module->response_time = response_time_ms;
-    module->response_share_batch = batch_count;
-    if (module->response_time_min <= 0.0f || response_time_ms < module->response_time_min) {
-        module->response_time_min = response_time_ms;
-    }
-    if (module->response_time_max <= 0.0f || response_time_ms > module->response_time_max) {
-        module->response_time_max = response_time_ms;
-    }
-}
 
 void SYSTEM_decode_and_apply_coinbase(GlobalState * GLOBAL_STATE, const miner_job_t * job)
 {
@@ -695,12 +590,12 @@ void SYSTEM_noinit_update(SystemModule * SYSTEM_MODULE)
     }
 
     uint64_t elapsed_ms = current_time_ms - last_update_time_ms;
-    last_update_time_ms = current_time_ms;
     
     // Only update if at least 1 second has passed
     if (elapsed_ms < 1000) {
         return;
     }
+    last_update_time_ms = current_time_ms;
     
     SYSTEM_MODULE->uptime_seconds = (esp_timer_get_time() - SYSTEM_MODULE->start_time_us) / 1000000;
     noinit_state.total_uptime = total_uptime_at_system_start + SYSTEM_MODULE->uptime_seconds;
@@ -795,39 +690,84 @@ void SYSTEM_init_partitions(GlobalState * GLOBAL_STATE) {
     }
 }
 
-void SYSTEM_load_pool_from_nvs(GlobalState * GLOBAL_STATE, int i) {
-    if (i < 0 || i >= MAX_POOLS) return;
-    
-    PoolConfig *cfg = &GLOBAL_STATE->SYSTEM_MODULE.pools[i];
+static inline bool pool_str_equal(const char *a, const char *b) {
+    return strcmp(a ? a : "", b ? b : "") == 0;
+}
+
+static bool pool_config_needs_reconnect(const PoolConfig *old_cfg, const PoolConfig *new_cfg)
+{
+    if (!old_cfg || !new_cfg) {
+        return true;
+    }
+
+    if (old_cfg->protocol != new_cfg->protocol ||
+        old_cfg->port != new_cfg->port ||
+        !pool_str_equal(old_cfg->url, new_cfg->url)) {
+        return true;
+    }
+
+    switch (new_cfg->protocol) {
+        case STRATUM_PROTOCOL_V1:
+            if (old_cfg->tls != new_cfg->tls ||
+                old_cfg->difficulty != new_cfg->difficulty ||
+                old_cfg->extranonce_subscribe != new_cfg->extranonce_subscribe ||
+                !pool_str_equal(old_cfg->user, new_cfg->user) ||
+                !pool_str_equal(old_cfg->pass, new_cfg->pass) ||
+                !pool_str_equal(old_cfg->cert, new_cfg->cert)) {
+                return true;
+            }
+            return false;
+
+        case STRATUM_PROTOCOL_V2:
+            if (old_cfg->sv2_channel_type != new_cfg->sv2_channel_type ||
+                old_cfg->sv2_require_auth != new_cfg->sv2_require_auth ||
+                !pool_str_equal(old_cfg->user, new_cfg->user) ||
+                !pool_str_equal(old_cfg->sv2_authority_pubkey, new_cfg->sv2_authority_pubkey)) {
+                return true;
+            }
+            return false;
+
+        default:
+            return true;
+    }
+}
+
+static void free_pool_config(PoolConfig *cfg) {
+    if (!cfg) return;
     free(cfg->url);
     free(cfg->user);
     free(cfg->pass);
     free(cfg->cert);
     free(cfg->sv2_authority_pubkey);
+    memset(cfg, 0, sizeof(*cfg));
+}
+
+void SYSTEM_load_pool_from_nvs(GlobalState * GLOBAL_STATE, int i, bool *reconnect_required) {
+    if (reconnect_required) {
+        *reconnect_required = false;
+    }
+    if (i < 0 || i >= MAX_POOLS) return;
     
-    cfg->url = NULL;
-    cfg->user = NULL;
-    cfg->pass = NULL;
-    cfg->cert = NULL;
-    cfg->sv2_authority_pubkey = NULL;
+    PoolConfig *cfg = &GLOBAL_STATE->SYSTEM_MODULE.pools[i];
+    PoolConfig new_cfg;
+    memset(&new_cfg, 0, sizeof(new_cfg));
 
     char *json_str = nvs_config_get_string_indexed(NVS_CONFIG_POOL, i);
-    parse_pool_config_json(json_str, cfg, i);
+    parse_pool_config_json(json_str, &new_cfg, i);
     free(json_str);
+
+    if (reconnect_required) {
+        *reconnect_required = pool_config_needs_reconnect(cfg, &new_cfg);
+    }
+
+    free_pool_config(cfg);
+    *cfg = new_cfg;
 }
 
 void SYSTEM_reload_pool_config(GlobalState * GLOBAL_STATE)
 {
     SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
-    module->primary_pool_index = nvs_config_get_u16(NVS_CONFIG_PRIMARY_POOL_INDEX);
-    module->secondary_pool_index = nvs_config_get_u16(NVS_CONFIG_SECONDARY_POOL_INDEX);
-
-    if (module->primary_pool_index >= MAX_POOLS) {
-        module->primary_pool_index = 0;
-    }
-    if (module->secondary_pool_index >= MAX_POOLS) {
-        module->secondary_pool_index = 1;
-    }
-
+    module->primary_pool_index = 0;
+    module->secondary_pool_index = 1;
     module->use_fallback_stratum = nvs_config_get_bool(NVS_CONFIG_USE_FALLBACK_STRATUM);
 }
