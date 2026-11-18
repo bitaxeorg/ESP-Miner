@@ -17,6 +17,7 @@
 #include "device_config.h"
 #include "esp_heap_caps.h"
 #include "difficulty_controller.h"
+#include "power_management_task.h"
 
 #include <string.h>
 #include <stdlib.h>
@@ -650,8 +651,7 @@ esp_err_t stratum_v2_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
 
     // 3. Send OpenMiningChannel
     {
-        float expected_gh = GLOBAL_STATE->POWER_MANAGEMENT_MODULE.expected_hashrate;
-        float hash_rate = (expected_gh > 0.0f) ? (expected_gh * 1e9f) : 1e12f;
+        float hash_rate = POWER_MANAGEMENT_get_nominal_hashrate(GLOBAL_STATE) * 1e9;
         int frame_len;
 
         if (channel_type == SV2_CHANNEL_EXTENDED) {

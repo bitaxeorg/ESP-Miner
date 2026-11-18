@@ -71,7 +71,7 @@ static void spy_asic_set_version_mask(GlobalState *state, uint32_t mask)
     harness_result->version_masks[harness_result->version_mask_count++] = mask;
 }
 
-static double stub_asic_get_job_frequency(GlobalState *state)
+static float stub_asic_get_job_frequency(GlobalState *state)
 {
     (void)state;
     return harness_job_frequency_ms;
