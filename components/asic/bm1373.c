@@ -35,10 +35,6 @@
 #define BM1372_REGISTER_VERSION_ROLLING 0xA4
 #define BM1372_REGISTER_AUTO_WORK_CONFIGURATION 0xC4
 
-// The generic BM13xx nonce-space calculation makes BM1372/BM1373 chips search
-// overlapping work. This is the known-good S21 Pro stock register value.
-#define BM1372_HASH_COUNTING_NUMBER_S21_PRO 0x00001EB5
-
 #define BM1372_CORE_REGISTER_CLOCK_DELAY_CTRL 0x00
 #define BM1372_CORE_REGISTER_CORE_ENABLE 0x02
 #define BM1372_CORE_REGISTER_CLOCK_SELECT_CTRL 0x0B
@@ -63,7 +59,6 @@
 #define BM1372_WRITE_RETRY_DELAY_MS 50
 #define BM1372_INIT_STEP_DELAY_MS 10
 #define BM1372_FAST_RESET_DELAY_MS 20
-#define BM1372_SET_ADDRESS_STRIDE 0x10
 #define BM1372_COMMAND_ADDRESS_SHIFT 2
 
 #define TYPE_JOB 0x20
@@ -122,8 +117,8 @@ static const char * TAG = "bm1372/73";
 
 static task_result result;
 
-static uint8_t chip_command_address_interval;
-static uint8_t chip_response_address_interval;
+static uint16_t chip_command_address_interval;
+static uint16_t chip_response_address_interval;
 static uint16_t chip_nonce_address_interval;
 static uint8_t detected_chip_count;
 static uint8_t detected_voltage_domains;
@@ -243,14 +238,32 @@ void BM1373_set_hash_counting_number(uint32_t hcn)
     }
 }
 
+static uint32_t calculate_hcn(double nonce_percent, float frequency, uint16_t asic_count, uint16_t cores)
+{
+    if (frequency <= 0.0f || asic_count == 0 || cores == 0 || nonce_percent <= 0.0) {
+        return 0;
+    }
+
+    int cores_up = _next_power_of_two(cores);
+    int asic_count_up = _next_power_of_two(asic_count);
+
+    // HCN hash counting number (the size of the nonce space)
+    double hcn_space = NONCE_SPACE / (double)cores_up / (double)asic_count_up;
+    double hcn_max = hcn_space * (double)FREQ_MULT / (double)frequency * 0.5;
+    double hcn_frac = nonce_percent * hcn_max;
+    return (uint32_t)hcn_frac;
+}
+
 void BM1373_set_nonce_space(double nonce_percent, float frequency, uint16_t asic_count, uint16_t cores)
 {
-    (void)nonce_percent;
-    (void)frequency;
-    (void)asic_count;
-    (void)cores;
+    uint32_t hcn = calculate_hcn(nonce_percent, frequency, asic_count, cores);
+    if (hcn == 0) {
+        ESP_LOGE(TAG, "Invalid nonce space parameters (freq=%g, asics=%u, cores=%u)",
+                 frequency, asic_count, cores);
+        return;
+    }
 
-    BM1373_set_hash_counting_number(BM1372_HASH_COUNTING_NUMBER_S21_PRO);
+    BM1373_set_hash_counting_number(hcn);
 }
 
 float BM1373_send_hash_frequency(float target_freq)
@@ -312,11 +325,12 @@ uint8_t BM1373_init(GlobalState * GLOBAL_STATE)
 
     detected_chip_count = chip_counter;
     detected_voltage_domains = GLOBAL_STATE->DEVICE_CONFIG.family.voltage_domains;
-    chip_command_address_interval = BM1372_SET_ADDRESS_STRIDE >> BM1372_COMMAND_ADDRESS_SHIFT;
-    chip_response_address_interval = BM1372_SET_ADDRESS_STRIDE;
-    chip_nonce_address_interval = 256 / detected_chip_count;
-    if (chip_nonce_address_interval == 0) {
-        ESP_LOGE(TAG, "Invalid nonce address interval for %u ASICs", detected_chip_count);
+    uint16_t address_interval = 256 / _next_power_of_two(detected_chip_count);
+    chip_command_address_interval = address_interval >> BM1372_COMMAND_ADDRESS_SHIFT;
+    chip_response_address_interval = address_interval;
+    chip_nonce_address_interval = address_interval;
+    if (address_interval == 0 || (detected_chip_count > 1 && chip_command_address_interval == 0)) {
+        ESP_LOGE(TAG, "Invalid address interval for %u ASICs", detected_chip_count);
         return 0;
     }
 
@@ -326,7 +340,7 @@ uint8_t BM1373_init(GlobalState * GLOBAL_STATE)
     vTaskDelay(pdMS_TO_TICKS(BM1372_INIT_STEP_DELAY_MS));
 
     for (uint8_t chip = 0; chip < detected_chip_count; chip++) {
-        if (!_set_chip_address(chip * BM1372_SET_ADDRESS_STRIDE)) {
+        if (!_set_chip_address((uint8_t)(chip * address_interval))) {
             return 0;
         }
     }
@@ -421,8 +435,10 @@ uint8_t BM1373_init(GlobalState * GLOBAL_STATE)
         return 0;
     }
 
-    if (!_write_broadcast(BM1372_REGISTER_HASH_COUNTING_NUMBER,
-                          BM1372_HASH_COUNTING_NUMBER_S21_PRO)) {
+    float frequency = GLOBAL_STATE->POWER_MANAGEMENT_MODULE.actual_frequency;
+    uint16_t cores = GLOBAL_STATE->DEVICE_CONFIG.family.asic.core_count;
+    uint32_t hcn = calculate_hcn(1.0, frequency, detected_chip_count, cores);
+    if (hcn == 0 || !_write_broadcast(BM1372_REGISTER_HASH_COUNTING_NUMBER, hcn)) {
         ESP_LOGE(TAG, "Failed to configure nonce space");
         return 0;
     }
