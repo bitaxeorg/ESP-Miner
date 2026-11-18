@@ -25,9 +25,24 @@
 #define TPS546_THROTTLE_TEMP 105.0
 #define TPS546_MAX_TEMP 145.0
 
+// Physically plausible temperature envelope shared by the VR and ASIC
+// readings. A value outside it (e.g. a corrupted PMBus read yielding 16384 C)
+// is a sensor fault, not heat, and must never be acted upon.
+#define TEMP_PLAUSIBLE_MIN (-40.0)
+#define TEMP_PLAUSIBLE_MAX 150.0
+
+// Consecutive polls with a plausible over-limit reading required before a
+// permanent downgrade is written to NVS. One spurious sample is not evidence.
+#define OVERHEAT_CONSECUTIVE_READINGS 2
+
 #define ASIC_REDUCTION 100.0
 
 static const char * TAG = "power_management";
+
+static bool temp_is_plausible(float temp)
+{
+    return temp >= TEMP_PLAUSIBLE_MIN && temp <= TEMP_PLAUSIBLE_MAX;
+}
 
 static void mining_stop(GlobalState * GLOBAL_STATE)
 {
@@ -140,6 +155,7 @@ void POWER_MANAGEMENT_task(void * pvParameters)
     uint16_t last_known_asic_voltage = 0;
     float last_known_asic_frequency = 0.0;
     bool is_paused = false;
+    int overheat_streak = 0;
 
     while (1) {
         if (GLOBAL_STATE->SELF_TEST_MODULE.is_finished) {
@@ -168,15 +184,30 @@ void POWER_MANAGEMENT_task(void * pvParameters)
 
         // If we've paused or have a hardware fault, skip doing anything else
         if (is_paused || sys_module->hardware_fault) {
+            overheat_streak = 0; // stale samples must not count as "consecutive"
             vTaskDelay(POLL_RATE / portTICK_PERIOD_MS);
             continue;
         }
 
-        bool asic_overheat =
-            power_management->chip_temp_avg > THROTTLE_TEMP
-            || power_management->chip_temp2_avg > THROTTLE_TEMP;
+        bool vr_plausible = temp_is_plausible(power_management->vr_temp);
+        bool asic1_plausible = temp_is_plausible(power_management->chip_temp_avg);
+        bool asic2_plausible = temp_is_plausible(power_management->chip_temp2_avg);
 
-        if ((power_management->vr_temp > TPS546_THROTTLE_TEMP || asic_overheat) && (power_management->frequency_value > 50 || power_management->voltage > 1000)) {
+        if (!vr_plausible) {
+            ESP_LOGW(TAG, "Implausible VR temperature %.1fC, not acting on it", power_management->vr_temp);
+        }
+
+        // Only plausible, over-limit readings count as heat. Unavailable ASIC
+        // sensors report -1 and are simply not warm.
+        bool vr_overheat = vr_plausible && power_management->vr_temp > TPS546_THROTTLE_TEMP;
+        bool asic_overheat =
+            (asic1_plausible && power_management->chip_temp_avg > THROTTLE_TEMP)
+            || (asic2_plausible && power_management->chip_temp2_avg > THROTTLE_TEMP);
+
+        overheat_streak = (vr_overheat || asic_overheat) ? overheat_streak + 1 : 0;
+
+        if (overheat_streak >= OVERHEAT_CONSECUTIVE_READINGS && (power_management->frequency_value > 50 || power_management->voltage > 1000)) {
+            overheat_streak = 0;
             if (power_management->chip_temp2_avg > 0) {
                 ESP_LOGE(TAG, "OVERHEAT! VR: %fC ASIC1: %fC ASIC2: %fC", power_management->vr_temp, power_management->chip_temp_avg, power_management->chip_temp2_avg);
             } else {
@@ -198,7 +229,8 @@ void POWER_MANAGEMENT_task(void * pvParameters)
             int cooling_cycles = 0;
             const int MIN_COOLING_CYCLES = 6; // Minimum 30 seconds cooling
             
-            while (cooling_cycles < MIN_COOLING_CYCLES || power_management->vr_temp > TPS546_THROTTLE_TEMP - 10) {
+            while (cooling_cycles < MIN_COOLING_CYCLES ||
+                   (temp_is_plausible(power_management->vr_temp) && power_management->vr_temp > TPS546_THROTTLE_TEMP - 10)) {
                 vTaskDelay(5000 / portTICK_PERIOD_MS); // Wait 5 seconds
                 cooling_cycles++;
                 
@@ -212,7 +244,8 @@ void POWER_MANAGEMENT_task(void * pvParameters)
                              cooling_cycles, power_management->vr_temp, power_management->chip_temp_avg, power_management->chip_temp2_avg);
                     
                     // Continue if ASIC temps still too high
-                    if (power_management->chip_temp_avg >  SAFE_TEMP || power_management->chip_temp2_avg > SAFE_TEMP) {
+                    if ((temp_is_plausible(power_management->chip_temp_avg) && power_management->chip_temp_avg > SAFE_TEMP)
+                        || (temp_is_plausible(power_management->chip_temp2_avg) && power_management->chip_temp2_avg > SAFE_TEMP)) {
                         cooling_cycles = 0; // Reset cycle count if still hot
                     }
                 } else {

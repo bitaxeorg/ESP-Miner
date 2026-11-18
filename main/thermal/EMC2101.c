@@ -147,11 +147,15 @@ float EMC2101_get_external_temp(void)
         signed_reading |= 0xF800;  // Set upper bits to extend the sign
     }
 
+    // A fault code is not a temperature: 0x3F8/8 would decode to 127.0 °C and
+    // be consumed as a real reading. Report -1 like the I2C error paths.
     if (signed_reading == EMC2101_TEMP_FAULT_OPEN_CIRCUIT) {
         ESP_LOGE(TAG, "EMC2101 TEMP_FAULT_OPEN_CIRCUIT: %04X", signed_reading);
+        return -1.0f;
     }
     if (signed_reading == EMC2101_TEMP_FAULT_SHORT) {
         ESP_LOGE(TAG, "EMC2101 TEMP_FAULT_SHORT: %04X", signed_reading);
+        return -1.0f;
     }
 
     // Convert the signed reading to temperature in Celsius
