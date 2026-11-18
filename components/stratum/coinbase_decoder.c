@@ -7,6 +7,7 @@
 #include <strings.h>
 #include <stdlib.h>
 #include <ctype.h>
+#include <limits.h>
 
 #define BIP110_SIGNAL_BIT 4
 #define BIP110_SIGNAL_EXPIRY_BLOCK 965664
@@ -612,7 +613,7 @@ esp_err_t coinbase_process_miner_job(const miner_job_t *job,
 
     uint64_t scriptsig_len = coinbase_decode_varint(job->coinbase_prefix, coinbase_1_len, &coinbase_1_offset);
 
-    if (scriptsig_len == 0 || coinbase_1_len < coinbase_1_offset + 1) return ESP_ERR_INVALID_ARG;
+    if (scriptsig_len == 0 || scriptsig_len > INT_MAX || coinbase_1_len < coinbase_1_offset + 1) return ESP_ERR_INVALID_ARG;
     
     uint8_t block_height_len = job->coinbase_prefix[coinbase_1_offset++];
 
