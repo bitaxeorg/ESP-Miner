@@ -92,6 +92,7 @@ void POOL_notify_work_received(GlobalState * GLOBAL_STATE, uint16_t pool_idx)
     PoolSession * session = get_pool_session(GLOBAL_STATE, pool_idx);
     if (!session) return;
     session->work_received++;
+    session->pool_error[0] = '\0';
 }
 
 void POOL_set_difficulty(GlobalState * GLOBAL_STATE, uint16_t pool_idx, double difficulty)

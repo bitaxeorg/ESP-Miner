@@ -25,5 +25,6 @@ void bm1397_stub_delay(TickType_t ticks);
 #define BM1397_send_hash_frequency bm1397_test_send_hash_frequency
 #define BM1397_process_work bm1397_test_process_work
 #define BM1397_read_registers bm1397_test_read_registers
+#define BM1397_set_difficulty bm1397_test_set_difficulty
 
 #endif
