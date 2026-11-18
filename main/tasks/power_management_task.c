@@ -143,7 +143,12 @@ void POWER_MANAGEMENT_init_frequency(GlobalState * GLOBAL_STATE)
 // averages, and nothing notices: the miner looks alive while it is doing no
 // work. Two independent signals, both conservative, trigger a chain restart.
 #define WATCHDOG_HASHRATE_FLATLINE_S 180
-#define WATCHDOG_NO_SHARE_S 300
+// A 300 s window was too aggressive: on a high-difficulty pool (or a low
+// clock) a healthy chain can legitimately go minutes without a share and
+// would be restarted, and three such events in an hour would flag a bogus
+// hardware fault. The frozen-hashrate signal (180 s) is the precise one;
+// this one is the safety net for a chain stuck at 0 GH/s, so it may be slow.
+#define WATCHDOG_NO_SHARE_S 900
 // Grace period after a (re)start: a cold chain ramps for minutes and must never
 // be mistaken for a flatline.
 #define WATCHDOG_WARMUP_S 300
