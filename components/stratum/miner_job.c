@@ -28,7 +28,7 @@ void miner_job_pool_init_instance(miner_job_pool_t *pool)
             }
         }
         if (!pool->slots[i].coinbase_suffix) {
-            pool->slots[i].coinbase_suffix = heap_caps_calloc(1, MAX_COINBASE_SUFFIX_LEN, MALLOC_CAP_SPIRAM);
+            pool->slots[i].coinbase_suffix = heap_caps_calloc(1, 2048, MALLOC_CAP_SPIRAM);
             if (!pool->slots[i].coinbase_suffix) {
                 pool->slots[i].coinbase_suffix = calloc(1, 2048);
             }
@@ -61,6 +61,16 @@ void miner_job_pool_free(miner_job_pool_t *pool)
     }
     free(pool->slots);
     pool->slots = NULL;
+}
+
+bool miner_job_resize_coinbase_suffix(miner_job_t *job, size_t length)
+{
+    if (!job || length > MAX_COINBASE_SUFFIX_LEN) return false;
+    uint8_t *buffer = heap_caps_realloc(job->coinbase_suffix, length ? length : 1,
+                                        MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    if (!buffer) return false;
+    job->coinbase_suffix = buffer;
+    return true;
 }
 
 void miner_job_pool_init(void)

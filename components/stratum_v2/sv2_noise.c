@@ -11,6 +11,7 @@
 #include "esp_log.h"
 #include "esp_random.h"
 #include "esp_timer.h"
+#include "esp_heap_caps.h"
 
 #include "psa/crypto.h"
 
@@ -653,11 +654,18 @@ int sv2_noise_recv(sv2_noise_ctx_t *ctx, esp_transport_handle_t transport,
         return -1;
     }
 
-    // Receive and decrypt payload
+    // Receive and decrypt payload. Large frames need PSRAM: a protocol-max
+    // NewExtendedMiningJob carries a 64 KiB coinbase suffix.
     int enc_len = hdr.msg_length + 16;
     uint8_t stack_payload[128];
-    uint8_t *enc_payload = (enc_len <= (int)sizeof(stack_payload)) ? stack_payload : malloc(enc_len);
-    if (!enc_payload) return -1;
+    uint8_t *enc_payload = stack_payload;
+    if (enc_len > (int)sizeof(stack_payload)) {
+        enc_payload = heap_caps_malloc(enc_len, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+        if (!enc_payload) {
+            ESP_LOGE(TAG, "Failed to allocate %d-byte receive payload", enc_len);
+            return -1;
+        }
+    }
 
     if (noise_recv_exact(transport, enc_payload, enc_len, RECV_TIMEOUT_MS) != 0) {
         if (enc_payload != stack_payload) free(enc_payload);

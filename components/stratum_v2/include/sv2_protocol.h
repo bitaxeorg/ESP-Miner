@@ -31,7 +31,28 @@
 #define SV2_MSG_SET_NEW_PREV_HASH                       0x20
 #define SV2_MSG_SET_TARGET                              0x21
 
-#define SV2_MAX_FRAME_SIZE 8192
+// Stratum V2 B0_64K wire type maximum length (spec 5.3.16)
+#define SV2_MAX_COINBASE_SUFFIX_LEN UINT16_MAX
+_Static_assert(MAX_COINBASE_SUFFIX_LEN >= SV2_MAX_COINBASE_SUFFIX_LEN,
+               "coinbase suffix limit must cover the SV2 B0_64K wire maximum");
+
+// Largest frame we build (SetupConnection, channel open, SubmitShares). These
+// are small; keeping this separate avoids reserving a large send buffer.
+#define SV2_MAX_SEND_FRAME_SIZE 8192
+
+// Largest frame we accept. Covers NewExtendedMiningJob with a B0_64K coinbase
+// suffix (65,535 bytes), a 32-branch merkle path and the 1 KiB coinbase prefix
+// cap.
+#define SV2_MAX_RECV_FRAME_SIZE (68 * 1024)
+
+// Worst-case NewExtendedMiningJob payload: channel_id, job_id, min_ntime option,
+// version, version rolling flag, merkle path, then B0_64K prefixed prefix and
+// suffix.
+#define SV2_MAX_NEW_EXTENDED_JOB_SIZE \
+    (4 + 4 + (1 + 4) + 4 + 1 + 1 + MAX_MERKLE_BRANCHES * 32 + \
+     2 + MAX_COINBASE_PREFIX_LEN + 2 + SV2_MAX_COINBASE_SUFFIX_LEN)
+_Static_assert(SV2_MAX_RECV_FRAME_SIZE >= SV2_MAX_NEW_EXTENDED_JOB_SIZE,
+               "receive buffer must fit a protocol-max NewExtendedMiningJob");
 
 // Minimum extranonce size requested in OpenExtendedMiningChannel (spec 5.4.4)
 #define SV2_MIN_EXTRANONCE_SIZE 2

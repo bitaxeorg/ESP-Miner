@@ -265,6 +265,8 @@ esp_err_t stratum_v1_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
 
     StratumApiV1Message v1_msg = {0};
     esp_err_t run_result = ESP_OK;
+    uint8_t last_notified_slot = GLOBAL_STATE->active_job_slot_idx;
+    uint8_t next_slot = 0;
 
     while (1) {
         if (stratum_reconnect_requested()) {
@@ -279,8 +281,31 @@ esp_err_t stratum_v1_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
             break;
         }
 
-        char *line = STRATUM_V1_receive_jsonrpc_line(conn);
-        if (!line) {
+        int64_t receive_time_us = 0;
+        bool reconnect_requested = false;
+
+        uint8_t active_slot = GLOBAL_STATE->SYSTEM_MODULE.pool_sessions[pool_idx].active_job_slot_idx;
+        for (uint8_t s = 0; s < 3U; s++) {
+            if (s != active_slot && s != last_notified_slot) {
+                miner_job_t *idle_job = POOL_get_job_slot(GLOBAL_STATE, pool_idx, s);
+                if (idle_job && idle_job->coinbase_suffix_len > 2048U) {
+                    miner_job_resize_coinbase_suffix(idle_job, 2048U);
+                    idle_job->coinbase_suffix_len = 0;
+                }
+            }
+        }
+        while (next_slot == active_slot || next_slot == last_notified_slot) {
+            next_slot = (uint8_t)((next_slot + 1U) % 3U);
+        }
+        uint8_t target_slot = next_slot;
+        miner_job_t *target_job = POOL_get_job_slot(GLOBAL_STATE, pool_idx, target_slot);
+        if (!target_job) {
+            ESP_LOGE(TAG, "Failed to allocate job slot for pool %u", pool_idx);
+            continue;
+        }
+
+        stratum_v1_rx_status_t rx_status = STRATUM_V1_receive_message(conn->transport, &v1_msg, target_job, &receive_time_us);
+        if (rx_status == STRATUM_V1_RX_TRANSPORT_ERROR) {
             if (stratum_reconnect_requested()) {
                 ESP_LOGI(TAG, "Reconnect requested during read");
                 run_result = ESP_OK;
@@ -291,22 +316,9 @@ esp_err_t stratum_v1_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
             }
             break;
         }
-
-        int64_t receive_time_us = esp_timer_get_time();
-        bool reconnect_requested = false;
-
-        uint8_t target_slot = (GLOBAL_STATE->SYSTEM_MODULE.pool_sessions[pool_idx].active_job_slot_idx + 1) % 2;
-        miner_job_t *target_job = POOL_get_job_slot(GLOBAL_STATE, pool_idx, target_slot);
-        if (!target_job) {
-            ESP_LOGE(TAG, "Failed to allocate job slot for pool %u", pool_idx);
-            free(line);
-            continue;
-        }
-
-        if (!STRATUM_V1_parse(&v1_msg, line, target_job)) {
+        if (rx_status == STRATUM_V1_RX_PARSE_ERROR) {
             ESP_LOGE(TAG, "Failed to parse Stratum message, ignoring");
             STRATUM_V1_reset_message(&v1_msg);
-            free(line);
             continue;
         }
 
@@ -315,6 +327,7 @@ esp_err_t stratum_v1_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
                 break;
 
             case MINING_NOTIFY: {
+                int64_t notify_start_us = esp_timer_get_time();
                 bool is_duplicate = false;
                 if (target_job->job_id[0] != '\0') {
                     if (target_job->clean_jobs) {
@@ -328,6 +341,13 @@ esp_err_t stratum_v1_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
                 } else {
                     POOL_notify_work_received(GLOBAL_STATE, pool_idx);
                     bool is_active_pool = stratum_check_primary_handover(GLOBAL_STATE, pool_idx);
+                    int64_t notify_dt = esp_timer_get_time() - notify_start_us;
+                    if (notify_dt > 0) {
+                        uint64_t total_parse = (uint64_t)target_job->parse_time_us + (uint64_t)notify_dt;
+                        target_job->parse_time_us = (total_parse > UINT32_MAX) ? UINT32_MAX : (uint32_t)total_parse;
+                    }
+                    last_notified_slot = target_slot;
+                    next_slot = (uint8_t)((target_slot + 1U) % 3U);
 
                     target_job->pool_id = (uint8_t)pool_idx;
                     memcpy(target_job->pool_target, conn->pool_target, 32);
@@ -481,8 +501,6 @@ esp_err_t stratum_v1_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
             }
         }
 
-        ESP_LOGI(TAG, "rx: %s", line);
-        free(line);
         STRATUM_V1_reset_message(&v1_msg);
         if (reconnect_requested) {
             run_result = ESP_FAIL;
