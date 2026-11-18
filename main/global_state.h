@@ -78,6 +78,7 @@ typedef struct SystemModule
     bool is_using_fallback;
     float process_time;
     float cpu_usage;
+    uint8_t current_difficulty_power;
     bool overheat_mode;
     bool mining_paused;
     bool pools_unavailable;
@@ -135,8 +136,7 @@ typedef struct GlobalState
     SelfTestModule SELF_TEST_MODULE;
     HashrateMonitorModule HASHRATE_MONITOR_MODULE;
 
-    uint8_t current_difficulty_power;
-    double target_share_interval_s;
+
 
     bool ASIC_initalized;
     bool has_work;

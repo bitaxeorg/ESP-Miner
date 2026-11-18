@@ -60,6 +60,7 @@ export class PoolComponent implements OnInit {
   ];
 
   public asicModel: string = '';
+  public asicDifficulty: number = 0;
 
   @Input() uri = '';
 
@@ -77,6 +78,7 @@ export class PoolComponent implements OnInit {
       .pipe(first(), this.loadingService.lockUIUntilComplete())
       .subscribe(info => {
         this.asicModel = info.ASICModel || '';
+        this.asicDifficulty = info.asicDifficulty || 0;
 
         const poolsList = [...(info.pools || [])];
         const orderedList: any[] = poolsList.length > 0 ? poolsList : [

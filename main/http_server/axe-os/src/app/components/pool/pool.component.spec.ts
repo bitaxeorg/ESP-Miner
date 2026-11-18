@@ -25,6 +25,7 @@ describe('PoolComponent', () => {
   beforeEach(() => {
     mockInfo$ = of({
       ASICModel: 'BM1366',
+      asicDifficulty: 128,
       primaryPoolIndex: 0,
       secondaryPoolIndex: 1,
       pools: [
@@ -194,6 +195,21 @@ describe('PoolComponent', () => {
     // Trying to delete the only pool should be rejected
     component.deletePool(0);
     expect(component.poolsArray.length).toBe(1);
+  });
+
+  it('should warn when stratumSuggestedDifficulty is positive and below asicDifficulty', () => {
+    const getWarning = () =>
+      (fixture.nativeElement as HTMLElement).textContent?.includes('Below current ASIC difficulty (128)');
+
+    expect(getWarning()).toBeFalse();
+
+    component.poolsArray.at(0).get('stratumSuggestedDifficulty')?.setValue(64);
+    fixture.detectChanges();
+    expect(getWarning()).toBeTrue();
+
+    component.poolsArray.at(0).get('stratumSuggestedDifficulty')?.setValue(128);
+    fixture.detectChanges();
+    expect(getWarning()).toBeFalse();
   });
 });
 

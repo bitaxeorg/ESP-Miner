@@ -16,7 +16,6 @@
 #include "libbase58.h"
 #include "device_config.h"
 #include "esp_heap_caps.h"
-#include "difficulty_controller.h"
 #include "power_management_task.h"
 
 #include <string.h>
@@ -421,7 +420,6 @@ static void stratum_v2_handle_set_target(GlobalState *GLOBAL_STATE, uint16_t poo
     POOL_set_difficulty(GLOBAL_STATE, pool_idx, pdiff);
 
     ESP_LOGI(TAG, "Set pool difficulty: %g", pdiff);
-    difficulty_controller_update(GLOBAL_STATE);
 }
 
 static void stratum_v2_handle_set_extranonce_prefix(sv2_conn_t *conn,
@@ -743,7 +741,6 @@ esp_err_t stratum_v2_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
                  channel_id, group_channel_id,
                  sv2_channel_type_to_string(channel_type));
         ESP_LOGI(TAG, "Set pool difficulty: %g", pdiff);
-        difficulty_controller_update(GLOBAL_STATE);
     }
 
     {
