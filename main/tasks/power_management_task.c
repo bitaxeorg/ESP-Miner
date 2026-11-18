@@ -4,6 +4,7 @@
 #include "global_state.h"
 #include "nvs_config.h"
 #include "vcore.h"
+#include "power_settings.h"
 #include "thermal.h"
 #include "power.h"
 #include "asic.h"
@@ -60,7 +61,7 @@ static void mining_stop(GlobalState * GLOBAL_STATE)
     ESP_LOGI(TAG, "Mining stopped");
 }
 
-static uint8_t mining_start(GlobalState * GLOBAL_STATE)
+static uint8_t mining_start(GlobalState * GLOBAL_STATE, uint16_t *last_voltage, float *last_frequency)
 {
     ESP_LOGI(TAG, "Starting mining");
 
@@ -68,7 +69,11 @@ static uint8_t mining_start(GlobalState * GLOBAL_STATE)
 
     // Restore voltage from NVS
     uint16_t voltage = nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE);
-    VCORE_set_voltage(GLOBAL_STATE, (double) voltage / 1000.0);
+    if (VCORE_set_voltage(GLOBAL_STATE, (float) voltage / 1000.0f) != ESP_OK) {
+        *last_voltage = 0;
+        return 0;
+    }
+    *last_voltage = voltage;
 
     // Wait for voltage to stabilize before touching the ASIC
     vTaskDelay(500 / portTICK_PERIOD_MS);
@@ -82,6 +87,7 @@ static uint8_t mining_start(GlobalState * GLOBAL_STATE)
     uint8_t chip_count = asic_initialize(GLOBAL_STATE, ASIC_INIT_RECOVERY, 2000);
 
     if (chip_count > 0) {
+        *last_frequency = GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value;
         ESP_LOGI(TAG, "Mining started successfully (%d chip(s))", chip_count);
     } else {
         ESP_LOGE(TAG, "Mining start failed - ASIC not detected");
@@ -161,10 +167,13 @@ void POWER_MANAGEMENT_task(void * pvParameters)
         bool wants_stop = sys_module->mining_paused || sys_module->hardware_fault || sys_module->pools_unavailable;
         if (wants_stop && !is_paused) {
             mining_stop(GLOBAL_STATE);
+            last_core_voltage = 0;
             is_paused = true;
         } else if (!wants_stop && is_paused) {
-            mining_start(GLOBAL_STATE);
-            is_paused = false;
+            is_paused = mining_start(GLOBAL_STATE, &last_core_voltage, &last_asic_frequency) == 0;
+            if (!is_paused && nvs_config_get_bool(NVS_CONFIG_OVERHEAT_MODE)) {
+                nvs_config_set_bool(NVS_CONFIG_OVERHEAT_MODE, false);
+            }
         }
 
         // If we've paused or have a hardware fault, skip doing anything else
@@ -191,6 +200,7 @@ void POWER_MANAGEMENT_task(void * pvParameters)
             nvs_config_set_bool(NVS_CONFIG_OVERHEAT_MODE, true);
             ESP_LOGW(TAG, "Entering safe mode due to overheat condition. System operation halted.");
             mining_stop(GLOBAL_STATE);
+            last_core_voltage = 0;
             
             // Note: ASIC temperature readings are invalid when ASIC is powered down (returns -1)
             // For 600-series boards that use ASIC thermal diode, we rely on VR temp and fixed cooling time
@@ -242,12 +252,15 @@ void POWER_MANAGEMENT_task(void * pvParameters)
             ESP_LOGI(TAG, "Restoring at reduced settings: %umV (was %umV), %.0f MHz (was %.0f MHz)",
                      reduced_voltage, last_known_asic_voltage, reduced_asic_frequency, last_known_asic_frequency);
 
-            uint8_t chip_count = mining_start(GLOBAL_STATE);
+            uint8_t chip_count = mining_start(GLOBAL_STATE, &last_core_voltage, &last_asic_frequency);
 
             if (chip_count > 0) {
                 // Frequency reduction will now be applied by normal power management loop
                 nvs_config_set_bool(NVS_CONFIG_OVERHEAT_MODE, false);
                 ESP_LOGI(TAG, "Resuming normal operation. Reduced frequency (%.0f MHz) will be applied automatically.", reduced_asic_frequency);
+            } else {
+                is_paused = true;
+                continue;
             }
         }
 
@@ -258,26 +271,8 @@ void POWER_MANAGEMENT_task(void * pvParameters)
                                  ? GLOBAL_STATE-> DEVICE_CONFIG.family.asic.default_frequency_mhz
                                  : nvs_config_get_float(NVS_CONFIG_ASIC_FREQUENCY);
 
-        if (core_voltage != last_core_voltage) {
-            ESP_LOGI(TAG, "setting new vcore voltage to %umV", core_voltage);
-            VCORE_set_voltage(GLOBAL_STATE, (double) core_voltage / 1000.0);
-            last_core_voltage = core_voltage;
-        }
-
-        if (asic_frequency != last_asic_frequency) {
-            ESP_LOGI(TAG, "New ASIC frequency requested: %g MHz (current: %g MHz)", asic_frequency, last_asic_frequency);
-            
-            power_management->frequency_value = asic_frequency;
-            power_management->expected_hashrate = expected_hashrate(GLOBAL_STATE);
-
-            bool frequency_set = ASIC_set_frequency(GLOBAL_STATE);
-            ASIC_set_nonce_space(GLOBAL_STATE);
-            uint8_t difficulty_power = calculate_effective_asic_difficulty(power_management->expected_hashrate);
-            ASIC_set_difficulty(GLOBAL_STATE, difficulty_power);
-            
-            // A partial ramp must also retry a request for the previous endpoint.
-            last_asic_frequency = frequency_set ? asic_frequency : NAN;
-        }
+        POWER_MANAGEMENT_apply_settings(GLOBAL_STATE, core_voltage, asic_frequency,
+                                         &last_core_voltage, &last_asic_frequency);
 
         // Check for changing of overheat mode
         bool new_overheat_mode = nvs_config_get_bool(NVS_CONFIG_OVERHEAT_MODE);
