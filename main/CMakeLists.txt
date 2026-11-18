@@ -61,6 +61,7 @@ SRCS
     "./power/INA260.c"
     "./power/power.c"
     "./power/vcore.c"
+    "./power/power_settings.c"
     "./power/asic_reset.c"
     "./power/asic_init.c"
     "${CMAKE_CURRENT_BINARY_DIR}/embedded_web_ui.c"
