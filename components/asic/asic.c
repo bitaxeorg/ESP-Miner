@@ -169,13 +169,13 @@ void ASIC_set_nonce_space(GlobalState * GLOBAL_STATE)
     ESP_LOGE(TAG, "Unknown ASIC id %d — cannot set nonce space", GLOBAL_STATE->DEVICE_CONFIG.family.asic.id);
 }
 
-double ASIC_get_asic_job_frequency_ms(GlobalState * GLOBAL_STATE, uint32_t version_mask)
+float ASIC_get_asic_job_frequency_ms(GlobalState * GLOBAL_STATE, uint32_t version_mask)
 {
     const AsicConfig *asic = &GLOBAL_STATE->DEVICE_CONFIG.family.asic;
     int asic_count = GLOBAL_STATE->DEVICE_CONFIG.family.asic_count;
 
     if (asic->fixed_timeout_ms > 0) {
-        return (double)asic->fixed_timeout_ms / _next_power_of_two(asic_count);
+        return (float)asic->fixed_timeout_ms / _next_power_of_two(asic_count);
     }
 
     float freq = GLOBAL_STATE->POWER_MANAGEMENT_MODULE.actual_frequency;
@@ -242,9 +242,13 @@ esp_err_t ASIC_get_domain_measurement(GlobalState * GLOBAL_STATE, uint8_t asic_n
 
 void ASIC_set_difficulty(GlobalState * GLOBAL_STATE, uint8_t difficulty_power)
 {
-    if (!GLOBAL_STATE || !GLOBAL_STATE->ASIC_initalized || difficulty_power == 0) {
+    if (!GLOBAL_STATE || !GLOBAL_STATE->ASIC_initalized) {
         return;
     }
+
+    GLOBAL_STATE->SYSTEM_MODULE.current_difficulty_power = difficulty_power;
+
+    ESP_LOGI(TAG, "ASIC difficulty set to %u", 1U << difficulty_power);
 
     switch (GLOBAL_STATE->DEVICE_CONFIG.family.asic.id) {
         case BM1397:

@@ -10,7 +10,6 @@
 #include "esp_timer.h"
 
 #include "asic.h"
-#include "difficulty_controller.h"
 #include "system.h"
 #include "utils.h"
 
@@ -194,7 +193,6 @@ void create_jobs_task(void *pvParameters)
                 ASIC_set_version_mask(GLOBAL_STATE, sched.current_work->version_mask);
                 sched.current_version_mask = sched.current_work->version_mask;
             }
-            difficulty_controller_update(GLOBAL_STATE);
         }
 
         bool built = false;
