@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include <math.h>
 #include <arpa/inet.h>
 #include "asic_common.h"
 #include "bm_job_packet.h"
@@ -11,6 +12,7 @@
 #include "esp_log.h"
 #include "crc.h"
 #include "esp_timer.h"
+#include "utils.h"
 
 #define PREAMBLE 0xAA55
 
@@ -214,61 +216,38 @@ void get_difficulty_mask(uint8_t difficulty_power, uint8_t *job_difficulty_mask)
     job_difficulty_mask[5] = _reverse_bits( mask        & 0xFF);
 }
 
-uint8_t calculate_effective_asic_difficulty(double expected_ghs, double interval_s, double pool_difficulty)
+uint8_t calculate_effective_asic_difficulty(double expected_ghs)
 {
-    if (interval_s <= 0.0) {
-        interval_s = DEFAULT_SHARE_INTERVAL_S;
+    double raw_diff = expected_ghs * 1e9 / NONCE_SPACE;
+    if (raw_diff < 1.5) {
+        return 0;
     }
 
-    uint8_t power = MIN_ASIC_DIFFICULTY_POWER;
-    if (expected_ghs > 0.0) {
-        double raw_diff = expected_ghs * 1e9 * interval_s / NONCE_SPACE;
-        if (raw_diff > (double)(1U << MIN_ASIC_DIFFICULTY_POWER)) {
-            int p = MIN_ASIC_DIFFICULTY_POWER;
-            while ((p < 31) && ((double)(1U << (p + 1)) <= raw_diff + 1e-6)) {
-                p++;
-            }
-            double lower = (double)(1U << p);
-            double upper = (double)(1U << (p + 1));
-            power = ((raw_diff - lower) > (upper - raw_diff)) ? (uint8_t)(p + 1) : (uint8_t)p;
-        }
-    }
-
-    if (pool_difficulty > 0.0) {
-        while (power > MIN_ASIC_DIFFICULTY_POWER && ((double)(1U << power) > pool_difficulty + 1e-6)) {
-            power--;
-        }
-    }
-
-    return power;
+    return (uint8_t)(log2(raw_diff / 1.5) + 1);
 }
 
-double calculate_bm_timeout_ms(float frequency_mhz, size_t asic_count, size_t small_cores, size_t cores, size_t version_size, float timeout_percent, double default_time_ms)
+float calculate_bm_timeout_ms(float frequency_mhz, size_t asic_count, size_t small_cores, size_t cores, uint64_t version_size, float timeout_percent)
 {
-    if (asic_count <= 0)
-        return default_time_ms;
+    if (asic_count == 0 || cores == 0 || small_cores < cores || frequency_mhz <= 0.0f)
+        return 0.0f;
 
     // Round up to the nearest power of 2 some asic constants
-    int cores_up = _next_power_of_two((int)cores);
-    int small_cores_up = _next_power_of_two((int)small_cores);
-    int asic_count_up = _next_power_of_two((int)asic_count);
-
-    if ((small_cores_up < cores_up) || (frequency_mhz <= 0.0f))
-        return default_time_ms;
+    int cores_up = _next_power_of_two(cores);
+    int small_cores_up = _next_power_of_two(small_cores);
+    int asic_count_up = _next_power_of_two(asic_count);
 
     // Calulate the time to scan the full nonce * version space
     // effectively how many iterations we have to do
     // First we remove the paralell nonces/versions
     // then we end up with `time = space / frequency`
-    double midstates = (double)small_cores_up / (double)cores_up;
-    double serial_versions = (double)version_size / midstates;
-    double serial_nonces = (double)NONCE_SPACE / (double)cores_up / (double)asic_count_up;
-    double fullspace_timeout_ms = serial_versions * serial_nonces / ((double)frequency_mhz * 1000.0);
+    float midstates = (float)small_cores_up / cores_up;
+    float serial_versions = version_size / midstates;
+    if (serial_versions < 1.0f)
+        serial_versions = 1.0f;
+    float serial_nonces = (float)NONCE_SPACE / cores_up / asic_count_up;
+    float fullspace_timeout_ms = serial_versions * serial_nonces / (frequency_mhz * 1000.0f);
 
-    if (!(fullspace_timeout_ms > 0.0))
-        return default_time_ms;
-
-    return (double)timeout_percent * fullspace_timeout_ms;
+    return timeout_percent * fullspace_timeout_ms;
 }
 
 bool bm13xx_decode_job_result(asic_job_store_t *store,
@@ -294,8 +273,8 @@ bool bm13xx_decode_job_result(asic_job_store_t *store,
     uint8_t asic_nr = (uint8_t)(((nonce_h >> 17) & 0xff) / address_interval);
     uint8_t core_id = (uint8_t)((nonce_h >> 25) & 0x7f);
     uint32_t version_bits = ((uint32_t)ntohs(wire_version) << 13);
-
-    result->rolled_version = result->job.version | version_bits;
+    uint32_t mask = result->job.version_mask & BIP320_VERSION_ROLLING_MASK;
+    result->rolled_version = (result->job.version & ~mask) | (version_bits & mask);
     result->nonce = wire_nonce;
     result->asic_nr = asic_nr;
     result->core_id = core_id;

@@ -67,6 +67,48 @@ TEST_CASE("SV2 parse open extended channel extranonce bounds", "[sv2]")
         payload, len_32 - 1, &req_id, &chan_id, target, &extranonce_size, prefix, &prefix_len, &group_id));
 }
 
+TEST_CASE("SV2 parse set extranonce prefix", "[sv2]")
+{
+    // Frame structure: channel_id(4) + B0_32(1+N)
+    uint8_t payload[64];
+    uint32_t chan_id;
+    uint8_t prefix[32];
+    uint8_t prefix_len;
+
+    // 1. Valid case: channel_id = 7, prefix = 01 02 03 04
+    memset(payload, 0, sizeof(payload));
+    payload[0] = 7;
+    payload[4] = 4;
+    payload[5] = 1; payload[6] = 2; payload[7] = 3; payload[8] = 4;
+    TEST_ASSERT_EQUAL(0, sv2_parse_set_extranonce_prefix(payload, 9, &chan_id, prefix, &prefix_len));
+    TEST_ASSERT_EQUAL_UINT32(7, chan_id);
+    TEST_ASSERT_EQUAL_UINT8(4, prefix_len);
+    const uint8_t expected[4] = {1, 2, 3, 4};
+    TEST_ASSERT_EQUAL_UINT8_ARRAY(expected, prefix, 4);
+
+    // 2. Empty prefix
+    payload[4] = 0;
+    TEST_ASSERT_EQUAL(0, sv2_parse_set_extranonce_prefix(payload, 5, &chan_id, prefix, &prefix_len));
+    TEST_ASSERT_EQUAL_UINT8(0, prefix_len);
+
+    // 3. Exact boundary: prefix_len = 32
+    payload[4] = 32;
+    TEST_ASSERT_EQUAL(0, sv2_parse_set_extranonce_prefix(payload, 5 + 32, &chan_id, prefix, &prefix_len));
+    TEST_ASSERT_EQUAL_UINT8(32, prefix_len);
+
+    // 4. Invalid case: prefix_len = 33 (> 32)
+    payload[4] = 33;
+    TEST_ASSERT_EQUAL(-1, sv2_parse_set_extranonce_prefix(payload, 5 + 33, &chan_id, prefix, &prefix_len));
+
+    // 5. Framing checks: truncated prefix or trailing byte rejected
+    payload[4] = 4;
+    TEST_ASSERT_EQUAL(-1, sv2_parse_set_extranonce_prefix(payload, 8, &chan_id, prefix, &prefix_len));
+    TEST_ASSERT_EQUAL(-1, sv2_parse_set_extranonce_prefix(payload, 10, &chan_id, prefix, &prefix_len));
+
+    // 6. Payload shorter than channel_id + length byte
+    TEST_ASSERT_EQUAL(-1, sv2_parse_set_extranonce_prefix(payload, 4, &chan_id, prefix, &prefix_len));
+}
+
 TEST_CASE("SV2 parse submit shares error", "[sv2]")
 {
     uint8_t payload[64];
