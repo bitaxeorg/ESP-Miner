@@ -57,6 +57,9 @@ static void mining_stop(GlobalState * GLOBAL_STATE)
     // Give tasks time to complete any in-progress UART operation
     vTaskDelay(500 / portTICK_PERIOD_MS);
 
+    // Clear stale measurements and stall flags once UART traffic has drained
+    hashrate_monitor_reset_measurements(GLOBAL_STATE);
+
     // Flush any stale data from the UART buffers
     uart_flush(UART_NUM_1);
     vTaskDelay(100 / portTICK_PERIOD_MS);
@@ -86,7 +89,6 @@ static uint8_t mining_start(GlobalState * GLOBAL_STATE)
     uint8_t chip_count = asic_initialize(GLOBAL_STATE, ASIC_INIT_RECOVERY, 2000);
 
     if (chip_count > 0) {
-        hashrate_monitor_reset_measurements(GLOBAL_STATE);
         ESP_LOGI(TAG, "Mining started successfully (%d chip(s))", chip_count);
     } else {
         ESP_LOGE(TAG, "Mining start failed - ASIC not detected");

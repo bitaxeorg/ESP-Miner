@@ -61,6 +61,7 @@ void hashrate_monitor_reset_measurements(void *pvParameters)
     memset(HASHRATE_MONITOR_MODULE->domain_stall_counts[0], 0, asic_count * hash_domains * sizeof(uint8_t));
     memset(HASHRATE_MONITOR_MODULE->domain_stalled[0], 0, asic_count * hash_domains * sizeof(bool));
     memset(HASHRATE_MONITOR_MODULE->error_measurement, 0, asic_count * sizeof(measurement_t));
+    HASHRATE_MONITOR_MODULE->stall_detection_active = false;
     pthread_mutex_unlock(&HASHRATE_MONITOR_MODULE->lock);
 }
 
@@ -145,13 +146,18 @@ static void update_domain_hash_counter(HashrateMonitorModule *module, uint8_t as
         return;
     }
 
-    if (value == previous_value) {
-        if (module->domain_stall_counts[asic_nr][domain_nr] < DOMAIN_STALL_POLLS) {
-            module->domain_stall_counts[asic_nr][domain_nr]++;
-        }
-    } else {
+    if (value != previous_value) {
         module->domain_stall_counts[asic_nr][domain_nr] = 0;
         module->domain_stalled[asic_nr][domain_nr] = false;
+        return;
+    }
+
+    if (!module->stall_detection_active) {
+        return;
+    }
+
+    if (module->domain_stall_counts[asic_nr][domain_nr] < DOMAIN_STALL_POLLS) {
+        module->domain_stall_counts[asic_nr][domain_nr]++;
     }
 
     if (module->domain_stall_counts[asic_nr][domain_nr] >= DOMAIN_STALL_POLLS && !module->domain_stalled[asic_nr][domain_nr]) {
@@ -237,15 +243,21 @@ void hashrate_monitor_task(void *pvParameters)
     }
     HASHRATE_MONITOR_MODULE->error_measurement = heap_caps_malloc(asic_count * sizeof(measurement_t), MALLOC_CAP_SPIRAM);
 
+    memset(HASHRATE_MONITOR_MODULE->total_measurement, 0, asic_count * sizeof(measurement_t));
+    memset(HASHRATE_MONITOR_MODULE->domain_measurements[0], 0, asic_count * hash_domains * sizeof(measurement_t));
+    memset(HASHRATE_MONITOR_MODULE->domain_stall_counts[0], 0, asic_count * hash_domains * sizeof(uint8_t));
+    memset(HASHRATE_MONITOR_MODULE->domain_stalled[0], 0, asic_count * hash_domains * sizeof(bool));
+    memset(HASHRATE_MONITOR_MODULE->error_measurement, 0, asic_count * sizeof(measurement_t));
+    HASHRATE_MONITOR_MODULE->stall_detection_active = false;
+
     pthread_mutex_init(&HASHRATE_MONITOR_MODULE->lock, NULL);
     HASHRATE_MONITOR_MODULE->is_initialized = true;
-
-    hashrate_monitor_reset_measurements(GLOBAL_STATE);
 
     init_averages();
 
     bool was_asic_initialized = false;
-    TickType_t asic_initialized_ticks = xTaskGetTickCount();
+    bool was_mining_active = false;
+    TickType_t mining_active_ticks = xTaskGetTickCount();
     TickType_t taskWakeTime = xTaskGetTickCount();
     while (1) {
         bool is_asic_initialized = GLOBAL_STATE->ASIC_initalized;
@@ -257,10 +269,31 @@ void hashrate_monitor_task(void *pvParameters)
             // which would cause a hashrate spike when resuming.
             hashrate_monitor_reset_measurements(GLOBAL_STATE);
         }
-        if (!was_asic_initialized && is_asic_initialized) {
-            asic_initialized_ticks = xTaskGetTickCount();
-        }
         was_asic_initialized = is_asic_initialized;
+
+        PoolSession *active_session = POOL_get_active_session(GLOBAL_STATE);
+        bool has_active_work = active_session && active_session->work_received > 0;
+        bool mining_active = is_asic_initialized &&
+                             has_active_work &&
+                             !GLOBAL_STATE->SELF_TEST_MODULE.is_active &&
+                             !SYSTEM_MODULE->mining_paused;
+
+        if (!was_mining_active && mining_active) {
+            mining_active_ticks = xTaskGetTickCount();
+        }
+        was_mining_active = mining_active;
+
+        bool check_stalls = mining_active &&
+                            GLOBAL_STATE->DEVICE_CONFIG.family.asic.id != BM1397 &&
+                            ((xTaskGetTickCount() - mining_active_ticks) * portTICK_PERIOD_MS >= 15000);
+
+        pthread_mutex_lock(&HASHRATE_MONITOR_MODULE->lock);
+        HASHRATE_MONITOR_MODULE->stall_detection_active = check_stalls;
+        if (!mining_active) {
+            memset(HASHRATE_MONITOR_MODULE->domain_stall_counts[0], 0, asic_count * hash_domains * sizeof(uint8_t));
+            memset(HASHRATE_MONITOR_MODULE->domain_stalled[0], 0, asic_count * hash_domains * sizeof(bool));
+        }
+        pthread_mutex_unlock(&HASHRATE_MONITOR_MODULE->lock);
 
         if (is_asic_initialized) {
             ASIC_read_registers(GLOBAL_STATE);
@@ -270,14 +303,9 @@ void hashrate_monitor_task(void *pvParameters)
             float current_hashrate = sum_hashrates(HASHRATE_MONITOR_MODULE->total_measurement, asic_count);
             float error_hashrate = sum_hashrates(HASHRATE_MONITOR_MODULE->error_measurement, asic_count);
 
-            uint64_t now_us = esp_timer_get_time();
-            uint64_t stall_timeout_us = (uint64_t)DOMAIN_STALL_POLLS * 1000000ULL;
-            bool check_unresponsive = GLOBAL_STATE->DEVICE_CONFIG.family.asic.id != BM1397 &&
-                                      !GLOBAL_STATE->SELF_TEST_MODULE.is_active &&
-                                      !SYSTEM_MODULE->mining_paused &&
-                                      ((xTaskGetTickCount() - asic_initialized_ticks) * portTICK_PERIOD_MS >= 15000);
-
-            if (check_unresponsive) {
+            if (check_stalls) {
+                uint64_t now_us = esp_timer_get_time();
+                uint64_t stall_timeout_us = (uint64_t)DOMAIN_STALL_POLLS * 1000000ULL;
                 for (int i = 0; i < asic_count; i++) {
                     for (int j = 0; j < hash_domains; j++) {
                         measurement_t *m = &HASHRATE_MONITOR_MODULE->domain_measurements[i][j];

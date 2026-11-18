@@ -69,6 +69,11 @@ void *hashrate_monitor_test_malloc(size_t size, uint32_t caps)
     return allocation;
 }
 
+HashrateMonitorTestPoolSession *hashrate_monitor_test_get_active_session(HashrateMonitorTestState *state)
+{
+    return state ? &state->active_session : NULL;
+}
+
 static void init_fixture(Asic id, unsigned asic_count, unsigned hash_domains)
 {
     memset(&fixture, 0, sizeof(fixture));
@@ -76,6 +81,7 @@ static void init_fixture(Asic id, unsigned asic_count, unsigned hash_domains)
     fixture.DEVICE_CONFIG.family.asic_count = asic_count;
     fixture.DEVICE_CONFIG.family.asic.hash_domains = hash_domains;
     fixture.ASIC_initalized = true;
+    fixture.active_session.work_received = 1;
     now_us = 60000000;
     polls = 0;
     send_counters = false;
@@ -233,4 +239,30 @@ TEST_CASE("partial stall query rejects unavailable monitor and BM1397",
     TEST_ASSERT_FALSE(hashrate_monitor_test_has_partial_stall(&fixture, &count));
     TEST_ASSERT_EQUAL_INT(0, count);
     finish_query_fixture();
+}
+
+TEST_CASE("polling ignores static counters without active work or during self-test",
+          "[asic][hashrate]")
+{
+    init_fixture(BM1370, 1, 4);
+    fixture.active_session.work_received = 0;
+    send_counters = true;
+    run_polling_fixture();
+    for (unsigned domain = 0; domain < 4; domain++) {
+        TEST_ASSERT_FALSE(fixture.HASHRATE_MONITOR_MODULE.domain_stalled[0][domain]);
+        TEST_ASSERT_EQUAL_UINT8(0, fixture.HASHRATE_MONITOR_MODULE.domain_stall_counts[0][domain]);
+    }
+    TEST_ASSERT_FALSE(hashrate_monitor_test_has_partial_stall(&fixture, NULL));
+    finish_polling_fixture();
+
+    init_fixture(BM1370, 1, 4);
+    fixture.SELF_TEST_MODULE.is_active = true;
+    send_counters = true;
+    run_polling_fixture();
+    for (unsigned domain = 0; domain < 4; domain++) {
+        TEST_ASSERT_FALSE(fixture.HASHRATE_MONITOR_MODULE.domain_stalled[0][domain]);
+        TEST_ASSERT_EQUAL_UINT8(0, fixture.HASHRATE_MONITOR_MODULE.domain_stall_counts[0][domain]);
+    }
+    TEST_ASSERT_FALSE(hashrate_monitor_test_has_partial_stall(&fixture, NULL));
+    finish_polling_fixture();
 }

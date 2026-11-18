@@ -18,6 +18,10 @@ typedef struct {
     bool mining_paused;
 } HashrateMonitorTestSystemModule;
 
+typedef struct {
+    uint64_t work_received;
+} HashrateMonitorTestPoolSession;
+
 typedef struct HashrateMonitorTestState {
     struct {
         struct {
@@ -34,6 +38,7 @@ typedef struct HashrateMonitorTestState {
         bool is_active;
     } SELF_TEST_MODULE;
     bool ASIC_initalized;
+    HashrateMonitorTestPoolSession active_session;
 } HashrateMonitorTestState;
 
 void hashrate_monitor_test_task(void *state);
@@ -50,5 +55,6 @@ void hashrate_monitor_test_delay_until(TickType_t *last_wake, TickType_t ticks);
 void hashrate_monitor_test_read_registers(HashrateMonitorTestState *state);
 void hashrate_monitor_test_noinit_update(HashrateMonitorTestSystemModule *system);
 void *hashrate_monitor_test_malloc(size_t size, uint32_t caps);
+HashrateMonitorTestPoolSession *hashrate_monitor_test_get_active_session(HashrateMonitorTestState *state);
 
 #endif

@@ -20,6 +20,7 @@ typedef struct {
 
     pthread_mutex_t lock;
     bool is_initialized;
+    bool stall_detection_active;
 } HashrateMonitorModule;
 
 void hashrate_monitor_task(void *pvParameters);

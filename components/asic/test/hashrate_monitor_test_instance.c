@@ -6,6 +6,8 @@
 #define TEST_STUB_SYSTEM_H
 #define GlobalState HashrateMonitorTestState
 #define SystemModule HashrateMonitorTestSystemModule
+#define PoolSession HashrateMonitorTestPoolSession
+#define POOL_get_active_session hashrate_monitor_test_get_active_session
 #define hashrate_monitor_task hashrate_monitor_test_task
 #define hashrate_monitor_register_read hashrate_monitor_test_register_read
 #define hashrate_monitor_reset_measurements hashrate_monitor_test_reset_measurements
