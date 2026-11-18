@@ -654,13 +654,16 @@ TEST_CASE("Receive preserves consecutive JSON-RPC lines", "[stratum][security]")
     esp_transport_destroy(transport);
 }
 
-TEST_CASE("Receive rejects oversized JSON-RPC line", "[stratum][security]")
+TEST_CASE("Receive rejects oversized JSON-RPC line and resynchronises", "[stratum][security]")
 {
-    size_t data_length = STRATUM_V1_MAX_JSON_LINE_SIZE + 2U;
+    const char *next_line = "{\"id\":7,\"result\":true}\n";
+    size_t oversized_len = STRATUM_V1_MAX_JSON_LINE_SIZE + 1U;
+    size_t data_length = oversized_len + 1U + strlen(next_line);
     char *json = malloc(data_length);
     TEST_ASSERT_NOT_NULL(json);
-    memset(json, 'a', data_length - 1U);
-    json[data_length - 1U] = '\n';
+    memset(json, 'a', oversized_len);
+    json[oversized_len] = '\n';
+    memcpy(json + oversized_len + 1U, next_line, strlen(next_line));
 
     mock_transport_data_t mock = {
         .data = json,
@@ -674,6 +677,46 @@ TEST_CASE("Receive rejects oversized JSON-RPC line", "[stratum][security]")
     TEST_ASSERT_TRUE(STRATUM_V1_initialize_conn_buffer(&conn));
     TEST_ASSERT_NULL(STRATUM_V1_receive_jsonrpc_line(&conn));
 
+    // Framing must survive the rejected line: the next call returns the line
+    // that followed it, not a fragment.
+    char *line = STRATUM_V1_receive_jsonrpc_line(&conn);
+    TEST_ASSERT_NOT_NULL(line);
+    TEST_ASSERT_EQUAL_STRING("{\"id\":7,\"result\":true}", line);
+
+    free(line);
+    STRATUM_V1_free_conn_buffer(&conn);
+    esp_transport_destroy(transport);
+    free(json);
+}
+
+TEST_CASE("Receive drops oversized line split across many reads", "[stratum][security]")
+{
+    const char *next_line = "{}\n";
+    size_t oversized_len = STRATUM_V1_MAX_JSON_LINE_SIZE + 4096U;
+    size_t data_length = oversized_len + 1U + strlen(next_line);
+    char *json = malloc(data_length);
+    TEST_ASSERT_NOT_NULL(json);
+    memset(json, 'a', oversized_len);
+    json[oversized_len] = '\n';
+    memcpy(json + oversized_len + 1U, next_line, strlen(next_line));
+
+    mock_transport_data_t mock = {
+        .data = json,
+        .length = data_length,
+        .max_chunk = 512,
+    };
+    esp_transport_handle_t transport = create_mock_transport(&mock);
+    TEST_ASSERT_NOT_NULL(transport);
+
+    sv1_conn_t conn = { .transport = transport };
+    TEST_ASSERT_TRUE(STRATUM_V1_initialize_conn_buffer(&conn));
+    TEST_ASSERT_NULL(STRATUM_V1_receive_jsonrpc_line(&conn));
+
+    char *line = STRATUM_V1_receive_jsonrpc_line(&conn);
+    TEST_ASSERT_NOT_NULL(line);
+    TEST_ASSERT_EQUAL_STRING("{}", line);
+
+    free(line);
     STRATUM_V1_free_conn_buffer(&conn);
     esp_transport_destroy(transport);
     free(json);

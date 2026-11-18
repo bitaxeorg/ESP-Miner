@@ -27,6 +27,13 @@
 
 #define BUFFER_SIZE 1024
 #define JSON_RPC_BUFFER_LIMIT (STRATUM_V1_MAX_JSON_LINE_SIZE + 2U)
+// Upper bound on the bytes thrown away while resynchronising to the next line
+// after an oversized one. Bounded so a peer that never sends '\n' cannot keep
+// the caller here forever.
+#define OVERSIZED_LINE_DISCARD_LIMIT (256U * 1024U)
+// The 32 KB receive buffer does not fit in the largest internal heap block of
+// an ESP32-S3, so try PSRAM first and fall back to the default heap.
+#define STRATUM_BUFFER_CAPS_PREFERRED (MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT)
 #define BITCOIN_GENESIS_NTIME 1231006505
 #define MAX_ERROR_MSG_LEN 256
 static const char * TAG = "stratum_api";
@@ -74,14 +81,24 @@ esp_transport_handle_t STRATUM_V1_transport_init(tls_mode tls, const char * cert
 bool STRATUM_V1_initialize_conn_buffer(sv1_conn_t *conn)
 {
     if (!conn) return false;
-    free(conn->json_rpc_buffer);
-    conn->json_rpc_buffer = malloc(BUFFER_SIZE);
+    STRATUM_V1_free_conn_buffer(conn);
+
+    uint32_t caps = STRATUM_BUFFER_CAPS_PREFERRED;
+    conn->json_rpc_buffer = heap_caps_malloc(BUFFER_SIZE, caps);
+    if (conn->json_rpc_buffer == NULL) {
+        // No PSRAM (or it is exhausted): internal RAM still works, it just
+        // cannot hold the largest allowed line.
+        caps = MALLOC_CAP_DEFAULT;
+        conn->json_rpc_buffer = heap_caps_malloc(BUFFER_SIZE, caps);
+    }
     if (conn->json_rpc_buffer == NULL) {
         ESP_LOGE(TAG, "Failed to allocate memory for JSON-RPC buffer");
         conn->json_rpc_buffer_size = 0;
         conn->json_rpc_buffer_len = 0;
+        conn->json_rpc_buffer_caps = 0;
         return false;
     }
+    conn->json_rpc_buffer_caps = caps;
     conn->json_rpc_buffer_size = BUFFER_SIZE;
     conn->json_rpc_buffer_len = 0;
     conn->json_rpc_buffer[0] = '\0';
@@ -92,37 +109,86 @@ void STRATUM_V1_free_conn_buffer(sv1_conn_t *conn)
 {
     if (!conn) return;
     if (conn->json_rpc_buffer) {
+        // heap_caps_malloc'd memory is freed by free() as well.
         free(conn->json_rpc_buffer);
         conn->json_rpc_buffer = NULL;
     }
     conn->json_rpc_buffer_size = 0;
     conn->json_rpc_buffer_len = 0;
+    conn->json_rpc_buffer_caps = 0;
 }
 
-static bool ensure_json_buffer_capacity(char **p_buffer, size_t *p_buffer_size, size_t required_size)
+static bool ensure_json_buffer_capacity(sv1_conn_t *conn, size_t required_size)
 {
     if (required_size > JSON_RPC_BUFFER_LIMIT) {
         return false;
     }
 
-    if (required_size <= *p_buffer_size) {
+    if (required_size <= conn->json_rpc_buffer_size) {
         return true;
     }
 
-    size_t new_size = *p_buffer_size;
+    size_t new_size = conn->json_rpc_buffer_size;
     while (new_size < required_size && new_size < JSON_RPC_BUFFER_LIMIT) {
         new_size = MIN(new_size + BUFFER_SIZE, JSON_RPC_BUFFER_LIMIT);
     }
 
-    char *new_buffer = realloc(*p_buffer, new_size);
+    // Realloc on the heap the buffer came from, otherwise PSRAM buffers would
+    // silently migrate (or fail) in internal RAM.
+    char *new_buffer = heap_caps_realloc(conn->json_rpc_buffer, new_size,
+                                         conn->json_rpc_buffer_caps);
     if (new_buffer == NULL) {
         ESP_LOGE(TAG, "Failed to grow JSON-RPC receive buffer to %zu bytes", new_size);
         return false;
     }
 
-    *p_buffer = new_buffer;
-    *p_buffer_size = new_size;
+    conn->json_rpc_buffer = new_buffer;
+    conn->json_rpc_buffer_size = new_size;
     return true;
+}
+
+// Consume and throw away the rest of an oversized line, up to and including its
+// '\n'. Keeping the framing intact is what stops a pool that re-sends the same
+// large job from wedging the miner: the next call to
+// STRATUM_V1_receive_jsonrpc_line() starts on a whole line.
+static void discard_oversized_line(sv1_conn_t *conn, size_t oversized_len)
+{
+    char sink[BUFFER_SIZE];
+    size_t discarded = oversized_len;
+
+    conn->json_rpc_buffer_len = 0;
+    conn->json_rpc_buffer[0] = '\0';
+
+    while (discarded < OVERSIZED_LINE_DISCARD_LIMIT) {
+        int nbytes = esp_transport_read(conn->transport, sink, sizeof(sink),
+                                        TRANSPORT_TIMEOUT_MS);
+        if (nbytes <= 0) {
+            ESP_LOGE(TAG, "Discarded oversized JSON-RPC line of %zu bytes, stream ended before the line terminator", discarded);
+            return;
+        }
+
+        const char *newline_pos = memchr(sink, '\n', (size_t)nbytes);
+        if (newline_pos == NULL) {
+            discarded += (size_t)nbytes;
+            continue;
+        }
+
+        size_t consumed = (size_t)(newline_pos - sink) + 1U;
+        size_t leftover = (size_t)nbytes - consumed;
+        discarded += consumed;
+
+        ESP_LOGE(TAG, "Discarded oversized JSON-RPC line of %zu bytes, resynchronised on the next line", discarded);
+
+        if (leftover > 0 && ensure_json_buffer_capacity(conn, leftover + 1U)) {
+            // The next line already arrived in the same read; keep it.
+            memcpy(conn->json_rpc_buffer, sink + consumed, leftover);
+            conn->json_rpc_buffer_len = leftover;
+            conn->json_rpc_buffer[leftover] = '\0';
+        }
+        return;
+    }
+
+    ESP_LOGE(TAG, "Discarded oversized JSON-RPC line of %zu bytes without finding a line terminator, abandoning the stream", discarded);
 }
 
 char * STRATUM_V1_receive_jsonrpc_line(sv1_conn_t *conn)
@@ -176,7 +242,7 @@ char * STRATUM_V1_receive_jsonrpc_line(sv1_conn_t *conn)
             }
 
             size_t required_size = conn->json_rpc_buffer_len + (size_t)nbytes + 1U;
-            if (!ensure_json_buffer_capacity(&conn->json_rpc_buffer, &conn->json_rpc_buffer_size, required_size)) {
+            if (!ensure_json_buffer_capacity(conn, required_size)) {
                 conn->json_rpc_buffer_len = 0;
                 conn->json_rpc_buffer[0] = '\0';
                 return NULL;
@@ -190,10 +256,10 @@ char * STRATUM_V1_receive_jsonrpc_line(sv1_conn_t *conn)
 
             if (newline_pos == NULL &&
                 conn->json_rpc_buffer_len > STRATUM_V1_MAX_JSON_LINE_SIZE) {
-                ESP_LOGE(TAG, "JSON-RPC line exceeds %u bytes",
-                         STRATUM_V1_MAX_JSON_LINE_SIZE);
-                conn->json_rpc_buffer_len = 0;
-                conn->json_rpc_buffer[0] = '\0';
+                // Too long to keep, but not fatal: drop the rest of the line so
+                // the next read starts on a whole one.
+                size_t oversized_len = conn->json_rpc_buffer_len;
+                discard_oversized_line(conn, oversized_len);
                 return NULL;
             }
         }

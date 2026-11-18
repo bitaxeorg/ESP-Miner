@@ -9,7 +9,10 @@
 
 #define MAX_REQUEST_IDS 1024
 #define MAX_POOL_MESSAGE_LEN 256
-#define STRATUM_V1_MAX_JSON_LINE_SIZE 16384
+// Maximum length of a single JSON-RPC line. The stratum spec does not bound
+// coinb2, and real pools ship ~20 KB mining.notify payloads, so the limit must
+// leave room for them.
+#define STRATUM_V1_MAX_JSON_LINE_SIZE 32768
 
 typedef enum
 {
@@ -75,6 +78,9 @@ typedef struct sv1_conn {
     char *json_rpc_buffer;
     size_t json_rpc_buffer_size;
     size_t json_rpc_buffer_len;
+    // Heap capabilities the buffer was allocated with, so growth and free stay
+    // on the same heap (PSRAM when available, internal otherwise).
+    uint32_t json_rpc_buffer_caps;
     int send_uid;
     char user[256];
     uint8_t pool_target[32];
