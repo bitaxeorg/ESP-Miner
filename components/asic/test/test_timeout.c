@@ -78,3 +78,14 @@ TEST_CASE("Check fixed version clamps serial_versions to one full nonce pass", "
     TEST_ASSERT_FLOAT_WITHIN(0.01f, 74.565f, fixed_ms);
     TEST_ASSERT_FLOAT_WITHIN(0.001f, sixteen_ms, fixed_ms);
 }
+
+TEST_CASE("Check asic timeout 2x BM1373", "[common]")
+{
+    // BM1373: 432 cores (512 up), 6725 small cores (8192 up -> 16/core),
+    // min_nonce_partitions = 8 (8-bucket hardware ceiling = 1,048,576 nonces/stream)
+    float rolled_ms = calculate_bm_timeout_ms(327.0f, 8, 6725, 432, 65536, 0.95f);
+    float fixed_ms = calculate_bm_timeout_ms(327.0f, 8, 6725, 432, 1, 0.95f);
+
+    TEST_ASSERT_FLOAT_WITHIN(1.0f, 12477.7f, rolled_ms);
+    TEST_ASSERT_FLOAT_WITHIN(0.01f, 3.046f, fixed_ms);
+}

@@ -145,9 +145,13 @@ void ASIC_set_frequency(GlobalState * GLOBAL_STATE)
 
 void ASIC_set_nonce_space(GlobalState * GLOBAL_STATE)
 {
+    const AsicConfig *asic = &GLOBAL_STATE->DEVICE_CONFIG.family.asic;
     float nonce_percent = 1.0;
-    int cores = GLOBAL_STATE->DEVICE_CONFIG.family.asic.core_count;
+    int cores = asic->core_count;
     int asic_count = GLOBAL_STATE->DEVICE_CONFIG.family.asic_count;
+    if (asic->min_nonce_partitions > asic_count) {
+        asic_count = asic->min_nonce_partitions;
+    }
     float frequency = GLOBAL_STATE->POWER_MANAGEMENT_MODULE.actual_frequency;
 
     switch (GLOBAL_STATE->DEVICE_CONFIG.family.asic.id) {
@@ -174,10 +178,6 @@ float ASIC_get_asic_job_frequency_ms(GlobalState * GLOBAL_STATE, uint32_t versio
     const AsicConfig *asic = &GLOBAL_STATE->DEVICE_CONFIG.family.asic;
     int asic_count = GLOBAL_STATE->DEVICE_CONFIG.family.asic_count;
 
-    if (asic->fixed_timeout_ms > 0) {
-        return (float)asic->fixed_timeout_ms / _next_power_of_two(asic_count);
-    }
-
     float freq = GLOBAL_STATE->POWER_MANAGEMENT_MODULE.actual_frequency;
     if (freq <= 0.0f) {
         freq = GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value;
@@ -186,8 +186,12 @@ float ASIC_get_asic_job_frequency_ms(GlobalState * GLOBAL_STATE, uint32_t versio
     uint32_t hw_bits = version_mask & asic->hw_version_mask;
     uint8_t midstates = (asic->packet_midstates > 0) ? asic->packet_midstates : 1;
     uint64_t versions_per_packet = (uint64_t)midstates << __builtin_popcount(hw_bits);
+    size_t effective_asic_count = asic_count;
+    if (asic->min_nonce_partitions > effective_asic_count) {
+        effective_asic_count = asic->min_nonce_partitions;
+    }
 
-    return calculate_bm_timeout_ms(freq, asic_count, asic->small_core_count, asic->core_count, versions_per_packet, 0.95f);
+    return calculate_bm_timeout_ms(freq, effective_asic_count, asic->small_core_count, asic->core_count, versions_per_packet, 0.95f);
 }
 
 void ASIC_read_registers(GlobalState * GLOBAL_STATE)
