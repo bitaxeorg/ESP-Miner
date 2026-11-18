@@ -4,6 +4,7 @@ SRCS
     "i2c_bitaxe.c"
     "main.c"
     "log_buffer.c"
+    "register_dump.c"
     "nvs_config.c"
     "display.c"
     "display_oled.c"

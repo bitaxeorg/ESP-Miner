@@ -45,6 +45,7 @@
 #include "websocket_api.h"
 #include "system_api_json.h"
 #include "log_buffer.h"
+#include "register_dump.h"
 #include "utils.h"
 
 static const char * TAG = "http_server";
@@ -1824,6 +1825,7 @@ esp_err_t start_rest_server(GlobalState * GLOBAL_STATE)
 
         // System queries & telemetry
         { .uri = "/api/system/asic",               .method = HTTP_GET,     .handler = GET_system_asic },
+        { .uri = "/api/system/asic/registers",     .method = HTTP_GET,     .handler = GET_system_asic_registers },
         { .uri = "/api/system/firmware/checksum",  .method = HTTP_GET,     .handler = GET_system_firmware_checksum },
         { .uri = "/api/system/info",               .method = HTTP_GET,     .handler = GET_system_info },
         { .uri = "/api/system/logs",               .method = HTTP_GET,     .handler = GET_system_logs },

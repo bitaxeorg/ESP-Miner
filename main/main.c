@@ -29,6 +29,7 @@
 #include "filesystem.h"
 #include "log_buffer.h"
 #include "setup_ble.h"
+#include "register_dump.h"
 #include "esp_ota_ops.h"
 #include "esp_netif_sntp.h"
 
@@ -225,6 +226,11 @@ void app_main(void)
         if (retry == -1) {
             ESP_LOGW(TAG, "Failed to get NTP in time! Certificate validation may fail!");
         }
+    }
+
+    if (system_init_ret == ESP_OK && !GLOBAL_STATE.SELF_TEST_MODULE.is_active) {
+        register_dump_run(&GLOBAL_STATE);
+        return;
     }
 
     if (system_init_ret == ESP_OK) {

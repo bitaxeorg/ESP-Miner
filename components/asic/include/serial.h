@@ -12,6 +12,7 @@ typedef enum
 #define UART_FREQ 115200
 
 int SERIAL_send(uint8_t *, int, bool);
+void SERIAL_set_tx_hook(void (*hook)(const uint8_t *data, int len));
 esp_err_t SERIAL_init(void);
 void SERIAL_debug_rx(void);
 int16_t SERIAL_rx(uint8_t *, uint16_t, uint16_t);

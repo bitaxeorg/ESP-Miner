@@ -58,8 +58,20 @@ esp_err_t SERIAL_set_baud(int baud)
     return ESP_OK;
 }
 
+static void (*tx_hook)(const uint8_t *data, int len);
+
+void SERIAL_set_tx_hook(void (*hook)(const uint8_t *data, int len))
+{
+    tx_hook = hook;
+}
+
 int SERIAL_send(uint8_t *data, int len, bool debug)
 {
+    if (tx_hook != NULL)
+    {
+        tx_hook(data, len);
+    }
+
     if (debug)
     {
         printf("tx: ");
