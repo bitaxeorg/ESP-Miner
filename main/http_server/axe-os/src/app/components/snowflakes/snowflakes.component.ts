@@ -3,8 +3,7 @@ import { AfterViewInit, Component, ElementRef, OnDestroy, OnInit, ViewChild } fr
 @Component({
     selector: 'app-snowflakes',
     templateUrl: './snowflakes.component.html',
-    styleUrls: ['./snowflakes.component.scss'],
-    standalone: false
+    styleUrls: ['./snowflakes.component.scss']
 })
 export class SnowflakesComponent implements OnInit, AfterViewInit, OnDestroy {
   @ViewChild('container', { static: true }) containerRef!: ElementRef<HTMLDivElement>;

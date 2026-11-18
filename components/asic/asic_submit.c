@@ -1,7 +1,6 @@
 #include "asic.h"
 #include "asic_internal.h"
 #include "esp_log.h"
-#include <stdlib.h>
 #include <string.h>
 
 void ASIC_send_job(GlobalState *state, const asic_job_t *job)
@@ -12,11 +11,5 @@ void ASIC_send_job(GlobalState *state, const asic_job_t *job)
         ESP_LOGE("asic", "Invalid common job metadata");
         return;
     }
-    asic_job_t *retained_job = malloc(sizeof(*retained_job));
-    if (retained_job == NULL) {
-        ESP_LOGE("asic", "Failed to allocate common job");
-        return;
-    }
-    *retained_job = *job;
-    ASIC_send_work(state, retained_job);
+    ASIC_send_work(state, job);
 }

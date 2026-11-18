@@ -38,6 +38,7 @@
 #include "hashrate_monitor_task.h"
 #include "coinbase_decoder.h"
 #include "sv2_protocol.h"
+#include "asic.h"
 
 #define NVS_COUNTER_UPDATE_INTERVAL_MS 60 * 60 * 1000  // Update NVS once per hour
 #define NOINIT_SENTINEL_VALUE 0x4C4F4732       // "LOG2" in hex
@@ -201,8 +202,6 @@ void SYSTEM_init_system(GlobalState * GLOBAL_STATE)
     SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
 
     module->screen_page = 0;
-    module->shares_accepted = 0;
-    module->shares_rejected = 0;
     module->best_nonce_diff = nvs_config_get_u64(NVS_CONFIG_BEST_DIFF);
     module->best_session_nonce_diff = 0;
     module->start_time_us = esp_timer_get_time();
@@ -246,16 +245,15 @@ void SYSTEM_init_system(GlobalState * GLOBAL_STATE)
         module->pools[i].pass = NULL;
         module->pools[i].cert = NULL;
         module->pools[i].sv2_authority_pubkey = NULL;
+        POOL_reset_session(GLOBAL_STATE, i);
         SYSTEM_load_pool_from_nvs(GLOBAL_STATE, i);
     }
 
     // load primary and secondary pool index selectors and fallback preference
     SYSTEM_reload_pool_config(GLOBAL_STATE);
-
-    // Initialize pool connection info
-    strcpy(module->pool_connection_info, "Not Connected");
-    module->primary_pool_error[0] = '\0';
-    module->pool_banner[0] = '\0';
+    const PoolConfig *sec_pool = &module->pools[module->secondary_pool_index];
+    module->is_using_fallback = module->use_fallback_stratum &&
+        (sec_pool->url != NULL && sec_pool->url[0] != '\0' && sec_pool->port != 0);
 
     // Initialize overheat_mode
     module->overheat_mode = nvs_config_get_bool(NVS_CONFIG_OVERHEAT_MODE);
@@ -271,20 +269,9 @@ void SYSTEM_init_system(GlobalState * GLOBAL_STATE)
     suffixString(module->best_nonce_diff, module->best_diff_string, DIFF_STRING_SIZE, 0);
     suffixString(module->best_session_nonce_diff, module->best_session_diff_string, DIFF_STRING_SIZE, 0);
 
-    // Initialize mutexes
-    pthread_mutex_init(&GLOBAL_STATE->ASIC_TASK_MODULE.valid_jobs_lock, NULL);
-    pthread_mutex_init(&GLOBAL_STATE->transport_mutex, NULL);
-
-    // Allocate the job tracking tables here rather than in create_jobs_task().
-    // The stratum tasks touch valid_jobs (via SYSTEM_reset_pool_session) as soon as they
-    // connect, so tying the allocation to create_jobs_task actually starting is a
-    // NULL dereference waiting to happen if that task ever fails to spawn.
-    GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs = calloc(MAX_ASIC_JOBS, sizeof(*GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs));
-    GLOBAL_STATE->ASIC_TASK_MODULE.valid_jobs = calloc(MAX_ASIC_JOBS, sizeof(uint8_t));
-    if (GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs == NULL || GLOBAL_STATE->ASIC_TASK_MODULE.valid_jobs == NULL) {
-        ESP_LOGE(TAG, "Failed to allocate job tracking tables");
-        abort();
-    }
+    // Initialize mutexes and job slots
+    ASIC_init_job_slots(GLOBAL_STATE);
+    GLOBAL_STATE->has_work = false;
 }
 
 void SYSTEM_init_versions(GlobalState * GLOBAL_STATE)
@@ -412,60 +399,17 @@ esp_err_t SYSTEM_init_peripherals(GlobalState * GLOBAL_STATE) {
     return ESP_OK;
 }
 
-static void clean_jobs_queue(GlobalState * GLOBAL_STATE)
+void SYSTEM_clean_jobs_queue(GlobalState * GLOBAL_STATE)
 {
     ESP_LOGI(TAG, "Clean Jobs: invalidating active jobs");
 
-    pthread_mutex_lock(&GLOBAL_STATE->ASIC_TASK_MODULE.valid_jobs_lock);
-    for (int i = 0; i < MAX_ASIC_JOBS; i = i + 4) {
-        GLOBAL_STATE->ASIC_TASK_MODULE.valid_jobs[i] = 0;
-    }
-    pthread_mutex_unlock(&GLOBAL_STATE->ASIC_TASK_MODULE.valid_jobs_lock);
+    ASIC_clear_work(GLOBAL_STATE);
+    GLOBAL_STATE->has_work = false;
 
     // Reset hashrate measurements to prevent a spike on reconnection
     hashrate_monitor_reset_measurements(GLOBAL_STATE);
 }
 
-void SYSTEM_notify_accepted_share(GlobalState * GLOBAL_STATE)
-{
-    SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
-
-    module->shares_accepted++;
-}
-
-static int compare_rejected_reason_stats(const void *a, const void *b) {
-    const RejectedReasonStat *ea = a;
-    const RejectedReasonStat *eb = b;
-    return (eb->count > ea->count) - (ea->count > eb->count);
-}
-
-void SYSTEM_notify_rejected_share(GlobalState * GLOBAL_STATE, char * error_msg)
-{
-    SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
-
-    module->shares_rejected++;
-
-    for (int i = 0; i < module->rejected_reason_stats_count; i++) {
-        if (strncmp(module->rejected_reason_stats[i].message, error_msg, sizeof(module->rejected_reason_stats[i].message) - 1) == 0) {
-            module->rejected_reason_stats[i].count++;
-            return;
-        }
-    }
-
-    if (module->rejected_reason_stats_count < (int)(sizeof(module->rejected_reason_stats) / sizeof(module->rejected_reason_stats[0]))) {
-        strncpy(module->rejected_reason_stats[module->rejected_reason_stats_count].message, 
-                error_msg, 
-                sizeof(module->rejected_reason_stats[module->rejected_reason_stats_count].message) - 1);
-        module->rejected_reason_stats[module->rejected_reason_stats_count].message[sizeof(module->rejected_reason_stats[module->rejected_reason_stats_count].message) - 1] = '\0'; // Ensure null termination
-        module->rejected_reason_stats[module->rejected_reason_stats_count].count = 1;
-        module->rejected_reason_stats_count++;
-    }
-
-    if (module->rejected_reason_stats_count > 1) {
-        qsort(module->rejected_reason_stats, module->rejected_reason_stats_count, 
-            sizeof(module->rejected_reason_stats[0]), compare_rejected_reason_stats);
-    }    
-}
 void SYSTEM_notify_new_ntime(GlobalState * GLOBAL_STATE, uint32_t ntime)
 {
     SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
@@ -498,44 +442,6 @@ void SYSTEM_reset_coinbase_ui_state(GlobalState * GLOBAL_STATE)
     GLOBAL_STATE->block_signals_count = 0;
 }
 
-void SYSTEM_reset_pool_session(GlobalState * GLOBAL_STATE)
-{
-    if (!GLOBAL_STATE) return;
-
-    SystemModule *module = &GLOBAL_STATE->SYSTEM_MODULE;
-    for (int i = 0; i < module->rejected_reason_stats_count; i++) {
-        module->rejected_reason_stats[i].count = 0;
-        module->rejected_reason_stats[i].message[0] = '\0';
-    }
-    module->rejected_reason_stats_count = 0;
-    module->shares_accepted = 0;
-    module->shares_rejected = 0;
-    module->shares_pending = 0;
-    module->response_time = 0.0f;
-    module->response_time_min = 0.0f;
-    module->response_time_max = 0.0f;
-    module->last_response_time_min = 0.0f;
-    module->last_response_time_max = 0.0f;
-    module->response_share_batch = 0;
-    module->pool_difficulty = 0.0;
-
-    clean_jobs_queue(GLOBAL_STATE);
-    SYSTEM_reset_coinbase_ui_state(GLOBAL_STATE);
-}
-
-void SYSTEM_record_response_time(GlobalState * GLOBAL_STATE, float response_time_ms, uint16_t batch_count)
-{
-    if (!GLOBAL_STATE || response_time_ms <= 0.0f) return;
-    SystemModule *module = &GLOBAL_STATE->SYSTEM_MODULE;
-    module->response_time = response_time_ms;
-    module->response_share_batch = batch_count;
-    if (module->response_time_min <= 0.0f || response_time_ms < module->response_time_min) {
-        module->response_time_min = response_time_ms;
-    }
-    if (module->response_time_max <= 0.0f || response_time_ms > module->response_time_max) {
-        module->response_time_max = response_time_ms;
-    }
-}
 
 void SYSTEM_decode_and_apply_coinbase(GlobalState * GLOBAL_STATE, const miner_job_t * job)
 {

@@ -1,6 +1,5 @@
 import { Component, ElementRef, EventEmitter, HostListener, Input, Output, forwardRef } from '@angular/core';
 import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
-import { CommonModule } from '@angular/common';
 import { SelectOption } from '../../models/select-option.model';
 
 @Component({
@@ -13,8 +12,7 @@ import { SelectOption } from '../../models/select-option.model';
       multi: true
     }
   ],
-  standalone: true,
-  imports: [CommonModule]
+  standalone: true
 })
 export class DropdownComponent implements ControlValueAccessor {
   @Input() options: SelectOption[] = [];

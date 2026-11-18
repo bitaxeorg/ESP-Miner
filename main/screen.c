@@ -877,9 +877,10 @@ static void screen_update_cb(lv_timer_t * timer)
         current_rssi_value = rssi_value;
     }
 
-    uint32_t shares_accepted = module->shares_accepted;
-    uint32_t shares_rejected = module->shares_rejected;
-    uint32_t work_received = module->work_received;
+    PoolSession *session = POOL_get_active_session(GLOBAL_STATE);
+    uint32_t shares_accepted = session ? (uint32_t)session->shares_accepted : 0;
+    uint32_t shares_rejected = session ? (uint32_t)session->shares_rejected : 0;
+    uint32_t work_received = session ? (uint32_t)session->work_received : 0;
 
     if (current_shares_accepted != shares_accepted 
         || current_shares_rejected != shares_rejected

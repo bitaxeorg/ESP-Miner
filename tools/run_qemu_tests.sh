@@ -13,7 +13,7 @@ if ! command -v idf.py &> /dev/null; then
     echo "ESP-IDF environment not detected in PATH."
     # Try common local installation paths
     IDF_EXPORT_PATHS=(
-        "$HOME/esp/v6.0.2/esp-idf/export.sh"
+        "$HOME/esp/v6.0.3/esp-idf/export.sh"
         "$HOME/esp/v5.5/esp-idf/export.sh"
         "$HOME/esp/esp-idf/export.sh"
     )
@@ -31,7 +31,7 @@ if ! command -v idf.py &> /dev/null; then
     
     if [ "$SOURCED" = false ]; then
         echo "ERROR: Could not locate ESP-IDF export script."
-        echo "Please source it manually (e.g. '. ~/esp/v6.0.2/esp-idf/export.sh') before running this script."
+        echo "Please source it manually (e.g. '. ~/esp/v6.0.3/esp-idf/export.sh') before running this script."
         exit 1
     fi
 fi
@@ -51,4 +51,7 @@ cd build
 esptool --chip esp32s3 merge-bin --pad-to-size 16MB -o flash_image.bin @flash_args
 
 echo "Running tests in QEMU emulator..."
-qemu-system-xtensa -machine esp32s3 -monitor none -nographic -no-reboot -semihosting -drive file=flash_image.bin,if=mtd,format=raw -m 4 -serial stdio
+rm -f output.log
+timeout 5m qemu-system-xtensa -machine esp32s3 -nographic -no-reboot -watchdog-action shutdown -drive file=flash_image.bin,if=mtd,format=raw -m 4 -serial file:output.log
+cat output.log
+grep -q -E '[[:digit:]]+ Tests [[:digit:]]+ Failures [[:digit:]]+ Ignored' output.log

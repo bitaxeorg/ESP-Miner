@@ -5,6 +5,7 @@ SRCS
     "mining.c"
     "mining_job.c"
     "stratum_api.c"
+    "stratum_timing.c"
     "stratum_socket.c"
     "coinbase_decoder.c"
     "segwit_addr.c"

@@ -2,7 +2,6 @@
 #include "unity.h"
 
 #include "job_pipeline_test_harness.h"
-#include "mining.h"
 #include "stratum_api.h"
 #include "sv2_protocol.h"
 #include "utils.h"
@@ -63,7 +62,7 @@ static void assert_bitmain_job_fields(const asic_job_t *job,
     TEST_ASSERT_EQUAL_INT(type, job->source_type);
     TEST_ASSERT_FLOAT_WITHIN(1e-4, pool_diff, target_to_diff(job->pool_target));
     bm13xx_job_packet_t packet;
-    bm13xx_build_job_packet(job, 0, &packet);
+    bm13xx_encode_job_packet(job, 0, &packet);
     TEST_ASSERT_EQUAL_UINT8(1, packet.num_midstates);
     assert_hex32(
         "000000000000000049070000a804d248b472b528c6e5607d837bdc1335fd44bf",
@@ -74,7 +73,7 @@ static void assert_bitmain_job_fields(const asic_job_t *job,
 static void assert_packet_merkle(const char *expected_hex, const asic_job_t *job)
 {
     bm13xx_job_packet_t packet;
-    bm13xx_build_job_packet(job, 0, &packet);
+    bm13xx_encode_job_packet(job, 0, &packet);
     assert_hex32(expected_hex, packet.merkle_root);
 }
 
@@ -148,7 +147,7 @@ TEST_CASE("SV1 notify produces expected Bitmain job fields",
     TEST_ASSERT_EQUAL_STRING("1f9a56282c", asic_job->job_id);
     TEST_ASSERT_EQUAL_STRING("0000000000000000", asic_job->extranonce2);
     bm1397_job_packet_t packet;
-    bm1397_build_job_packet(asic_job, 0, 4, &packet);
+    bm1397_encode_job_packet(asic_job, 0, 4, &packet);
     TEST_ASSERT_EQUAL_UINT8(4, packet.num_midstates);
     assert_hex32(
         "4d3185f25f7d5de0e3591741cb21cae11574ddd65d490d3d68739f8a52eadf91",
@@ -301,7 +300,7 @@ TEST_CASE("SV2 standard messages produce expected Bitmain job fields",
         asic_job, 0x20008004, JOB_TYPE_SV2_STANDARD, 3, 2048.0,
         "c604a846ea9ef9b4dbd3eb32cfdb61d41fa0247f053dcece32ef0d12cd1be821");
     bm1397_job_packet_t packet;
-    bm1397_build_job_packet(asic_job, 0, 4, &packet);
+    bm1397_encode_job_packet(asic_job, 0, 4, &packet);
     TEST_ASSERT_EQUAL_UINT8(4, packet.num_midstates);
     assert_hex32(
         "d3e7e0f843a5eab9d8738ebae0845dc947140afd1a9e9aba63782cb00fdfee73",
@@ -676,4 +675,76 @@ TEST_CASE("coinbase hash failures skip sending work and permit the next cycle",
         assert_packet_merkle("c528516952ea823ab4cd034973550175c63ebf0f49cb126ccee58049a3fc487c", result.jobs[0]);
         job_pipeline_harness_result_free(&result);
     }
+}
+
+TEST_CASE("BM1397 rolls version instead of extranonce2 on rollable jobs until exhausted",
+          "[mining][bm1397][job-task]")
+{
+    miner_job_pool_init();
+    miner_job_t *job = miner_job_get_slot(0);
+    (void)snprintf(job->job_id, sizeof(job->job_id), "bm1397roll");
+    job->type = JOB_TYPE_V1;
+    job->version = 0x20000004;
+    job->version_mask = BIP320_VERSION_ROLLING_MASK;
+    job->clean_jobs = true;
+    job->ntime = 0x64658bd8;
+    job->nbits = 0x1705dd01;
+    diff_to_target(256.0, job->pool_target);
+    job->extranonce2_len = 8;
+    job->coinbase_prefix_len = 1;
+    job->coinbase_prefix[0] = 0x01;
+    job->coinbase_suffix_len = 1;
+    job->coinbase_suffix[0] = 0x02;
+
+    const job_pipeline_harness_event_t events[] = {
+        { .type = JOB_PIPELINE_HARNESS_NOTIFY, .slot = 0 },
+        { .type = JOB_PIPELINE_HARNESS_TIMEOUT },
+        { .type = JOB_PIPELINE_HARNESS_TIMEOUT },
+    };
+    job_pipeline_harness_result_t result;
+    job_pipeline_harness_run(
+        (job_pipeline_harness_config_t) {
+            .hardware_version_rolling = false,
+            .software_midstates = 4,
+            .asic_initialized = true,
+            .job_frequency_ms = 1,
+        }, events, sizeof(events) / sizeof(events[0]), &result);
+
+    TEST_ASSERT_EQUAL_UINT32(3, result.job_count);
+    // Extranonce2 stays at 0 while version rolls
+    TEST_ASSERT_EQUAL_STRING("0000000000000000", result.jobs[0]->extranonce2);
+    TEST_ASSERT_EQUAL_STRING("0000000000000000", result.jobs[1]->extranonce2);
+    TEST_ASSERT_EQUAL_STRING("0000000000000000", result.jobs[2]->extranonce2);
+
+    // Merkle root is cached and identical across all 3 jobs
+    TEST_ASSERT_EQUAL_MEMORY(result.jobs[0]->merkle_root, result.jobs[1]->merkle_root, 32);
+    TEST_ASSERT_EQUAL_MEMORY(result.jobs[0]->merkle_root, result.jobs[2]->merkle_root, 32);
+
+    // Versions advance by 4 midstates on each job (4 << 13 = 0x8000)
+    TEST_ASSERT_EQUAL_HEX32(0x20000004, result.jobs[0]->version);
+    TEST_ASSERT_EQUAL_HEX32(0x20008004, result.jobs[1]->version);
+    TEST_ASSERT_EQUAL_HEX32(0x20010004, result.jobs[2]->version);
+
+    job_pipeline_harness_result_free(&result);
+
+    // Now test exhaustion with a 2-bit mask (4 versions)
+    job->version_mask = 0x00006000;
+    const job_pipeline_harness_event_t exhaust_events[] = {
+        { .type = JOB_PIPELINE_HARNESS_NOTIFY, .slot = 0 },
+        { .type = JOB_PIPELINE_HARNESS_TIMEOUT },
+    };
+    job_pipeline_harness_run(
+        (job_pipeline_harness_config_t) {
+            .hardware_version_rolling = false,
+            .software_midstates = 4,
+            .asic_initialized = true,
+            .job_frequency_ms = 1,
+        }, exhaust_events, sizeof(exhaust_events) / sizeof(exhaust_events[0]), &result);
+
+    TEST_ASSERT_EQUAL_UINT32(2, result.job_count);
+    TEST_ASSERT_EQUAL_STRING("0000000000000000", result.jobs[0]->extranonce2);
+    // After 4 versions are exhausted, extranonce2 rolls to 1
+    TEST_ASSERT_EQUAL_STRING("0100000000000000", result.jobs[1]->extranonce2);
+    TEST_ASSERT_EQUAL_HEX32(0x20000004, result.jobs[1]->version);
+    job_pipeline_harness_result_free(&result);
 }

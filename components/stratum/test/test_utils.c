@@ -1,7 +1,5 @@
 #include "unity.h"
 #include "utils.h"
-#include "mining.h"
-#include <math.h>
 #include <string.h>
 
 TEST_CASE("Test sha256_bin", "[utils]")

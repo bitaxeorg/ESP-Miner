@@ -46,13 +46,20 @@ static void spy_task_delay(TickType_t ticks)
     harness_result->delay_count++;
 }
 
-void spy_asic_send_work(GlobalState *state, asic_job_t *job)
+void spy_asic_send_work(GlobalState *state, const asic_job_t *job)
 {
     (void)state;
     if (harness_result->job_count >= JOB_PIPELINE_HARNESS_MAX_JOBS) {
         longjmp(harness_exit, 2);
     }
-    harness_result->jobs[harness_result->job_count++] = job;
+    if (job != NULL) {
+        harness_result->storage[harness_result->job_count] = *job;
+        harness_result->jobs[harness_result->job_count] =
+            &harness_result->storage[harness_result->job_count];
+    } else {
+        harness_result->jobs[harness_result->job_count] = NULL;
+    }
+    harness_result->job_count++;
 }
 
 static void spy_asic_set_version_mask(GlobalState *state, uint32_t mask)
@@ -96,7 +103,9 @@ static void stub_difficulty_controller_update(GlobalState *state)
 #define ASIC_get_asic_job_frequency_ms stub_asic_get_job_frequency
 #define SYSTEM_decode_and_apply_coinbase spy_decode_coinbase
 #define difficulty_controller_update stub_difficulty_controller_update
+#define POOL_resolve_notified_job(gs, notify) miner_job_get_slot((size_t)(notify))
 #include "../../../main/tasks/create_jobs_task.c"
+#undef POOL_resolve_notified_job
 #undef difficulty_controller_update
 #undef SYSTEM_decode_and_apply_coinbase
 #undef ASIC_get_asic_job_frequency_ms
@@ -153,7 +162,6 @@ void job_pipeline_harness_result_free(job_pipeline_harness_result_t *result)
 {
     if (result == NULL) return;
     for (size_t index = 0; index < result->job_count; ++index) {
-        free(result->jobs[index]);
         result->jobs[index] = NULL;
     }
     result->job_count = 0;

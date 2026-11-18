@@ -1,13 +1,17 @@
 #include <string.h>
+#include <stdlib.h>
 #include <stdbool.h>
-#include <math.h>
 #include <stdio.h>
-
+#include <arpa/inet.h>
 #include "asic_common.h"
+#include "bm_job_packet.h"
+#include "bm1397.h"
+#include "mining.h"
 #include "serial.h"
 #include "esp_log.h"
 #include "crc.h"
 #include "esp_timer.h"
+#include "utils.h"
 
 #define PREAMBLE 0xAA55
 
@@ -266,4 +270,107 @@ double calculate_bm_timeout_ms(float frequency_mhz, size_t asic_count, size_t sm
         return default_time_ms;
 
     return (double)timeout_percent * fullspace_timeout_ms;
+}
+
+bool bm13xx_decode_job_result(asic_job_store_t *store,
+                              uint8_t small_core_bits,
+                              uint16_t address_interval,
+                              uint32_t wire_nonce,
+                              uint8_t wire_chip_slot,
+                              uint16_t wire_version,
+                              task_result *result)
+{
+    if (address_interval == 0 || result == NULL) {
+        return false;
+    }
+
+    uint8_t slot = bm_decode_wire_job_slot(wire_chip_slot, small_core_bits);
+    uint8_t small_core_id = bm_decode_wire_sub_id(wire_chip_slot, small_core_bits);
+
+    if (!asic_job_store_lookup(store, slot, &result->job)) {
+        return false;
+    }
+
+    uint32_t nonce_h = ntohl(wire_nonce);
+    uint8_t asic_nr = (uint8_t)(((nonce_h >> 17) & 0xff) / address_interval);
+    uint8_t core_id = (uint8_t)((nonce_h >> 25) & 0x7f);
+    uint32_t version_bits = ((uint32_t)ntohs(wire_version) << 13);
+    uint32_t mask = result->job.version_mask & BIP320_VERSION_ROLLING_MASK;
+    result->rolled_version = (result->job.version & ~mask) | (version_bits & mask);
+    result->nonce = wire_nonce;
+    result->asic_nr = asic_nr;
+    result->core_id = core_id;
+    result->small_core_id = small_core_id;
+
+    return true;
+}
+
+bool bm1397_decode_job_result(asic_job_store_t *store,
+                              uint16_t address_interval,
+                              uint32_t wire_nonce,
+                              uint8_t wire_chip_slot,
+                              task_result *result)
+{
+    if (address_interval == 0 || result == NULL) {
+        return false;
+    }
+
+    uint8_t slot = bm_decode_wire_job_slot(wire_chip_slot, BM1397_MIDSTATE_BITS);
+    uint8_t rx_midstate_index = bm_decode_wire_sub_id(wire_chip_slot, BM1397_MIDSTATE_BITS);
+
+    if (!asic_job_store_lookup(store, slot, &result->job)) {
+        return false;
+    }
+
+    uint32_t rolled_version = result->job.version;
+    for (int i = 0; i < rx_midstate_index; i++) {
+        rolled_version = increment_bitmask(rolled_version, result->job.version_mask);
+    }
+
+    uint32_t nonce_h = ntohl(wire_nonce);
+    uint8_t asic_nr = (uint8_t)(((nonce_h >> 17) & 0xff) / address_interval);
+    uint8_t core_id = (uint8_t)((nonce_h >> 25) & 0x7f);
+
+    result->rolled_version = rolled_version;
+    result->nonce = wire_nonce;
+    result->asic_nr = asic_nr;
+    result->core_id = core_id;
+    result->small_core_id = (uint8_t)(wire_chip_slot & 0x0f);
+
+    return true;
+}
+
+void bm13xx_clear_work(asic_job_store_t *store)
+{
+    if (store) {
+        asic_job_store_invalidate_all(store);
+    }
+}
+
+void bm13xx_init_job_slots(asic_job_store_t *store, uint16_t capacity)
+{
+    if (!store || capacity == 0) {
+        return;
+    }
+    if (store->entries != NULL) {
+        bm13xx_destroy_job_slots(store);
+    }
+    asic_job_slot_entry_t *entries = (asic_job_slot_entry_t *)calloc(capacity, sizeof(asic_job_slot_entry_t));
+    if (entries == NULL) {
+        ESP_LOGE(TAG, "Failed to allocate %u Bitmain job slots", capacity);
+        return;
+    }
+    asic_job_store_init(store, entries, capacity);
+}
+
+void bm13xx_destroy_job_slots(asic_job_store_t *store)
+{
+    if (!store) {
+        return;
+    }
+    asic_job_store_destroy(store);
+    if (store->entries != NULL) {
+        free(store->entries);
+        store->entries = NULL;
+    }
 }

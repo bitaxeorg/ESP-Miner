@@ -10,14 +10,9 @@ static const char *TAG = "theme_api";
 static int theme_prebuffer_len = 256;
 
 // GET /api/theme handler
-static esp_err_t theme_get_handler(httpd_req_t *req)
+esp_err_t theme_get_handler(httpd_req_t *req)
 {
-    if (is_network_allowed(req) != ESP_OK) {
-        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
-    }
-
     httpd_resp_set_type(req, "application/json");
-    set_cors_headers(req);
 
     char *scheme = nvs_config_get_string(NVS_CONFIG_THEME_SCHEME);
     char *primary_color = nvs_config_get_string(NVS_CONFIG_THEME_COLOR);
@@ -37,14 +32,8 @@ static esp_err_t theme_get_handler(httpd_req_t *req)
 }
 
 // POST /api/theme handler
-static esp_err_t theme_post_handler(httpd_req_t *req)
+esp_err_t theme_post_handler(httpd_req_t *req)
 {
-    if (is_network_allowed(req) != ESP_OK) {
-        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
-    }
-
-    set_cors_headers(req);
-
     // Read POST data
     char content[1024];
     int ret = httpd_req_recv(req, content, sizeof(content) - 1);
@@ -79,27 +68,5 @@ static esp_err_t theme_post_handler(httpd_req_t *req)
 
     cJSON_Delete(root);
     httpd_resp_sendstr(req, "{\"status\":\"ok\"}");
-    return ESP_OK;
-}
-
-esp_err_t register_theme_api_endpoints(httpd_handle_t server, void* ctx)
-{
-    httpd_uri_t theme_get = {
-        .uri = "/api/theme",
-        .method = HTTP_GET,
-        .handler = theme_get_handler,
-        .user_ctx = ctx
-    };
-
-    httpd_uri_t theme_post = {
-        .uri = "/api/theme",
-        .method = HTTP_POST,
-        .handler = theme_post_handler,
-        .user_ctx = ctx
-    };
-
-    ESP_ERROR_CHECK(httpd_register_uri_handler(server, &theme_get));
-    ESP_ERROR_CHECK(httpd_register_uri_handler(server, &theme_post));
-
     return ESP_OK;
 }

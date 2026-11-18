@@ -49,7 +49,7 @@
       </div>
       <div id="logs" #scrollContainer>
         @for (log of logs; track $index) {
-          <div [ngClass]="log.className">₿ {{log.text | ANSI}}</div>
+          <div [class]="log.className">₿ {{log.text | ANSI}}</div>
         }
       </div>
     </form>

@@ -3,17 +3,16 @@
 
 #include <stdbool.h>
 #include <stdint.h>
-#include <pthread.h>
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "scoreboard.h"
+#include "asic_job_slot.h"
 
 /*
  * Shared test view for the real job task and isolated BM13xx driver copies.
  * Only the fields read by those production files belong here.
  */
-#define MAX_ASIC_JOBS 128
 
 typedef struct GlobalState {
     void *create_jobs_task_handle;
@@ -30,11 +29,8 @@ typedef struct GlobalState {
             } asic;
         } family;
     } DEVICE_CONFIG;
-    struct {
-        struct asic_job **active_jobs;
-        uint8_t *valid_jobs;
-        pthread_mutex_t valid_jobs_lock;
-    } ASIC_TASK_MODULE;
+    asic_job_store_t job_store;
+    bool has_work;
     struct {
         float frequency_value;
         float actual_frequency;

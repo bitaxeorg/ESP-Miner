@@ -17,7 +17,7 @@ import {
   standalone: true,
   template: `{{ text }}`,
   host: {
-    'class': 'fixed z-[99999] bg-[#2b2b2b] text-[#ffffff] app-tooltip-text px-2.5 py-1.5 rounded shadow-xl pointer-events-none border border-neutral-700 max-w-[250px] whitespace-normal text-center'
+    'class': 'fixed z-[99999] bg-[#2b2b2b] text-[#ffffff] app-tooltip-text px-2.5 py-1.5 rounded shadow-xl pointer-events-none border border-neutral-700 max-w-[250px] whitespace-pre-line text-center'
   }
 })
 export class TooltipContentComponent {

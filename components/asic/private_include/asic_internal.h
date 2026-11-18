@@ -5,7 +5,6 @@
 
 typedef struct GlobalState GlobalState;
 
-/* Takes ownership of the common job and dispatches it to the selected driver. */
-void ASIC_send_work(GlobalState *state, asic_job_t *job);
+void ASIC_send_work(GlobalState *state, const asic_job_t *job);
 
 #endif
