@@ -12,6 +12,8 @@
 #include "asic_init.h"
 #include "asic_reset.h"
 #include "driver/uart.h"
+#include "esp_timer.h"
+#include <stdio.h>
 
 #define POLL_RATE 100
 #define MAX_TEMP 90.0
@@ -136,6 +138,142 @@ void POWER_MANAGEMENT_init_frequency(GlobalState * GLOBAL_STATE)
     ESP_LOGI(TAG, "ASIC Frequency: %g MHz, Expected hashrate: %sH/s", frequency, expected_hashrate_str);
 }
 
+// --- Mining watchdog (issue #1053, "flatline of death") ---------------------
+// A chain that keeps drawing power but returns no results freezes the hashrate
+// averages, and nothing notices: the miner looks alive while it is doing no
+// work. Two independent signals, both conservative, trigger a chain restart.
+#define WATCHDOG_HASHRATE_FLATLINE_S 180
+#define WATCHDOG_NO_SHARE_S 300
+// Grace period after a (re)start: a cold chain ramps for minutes and must never
+// be mistaken for a flatline.
+#define WATCHDOG_WARMUP_S 300
+#define WATCHDOG_MAX_RECOVERIES_PER_HOUR 3
+#define WATCHDOG_MIN_FREQUENCY_MHZ 50.0f
+#define WATCHDOG_HOUR_US (3600LL * 1000000LL)
+
+typedef struct
+{
+    int64_t started_us;   // last mining start, anchors the warm-up grace period
+    float last_hashrate_1m;
+    int64_t hashrate_since_us;
+    uint64_t last_share_count;
+    int64_t shares_since_us;
+    int64_t recovery_us[WATCHDOG_MAX_RECOVERIES_PER_HOUR];
+    int recovery_count;
+} mining_watchdog_t;
+
+static uint64_t watchdog_share_count(const SystemModule * sys_module)
+{
+    uint64_t total = 0;
+    for (int i = 0; i < MAX_POOLS; i++) {
+        total += sys_module->pool_sessions[i].shares_accepted;
+        total += sys_module->pool_sessions[i].shares_rejected;
+    }
+    return total;
+}
+
+// Only a miner that is really mining can flatline. Anything else (paused,
+// overheat, hardware fault, self-test, no pool job, chain still at idle
+// frequency) keeps the watchdog out of the way.
+static bool watchdog_is_eligible(const GlobalState * GLOBAL_STATE, bool is_paused)
+{
+    const SystemModule * sys_module = &GLOBAL_STATE->SYSTEM_MODULE;
+    const PowerManagementModule * power_management = &GLOBAL_STATE->POWER_MANAGEMENT_MODULE;
+
+    return !is_paused
+        && !sys_module->mining_paused
+        && !sys_module->overheat_mode
+        && !sys_module->hardware_fault
+        && !sys_module->pools_unavailable
+        && !GLOBAL_STATE->SELF_TEST_MODULE.is_active
+        && GLOBAL_STATE->ASIC_initalized
+        && GLOBAL_STATE->has_work
+        && power_management->frequency_value > WATCHDOG_MIN_FREQUENCY_MHZ
+        && power_management->expected_hashrate > 0.0f;
+}
+
+static void watchdog_reset_signals(mining_watchdog_t * wd, const SystemModule * sys_module,
+                                   int64_t now_us)
+{
+    wd->last_hashrate_1m = sys_module->hashrate_1m;
+    wd->hashrate_since_us = now_us;
+    wd->last_share_count = watchdog_share_count(sys_module);
+    wd->shares_since_us = now_us;
+}
+
+static void watchdog_tick(mining_watchdog_t * wd, GlobalState * GLOBAL_STATE, bool is_paused)
+{
+    SystemModule * sys_module = &GLOBAL_STATE->SYSTEM_MODULE;
+    int64_t now_us = esp_timer_get_time();
+
+    if (!watchdog_is_eligible(GLOBAL_STATE, is_paused) ||
+        now_us - wd->started_us < (int64_t) WATCHDOG_WARMUP_S * 1000000LL) {
+        watchdog_reset_signals(wd, sys_module, now_us);
+        return;
+    }
+
+    // (a) hashrate_1m stuck at exactly the same value. Zero is not a flatline:
+    //     a chain reporting nothing is covered by the share signal instead.
+    if (sys_module->hashrate_1m != wd->last_hashrate_1m) {
+        wd->last_hashrate_1m = sys_module->hashrate_1m;
+        wd->hashrate_since_us = now_us;
+    }
+
+    // (b) no share accepted or rejected, pool answers included.
+    uint64_t shares = watchdog_share_count(sys_module);
+    if (shares != wd->last_share_count) {
+        wd->last_share_count = shares;
+        wd->shares_since_us = now_us;
+    }
+
+    bool hashrate_flat = wd->last_hashrate_1m > 0.0f &&
+        now_us - wd->hashrate_since_us >= (int64_t) WATCHDOG_HASHRATE_FLATLINE_S * 1000000LL;
+    bool no_shares =
+        now_us - wd->shares_since_us >= (int64_t) WATCHDOG_NO_SHARE_S * 1000000LL;
+
+    const char *reason = hashrate_flat ? "hashrate_1m frozen" : (no_shares ? "no new shares" : NULL);
+    if (reason == NULL) {
+        return;
+    }
+
+    // Forget recoveries older than an hour.
+    int kept = 0;
+    for (int i = 0; i < wd->recovery_count; i++) {
+        if (now_us - wd->recovery_us[i] < WATCHDOG_HOUR_US) {
+            wd->recovery_us[kept++] = wd->recovery_us[i];
+        }
+    }
+    wd->recovery_count = kept;
+
+    if (wd->recovery_count >= WATCHDOG_MAX_RECOVERIES_PER_HOUR) {
+        if (!sys_module->hardware_fault) {
+            ESP_LOGE(TAG, "Mining watchdog: %s after %d restarts in an hour, giving up and flagging a hardware fault",
+                     reason, wd->recovery_count);
+            snprintf(sys_module->hardware_fault_msg, sizeof(sys_module->hardware_fault_msg),
+                     "Mining stalled: %s", reason);
+            sys_module->hardware_fault = true;
+        }
+        watchdog_reset_signals(wd, sys_module, now_us);
+        return;
+    }
+
+    float stalled_s = hashrate_flat
+        ? (float) (now_us - wd->hashrate_since_us) / 1e6f
+        : (float) (now_us - wd->shares_since_us) / 1e6f;
+
+    ESP_LOGW(TAG, "Mining watchdog: %s for %.0fs (hashrate_1m %.2f GH/s, %llu shares); restarting the ASIC chain (%d/%d this hour)",
+             reason, stalled_s, sys_module->hashrate_1m, (unsigned long long) shares,
+             wd->recovery_count + 1, WATCHDOG_MAX_RECOVERIES_PER_HOUR);
+
+    wd->recovery_us[wd->recovery_count++] = now_us;
+
+    mining_stop(GLOBAL_STATE);
+    mining_start(GLOBAL_STATE);
+
+    wd->started_us = esp_timer_get_time();
+    watchdog_reset_signals(wd, sys_module, wd->started_us);
+}
+
 void POWER_MANAGEMENT_task(void * pvParameters)
 {
     ESP_LOGI(TAG, "Starting");
@@ -156,6 +294,9 @@ void POWER_MANAGEMENT_task(void * pvParameters)
     float last_known_asic_frequency = 0.0;
     bool is_paused = false;
     int overheat_streak = 0;
+
+    mining_watchdog_t watchdog = { .started_us = esp_timer_get_time() };
+    watchdog_reset_signals(&watchdog, sys_module, watchdog.started_us);
 
     while (1) {
         if (GLOBAL_STATE->SELF_TEST_MODULE.is_finished) {
@@ -180,6 +321,9 @@ void POWER_MANAGEMENT_task(void * pvParameters)
         } else if (!wants_stop && is_paused) {
             mining_start(GLOBAL_STATE);
             is_paused = false;
+            // A fresh start gets a fresh grace period.
+            watchdog.started_us = esp_timer_get_time();
+            watchdog_reset_signals(&watchdog, sys_module, watchdog.started_us);
         }
 
         // If we've paused or have a hardware fault, skip doing anything else
@@ -276,6 +420,10 @@ void POWER_MANAGEMENT_task(void * pvParameters)
 
             uint8_t chip_count = mining_start(GLOBAL_STATE);
 
+            // The chain was restarted: give it the warm-up grace again.
+            watchdog.started_us = esp_timer_get_time();
+            watchdog_reset_signals(&watchdog, sys_module, watchdog.started_us);
+
             if (chip_count > 0) {
                 // Frequency reduction will now be applied by normal power management loop
                 nvs_config_set_bool(NVS_CONFIG_OVERHEAT_MODE, false);
@@ -309,6 +457,10 @@ void POWER_MANAGEMENT_task(void * pvParameters)
             
             last_asic_frequency = asic_frequency;
         }
+
+        // A chain that draws power but produces nothing must not be left
+        // running: restart it, or fault out if restarting does not help.
+        watchdog_tick(&watchdog, GLOBAL_STATE, is_paused);
 
         // Check for changing of overheat mode
         bool new_overheat_mode = nvs_config_get_bool(NVS_CONFIG_OVERHEAT_MODE);
