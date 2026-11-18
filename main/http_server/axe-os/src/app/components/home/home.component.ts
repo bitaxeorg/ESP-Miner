@@ -45,7 +45,8 @@ type MessageType =
   | 'NOT_SOLO_MINING'
   | 'NO_MINING_REWARD'
   | 'HASH_DOMAIN_STALLED'
-  | 'HARDWARE_FAULT';
+  | 'HARDWARE_FAULT'
+  | 'POOL_DIFFICULTY_LOW';
 
 interface ISystemMessage {
   type: MessageType;
@@ -1365,6 +1366,7 @@ export class HomeComponent implements OnInit, OnDestroy {
         updateMessage(true, 'FALLBACK_STRATUM', 'info', 'Mining on fallback pool by user preference.');
       }
     }
+    updateMessage(!!(info.poolDifficulty > 0 && info.asicDifficulty && info.poolDifficulty < info.asicDifficulty), 'POOL_DIFFICULTY_LOW', 'warn', `Pool difficulty (${info.poolDifficulty}) is below ASIC difficulty (${info.asicDifficulty}).`);
     if (info.coinbaseOutputs && info.coinbaseOutputs.length > 0) {
       let percentage = this.getPayoutPercentage(info);
       const warn = this.activePoolShareWarning;
