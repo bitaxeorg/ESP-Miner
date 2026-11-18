@@ -102,6 +102,12 @@ uint16_t EMC2101_get_fan_speed(void)
     // ESP_LOGI(TAG, "Raw Fan Speed = %02X %02X", tach_msb, tach_lsb);
 
     reading = tach_lsb | (tach_msb << 8);
+    // A zero tach word means the fan is stalled or the tach line is not wired;
+    // dividing by it traps on Xtensa and reboots the miner.
+    if (reading == 0) {
+        ESP_LOGW(TAG, "Tach reading is zero (fan stalled or tach not connected)");
+        return 0;
+    }
     RPM = 5400000 / reading;
 
     // ESP_LOGI(TAG, "Fan Speed = %d RPM", RPM);
