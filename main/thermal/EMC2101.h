@@ -3,6 +3,21 @@
 
 #include "i2c_bitaxe.h"
 
+// StarMiner LT-01 uses either a genuine EMC2101 or a CTF2301B clone on the same
+// I2C address. They share the temperature path but differ in the NC/beta and PWM
+// configuration registers, so the chip type is detected at runtime.
+typedef enum {
+    CHIP_EMC2101,
+    CHIP_CTF2301B
+} emc2101_chip_type_t;
+
+#define CTF2301B_REG_CHIP_ID   0xFE
+#define CTF2301B_REG_MFG_ID    0xFF
+#define CTF2301B_REG_BETA      0x30
+#define CTF2301B_REG_NC        0x34
+#define CTF2301B_CHIP_ID       0x41
+#define CTF2301B_MFG_ID        0x59
+
 // TODO Make all these enums
 
 #define EMC2101_BETA_11         0x00
