@@ -64,10 +64,11 @@ void hashrate_monitor_reset_measurements(void *pvParameters)
     pthread_mutex_unlock(&HASHRATE_MONITOR_MODULE->lock);
 }
 
-bool hashrate_monitor_has_stalled_domains(void *pvParameters, int *stalled_count_out)
+bool hashrate_monitor_has_partial_stall(void *pvParameters, int *stalled_count_out)
 {
     GlobalState * GLOBAL_STATE = (GlobalState *)pvParameters;
-    if (!GLOBAL_STATE || !GLOBAL_STATE->HASHRATE_MONITOR_MODULE.is_initialized) {
+    if (!GLOBAL_STATE || !GLOBAL_STATE->HASHRATE_MONITOR_MODULE.is_initialized ||
+        GLOBAL_STATE->DEVICE_CONFIG.family.asic.id == BM1397) {
         if (stalled_count_out) *stalled_count_out = 0;
         return false;
     }
@@ -76,21 +77,32 @@ bool hashrate_monitor_has_stalled_domains(void *pvParameters, int *stalled_count
     int asic_count = GLOBAL_STATE->DEVICE_CONFIG.family.asic_count;
     int hash_domains = GLOBAL_STATE->DEVICE_CONFIG.family.asic.hash_domains;
     int count = 0;
+    bool partial_stall = false;
 
     pthread_mutex_lock(&monitor->lock);
+    uint64_t now_us = esp_timer_get_time();
+    uint64_t stall_timeout_us = (uint64_t)DOMAIN_STALL_POLLS * 1000000ULL;
     for (int i = 0; i < asic_count; i++) {
+        int stalled = 0;
+        bool live = false;
         for (int j = 0; j < hash_domains; j++) {
+            measurement_t *measurement = &monitor->domain_measurements[i][j];
             if (monitor->domain_stalled[i][j]) {
-                count++;
+                stalled++;
+            } else if (measurement->time_us != 0 && measurement->time_us <= now_us &&
+                       now_us - measurement->time_us < stall_timeout_us && measurement->hashrate > 0.0f) {
+                live = true;
             }
         }
+        count += stalled;
+        partial_stall |= stalled > 0 && live;
     }
     pthread_mutex_unlock(&monitor->lock);
 
     if (stalled_count_out) {
         *stalled_count_out = count;
     }
-    return count > 0;
+    return partial_stall;
 }
 
 void update_hashrate(measurement_t * measurement, uint32_t value)
@@ -260,7 +272,8 @@ void hashrate_monitor_task(void *pvParameters)
 
             uint64_t now_us = esp_timer_get_time();
             uint64_t stall_timeout_us = (uint64_t)DOMAIN_STALL_POLLS * 1000000ULL;
-            bool check_unresponsive = !GLOBAL_STATE->SELF_TEST_MODULE.is_active &&
+            bool check_unresponsive = GLOBAL_STATE->DEVICE_CONFIG.family.asic.id != BM1397 &&
+                                      !GLOBAL_STATE->SELF_TEST_MODULE.is_active &&
                                       !SYSTEM_MODULE->mining_paused &&
                                       ((xTaskGetTickCount() - asic_initialized_ticks) * portTICK_PERIOD_MS >= 15000);
 

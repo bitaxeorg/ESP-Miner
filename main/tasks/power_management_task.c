@@ -121,7 +121,7 @@ static bool silent_domain_fault(GlobalState * GLOBAL_STATE, int * stalled_out)
         return false;
     }
 
-    return hashrate_monitor_has_stalled_domains(GLOBAL_STATE, stalled_out);
+    return hashrate_monitor_has_partial_stall(GLOBAL_STATE, stalled_out);
 }
 
 float POWER_MANAGEMENT_get_nominal_hashrate(const GlobalState * GLOBAL_STATE)

@@ -28,5 +28,5 @@ void hashrate_monitor_reset_measurements(void *pvParameters);
 
 void update_hashrate(measurement_t * measurement, uint32_t value);
 void update_hash_counter(measurement_t * measurement, uint32_t value, uint64_t time_us);
-bool hashrate_monitor_has_stalled_domains(void *pvParameters, int *stalled_count_out);
+bool hashrate_monitor_has_partial_stall(void *pvParameters, int *stalled_count_out);
 #endif /* HASHRATE_MONITOR_TASK_H_ */

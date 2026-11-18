@@ -1,0 +1,30 @@
+#include <esp_heap_caps.h>
+#include "esp_timer.h"
+#include "hashrate_monitor_test_harness.h"
+
+#define TEST_STUB_GLOBAL_STATE_H
+#define TEST_STUB_SYSTEM_H
+#define GlobalState HashrateMonitorTestState
+#define SystemModule HashrateMonitorTestSystemModule
+#define hashrate_monitor_task hashrate_monitor_test_task
+#define hashrate_monitor_register_read hashrate_monitor_test_register_read
+#define hashrate_monitor_reset_measurements hashrate_monitor_test_reset_measurements
+#define hashrate_monitor_has_partial_stall hashrate_monitor_test_has_partial_stall
+#define update_hashrate hashrate_monitor_test_update_hashrate
+#define update_hash_counter hashrate_monitor_test_update_hash_counter
+#define esp_timer_get_time hashrate_monitor_test_time_us
+#define xTaskGetTickCount hashrate_monitor_test_ticks
+#define ASIC_read_registers hashrate_monitor_test_read_registers
+#define SYSTEM_noinit_update hashrate_monitor_test_noinit_update
+#define heap_caps_malloc hashrate_monitor_test_malloc
+
+#ifdef vTaskDelay
+#undef vTaskDelay
+#endif
+#define vTaskDelay hashrate_monitor_test_delay
+#ifdef vTaskDelayUntil
+#undef vTaskDelayUntil
+#endif
+#define vTaskDelayUntil hashrate_monitor_test_delay_until
+
+#include "../../../main/tasks/hashrate_monitor_task.c"
