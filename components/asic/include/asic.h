@@ -23,7 +23,7 @@ int ASIC_set_max_baud(GlobalState * GLOBAL_STATE);
 /* The caller retains ownership and may release the job after this call. */
 void ASIC_send_job(GlobalState *state, const asic_job_t *job);
 void ASIC_set_version_mask(GlobalState * GLOBAL_STATE, uint32_t mask);
-void ASIC_set_frequency(GlobalState * GLOBAL_STATE);
+bool ASIC_set_frequency(GlobalState * GLOBAL_STATE);
 void ASIC_set_nonce_space(GlobalState * GLOBAL_STATE);
 float ASIC_get_asic_job_frequency_ms(GlobalState * GLOBAL_STATE);
 void ASIC_read_registers(GlobalState * GLOBAL_STATE);

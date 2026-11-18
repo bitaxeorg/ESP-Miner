@@ -13,6 +13,7 @@
 #include "pll.h"
 
 #include <stdint.h>
+#include <math.h>
 #include <string.h>
 #include <arpa/inet.h>
 
@@ -199,7 +200,10 @@ float BM1370_send_hash_frequency(float target_freq)
     uint8_t fb_divider, refdiv, postdiv1, postdiv2;
     float frequency;
 
-    pll_get_parameters(target_freq, 160, 239, &fb_divider, &refdiv, &postdiv1, &postdiv2, &frequency);
+    if (!pll_get_parameters_bm1370(target_freq, &fb_divider, &refdiv, &postdiv1, &postdiv2, &frequency)) {
+        ESP_LOGE(TAG, "No valid BM1370 PLL parameters for %g MHz", target_freq);
+        return NAN;
+    }
     
     uint8_t vdo_scale = (fb_divider * FREQ_MULT / refdiv >= 2400) ? 0x50 : 0x40;
     uint8_t postdiv = (((postdiv1 - 1) & 0xf) << 4) | ((postdiv2 - 1) & 0xf);
@@ -210,6 +214,18 @@ float BM1370_send_hash_frequency(float target_freq)
     ESP_LOGI(TAG, "Setting Frequency to %g MHz (%g)", target_freq, frequency);
 
     return frequency;
+}
+
+bool BM1370_set_frequency(GlobalState * GLOBAL_STATE)
+{
+    uint8_t fb, ref, p1, p2;
+    float frequency;
+    if (!pll_get_parameters_bm1370(GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value,
+                                   &fb, &ref, &p1, &p2, &frequency)) {
+        ESP_LOGE(TAG, "Unsupported BM1370 target frequency");
+        return false;
+    }
+    return do_frequency_transition(GLOBAL_STATE, BM1370_send_hash_frequency);
 }
 
 uint8_t BM1370_init(GlobalState * GLOBAL_STATE)
@@ -305,7 +321,9 @@ uint8_t BM1370_init(GlobalState * GLOBAL_STATE)
     asic_init_core_register_delay();
 
     //ramp up the hash frequency
-    do_frequency_transition(GLOBAL_STATE, BM1370_send_hash_frequency);
+    if (!BM1370_set_frequency(GLOBAL_STATE)) {
+        return 0;
+    }
 
     float frequency = GLOBAL_STATE->POWER_MANAGEMENT_MODULE.actual_frequency;
     int cores = GLOBAL_STATE->DEVICE_CONFIG.family.asic.core_count;

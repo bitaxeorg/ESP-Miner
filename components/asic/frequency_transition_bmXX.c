@@ -10,19 +10,34 @@
 
 static const char * TAG = "frequency_transition";
 
-void do_frequency_transition(GlobalState * GLOBAL_STATE, set_hash_frequency_fn set_frequency_fn)
+static bool set_step(GlobalState * GLOBAL_STATE, set_hash_frequency_fn set_frequency_fn, float frequency)
+{
+    float actual_frequency = set_frequency_fn(frequency);
+    if (!isfinite(actual_frequency) || actual_frequency <= 0.0f) {
+        ESP_LOGE(TAG, "Failed to set frequency to %g MHz", frequency);
+        return false;
+    }
+    GLOBAL_STATE->POWER_MANAGEMENT_MODULE.actual_frequency = actual_frequency;
+    return true;
+}
+
+bool do_frequency_transition(GlobalState * GLOBAL_STATE, set_hash_frequency_fn set_frequency_fn)
 {
     float target_frequency = GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value;
     float current_frequency = GLOBAL_STATE->POWER_MANAGEMENT_MODULE.actual_frequency;
 
+    if (!isfinite(target_frequency) || target_frequency <= 0.0f ||
+        !isfinite(current_frequency) || current_frequency <= 0.0f) {
+        return false;
+    }
+
     if (fabs(current_frequency - target_frequency) < EPSILON) {
-        return;
+        return true;
     }
 
     if (fabs(target_frequency - current_frequency) < STEP_SIZE) {
         current_frequency = target_frequency;
-        GLOBAL_STATE->POWER_MANAGEMENT_MODULE.actual_frequency = set_frequency_fn(current_frequency);
-        return;
+        return set_step(GLOBAL_STATE, set_frequency_fn, current_frequency);
     }
 
     ESP_LOGI(TAG, "Ramping up frequency from %g MHz to %g MHz", current_frequency, target_frequency);
@@ -38,7 +53,9 @@ void do_frequency_transition(GlobalState * GLOBAL_STATE, set_hash_frequency_fn s
             current_step += signum;
 
             current_frequency = current_step * STEP_SIZE;
-            GLOBAL_STATE->POWER_MANAGEMENT_MODULE.actual_frequency = set_frequency_fn(current_frequency);
+            if (!set_step(GLOBAL_STATE, set_frequency_fn, current_frequency)) {
+                return false;
+            }
             
             vTaskDelay(100 / portTICK_PERIOD_MS);
         }
@@ -46,8 +63,11 @@ void do_frequency_transition(GlobalState * GLOBAL_STATE, set_hash_frequency_fn s
     
     if (fabs(current_frequency - target_frequency) > EPSILON) {
         current_frequency = target_frequency;
-        GLOBAL_STATE->POWER_MANAGEMENT_MODULE.actual_frequency = set_frequency_fn(current_frequency);
+        if (!set_step(GLOBAL_STATE, set_frequency_fn, current_frequency)) {
+            return false;
+        }
     }
     
     ESP_LOGI(TAG, "Successfully transitioned to %g MHz", target_frequency);
+    return true;
 }
