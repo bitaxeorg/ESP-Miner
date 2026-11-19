@@ -12,6 +12,11 @@
 #define EPSILON 0.0001f
 #define POLL_TIME_MS 100
 #define LOG_TIME_MS 2000
+// A fan driven at least this hard but turning slower than this, for this long, has
+// stalled. Only fans seen spinning since boot count, so a missing second fan is fine.
+#define FAN_STALL_MIN_PERC 30.0f
+#define FAN_STALL_RPM 300
+#define FAN_STALL_MS 10000
 
 #define PID_P 5.0
 #define PID_I 0.1
@@ -56,6 +61,8 @@ void FAN_CONTROLLER_task(void * pvParameters)
     uint16_t pid_output_min = 0;
     int log_counter = 0;
     float filtered_input = -1.0f;
+    bool fan_seen[2] = {false, false};
+    int fan_stall_ms[2] = {0, 0};
 
     GlobalState * GLOBAL_STATE = (GlobalState *) pvParameters;
 
@@ -133,6 +140,19 @@ void FAN_CONTROLLER_task(void * pvParameters)
 
         power_management->fan_rpm = Thermal_get_fan_speed(&GLOBAL_STATE->DEVICE_CONFIG);
         power_management->fan2_rpm = Thermal_get_fan2_speed(&GLOBAL_STATE->DEVICE_CONFIG);
+
+        // A dead fan otherwise only shows once the chips are already hot.
+        const uint16_t rpm[2] = {power_management->fan_rpm, power_management->fan2_rpm};
+        for (int i = 0; i < 2 && !GLOBAL_STATE->SYSTEM_MODULE.hardware_fault; i++) {
+            if (rpm[i] >= FAN_STALL_RPM) fan_seen[i] = true;
+            bool slow = fan_seen[i] && power_management->fan_perc >= FAN_STALL_MIN_PERC && rpm[i] < FAN_STALL_RPM;
+            fan_stall_ms[i] = slow ? fan_stall_ms[i] + POLL_TIME_MS : 0;
+            if (fan_stall_ms[i] >= FAN_STALL_MS) {
+                ESP_LOGE(TAG, "Fan %d stalled or its speed unreadable (%u rpm at %.0f%%). Flagging hardware fault.", i + 1, rpm[i], power_management->fan_perc);
+                GLOBAL_STATE->SYSTEM_MODULE.hardware_fault = true;
+                snprintf(GLOBAL_STATE->SYSTEM_MODULE.hardware_fault_msg, sizeof(GLOBAL_STATE->SYSTEM_MODULE.hardware_fault_msg), "Fan %d stalled or unreadable", i + 1);
+            }
+        }
 
         vTaskDelayUntil(&taskWakeTime, POLL_TIME_MS / portTICK_PERIOD_MS);
     }
