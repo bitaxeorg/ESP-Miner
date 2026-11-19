@@ -12,6 +12,8 @@
 #include "asic_init.h"
 #include "asic_reset.h"
 #include "driver/uart.h"
+#include "esp_timer.h"
+#include <stdio.h>
 
 #define POLL_RATE 100
 #define MAX_TEMP 90.0
@@ -25,9 +27,24 @@
 #define TPS546_THROTTLE_TEMP 105.0
 #define TPS546_MAX_TEMP 145.0
 
+// Physically plausible temperature envelope shared by the VR and ASIC
+// readings. A value outside it (e.g. a corrupted PMBus read yielding 16384 C)
+// is a sensor fault, not heat, and must never be acted upon.
+#define TEMP_PLAUSIBLE_MIN (-40.0)
+#define TEMP_PLAUSIBLE_MAX 150.0
+
+// Consecutive polls with a plausible over-limit reading required before a
+// permanent downgrade is written to NVS. One spurious sample is not evidence.
+#define OVERHEAT_CONSECUTIVE_READINGS 2
+
 #define ASIC_REDUCTION 100.0
 
 static const char * TAG = "power_management";
+
+static bool temp_is_plausible(float temp)
+{
+    return temp >= TEMP_PLAUSIBLE_MIN && temp <= TEMP_PLAUSIBLE_MAX;
+}
 
 static void mining_stop(GlobalState * GLOBAL_STATE)
 {
@@ -121,6 +138,147 @@ void POWER_MANAGEMENT_init_frequency(GlobalState * GLOBAL_STATE)
     ESP_LOGI(TAG, "ASIC Frequency: %g MHz, Expected hashrate: %sH/s", frequency, expected_hashrate_str);
 }
 
+// --- Mining watchdog (issue #1053, "flatline of death") ---------------------
+// A chain that keeps drawing power but returns no results freezes the hashrate
+// averages, and nothing notices: the miner looks alive while it is doing no
+// work. Two independent signals, both conservative, trigger a chain restart.
+#define WATCHDOG_HASHRATE_FLATLINE_S 180
+// A 300 s window was too aggressive: on a high-difficulty pool (or a low
+// clock) a healthy chain can legitimately go minutes without a share and
+// would be restarted, and three such events in an hour would flag a bogus
+// hardware fault. The frozen-hashrate signal (180 s) is the precise one;
+// this one is the safety net for a chain stuck at 0 GH/s, so it may be slow.
+#define WATCHDOG_NO_SHARE_S 900
+// Grace period after a (re)start: a cold chain ramps for minutes and must never
+// be mistaken for a flatline.
+#define WATCHDOG_WARMUP_S 300
+#define WATCHDOG_MAX_RECOVERIES_PER_HOUR 3
+#define WATCHDOG_MIN_FREQUENCY_MHZ 50.0f
+#define WATCHDOG_HOUR_US (3600LL * 1000000LL)
+
+typedef struct
+{
+    int64_t started_us;   // last mining start, anchors the warm-up grace period
+    float last_hashrate_1m;
+    int64_t hashrate_since_us;
+    uint64_t last_share_count;
+    int64_t shares_since_us;
+    int64_t recovery_us[WATCHDOG_MAX_RECOVERIES_PER_HOUR];
+    int recovery_count;
+} mining_watchdog_t;
+
+static uint64_t watchdog_share_count(const SystemModule * sys_module)
+{
+    uint64_t total = 0;
+    for (int i = 0; i < MAX_POOLS; i++) {
+        total += sys_module->pool_sessions[i].shares_accepted;
+        total += sys_module->pool_sessions[i].shares_rejected;
+    }
+    return total;
+}
+
+// Only a miner that is really mining can flatline. Anything else (paused,
+// overheat, hardware fault, self-test, no pool job, chain still at idle
+// frequency) keeps the watchdog out of the way.
+static bool watchdog_is_eligible(const GlobalState * GLOBAL_STATE, bool is_paused)
+{
+    const SystemModule * sys_module = &GLOBAL_STATE->SYSTEM_MODULE;
+    const PowerManagementModule * power_management = &GLOBAL_STATE->POWER_MANAGEMENT_MODULE;
+
+    return !is_paused
+        && !sys_module->mining_paused
+        && !sys_module->overheat_mode
+        && !sys_module->hardware_fault
+        && !sys_module->pools_unavailable
+        && !GLOBAL_STATE->SELF_TEST_MODULE.is_active
+        && GLOBAL_STATE->ASIC_initalized
+        && GLOBAL_STATE->has_work
+        && power_management->frequency_value > WATCHDOG_MIN_FREQUENCY_MHZ
+        && power_management->expected_hashrate > 0.0f;
+}
+
+static void watchdog_reset_signals(mining_watchdog_t * wd, const SystemModule * sys_module,
+                                   int64_t now_us)
+{
+    wd->last_hashrate_1m = sys_module->hashrate_1m;
+    wd->hashrate_since_us = now_us;
+    wd->last_share_count = watchdog_share_count(sys_module);
+    wd->shares_since_us = now_us;
+}
+
+static void watchdog_tick(mining_watchdog_t * wd, GlobalState * GLOBAL_STATE, bool is_paused)
+{
+    SystemModule * sys_module = &GLOBAL_STATE->SYSTEM_MODULE;
+    int64_t now_us = esp_timer_get_time();
+
+    if (!watchdog_is_eligible(GLOBAL_STATE, is_paused) ||
+        now_us - wd->started_us < (int64_t) WATCHDOG_WARMUP_S * 1000000LL) {
+        watchdog_reset_signals(wd, sys_module, now_us);
+        return;
+    }
+
+    // (a) hashrate_1m stuck at exactly the same value. Zero is not a flatline:
+    //     a chain reporting nothing is covered by the share signal instead.
+    if (sys_module->hashrate_1m != wd->last_hashrate_1m) {
+        wd->last_hashrate_1m = sys_module->hashrate_1m;
+        wd->hashrate_since_us = now_us;
+    }
+
+    // (b) no share accepted or rejected, pool answers included.
+    uint64_t shares = watchdog_share_count(sys_module);
+    if (shares != wd->last_share_count) {
+        wd->last_share_count = shares;
+        wd->shares_since_us = now_us;
+    }
+
+    bool hashrate_flat = wd->last_hashrate_1m > 0.0f &&
+        now_us - wd->hashrate_since_us >= (int64_t) WATCHDOG_HASHRATE_FLATLINE_S * 1000000LL;
+    bool no_shares =
+        now_us - wd->shares_since_us >= (int64_t) WATCHDOG_NO_SHARE_S * 1000000LL;
+
+    const char *reason = hashrate_flat ? "hashrate_1m frozen" : (no_shares ? "no new shares" : NULL);
+    if (reason == NULL) {
+        return;
+    }
+
+    // Forget recoveries older than an hour.
+    int kept = 0;
+    for (int i = 0; i < wd->recovery_count; i++) {
+        if (now_us - wd->recovery_us[i] < WATCHDOG_HOUR_US) {
+            wd->recovery_us[kept++] = wd->recovery_us[i];
+        }
+    }
+    wd->recovery_count = kept;
+
+    if (wd->recovery_count >= WATCHDOG_MAX_RECOVERIES_PER_HOUR) {
+        if (!sys_module->hardware_fault) {
+            ESP_LOGE(TAG, "Mining watchdog: %s after %d restarts in an hour, giving up and flagging a hardware fault",
+                     reason, wd->recovery_count);
+            snprintf(sys_module->hardware_fault_msg, sizeof(sys_module->hardware_fault_msg),
+                     "Mining stalled: %s", reason);
+            sys_module->hardware_fault = true;
+        }
+        watchdog_reset_signals(wd, sys_module, now_us);
+        return;
+    }
+
+    float stalled_s = hashrate_flat
+        ? (float) (now_us - wd->hashrate_since_us) / 1e6f
+        : (float) (now_us - wd->shares_since_us) / 1e6f;
+
+    ESP_LOGW(TAG, "Mining watchdog: %s for %.0fs (hashrate_1m %.2f GH/s, %llu shares); restarting the ASIC chain (%d/%d this hour)",
+             reason, stalled_s, sys_module->hashrate_1m, (unsigned long long) shares,
+             wd->recovery_count + 1, WATCHDOG_MAX_RECOVERIES_PER_HOUR);
+
+    wd->recovery_us[wd->recovery_count++] = now_us;
+
+    mining_stop(GLOBAL_STATE);
+    mining_start(GLOBAL_STATE);
+
+    wd->started_us = esp_timer_get_time();
+    watchdog_reset_signals(wd, sys_module, wd->started_us);
+}
+
 void POWER_MANAGEMENT_task(void * pvParameters)
 {
     ESP_LOGI(TAG, "Starting");
@@ -140,6 +298,10 @@ void POWER_MANAGEMENT_task(void * pvParameters)
     uint16_t last_known_asic_voltage = 0;
     float last_known_asic_frequency = 0.0;
     bool is_paused = false;
+    int overheat_streak = 0;
+
+    mining_watchdog_t watchdog = { .started_us = esp_timer_get_time() };
+    watchdog_reset_signals(&watchdog, sys_module, watchdog.started_us);
 
     while (1) {
         if (GLOBAL_STATE->SELF_TEST_MODULE.is_finished) {
@@ -164,19 +326,37 @@ void POWER_MANAGEMENT_task(void * pvParameters)
         } else if (!wants_stop && is_paused) {
             mining_start(GLOBAL_STATE);
             is_paused = false;
+            // A fresh start gets a fresh grace period.
+            watchdog.started_us = esp_timer_get_time();
+            watchdog_reset_signals(&watchdog, sys_module, watchdog.started_us);
         }
 
         // If we've paused or have a hardware fault, skip doing anything else
         if (is_paused || sys_module->hardware_fault) {
+            overheat_streak = 0; // stale samples must not count as "consecutive"
             vTaskDelay(POLL_RATE / portTICK_PERIOD_MS);
             continue;
         }
 
-        bool asic_overheat =
-            power_management->chip_temp_avg > THROTTLE_TEMP
-            || power_management->chip_temp2_avg > THROTTLE_TEMP;
+        bool vr_plausible = temp_is_plausible(power_management->vr_temp);
+        bool asic1_plausible = temp_is_plausible(power_management->chip_temp_avg);
+        bool asic2_plausible = temp_is_plausible(power_management->chip_temp2_avg);
 
-        if ((power_management->vr_temp > TPS546_THROTTLE_TEMP || asic_overheat) && (power_management->frequency_value > 50 || power_management->voltage > 1000)) {
+        if (!vr_plausible) {
+            ESP_LOGW(TAG, "Implausible VR temperature %.1fC, not acting on it", power_management->vr_temp);
+        }
+
+        // Only plausible, over-limit readings count as heat. Unavailable ASIC
+        // sensors report -1 and are simply not warm.
+        bool vr_overheat = vr_plausible && power_management->vr_temp > TPS546_THROTTLE_TEMP;
+        bool asic_overheat =
+            (asic1_plausible && power_management->chip_temp_avg > THROTTLE_TEMP)
+            || (asic2_plausible && power_management->chip_temp2_avg > THROTTLE_TEMP);
+
+        overheat_streak = (vr_overheat || asic_overheat) ? overheat_streak + 1 : 0;
+
+        if (overheat_streak >= OVERHEAT_CONSECUTIVE_READINGS && (power_management->frequency_value > 50 || power_management->voltage > 1000)) {
+            overheat_streak = 0;
             if (power_management->chip_temp2_avg > 0) {
                 ESP_LOGE(TAG, "OVERHEAT! VR: %fC ASIC1: %fC ASIC2: %fC", power_management->vr_temp, power_management->chip_temp_avg, power_management->chip_temp2_avg);
             } else {
@@ -198,7 +378,8 @@ void POWER_MANAGEMENT_task(void * pvParameters)
             int cooling_cycles = 0;
             const int MIN_COOLING_CYCLES = 6; // Minimum 30 seconds cooling
             
-            while (cooling_cycles < MIN_COOLING_CYCLES || power_management->vr_temp > TPS546_THROTTLE_TEMP - 10) {
+            while (cooling_cycles < MIN_COOLING_CYCLES ||
+                   (temp_is_plausible(power_management->vr_temp) && power_management->vr_temp > TPS546_THROTTLE_TEMP - 10)) {
                 vTaskDelay(5000 / portTICK_PERIOD_MS); // Wait 5 seconds
                 cooling_cycles++;
                 
@@ -212,7 +393,8 @@ void POWER_MANAGEMENT_task(void * pvParameters)
                              cooling_cycles, power_management->vr_temp, power_management->chip_temp_avg, power_management->chip_temp2_avg);
                     
                     // Continue if ASIC temps still too high
-                    if (power_management->chip_temp_avg >  SAFE_TEMP || power_management->chip_temp2_avg > SAFE_TEMP) {
+                    if ((temp_is_plausible(power_management->chip_temp_avg) && power_management->chip_temp_avg > SAFE_TEMP)
+                        || (temp_is_plausible(power_management->chip_temp2_avg) && power_management->chip_temp2_avg > SAFE_TEMP)) {
                         cooling_cycles = 0; // Reset cycle count if still hot
                     }
                 } else {
@@ -242,6 +424,10 @@ void POWER_MANAGEMENT_task(void * pvParameters)
                      reduced_voltage, last_known_asic_voltage, reduced_asic_frequency, last_known_asic_frequency);
 
             uint8_t chip_count = mining_start(GLOBAL_STATE);
+
+            // The chain was restarted: give it the warm-up grace again.
+            watchdog.started_us = esp_timer_get_time();
+            watchdog_reset_signals(&watchdog, sys_module, watchdog.started_us);
 
             if (chip_count > 0) {
                 // Frequency reduction will now be applied by normal power management loop
@@ -276,6 +462,10 @@ void POWER_MANAGEMENT_task(void * pvParameters)
             
             last_asic_frequency = asic_frequency;
         }
+
+        // A chain that draws power but produces nothing must not be left
+        // running: restart it, or fault out if restarting does not help.
+        watchdog_tick(&watchdog, GLOBAL_STATE, is_paused);
 
         // Check for changing of overheat mode
         bool new_overheat_mode = nvs_config_get_bool(NVS_CONFIG_OVERHEAT_MODE);

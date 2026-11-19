@@ -29,6 +29,13 @@
 #define TPS546_POWER_GOOD_GRACE_MS 250
 #define TPS546_I2C_TIMEOUT_MS 500
 
+// Physically plausible band for the regulator's own thermal sense
+// (PMBus READ_TEMPERATURE_1). Anything outside is a bus/protocol fault, not
+// heat: a corrupted word (raw 0x6004/0x7001 = 2^14, or 0x3E8 = 1000) decodes
+// to thousands of degrees and must never be latched into last_temp.
+#define TPS546_TEMP_PLAUSIBLE_MIN_C (-40)
+#define TPS546_TEMP_PLAUSIBLE_MAX_C 150
+
 static const char *TAG = "TPS546";
 
 const TPS546_CONFIG TPS546_CONFIG_DEFAULT = {
@@ -869,6 +876,14 @@ int TPS546_get_temperature(void)
     }
     
     temp = slinear11_2_int(value);
+
+    // Validate before caching: an out-of-band value is a read error, not a
+    // temperature, and must not overwrite (and later re-serve) last_temp.
+    if (temp < TPS546_TEMP_PLAUSIBLE_MIN_C || temp > TPS546_TEMP_PLAUSIBLE_MAX_C) {
+        ESP_LOGE(TAG, "Implausible temperature reading %d C (raw 0x%04X), ignoring", temp, value);
+        return last_temp;
+    }
+
     last_temp = temp;
     return temp;
 }
