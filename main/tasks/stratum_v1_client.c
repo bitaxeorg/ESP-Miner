@@ -93,7 +93,8 @@ int stratum_v1_submit_share(GlobalState *GLOBAL_STATE, const asic_job_t *active_
     }
 
     int uid = conn->send_uid++;
-    uint64_t now = 0;
+    uint64_t now = esp_timer_get_time();
+    POOL_timing_record(GLOBAL_STATE, active_job->pool_id, (uint32_t)uid, now);
     int ret = STRATUM_V1_submit_share(
         conn->transport,
         uid,
@@ -103,14 +104,15 @@ int stratum_v1_submit_share(GlobalState *GLOBAL_STATE, const asic_job_t *active_
         active_job->ntime,
         nonce,
         version_bits,
-        &now);
+        NULL);
 
     if (ret >= 0) {
-        POOL_timing_record(GLOBAL_STATE, active_job->pool_id, (uint32_t)uid, now);
         if (sent_time_us) {
             *sent_time_us = now;
         }
         POOL_notify_submitted_share(GLOBAL_STATE, active_job->pool_id);
+    } else {
+        POOL_timing_record(GLOBAL_STATE, active_job->pool_id, (uint32_t)uid, 0);
     }
     pthread_mutex_unlock(&s_v1_conn_mutex);
     return ret;

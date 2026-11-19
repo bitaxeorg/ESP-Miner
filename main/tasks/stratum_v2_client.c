@@ -172,13 +172,17 @@ int stratum_v2_submit_share(GlobalState *GLOBAL_STATE, const asic_job_t *active_
         return -1;
     }
 
+    uint64_t now_us = esp_timer_get_time();
+    POOL_timing_record(GLOBAL_STATE, active_job->pool_id, sequence_number, now_us);
+
     int ret = sv2_noise_send(conn->noise_ctx, conn->transport, buf, len);
     if (ret >= 0) {
-        POOL_timing_record(GLOBAL_STATE, active_job->pool_id, sequence_number, esp_timer_get_time());
         if (sent_time_us) {
-            *sent_time_us = esp_timer_get_time();
+            *sent_time_us = now_us;
         }
         POOL_notify_submitted_share(GLOBAL_STATE, active_job->pool_id);
+    } else {
+        POOL_timing_record(GLOBAL_STATE, active_job->pool_id, sequence_number, 0);
     }
     pthread_mutex_unlock(&s_v2_conn_mutex);
     return ret;
@@ -857,6 +861,10 @@ esp_err_t stratum_v2_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
                         ESP_LOGW(TAG, "Dropping SubmitSharesError for unsent sequence %lu (sent %lu)",
                                  (unsigned long)seq_num, (unsigned long)conn->sequence_number);
                         break;
+                    }
+                    float response_time_ms = POOL_timing_calculate_ms(GLOBAL_STATE, pool_idx, seq_num, esp_timer_get_time());
+                    if (response_time_ms >= 0) {
+                        POOL_record_response_time(GLOBAL_STATE, pool_idx, response_time_ms, 1);
                     }
                     ESP_LOGW(TAG, "Share rejected: %s", error_code);
                     POOL_notify_rejected_share(GLOBAL_STATE, pool_idx, error_code);
