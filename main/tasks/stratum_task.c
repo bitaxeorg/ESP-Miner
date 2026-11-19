@@ -19,8 +19,18 @@
 static TaskHandle_t s_primary_task_handle = NULL;
 static TaskHandle_t s_fallback_task_handle = NULL;
 static GlobalState *s_global_state = NULL;
-static volatile bool s_preferred_fallback_exhausted = false;
 static volatile bool s_should_reconnect[MAX_POOLS] = {false};
+
+// A preferred fallback that ran out of retries stops its task and keeps its pool error,
+// so primary mines until a pool edit or selection change clears that error.
+static bool preferred_fallback_exhausted(const GlobalState *gs)
+{
+    uint16_t sec_idx = gs->SYSTEM_MODULE.secondary_pool_index;
+    return gs->SYSTEM_MODULE.use_fallback_stratum &&
+           !gs->SYSTEM_MODULE.is_using_fallback &&
+           sec_idx < MAX_POOLS &&
+           gs->SYSTEM_MODULE.pool_sessions[sec_idx].pool_error[0] != '\0';
+}
 
 void stratum_abort_pool(uint16_t pool_idx)
 {
@@ -48,7 +58,7 @@ bool stratum_reconnect_requested(void)
     bool is_fallback_task = (xTaskGetCurrentTaskHandle() == s_fallback_task_handle);
     if (is_fallback_task &&
         !s_global_state->SYSTEM_MODULE.is_using_fallback &&
-        (!s_global_state->SYSTEM_MODULE.use_fallback_stratum || s_preferred_fallback_exhausted)) {
+        !s_global_state->SYSTEM_MODULE.use_fallback_stratum) {
         return true;
     }
     uint16_t pool_idx = is_fallback_task
@@ -73,7 +83,7 @@ bool stratum_check_primary_handover(GlobalState *gs, uint16_t pool_idx)
 {
     if (!gs) return false;
     if (pool_idx == gs->SYSTEM_MODULE.primary_pool_index &&
-        (!gs->SYSTEM_MODULE.use_fallback_stratum || s_preferred_fallback_exhausted)) {
+        (!gs->SYSTEM_MODULE.use_fallback_stratum || preferred_fallback_exhausted(gs))) {
         if (gs->SYSTEM_MODULE.is_using_fallback) {
             ESP_LOGI(TAG, "Primary pool %u received work! Switching from fallback.", pool_idx);
             uint16_t sec_idx = gs->SYSTEM_MODULE.secondary_pool_index;
@@ -126,9 +136,7 @@ static void start_fallback_if_needed(GlobalState *gs)
         ESP_LOGI(TAG, "Starting stratum_task for fallback pool %u (%s)", sec_idx, pool->url);
         if (xTaskCreateWithCaps(stratum_task, "stratum_fb", 16384, (void *)gs, 16, &s_fallback_task_handle, caps) != pdPASS) {
             ESP_LOGE(TAG, "Failed to start fallback stratum task");
-            if (gs->SYSTEM_MODULE.use_fallback_stratum) {
-                s_preferred_fallback_exhausted = true;
-            }
+            POOL_set_error(gs, sec_idx, "Internal error");
             gs->SYSTEM_MODULE.is_using_fallback = false;
             gs->SYSTEM_MODULE.pools_unavailable = true;
         }
@@ -143,13 +151,12 @@ void stratum_notify_pool_modified(GlobalState *gs, uint16_t pool_idx)
     uint16_t prim_idx = gs->SYSTEM_MODULE.primary_pool_index;
     uint16_t sec_idx = gs->SYSTEM_MODULE.secondary_pool_index;
 
-    bool retry_preferred_fallback = false;
-    if (pool_idx == prim_idx || pool_idx == sec_idx) {
-        retry_preferred_fallback = s_preferred_fallback_exhausted && gs->SYSTEM_MODULE.use_fallback_stratum;
-        s_preferred_fallback_exhausted = false;
-        if (gs->SYSTEM_MODULE.use_fallback_stratum) {
-            stratum_abort_pool(prim_idx);
-        }
+    // Editing either pool retries an exhausted preferred fallback right away
+    bool retry_preferred_fallback = (pool_idx == prim_idx || pool_idx == sec_idx) &&
+                                    preferred_fallback_exhausted(gs);
+    if (retry_preferred_fallback) {
+        POOL_clear_status(gs, sec_idx);
+        stratum_abort_pool(prim_idx);
     }
     POOL_clear_status(gs, pool_idx);
     gs->SYSTEM_MODULE.pools_unavailable = false;
@@ -178,7 +185,6 @@ void stratum_notify_pool_selection_changed(GlobalState *gs)
 {
     if (!gs) return;
 
-    s_preferred_fallback_exhausted = false;
     stratum_abort_connection();
 
     for (int i = 0; i < MAX_POOLS; i++) {
@@ -211,7 +217,7 @@ void stratum_task(void *pvParameters)
 
     while (1) {
         // Fallback task exits when primary has recovered and fallback is not forced
-        if (!is_primary && !GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback && (!GLOBAL_STATE->SYSTEM_MODULE.use_fallback_stratum || s_preferred_fallback_exhausted)) {
+        if (!is_primary && !GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback && !GLOBAL_STATE->SYSTEM_MODULE.use_fallback_stratum) {
             break;
         }
 
@@ -226,9 +232,9 @@ void stratum_task(void *pvParameters)
             continue;
         }
 
-        // Prefer fallback until it exhausts its retries.
+        // Prefer fallback until it exhausts its retries
         if (is_primary && GLOBAL_STATE->SYSTEM_MODULE.use_fallback_stratum &&
-            !s_preferred_fallback_exhausted) {
+            !preferred_fallback_exhausted(GLOBAL_STATE)) {
             uint16_t prim_idx = GLOBAL_STATE->SYSTEM_MODULE.primary_pool_index;
             uint16_t sec_idx = GLOBAL_STATE->SYSTEM_MODULE.secondary_pool_index;
             stratum_abort_pool(prim_idx);
@@ -243,8 +249,7 @@ void stratum_task(void *pvParameters)
                     POOL_reset_session(GLOBAL_STATE, sec_idx);
                     GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback = false;
                 }
-                s_preferred_fallback_exhausted = true;
-                continue;
+                GLOBAL_STATE->SYSTEM_MODULE.pools_unavailable = true;
             }
             ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(5000));
             continue;
@@ -261,9 +266,9 @@ void stratum_task(void *pvParameters)
                 GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback = false;
                 break;
             }
-            if (s_preferred_fallback_exhausted) {
+            if (preferred_fallback_exhausted(GLOBAL_STATE)) {
                 ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(RECOVERY_PROBE_INTERVAL_MS));
-                s_preferred_fallback_exhausted = false;
+                POOL_clear_status(GLOBAL_STATE, GLOBAL_STATE->SYSTEM_MODULE.secondary_pool_index);
             } else {
                 vTaskDelay(pdMS_TO_TICKS(5000));
             }
@@ -275,7 +280,7 @@ void stratum_task(void *pvParameters)
         esp_err_t err = run_pool_session(GLOBAL_STATE, pool_idx);
 
         // Check if fallback should exit after session unblocks
-        if (!is_primary && !GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback && (!GLOBAL_STATE->SYSTEM_MODULE.use_fallback_stratum || s_preferred_fallback_exhausted)) {
+        if (!is_primary && !GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback && !GLOBAL_STATE->SYSTEM_MODULE.use_fallback_stratum) {
             break;
         }
 
@@ -302,9 +307,8 @@ void stratum_task(void *pvParameters)
                 retry_attempts = 0;
 
                 if (is_primary) {
-                    if (s_preferred_fallback_exhausted) {
+                    if (preferred_fallback_exhausted(GLOBAL_STATE)) {
                         GLOBAL_STATE->SYSTEM_MODULE.pools_unavailable = true;
-                        s_preferred_fallback_exhausted = false;
                     }
                     POOL_set_error(GLOBAL_STATE, pool_idx, GLOBAL_STATE->SYSTEM_MODULE.pool_sessions[pool_idx].pool_connection_info);
                     uint16_t sec_idx = GLOBAL_STATE->SYSTEM_MODULE.secondary_pool_index;
@@ -321,9 +325,12 @@ void stratum_task(void *pvParameters)
                     ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(RECOVERY_PROBE_INTERVAL_MS));
                 } else {
                     if (GLOBAL_STATE->SYSTEM_MODULE.use_fallback_stratum) {
-                        s_preferred_fallback_exhausted = true;
-                        GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback = false;
+                        PoolSession *session = &GLOBAL_STATE->SYSTEM_MODULE.pool_sessions[pool_idx];
+                        char err[sizeof(session->pool_error)];
+                        strlcpy(err, session->pool_error[0] ? session->pool_error : "Pool unreachable", sizeof(err));
                         POOL_reset_session(GLOBAL_STATE, pool_idx);
+                        POOL_set_error(GLOBAL_STATE, pool_idx, err);
+                        GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback = false;
                         ESP_LOGW(TAG, "Preferred fallback exhausted retries, trying primary");
                         break;
                     }
@@ -341,7 +348,7 @@ void stratum_task(void *pvParameters)
         ESP_LOGI(TAG, "Fallback stratum task exiting");
         s_fallback_task_handle = NULL;
         // Wake primary only after the handle is cleared, so it never sees an exiting fallback task
-        if (s_preferred_fallback_exhausted && s_primary_task_handle) {
+        if (preferred_fallback_exhausted(GLOBAL_STATE) && s_primary_task_handle) {
             xTaskNotifyGive(s_primary_task_handle);
         }
         vTaskDeleteWithCaps(NULL);
