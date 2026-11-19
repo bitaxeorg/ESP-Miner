@@ -80,6 +80,7 @@ REQUIRES
     "asic"
     "connect"
     "dns_server"
+    "mining_job"
     "stratum"
     "stratum_v2"
     "yyjson"

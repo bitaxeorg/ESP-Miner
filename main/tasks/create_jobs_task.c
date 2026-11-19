@@ -10,6 +10,7 @@
 #include "esp_timer.h"
 
 #include "asic.h"
+#include "create_jobs_task.h"
 #include "system.h"
 #include "utils.h"
 
@@ -52,7 +53,7 @@ static TickType_t compute_wait_ticks(const GlobalState *GLOBAL_STATE,
                                      int job_interval_ms,
                                      uint64_t now_us)
 {
-    if (sched->current_work == NULL || !GLOBAL_STATE->has_work || sched->exhausted) {
+    if (sched->current_work == NULL || sched->exhausted) {
         return portMAX_DELAY;
     }
 
@@ -144,19 +145,28 @@ void create_jobs_task(void *pvParameters)
         }
 
         if (notified == pdTRUE) {
+            if (slot_notify == CREATE_JOBS_NOTIFY_CLEAR_WORK) {
+                ESP_LOGI(TAG, "Work Cleared");
+                sched.current_work = NULL;
+                sched.current_work_sent = false;
+                sched.current_work_decoded = false;
+                sched.exhausted = false;
+                sched.last_send_time_us = 0;
+                continue;
+            }
+
             miner_job_t *new_work = POOL_resolve_notified_job(GLOBAL_STATE, slot_notify);
             if (!new_work) {
                 continue;
             }
 
-            bool asic_working = (sched.current_work != NULL) && GLOBAL_STATE->has_work && (sched.last_send_time_us != 0);
+            bool asic_working = (sched.current_work != NULL) && (sched.last_send_time_us != 0);
             if (!asic_working) {
                 sched.last_send_time_us = 0;
             }
 
             ESP_LOGI(TAG, "New Work Activated %s (type %d)", new_work->job_id, new_work->type);
             sched.current_work = new_work;
-            GLOBAL_STATE->has_work = true;
             GLOBAL_STATE->active_job_slot_idx = (uint8_t)(slot_notify % MINER_JOB_POOL_SIZE);
             sched.current_work_sent = false;
             sched.current_work_decoded = false;
@@ -173,8 +183,7 @@ void create_jobs_task(void *pvParameters)
                 }
             }
         } else {
-            if (sched.current_work == NULL || !GLOBAL_STATE->has_work) {
-                sched.current_work = NULL;
+            if (sched.current_work == NULL) {
                 sched.current_work_sent = false;
                 sched.current_work_decoded = false;
                 sched.exhausted = false;

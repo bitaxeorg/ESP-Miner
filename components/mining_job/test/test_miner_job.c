@@ -1,7 +1,7 @@
 #include "unity.h"
 #include "miner_job.h"
 
-TEST_CASE("miner_job_get_slot indexing and buffer validity", "[stratum]")
+TEST_CASE("miner_job_get_slot indexing and buffer validity", "[mining_job]")
 {
     miner_job_pool_init();
 
@@ -32,7 +32,7 @@ TEST_CASE("miner_job_get_slot indexing and buffer validity", "[stratum]")
 }
 
 
-TEST_CASE("miner_job_is_rollable validation", "[stratum]")
+TEST_CASE("miner_job_is_rollable validation", "[mining_job]")
 {
     miner_job_t *job = miner_job_get_slot(2);
     TEST_ASSERT_FALSE(miner_job_is_rollable(NULL));
@@ -50,7 +50,7 @@ TEST_CASE("miner_job_is_rollable validation", "[stratum]")
     TEST_ASSERT_TRUE(miner_job_is_rollable(job));
 }
 
-TEST_CASE("miner_job_pool_t isolates slots across pool sessions", "[stratum]")
+TEST_CASE("miner_job_pool_t isolates slots across pool sessions", "[mining_job]")
 {
     miner_job_pool_t primary_pool = {0};
     miner_job_pool_t fallback_pool = {0};
