@@ -1,9 +1,10 @@
 import { Injectable } from '@angular/core';
-import { BehaviorSubject, Observable, Subject, EMPTY, timer, merge, fromEvent } from 'rxjs';
-import { catchError, retry, share, tap, switchMap, startWith, scan, shareReplay, map, timeout, bufferTime, filter, distinctUntilChanged, exhaustMap } from 'rxjs/operators';
+import { BehaviorSubject, Observable, Subject, EMPTY, timer, merge, fromEvent, defer, race } from 'rxjs';
+import { catchError, retry, share, tap, switchMap, startWith, scan, shareReplay, map, timeout, bufferTime, filter, distinctUntilChanged, exhaustMap, take } from 'rxjs/operators';
 import { webSocket, WebSocketSubject } from 'rxjs/webSocket';
 import { SystemInfo as ISystemInfo } from 'src/app/generated/models';
 import { SystemApiService } from './system.service';
+import { AuthService } from './auth.service';
 import { environment } from 'src/environments/environment';
 
 @Injectable({
@@ -28,7 +29,8 @@ export class LiveDataService {
   public domainHistory: number[][][] = [];
 
   constructor(
-    private systemService: SystemApiService
+    private systemService: SystemApiService,
+    private authService: AuthService
   ) {
     // Visibility stream for polling adjustments
     const visibility$ = fromEvent(document, 'visibilitychange').pipe(
@@ -82,7 +84,10 @@ export class LiveDataService {
       scan((acc: ISystemInfo, curr: Partial<ISystemInfo>) => ({ ...acc, ...curr } as ISystemInfo), {} as ISystemInfo),
       // Ensure we have at least once received a message with a recognizable field before emitting
       filter(info => !!info.version || !!info.uptimeSeconds),
-      tap(info => this.recordDomainHistory(info)),
+      tap(info => {
+        this.authService.setReadAuthRequired(window.location.host, info.authReadRequired === 1);
+        this.recordDomainHistory(info);
+      }),
       shareReplay(1)
     );
   }
@@ -117,32 +122,38 @@ export class LiveDataService {
 
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const host = window.location.host;
-    const url = `${protocol}//${host}/api/ws/live`;
 
-    this.socket$ = webSocket({
-      url,
-      openObserver: {
-        next: () => {
-          this.openedAt = Date.now();
-          this.lastMessageAt = 0;
-          console.log('Live WebSocket connected');
-          this.connectedSubject.next(true);
-        }
-      },
-      closeObserver: {
-        next: (event: CloseEvent) => {
-          console.log(
-            `Live WebSocket disconnected (code=${event?.code} wasClean=${event?.wasClean}` +
-            ` afterMs=${this.openedAt ? Date.now() - this.openedAt : -1}` +
-            ` lastMsgAgoMs=${this.lastMessageAt ? Date.now() - this.lastMessageAt : -1})`
-          );
-          this.connectedSubject.next(false);
-          this.socket$ = null;
-        }
-      }
-    });
+    return defer(() => {
+      const token = this.authService.getCredentials(host);
+      // TODO(security): Browser WebSocket API cannot set custom Authorization headers; token is sent via query param on LAN WS.
+      const authParam = token ? `?auth=${encodeURIComponent(token)}` : '';
+      const url = `${protocol}//${host}/api/ws/live${authParam}`;
 
-    return this.socket$.pipe(
+      this.socket$ = webSocket({
+        url,
+        openObserver: {
+          next: () => {
+            this.openedAt = Date.now();
+            this.lastMessageAt = 0;
+            console.log('Live WebSocket connected');
+            this.connectedSubject.next(true);
+          }
+        },
+        closeObserver: {
+          next: (event: CloseEvent) => {
+            console.log(
+              `Live WebSocket disconnected (code=${event?.code} wasClean=${event?.wasClean}` +
+              ` afterMs=${this.openedAt ? Date.now() - this.openedAt : -1}` +
+              ` lastMsgAgoMs=${this.lastMessageAt ? Date.now() - this.lastMessageAt : -1})`
+            );
+            this.connectedSubject.next(false);
+            this.socket$ = null;
+          }
+        }
+      });
+
+      return this.socket$;
+    }).pipe(
       timeout(10000),
       tap(msg => {
         this.lastMessageAt = Date.now();
@@ -150,7 +161,15 @@ export class LiveDataService {
           this.updates$.next(msg.data);
         }
       }),
-      retry({ delay: 5000 }),
+      retry({
+        delay: () => race(
+          timer(5000),
+          this.authService.credentialsChanged$.pipe(
+            filter(changedHost => changedHost === host),
+            take(1)
+          )
+        )
+      }),
       share({ resetOnRefCountZero: false })
     );
   }

@@ -102,6 +102,17 @@
             <i class="pi pi-refresh text-xl block"></i>
           </a>
         </li>
+        @if (info.authEnabled === 1) {
+          <li>
+            <a class="block py-2 text-main cursor-pointer"
+              tooltipPosition="bottom"
+              [appTooltip]="isUnlocked(info) ? 'Lock / Logout' : 'Locked (click to unlock)'"
+              (click)="toggleAuth(info)"
+              >
+              <i class="pi text-xl block" [class]="isUnlocked(info) ? 'pi-lock-open' : 'pi-lock'"></i>
+            </a>
+          </li>
+        }
       </ul>
     }
     @if (isWidgetPanelOpen) {
