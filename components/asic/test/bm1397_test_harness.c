@@ -134,11 +134,12 @@ int bm1397_stub_count_chips(uint16_t count, uint16_t chip_id,
     return count;
 }
 
-void bm1397_stub_frequency_transition(
+bool bm1397_stub_frequency_transition(
     GlobalState *state, set_hash_frequency_fn set_frequency)
 {
     (void)state;
     (void)set_frequency;
+    return true;
 }
 
 void bm1397_stub_delay(TickType_t ticks)

@@ -12,6 +12,7 @@
 #include "asic_init.h"
 #include "asic_reset.h"
 #include "driver/uart.h"
+#include <math.h>
 
 #define POLL_RATE 100
 #define MAX_TEMP 90.0
@@ -269,12 +270,13 @@ void POWER_MANAGEMENT_task(void * pvParameters)
             power_management->frequency_value = asic_frequency;
             power_management->expected_hashrate = expected_hashrate(GLOBAL_STATE);
 
-            ASIC_set_frequency(GLOBAL_STATE);
+            bool frequency_set = ASIC_set_frequency(GLOBAL_STATE);
             ASIC_set_nonce_space(GLOBAL_STATE);
             uint8_t difficulty_power = calculate_effective_asic_difficulty(power_management->expected_hashrate);
             ASIC_set_difficulty(GLOBAL_STATE, difficulty_power);
             
-            last_asic_frequency = asic_frequency;
+            // A partial ramp must also retry a request for the previous endpoint.
+            last_asic_frequency = frequency_set ? asic_frequency : NAN;
         }
 
         // Check for changing of overheat mode

@@ -17,6 +17,7 @@ void BM1370_send_work(GlobalState * GLOBAL_STATE, const asic_job_t * next_job);
 void BM1370_set_version_mask(uint32_t version_mask);
 int BM1370_set_max_baud(void);
 float BM1370_send_hash_frequency(float frequency);
+bool BM1370_set_frequency(GlobalState * GLOBAL_STATE);
 task_result * BM1370_process_work(GlobalState * GLOBAL_STATE);
 void BM1370_read_registers(GlobalState * GLOBAL_STATE);
 void BM1370_set_nonce_space(double nonce_percent, float frequency, uint16_t asic_count, uint16_t cores);
