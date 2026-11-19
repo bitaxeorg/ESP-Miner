@@ -30,6 +30,26 @@ export function addressValidator(control: AbstractControl): ValidationErrors | n
   const trimmed = typeof value === 'string' ? value.trim() : '';
   if (!trimmed) return null;
 
+  if (trimmed.includes(':')) {
+    const bare = trimmed.startsWith('[') && trimmed.endsWith(']') ? trimmed.slice(1, -1) : trimmed;
+    if (!/^[0-9a-fA-F:.]+$/.test(bare)) return { invalidAddress: true };
+    try {
+      const host = trimmed.startsWith('[') ? trimmed : `[${trimmed}]`;
+      const url = new URL(`http://${host}`);
+      const normalized = url.hostname.replace(/^\[|\]$/g, '');
+      const first = parseInt(normalized.split(':')[0] || '0', 16);
+      // Browsers cannot navigate zone-scoped link-local URLs. Keep IPv4 fallback.
+      if ((first & 0xffc0) === 0xfe80 || (first & 0xff00) === 0xff00 ||
+          (normalized.startsWith('::') && normalized !== '::1' && !normalized.startsWith('::ffff:'))) {
+        return { invalidAddress: true };
+      }
+      return host.endsWith(']') && url.hostname.includes(':') && !url.port && url.pathname === '/'
+        ? null : { invalidAddress: true };
+    } catch {
+      return { invalidAddress: true };
+    }
+  }
+
   const parts = trimmed.split('.');
 
   // If input is an IPv4 address (4 numeric octets 0-255)
@@ -173,7 +193,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
       }
     }, 1000);
 
-    this.httpClient.get(`http://${window.location.hostname}/api/system/info`).subscribe({
+    this.httpClient.get(`${this.httpBase()}/api/system/info`).subscribe({
       next: (response: any) => {
         this.currentDeviceIp = this.deviceIpv4(response) ?? null;
         this.currentDeviceVersion = response.version;
@@ -224,6 +244,19 @@ export class SwarmComponent implements OnInit, OnDestroy {
     return ip.split('.').reduce((acc, octet) => (acc << 8) + parseInt(octet, 10), 0) >>> 0;
   }
 
+  private isIpv6Address(value: string): boolean {
+    return !!value && value.includes(':') && addressValidator({ value } as AbstractControl) === null;
+  }
+
+  /** Host suitable for use inside http://... URLs (bracket IPv6 literals). */
+  private formatHttpHost(host: string): string {
+    return this.isIpv6Address(host) && !host.startsWith('[') ? `[${host}]` : host;
+  }
+
+  public httpBase(host?: string): string {
+    return host === undefined ? window.location.origin : `http://${this.formatHttpHost(host)}`;
+  }
+
 private isIpAddress(value: string): boolean {
     const ipRegex = /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
     return ipRegex.test(value);
@@ -249,7 +282,7 @@ private isIpAddress(value: string): boolean {
     if (this.isIpAddress(address)) {
       return of(address);
     }
-    return this.httpClient.get(`http://${address}/api/ap/info`).pipe(
+    return this.httpClient.get(`${this.httpBase(address)}/api/ap/info`).pipe(
       timeout(3000),
       map((ap: any) => this.deviceIpv4(ap)),
       catchError(() => of(undefined))
@@ -269,12 +302,19 @@ private isIpAddress(value: string): boolean {
   // Follows the current device's access method (IP, hostname.local, bare hostname, or custom domain suffix like .lan)
   public getDeviceLink(device: SwarmDevice): string {
     const currentHost = this.getCurrentHostname();
+    if (this.isIpv6Address(currentHost)) {
+      const address = [device['ipv6'], device['ipv4'], device.connectionAddress, device.address]
+        .find(host => host && addressValidator({ value: host } as AbstractControl) === null) || '';
+      return this.formatHttpHost(address);
+    }
     const isIP = this.isIpAddress(currentHost);
     if (isIP) {
       // Accessing via IP — link to device IP
-      return device['ipv4'] || device.connectionAddress || device.address || '';
+      return this.formatHttpHost(device['ipv4'] || device.connectionAddress || device.address || '');
     }
 
+    const connection = device.connectionAddress || device.address || '';
+    if (!device['hostname'] && this.isIpv6Address(connection)) return this.formatHttpHost(connection);
     const dotIndex = currentHost.indexOf('.');
     if (dotIndex !== -1) {
       // Accessing via domain (e.g. .local, .lan, .home.arpa) — link using the same domain suffix
@@ -289,7 +329,7 @@ private isIpAddress(value: string): boolean {
     }
 
     // Accessing via bare hostname — link to device's bare hostname
-    return device['hostname'] || device.connectionAddress || device.address || '';
+    return this.formatHttpHost(device['hostname'] || device.connectionAddress || device.address || '');
   }
 
   private intToIp(int: number): string {
@@ -314,7 +354,7 @@ private isIpAddress(value: string): boolean {
       this.performNetworkScan(ips);
     } else {
       // mDNS hostname - fetch server IP first, then scan its subnet
-      this.httpClient.get(`http://${window.location.hostname}/api/system/info`)
+      this.httpClient.get(`${this.httpBase()}/api/system/info`)
         .subscribe({
           next: (response: any) => {
             const serverIp = this.deviceIpv4(response);
@@ -374,13 +414,13 @@ private isIpAddress(value: string): boolean {
   }
 
   private fetchDevice(address: string, fetchAsic: boolean = true): Observable<SwarmDevice | null> {
-    return this.httpClient.get<any>(`http://${address}/api/system/info`).pipe(
+    return this.httpClient.get<any>(`${this.httpBase(address)}/api/system/info`).pipe(
       mergeMap(info => {
         if (!info) {
           return of(null);
         }
         const asic$ = fetchAsic
-          ? this.httpClient.get<any>(`http://${address}/api/system/asic`).pipe(timeout(1000), catchError(() => of({})))
+          ? this.httpClient.get<any>(`${this.httpBase(address)}/api/system/asic`).pipe(timeout(1000), catchError(() => of({})))
           : of({});
 
         return forkJoin({
@@ -403,9 +443,9 @@ private isIpAddress(value: string): boolean {
   }
 
   public add() {
-    const address = this.form.value.manualAddAddress;
+    const address = (this.form.value.manualAddAddress || '').trim();
 
-    this.httpClient.get<any>(`http://${address}/api/system/info`).pipe(
+    this.httpClient.get<any>(`${this.httpBase(address)}/api/system/info`).pipe(
       catchError(error => {
         if (error.status === 401 || error.status === 0) {
           this.toastr.warning(`Potential swarm peer detected at ${address} - upgrade its firmware to be able to add it.`);
@@ -422,7 +462,7 @@ private isIpAddress(value: string): boolean {
           return of(null); // Already showed warning or timed out
         }
         return forkJoin({
-          asic: this.httpClient.get<any>(`http://${address}/api/system/asic`).pipe(timeout(1000), catchError(() => of({}))),
+          asic: this.httpClient.get<any>(`${this.httpBase(address)}/api/system/asic`).pipe(timeout(1000), catchError(() => of({}))),
           ipv4: this.fetchDeviceIpv4(address, info)
         }).pipe(
           map(({ asic, ipv4 }) => {
@@ -439,7 +479,7 @@ private isIpAddress(value: string): boolean {
       }
       const { info, asic, ipv4 } = result;
 
-      if (ipv4 && this.swarm.some(item => item.connectionAddress === ipv4)) {
+      if (this.swarm.some(item => item.connectionAddress === (ipv4 || address))) {
         this.toastr.warning('Device already added to the swarm.', `Device at ${address}`);
         return;
       }
@@ -469,7 +509,7 @@ private isIpAddress(value: string): boolean {
     if (action === 'restart' && !confirm('Are you sure you want to restart the device?')) {
       return;
     }
-    this.httpClient.post(`http://${device.connectionAddress}/api/system/${action}`, {}, { responseType: 'text' }).pipe(
+    this.httpClient.post(`${this.httpBase(device.connectionAddress)}/api/system/${action}`, {}, { responseType: 'text' }).pipe(
       timeout(800),
       catchError(error => {
         if ((action === 'restart' || action === 'identify') && (error.status === 200 || error.status === 0 || error.name === 'HttpErrorResponse' || error.statusText === 'Unknown Error')) {
