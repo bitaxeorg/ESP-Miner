@@ -41,6 +41,7 @@ static unsigned fixture_scores;
 static unsigned fixture_notifications;
 static unsigned fixture_self_tests;
 static unsigned fixture_registers;
+static unsigned fixture_watchdog_results;
 static char fixture_scored_id[32];
 static char fixture_submitted_id[32];
 
@@ -146,6 +147,11 @@ void result_task_spy_register_read(void *state, register_type_t type,
     fixture_registers++;
 }
 
+void result_task_spy_note_result(void)
+{
+    fixture_watchdog_results++;
+}
+
 static void run_result_case(result_case_t test_case)
 {
     fixture_case = test_case;
@@ -184,6 +190,7 @@ static void run_result_case(result_case_t test_case)
     fixture_notifications = 0;
     fixture_self_tests = 0;
     fixture_registers = 0;
+    fixture_watchdog_results = 0;
     fixture_scored_id[0] = '\0';
     fixture_submitted_id[0] = '\0';
 
@@ -209,6 +216,7 @@ TEST_CASE("result task submits embedded job snapshots without a job store for ev
         TEST_ASSERT_EQUAL_UINT32(1, fixture_scores);
         TEST_ASSERT_EQUAL_UINT32(1, fixture_notifications);
         TEST_ASSERT_EQUAL_UINT32(0, fixture_self_tests);
+        TEST_ASSERT_EQUAL_UINT32(1, fixture_watchdog_results);
         TEST_ASSERT_EQUAL_STRING("42", fixture_submitted_id);
         TEST_ASSERT_EQUAL_STRING("42", fixture_scored_id);
         TEST_ASSERT_EQUAL_FLOAT(1.0f,
@@ -223,6 +231,8 @@ TEST_CASE("result task separates registers and empty ASIC responses",
     TEST_ASSERT_EQUAL_UINT32(
         0, fixture_submissions + fixture_scores + fixture_notifications +
                fixture_self_tests);
+    // Register replies don't count as results for the chain watchdog
+    TEST_ASSERT_EQUAL_UINT32(0, fixture_watchdog_results);
 }
 
 TEST_CASE("result task preserves thresholds self test and repeated delivery",
@@ -230,6 +240,8 @@ TEST_CASE("result task preserves thresholds self test and repeated delivery",
 {
     run_result_case((result_case_t) {.self_test = true});
     TEST_ASSERT_EQUAL_UINT32(1, fixture_self_tests);
+    // Counted after the submit path, which self-test results never reach
+    TEST_ASSERT_EQUAL_UINT32(0, fixture_watchdog_results);
     TEST_ASSERT_EQUAL_UINT32(
         0, fixture_submissions + fixture_scores + fixture_notifications);
 
@@ -257,6 +269,7 @@ TEST_CASE("result task preserves thresholds self test and repeated delivery",
         .pool_diff = 1e-30,
         .repeated_results = 1,
     });
+    TEST_ASSERT_EQUAL_UINT32(2, fixture_watchdog_results);
     TEST_ASSERT_EQUAL_UINT32(2, fixture_submissions);
     TEST_ASSERT_EQUAL_UINT32(2, fixture_scores);
     TEST_ASSERT_EQUAL_UINT32(2, fixture_notifications);
@@ -269,6 +282,7 @@ TEST_CASE("result task discards results when nonce hashing fails",
         .pool_diff = 1e-30,
         .hash_failure = true,
     });
+    TEST_ASSERT_EQUAL_UINT32(0, fixture_watchdog_results);
     TEST_ASSERT_EQUAL_UINT32(0, fixture_submissions);
     TEST_ASSERT_EQUAL_UINT32(0, fixture_scores);
     TEST_ASSERT_EQUAL_UINT32(0, fixture_notifications);

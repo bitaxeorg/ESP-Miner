@@ -20,6 +20,7 @@ static TaskHandle_t s_primary_task_handle = NULL;
 static TaskHandle_t s_fallback_task_handle = NULL;
 static GlobalState *s_global_state = NULL;
 static volatile bool s_should_reconnect[MAX_POOLS] = {false};
+static volatile bool s_stalled[MAX_POOLS] = {false};
 
 void stratum_abort_pool(uint16_t pool_idx)
 {
@@ -32,6 +33,13 @@ void stratum_abort_pool(uint16_t pool_idx)
     if (s_fallback_task_handle && s_global_state && pool_idx == s_global_state->SYSTEM_MODULE.secondary_pool_index) {
         xTaskNotifyGive(s_fallback_task_handle);
     }
+}
+
+void stratum_report_stalled_pool(uint16_t pool_idx)
+{
+    if (pool_idx >= MAX_POOLS) return;
+    s_stalled[pool_idx] = true;
+    stratum_abort_pool(pool_idx);
 }
 
 void stratum_abort_connection(void)
@@ -107,6 +115,7 @@ static esp_err_t run_pool_session(GlobalState *gs, uint16_t pool_idx)
     }
 
     s_should_reconnect[pool_idx] = false;
+    s_stalled[pool_idx] = false;
     return driver->run(gs, pool_idx);
 }
 
@@ -254,6 +263,19 @@ void stratum_task(void *pvParameters)
         uint64_t work_before = GLOBAL_STATE->SYSTEM_MODULE.pool_sessions[pool_idx].work_received;
         esp_err_t err = run_pool_session(GLOBAL_STATE, pool_idx);
 
+        // Dropped by the pool watchdog: count it as the last failed attempt, so
+        // work moves straight to the fallback pool (or, without one, the pool
+        // is retried after the usual wait)
+        bool stalled = s_stalled[pool_idx];
+        if (stalled) {
+            s_stalled[pool_idx] = false;
+            stratum_set_pool_error(GLOBAL_STATE, pool_idx, "Pool stalled");
+            err = ESP_FAIL;
+            if (retry_attempts < MAX_RETRY_ATTEMPTS - 1) {
+                retry_attempts = MAX_RETRY_ATTEMPTS - 1;
+            }
+        }
+
         // Check if fallback should exit after session unblocks
         if (!is_primary && !GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback && !GLOBAL_STATE->SYSTEM_MODULE.use_fallback_stratum) {
             break;
@@ -269,7 +291,7 @@ void stratum_task(void *pvParameters)
         }
 
         bool session_had_work = (GLOBAL_STATE->SYSTEM_MODULE.pool_sessions[pool_idx].work_received > work_before);
-        if (err == ESP_OK || session_had_work) {
+        if (!stalled && (err == ESP_OK || session_had_work)) {
             retry_attempts = 0;
             POOL_reset_session(GLOBAL_STATE, pool_idx);
         } else {
