@@ -25,7 +25,7 @@ void bm13xx_encode_job_packet(const asic_job_t *job, uint8_t chip_slot,
 }
 
 void bm1397_encode_job_packet(const asic_job_t *job, uint8_t chip_slot,
-                              uint8_t software_midstates,
+                              uint8_t packet_midstates,
                               bm1397_job_packet_t *packet)
 {
     memset(packet, 0, sizeof(*packet));
@@ -38,7 +38,7 @@ void bm1397_encode_job_packet(const asic_job_t *job, uint8_t chip_slot,
     uint8_t header[80];
     uint8_t midstate[32];
     uint32_t version = job->version;
-    for (uint8_t i = 0; i < software_midstates && i < BM1397_NUM_MIDSTATES; ++i) {
+    for (uint8_t i = 0; i < packet_midstates && i < BM1397_NUM_MIDSTATES; ++i) {
         if (i > 0) {
             if (job->version_mask == 0) {
                 break;
@@ -64,12 +64,12 @@ void bm13xx_build_job_packet(asic_job_store_t *store,
 }
 
 void bm1397_build_job_packet(asic_job_store_t *store,
-                             uint8_t software_midstates,
+                             uint8_t packet_midstates,
                              const asic_job_t *job, bm1397_job_packet_t *packet)
 {
     uint8_t slot = (uint8_t)asic_job_store_claim(store, job);
     uint8_t chip_slot = bm_encode_wire_job_slot(slot, BM1397_TX_SLOT_SHIFT);
-    bm1397_encode_job_packet(job, chip_slot, software_midstates, packet);
+    bm1397_encode_job_packet(job, chip_slot, packet_midstates, packet);
 #if BM_DEBUG_JOBS
     ESP_LOGI(TAG, "Send Job: slot %u (0x%02X)", slot, chip_slot);
 #endif
