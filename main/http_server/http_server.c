@@ -18,6 +18,7 @@
 
 #include "dns_server.h"
 #include "esp_ota_ops.h"
+#include "ota_guard.h"
 #include "esp_app_desc.h"
 #include "esp_wifi.h"
 #include "lwip/inet.h"
@@ -1781,6 +1782,8 @@ esp_err_t POST_OTA_update(httpd_req_t * req)
         HTTP_send_json_error(req, "500 Internal Server Error", "Validation / Activation Error");
         return ESP_OK;
     }
+
+    ota_guard_arm(ota_partition);
 
     snprintf(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_status, 20, "Rebooting...");
 
