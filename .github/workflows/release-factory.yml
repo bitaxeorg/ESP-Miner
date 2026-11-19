@@ -39,7 +39,7 @@ jobs:
         with:
           esp_idf_version: v6.0.3
           target: esp32s3
-          command: GITHUB_ACTIONS="true" idf.py build
+          command: GITHUB_ACTIONS="true" idf.py build && python tools/test_ca_bundle.py --build-dir build
           path: '.'
       - name: "esp-idf build factory config for ${{ matrix.build_type }}"
         uses: espressif/esp-idf-ci-action@v1
