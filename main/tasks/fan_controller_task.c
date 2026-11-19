@@ -106,8 +106,16 @@ void FAN_CONTROLLER_task(void * pvParameters)
                     
                     // Initialize PID on first valid temperature reading
                     if (pid_get_mode(&pid) == MANUAL) {
+                        // pid_initialize() seeds the integrator from *output to hand
+                        // over without a bump, but pid_output has never been written
+                        // at this point -- the startup fan speed went straight to the
+                        // fan, not through the PID. Without seeding it here the
+                        // integrator starts from 0, is clamped up to the minimum fan
+                        // speed, and the fan drops from the startup value to that
+                        // minimum just as the ASIC reaches full power.
+                        pid_output = GLOBAL_STATE->POWER_MANAGEMENT_MODULE.fan_perc;
                         pid_set_mode(&pid, AUTOMATIC);
-                        ESP_LOGI(TAG, "PID initialized at %.1f°C (P:%.1f I:%.1f D:%.1f", pid_input, pid.dispKp, pid.dispKi, pid.dispKd);
+                        ESP_LOGI(TAG, "PID initialized at %.1f°C, output %.1f%% (P:%.1f I:%.1f D:%.1f", pid_input, pid_output, pid.dispKp, pid.dispKi, pid.dispKd);
                     }
                     
                     pid_compute(&pid);
