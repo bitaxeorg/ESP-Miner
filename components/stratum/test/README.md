@@ -34,6 +34,7 @@ live under `components/asic/test`; this test component has no ASIC dependency.
 | `test_miner_job.c` | Miner-job pool slots, buffer ownership, index wraparound, and rollable-job checks. |
 | `test_mining.c` | Coinbase hashes, Merkle roots, version-mask changes, and nonce difficulty using common Bitcoin headers. |
 | `test_stratum_json.c` | SV1 JSON-RPC parsing, job fields, server messages, malformed input, line buffering, and size limits. |
+| `test_stratum_socket.c` | IP literal detection and bracketed IPv6 literal handling in pool address resolution. |
 | `test_utils.c` | Hashing, hex conversion, URL decoding, byte order at every buffer alignment, overlapping buffers, guard bytes, all 256 target bits and conversion edge cases, network difficulty, and difficulty conversion safety. |
 
 ## Test double names

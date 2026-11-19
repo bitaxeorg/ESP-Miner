@@ -9,17 +9,21 @@
 #include "stratum_v1_client.h"
 #include "stratum_v2_client.h"
 #include "connect.h"
+#include "stratum_socket.h"
+#include "esp_timer.h"
 #include "system.h"
 #include <string.h>
 
 #define TAG "stratum_task"
 #define MAX_RETRY_ATTEMPTS 3
 #define RECOVERY_PROBE_INTERVAL_MS 30000
+#define IPV6_RETRY_INTERVAL_US (5 * 60 * 1000000LL)
 
 static TaskHandle_t s_primary_task_handle = NULL;
 static TaskHandle_t s_fallback_task_handle = NULL;
 static GlobalState *s_global_state = NULL;
 static volatile bool s_should_reconnect[MAX_POOLS] = {false};
+static int64_t s_ipv6_retry_after_us[MAX_POOLS] = {0};
 
 void stratum_abort_pool(uint16_t pool_idx)
 {
@@ -107,7 +111,34 @@ static esp_err_t run_pool_session(GlobalState *gs, uint16_t pool_idx)
     }
 
     s_should_reconnect[pool_idx] = false;
-    return driver->run(gs, pool_idx);
+
+    // Prefer IPv6 for hostnames that have an AAAA record when the device has a
+    // routable IPv6 address. IP literals, IPv4-only networks and pools where
+    // IPv4 recently worked after IPv6 failed keep the default resolution order.
+    stratum_connection_info_t ipv6_info;
+    if (stratum_socket_is_ip_literal(pool->url) || !stratum_socket_has_routable_ipv6() ||
+        esp_timer_get_time() < s_ipv6_retry_after_us[pool_idx] ||
+        stratum_socket_resolve(pool->url, pool->port, AF_INET6, &ipv6_info) != ESP_OK) {
+        return driver->run(gs, pool_idx, AF_UNSPEC);
+    }
+
+    uint64_t work_before = gs->SYSTEM_MODULE.pool_sessions[pool_idx].work_received;
+    esp_err_t err = driver->run(gs, pool_idx, AF_INET6);
+    bool had_work = gs->SYSTEM_MODULE.pool_sessions[pool_idx].work_received > work_before;
+    if (err == ESP_OK || err == ESP_ERR_INVALID_STATE || had_work || stratum_reconnect_requested()) {
+        return err;
+    }
+
+    // IPv6 failed before the pool sent work: try IPv4 for the same host. If
+    // that works, skip IPv6 for a while so a broken route is not retried on
+    // every reconnect.
+    ESP_LOGW(TAG, "Pool %u (%s) gave no work over IPv6, trying IPv4", pool_idx, pool->url);
+    s_ipv6_retry_after_us[pool_idx] = esp_timer_get_time() + IPV6_RETRY_INTERVAL_US;
+    err = driver->run(gs, pool_idx, AF_INET);
+    if (gs->SYSTEM_MODULE.pool_sessions[pool_idx].work_received <= work_before) {
+        s_ipv6_retry_after_us[pool_idx] = 0;
+    }
+    return err;
 }
 
 static void start_fallback_if_needed(GlobalState *gs)
@@ -141,6 +172,7 @@ void stratum_notify_pool_modified(GlobalState *gs, uint16_t pool_idx)
 
     POOL_clear_status(gs, pool_idx);
     gs->SYSTEM_MODULE.pools_unavailable = false;
+    s_ipv6_retry_after_us[pool_idx] = 0;
 
     stratum_abort_pool(pool_idx);
 

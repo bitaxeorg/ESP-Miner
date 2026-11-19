@@ -9,7 +9,7 @@
 typedef struct GlobalState GlobalState;
 
 // Run the Stratum V1 client loop for pool_idx until disconnect, ASIC pause, or reconnect requested.
-esp_err_t stratum_v1_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx);
+esp_err_t stratum_v1_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx, int addr_family);
 
 void stratum_v1_close_connection(GlobalState *GLOBAL_STATE, uint16_t pool_idx);
 

@@ -37,11 +37,62 @@ static void dns_found_cb(const char *name, const ip_addr_t *ipaddr, void *callba
     }
 }
 
-esp_err_t stratum_socket_resolve(const char *hostname, uint16_t port, stratum_connection_info_t *conn_info)
+// Returns hostname without the brackets of an "[IPv6 literal]", using buf as
+// storage. Anything else is returned unchanged.
+static const char *strip_brackets(const char *hostname, char *buf, size_t buf_len)
+{
+    size_t len = strlen(hostname);
+    if (len < 3 || hostname[0] != '[' || hostname[len - 1] != ']' || len - 2 >= buf_len) {
+        return hostname;
+    }
+    memcpy(buf, hostname + 1, len - 2);
+    buf[len - 2] = '\0';
+    return buf;
+}
+
+bool stratum_socket_is_ip_literal(const char *hostname)
+{
+    if (hostname == NULL) {
+        return false;
+    }
+    char buf[INET6_ADDRSTRLEN + 16];
+    ip_addr_t addr;
+    return ipaddr_aton(strip_brackets(hostname, buf, sizeof(buf)), &addr) != 0;
+}
+
+bool stratum_socket_has_routable_ipv6(void)
+{
+    esp_netif_t *netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
+    if (!netif) {
+        return false;
+    }
+
+    esp_ip6_addr_t addrs[LWIP_IPV6_NUM_ADDRESSES];
+    int count = esp_netif_get_all_preferred_ip6(netif, addrs);
+    for (int i = 0; i < count; i++) {
+        esp_ip6_addr_type_t type = esp_netif_ip6_get_addr_type(&addrs[i]);
+        if (type == ESP_IP6_ADDR_IS_GLOBAL || type == ESP_IP6_ADDR_IS_UNIQUE_LOCAL) {
+            return true;
+        }
+    }
+    return false;
+}
+
+esp_err_t stratum_socket_resolve(const char *hostname, uint16_t port, int addr_family, stratum_connection_info_t *conn_info)
 {
     // Input validation
     if (hostname == NULL || conn_info == NULL || port == 0) {
         return ESP_ERR_INVALID_ARG;
+    }
+
+    char literal[INET6_ADDRSTRLEN + 16];
+    hostname = strip_brackets(hostname, literal, sizeof(literal));
+
+    u8_t dns_addrtype = LWIP_DNS_ADDRTYPE_DEFAULT;
+    if (addr_family == AF_INET6) {
+        dns_addrtype = LWIP_DNS_ADDRTYPE_IPV6;
+    } else if (addr_family == AF_INET) {
+        dns_addrtype = LWIP_DNS_ADDRTYPE_IPV4;
     }
 
     ESP_LOGD(TAG, "Resolving address for %s:%u", hostname, port);
@@ -51,7 +102,7 @@ esp_err_t stratum_socket_resolve(const char *hostname, uint16_t port, stratum_co
         return ESP_ERR_NO_MEM;
     }
 
-    err_t dns_err = dns_gethostbyname_addrtype(hostname, &ctx->ip, dns_found_cb, ctx, LWIP_DNS_ADDRTYPE_DEFAULT);
+    err_t dns_err = dns_gethostbyname_addrtype(hostname, &ctx->ip, dns_found_cb, ctx, dns_addrtype);
 
     if (dns_err == ERR_OK) {
         ctx->status = 1;
@@ -71,7 +122,11 @@ esp_err_t stratum_socket_resolve(const char *hostname, uint16_t port, stratum_co
         }
 
         free(ctx);
-        ESP_LOGE(TAG, "DNS resolution failed for %s (err %d)", hostname, (int)dns_err);
+        if (addr_family == AF_INET6) {
+            ESP_LOGD(TAG, "No IPv6 address for %s", hostname);
+        } else {
+            ESP_LOGE(TAG, "DNS resolution failed for %s (err %d)", hostname, (int)dns_err);
+        }
         return ESP_ERR_NOT_FOUND;
     }
 
