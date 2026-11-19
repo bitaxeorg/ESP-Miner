@@ -1,6 +1,9 @@
 import { Component, OnDestroy, Renderer2, ViewChild } from '@angular/core';
-import { NavigationEnd, Router, RouterOutlet } from '@angular/router';
-import { filter, Subscription, Subject, takeUntil } from 'rxjs';
+import { AsyncPipe } from '@angular/common';
+import { NavigationEnd, Router, RouterLink, RouterOutlet } from '@angular/router';
+import { filter, Observable, Subscription, Subject, takeUntil } from 'rxjs';
+import { LiveDataService } from 'src/app/services/live-data.service';
+import { SystemInfo } from 'src/app/generated/models';
 import { SensitiveData } from 'src/app/services/sensitive-data.service';
 import { LayoutService } from "./service/app.layout.service";
 import { AppSidebarComponent } from "./app.sidebar.component";
@@ -11,12 +14,13 @@ import { LoadingComponent } from '../components/loading/loading.component';
 @Component({
   selector: 'app-layout',
   templateUrl: './app.layout.component.html',
-  imports: [AppTopBarComponent, AppSidebarComponent, RouterOutlet, AppFooterComponent, LoadingComponent]
+  imports: [AppTopBarComponent, AppSidebarComponent, RouterOutlet, RouterLink, AsyncPipe, AppFooterComponent, LoadingComponent]
 })
 export class AppLayoutComponent implements OnDestroy {
     private destroy$ = new Subject<void>();
 
     public sensitiveDataHidden: boolean = false;
+    public info$: Observable<SystemInfo>;
 
     overlayMenuOpenSubscription: Subscription;
 
@@ -33,7 +37,9 @@ export class AppLayoutComponent implements OnDestroy {
       public renderer: Renderer2,
       public router: Router,
       private sensitiveData: SensitiveData,
+      private liveDataService: LiveDataService,
     ) {
+        this.info$ = this.liveDataService.info$;
         this.overlayMenuOpenSubscription = this.layoutService.overlayOpen$.subscribe(() => {
             if (!this.menuOutsideClickListener) {
                 this.menuOutsideClickListener = this.renderer.listen('document', 'click', event => {

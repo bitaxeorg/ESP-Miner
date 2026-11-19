@@ -918,6 +918,10 @@ static void screen_update_cb(lv_timer_t * timer)
 
 void screen_button_press() 
 {
+    if (!GLOBAL_STATE || !GLOBAL_STATE->SYSTEM_MODULE.is_screen_active) {
+        return;
+    }
+
     if (GLOBAL_STATE->SYSTEM_MODULE.identify_mode_time_ms > 0) {
         GLOBAL_STATE->SYSTEM_MODULE.identify_mode_time_ms = 0;
     } else if (use_stats_background()) {
@@ -961,8 +965,8 @@ static void uptime_update_cb(lv_timer_t * timer)
 
 esp_err_t screen_start(GlobalState * global_state)
 {
-    GLOBAL_STATE = global_state;
     if (lvgl_port_lock(0)) {
+        GLOBAL_STATE = global_state;
         screen_lines = lv_display_get_vertical_resolution(NULL) / (is_large_display() ? 16 : 8);
 
         SystemModule * SYSTEM_MODULE = &GLOBAL_STATE->SYSTEM_MODULE;
