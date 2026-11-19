@@ -174,10 +174,6 @@ float ASIC_get_asic_job_frequency_ms(GlobalState * GLOBAL_STATE, uint32_t versio
     const AsicConfig *asic = &GLOBAL_STATE->DEVICE_CONFIG.family.asic;
     int asic_count = GLOBAL_STATE->DEVICE_CONFIG.family.asic_count;
 
-    if (asic->fixed_timeout_ms > 0) {
-        return (float)asic->fixed_timeout_ms / _next_power_of_two(asic_count);
-    }
-
     float freq = GLOBAL_STATE->POWER_MANAGEMENT_MODULE.actual_frequency;
     if (freq <= 0.0f) {
         freq = GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value;

@@ -321,3 +321,56 @@ TEST_CASE("BM13xx rolled version clears pre-set mask voting bits and formats BIP
         bm13xx_harness_end();
     }
 }
+
+TEST_CASE("BM1373 computes HCN and partitions chip addresses across nonce space",
+          "[asic][bm1373]")
+{
+    const bm13xx_harness_driver_t *driver = &bm13xx_harness_drivers[3];
+    GlobalState *state = bm13xx_harness_begin(driver);
+    state->DEVICE_CONFIG.family.asic_count = 2;
+    state->DEVICE_CONFIG.family.asic.core_count = 128;
+    state->POWER_MANAGEMENT_MODULE.frequency_value = 327.0f;
+    state->POWER_MANAGEMENT_MODULE.actual_frequency = 327.0f;
+
+    TEST_ASSERT_EQUAL_UINT8(2, driver->init(state));
+
+    bool saw_addr_00 = false;
+    bool saw_addr_80 = false;
+    uint32_t init_hcn = 0;
+    for (size_t i = 0; i < bm13xx_harness_packet_count(); i++) {
+        const bm13xx_harness_packet_t *pkt = bm13xx_harness_packet(i);
+        // SET_ADDRESS command: 55 AA 40 05 <addr> 00 <crc5>
+        if (pkt->length == 7 && pkt->bytes[2] == 0x40 && pkt->bytes[5] == 0x00) {
+            if (pkt->bytes[4] == 0x00) saw_addr_00 = true;
+            if (pkt->bytes[4] == 0x80) saw_addr_80 = true;
+        }
+        // Broadcast write to HCN register 0x10: 55 AA 51 09 00 10 <hcn:4> <crc5>
+        if (pkt->length == 11 && pkt->bytes[2] == 0x51 && pkt->bytes[5] == 0x10) {
+            init_hcn = ((uint32_t)pkt->bytes[6] << 24) |
+                       ((uint32_t)pkt->bytes[7] << 16) |
+                       ((uint32_t)pkt->bytes[8] << 8) |
+                       (uint32_t)pkt->bytes[9];
+        }
+    }
+    TEST_ASSERT_TRUE(saw_addr_00);
+    TEST_ASSERT_TRUE(saw_addr_80);
+    // In the harness, do_frequency_transition is stubbed so actual_frequency stays at 50 MHz:
+    // 2^32 / 128 / 2 * 25 / 50 * 0.5 = 4194304 (0x00400000).
+    TEST_ASSERT_EQUAL_HEX32(0x00400000, init_hcn);
+
+    // Direct set_nonce_space check at exact 327.0 MHz: 2^32 / 128 / 2 * 25 / 327 * 0.5 = 641330 (0x0009C932)
+    bm13xx_harness_clear_packets();
+    driver->set_nonce_space(1.0, 327.0f, 2, 128);
+    TEST_ASSERT_EQUAL_UINT(1, bm13xx_harness_packet_count());
+    const bm13xx_harness_packet_t *hcn_pkt = bm13xx_harness_packet(0);
+    TEST_ASSERT_EQUAL_UINT(11, hcn_pkt->length);
+    TEST_ASSERT_EQUAL_HEX8(0x51, hcn_pkt->bytes[2]);
+    TEST_ASSERT_EQUAL_HEX8(0x10, hcn_pkt->bytes[5]);
+    uint32_t direct_hcn = ((uint32_t)hcn_pkt->bytes[6] << 24) |
+                          ((uint32_t)hcn_pkt->bytes[7] << 16) |
+                          ((uint32_t)hcn_pkt->bytes[8] << 8) |
+                          (uint32_t)hcn_pkt->bytes[9];
+    TEST_ASSERT_EQUAL_HEX32(0x0009C932, direct_hcn);
+
+    bm13xx_harness_end();
+}
