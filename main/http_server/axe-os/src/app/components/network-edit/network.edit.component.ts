@@ -145,7 +145,7 @@ export class NetworkEditComponent implements OnInit {
               acc[network.ssid] = network;
             }
             return acc;
-          }, {} as { [key: string]: WifiNetwork });
+          }, Object.create(null) as { [key: string]: WifiNetwork });
 
           // Convert the object back to an array
           const filteredNetworks = Object.values(uniqueNetworks);
