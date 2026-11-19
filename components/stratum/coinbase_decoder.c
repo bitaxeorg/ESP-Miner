@@ -7,6 +7,7 @@
 #include <strings.h>
 #include <stdlib.h>
 #include <ctype.h>
+#include <limits.h>
 
 #define BIP110_SIGNAL_BIT 4
 #define BIP110_SIGNAL_EXPIRY_BLOCK 965664
@@ -474,7 +475,7 @@ static esp_err_t parse_coinbase_suffix(const miner_job_t *job,
         return ESP_ERR_INVALID_ARG;
     }
     result->output_count = 0;
-
+    result->total_output_count = (num_outputs > (uint64_t)INT_MAX) ? INT_MAX : (int)num_outputs;
 
     // Parse each output
     for (uint64_t i = 0; i < num_outputs; i++) {
@@ -585,6 +586,7 @@ esp_err_t coinbase_process_miner_job(const miner_job_t *job,
     // Initialize result
     result->total_value_satoshis = 0;
     result->user_value_satoshis = 0;
+    result->total_output_count = 0;
     result->others_count = 0;
     result->others_value_satoshis = 0;
     result->payout_status = COINBASE_PAYOUT_UNKNOWN;
