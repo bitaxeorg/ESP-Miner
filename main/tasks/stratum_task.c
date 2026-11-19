@@ -3,6 +3,8 @@
 #include "esp_psram.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "freertos/queue.h"
+#include "esp_timer.h"
 #include "global_state.h"
 #include "stratum_task.h"
 #include "stratum_driver.h"
@@ -15,11 +17,58 @@
 #define TAG "stratum_task"
 #define MAX_RETRY_ATTEMPTS 3
 #define RECOVERY_PROBE_INTERVAL_MS 30000
+#define SHARE_TX_QUEUE_LEN 16
+
+typedef struct {
+    asic_job_t job;
+    uint32_t nonce;
+    uint32_t rolled_version;
+} stratum_tx_item_t;
 
 static TaskHandle_t s_primary_task_handle = NULL;
 static TaskHandle_t s_fallback_task_handle = NULL;
 static GlobalState *s_global_state = NULL;
 static volatile bool s_should_reconnect[MAX_POOLS] = {false};
+static QueueHandle_t s_share_tx_queue = NULL;
+
+static int stratum_dispatch_share_tx(GlobalState *GLOBAL_STATE, const asic_job_t *active_job,
+                                     uint32_t nonce, uint32_t rolled_version, uint64_t *sent_time_us)
+{
+    uint16_t active_pool_idx = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback
+        ? GLOBAL_STATE->SYSTEM_MODULE.secondary_pool_index
+        : GLOBAL_STATE->SYSTEM_MODULE.primary_pool_index;
+
+    if (active_job->pool_id != (uint8_t)active_pool_idx) {
+        ESP_LOGW(TAG, "Dropping share for stale pool %u (active pool is %u)",
+                 active_job->pool_id, active_pool_idx);
+        return -1;
+    }
+
+    const stratum_driver_t *driver = stratum_get_driver_for_job(active_job);
+    if (!driver || !driver->submit_share) {
+        return -1;
+    }
+
+    int ret = driver->submit_share(GLOBAL_STATE, active_job, nonce, rolled_version, sent_time_us);
+
+    if (ret < 0) {
+        ESP_LOGW(TAG, "Failed to submit share to socket for pool %u (ret: %d)",
+                 active_job->pool_id, ret);
+    }
+    return ret;
+}
+
+static void stratum_tx_task(void *pvParameters)
+{
+    GlobalState *gs = (GlobalState *)pvParameters;
+    stratum_tx_item_t item;
+
+    while (1) {
+        if (xQueueReceive(s_share_tx_queue, &item, portMAX_DELAY) == pdTRUE) {
+            stratum_dispatch_share_tx(gs, &item.job, item.nonce, item.rolled_version, NULL);
+        }
+    }
+}
 
 void stratum_abort_pool(uint16_t pool_idx)
 {
@@ -194,6 +243,17 @@ void stratum_task(void *pvParameters)
         ESP_LOGI(TAG, "Fallback stratum task started");
     }
 
+    if (is_primary && !s_share_tx_queue) {
+        s_share_tx_queue = xQueueCreateWithCaps(SHARE_TX_QUEUE_LEN, sizeof(stratum_tx_item_t), MALLOC_CAP_SPIRAM);
+        if (s_share_tx_queue) {
+            if (xTaskCreateWithCaps(stratum_tx_task, "stratum_tx", 8192, (void *)GLOBAL_STATE, 16, NULL, MALLOC_CAP_SPIRAM) != pdPASS) {
+                ESP_LOGE(TAG, "Failed to create stratum TX task");
+            }
+        } else {
+            ESP_LOGE(TAG, "Failed to create stratum share TX queue");
+        }
+    }
+
     int retry_attempts = 0;
 
     while (1) {
@@ -329,16 +389,24 @@ int stratum_submit_share(GlobalState *GLOBAL_STATE, const asic_job_t *active_job
         return -1;
     }
 
-    const stratum_driver_t *driver = stratum_get_driver_for_job(active_job);
-    if (!driver || !driver->submit_share) {
+    if (!s_share_tx_queue) {
+        return stratum_dispatch_share_tx(GLOBAL_STATE, active_job, nonce, rolled_version, sent_time_us);
+    }
+
+    stratum_tx_item_t item = {
+        .job = *active_job,
+        .nonce = nonce,
+        .rolled_version = rolled_version,
+    };
+
+    if (sent_time_us) {
+        *sent_time_us = esp_timer_get_time();
+    }
+
+    if (xQueueSend(s_share_tx_queue, &item, 0) != pdTRUE) {
+        ESP_LOGW(TAG, "Share TX queue full, dropping share for job %s", active_job->job_id);
         return -1;
     }
 
-    int ret = driver->submit_share(GLOBAL_STATE, active_job, nonce, rolled_version, sent_time_us);
-
-    if (ret < 0) {
-        ESP_LOGW(TAG, "Failed to submit share to socket for pool %u (ret: %d)",
-                 active_job->pool_id, ret);
-    }
-    return ret;
+    return 0;
 }
