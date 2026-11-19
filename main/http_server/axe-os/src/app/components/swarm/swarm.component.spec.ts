@@ -137,6 +137,19 @@ describe('SwarmComponent', () => {
       expect(addressValidator(new FormControl('bitaxe_1.lan'))).toEqual({ invalidAddress: true });
     });
 
+    it('should allow routable IPv6 addresses, with or without brackets', () => {
+      expect(addressValidator(new FormControl('2001:db8::2'))).toBeNull();
+      expect(addressValidator(new FormControl('[2001:db8::2]'))).toBeNull();
+      expect(addressValidator(new FormControl('fd00::42'))).toBeNull();
+    });
+
+    it('should reject link-local, multicast, and malformed IPv6 addresses', () => {
+      expect(addressValidator(new FormControl('fe80::1'))).toEqual({ invalidAddress: true });
+      expect(addressValidator(new FormControl('ff02::1'))).toEqual({ invalidAddress: true });
+      expect(addressValidator(new FormControl('2001:db8::zz'))).toEqual({ invalidAddress: true });
+      expect(addressValidator(new FormControl('[2001:db8::2]:80'))).toEqual({ invalidAddress: true });
+    });
+
     it('should return null for empty input', () => {
       expect(addressValidator(new FormControl(''))).toBeNull();
       expect(addressValidator(new FormControl(null))).toBeNull();

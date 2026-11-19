@@ -420,7 +420,7 @@
 
   <app-modal [headline]="selectedAxeOs?.address">
     @if (selectedAxeOs) {
-      <app-edit [uri]="'http://' + selectedAxeOs.connectionAddress"></app-edit>
+      <app-edit [uri]="httpBase(selectedAxeOs.connectionAddress || selectedAxeOs.address)"></app-edit>
     }
   </app-modal>
 </div>
