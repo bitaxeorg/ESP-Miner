@@ -26,6 +26,8 @@ typedef struct {
 typedef enum {
     JOB_PIPELINE_HARNESS_TIMEOUT = 0,
     JOB_PIPELINE_HARNESS_NOTIFY,
+    JOB_PIPELINE_HARNESS_SET_VERSION_MASK,
+    JOB_PIPELINE_HARNESS_ASIC_REINITIALIZED,
 } job_pipeline_harness_event_type_t;
 
 typedef struct {

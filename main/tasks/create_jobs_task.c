@@ -19,6 +19,12 @@ static const char *TAG = "create_jobs_task";
 #define MIN_JOB_RUNTIME_MS 1000
 
 typedef struct {
+    bool valid;
+    uint32_t epoch;
+    uint32_t version_mask;
+} asic_version_mask_cache_t;
+
+typedef struct {
     asic_job_t active_asic_job;
     miner_job_t *current_work;
     uint64_t extranonce_2;
@@ -26,18 +32,20 @@ typedef struct {
     uint32_t sw_versions_rolled;
     uint64_t last_send_time_us;
     uint64_t last_cycle_time_us;
+    uint32_t sent_work_epoch;
     bool current_work_sent;
     bool current_work_decoded;
     bool need_build;
     bool exhausted;
 } job_scheduler_state_t;
 
-static void send_asic_job(GlobalState *GLOBAL_STATE, const miner_job_t *miner_job,
-                          const asic_job_t *job)
+static bool send_asic_job(GlobalState *GLOBAL_STATE, const miner_job_t *miner_job,
+                          const asic_job_t *job, uint32_t *dispatch_epoch,
+                          asic_version_mask_cache_t *mask_cache)
 {
     if (!GLOBAL_STATE->ASIC_initalized) {
         ESP_LOGW(TAG, "ASIC not initialized, skipping job send");
-        return;
+        return false;
     }
 
     asic_job_t next_job = *job;
@@ -45,7 +53,20 @@ static void send_asic_job(GlobalState *GLOBAL_STATE, const miner_job_t *miner_jo
     next_job.nbits = miner_job->nbits;
     memcpy(next_job.pool_target, miner_job->pool_target, sizeof(next_job.pool_target));
 
+    *dispatch_epoch = __atomic_load_n(&GLOBAL_STATE->ASIC_work_epoch, __ATOMIC_ACQUIRE);
+    // Programming the mask sends a UART command. Cache it for this ASIC epoch.
+    // Initialization advances the epoch, including recovery after a reset.
+    if (!mask_cache->valid || mask_cache->epoch != *dispatch_epoch ||
+        mask_cache->version_mask != miner_job->version_mask) {
+        uint32_t hw_mask = miner_job->version_mask & GLOBAL_STATE->DEVICE_CONFIG.family.asic.hw_version_mask;
+        ESP_LOGI(TAG, "Set chip version rolls %i", (int)(hw_mask >> 13));
+        ASIC_set_version_mask(GLOBAL_STATE, miner_job->version_mask);
+        mask_cache->version_mask = miner_job->version_mask;
+        mask_cache->epoch = *dispatch_epoch;
+        mask_cache->valid = true;
+    }
     ASIC_send_job(GLOBAL_STATE, &next_job);
+    return true;
 }
 
 static TickType_t compute_wait_ticks(const GlobalState *GLOBAL_STATE,
@@ -121,6 +142,7 @@ void create_jobs_task(void *pvParameters)
     job_scheduler_state_t sched = {
         .need_build = true,
     };
+    asic_version_mask_cache_t mask_cache = {0};
 
     int initial_interval_ms = (int)ASIC_get_asic_job_frequency_ms(GLOBAL_STATE, BIP320_VERSION_ROLLING_MASK);
     ESP_LOGI(TAG, "ASIC Job Interval: %d ms", initial_interval_ms);
@@ -155,31 +177,42 @@ void create_jobs_task(void *pvParameters)
                 continue;
             }
 
-            miner_job_t *new_work = POOL_resolve_notified_job(GLOBAL_STATE, slot_notify);
-            if (!new_work) {
-                continue;
-            }
-
-            bool asic_working = (sched.current_work != NULL) && (sched.last_send_time_us != 0);
-            if (!asic_working) {
-                sched.last_send_time_us = 0;
-            }
-
-            ESP_LOGI(TAG, "New Work Activated %s (type %d)", new_work->job_id, new_work->type);
-            sched.current_work = new_work;
-            GLOBAL_STATE->active_job_slot_idx = (uint8_t)(slot_notify % MINER_JOB_POOL_SIZE);
-            sched.current_work_sent = false;
-            sched.current_work_decoded = false;
-            sched.sw_versions_rolled = 0;
-            sched.extranonce_2 = 0;
-            sched.need_build = true;
-            sched.exhausted = false;
-
-            if (!new_work->clean_jobs && asic_working && job_interval_ms > 0) {
-                int throttle_ms = (job_interval_ms < MIN_JOB_RUNTIME_MS) ? job_interval_ms : MIN_JOB_RUNTIME_MS;
-                int64_t elapsed_ms = (int64_t)((esp_timer_get_time() - sched.last_send_time_us) / 1000ULL);
-                if (elapsed_ms < (int64_t)throttle_ms) {
+            if (slot_notify == CREATE_JOBS_NOTIFY_ASIC_REINITIALIZED) {
+                uint32_t current_epoch = __atomic_load_n(&GLOBAL_STATE->ASIC_work_epoch, __ATOMIC_ACQUIRE);
+                if (sched.current_work == NULL ||
+                    (sched.current_work_sent && sched.sent_work_epoch == current_epoch)) {
                     continue;
+                }
+                sched.current_work_sent = false;
+                sched.current_version_mask = 0;
+                sched.exhausted = false;
+            } else {
+                miner_job_t *new_work = POOL_resolve_notified_job(GLOBAL_STATE, slot_notify);
+                if (!new_work) {
+                    continue;
+                }
+
+                bool asic_working = (sched.current_work != NULL) && (sched.last_send_time_us != 0);
+                if (!asic_working) {
+                    sched.last_send_time_us = 0;
+                }
+
+                ESP_LOGI(TAG, "New Work Activated %s (type %d)", new_work->job_id, new_work->type);
+                sched.current_work = new_work;
+                GLOBAL_STATE->active_job_slot_idx = (uint8_t)(slot_notify % MINER_JOB_POOL_SIZE);
+                sched.current_work_sent = false;
+                sched.current_work_decoded = false;
+                sched.sw_versions_rolled = 0;
+                sched.extranonce_2 = 0;
+                sched.need_build = true;
+                sched.exhausted = false;
+
+                if (!new_work->clean_jobs && asic_working && job_interval_ms > 0) {
+                    int throttle_ms = (job_interval_ms < MIN_JOB_RUNTIME_MS) ? job_interval_ms : MIN_JOB_RUNTIME_MS;
+                    int64_t elapsed_ms = (int64_t)((esp_timer_get_time() - sched.last_send_time_us) / 1000ULL);
+                    if (elapsed_ms < (int64_t)throttle_ms) {
+                        continue;
+                    }
                 }
             }
         } else {
@@ -195,15 +228,6 @@ void create_jobs_task(void *pvParameters)
             }
         }
 
-        if (!sched.current_work_sent && GLOBAL_STATE->ASIC_initalized) {
-            if (sched.current_work->version_mask != sched.current_version_mask) {
-                uint32_t hw_mask = sched.current_work->version_mask & GLOBAL_STATE->DEVICE_CONFIG.family.asic.hw_version_mask;
-                ESP_LOGI(TAG, "Set chip version rolls %i", (int)(hw_mask >> 13));
-                ASIC_set_version_mask(GLOBAL_STATE, sched.current_work->version_mask);
-                sched.current_version_mask = sched.current_work->version_mask;
-            }
-        }
-
         bool built = false;
         if (sched.need_build) {
             if (mining_build_asic_job(sched.current_work, sched.extranonce_2, sched.current_work->version, &sched.active_asic_job)) {
@@ -216,28 +240,33 @@ void create_jobs_task(void *pvParameters)
             built = true;
         }
 
+        bool dispatched = false;
+        uint32_t dispatch_epoch = 0;
         if (built) {
-            send_asic_job(GLOBAL_STATE, sched.current_work, &sched.active_asic_job);
+            dispatched = send_asic_job(GLOBAL_STATE, sched.current_work, &sched.active_asic_job,
+                                       &dispatch_epoch, &mask_cache);
         }
 
         uint64_t cycle_done_us = esp_timer_get_time();
         sched.last_cycle_time_us = cycle_done_us;
-        if (built && GLOBAL_STATE->ASIC_initalized) {
+        if (dispatched) {
             sched.last_send_time_us = cycle_done_us;
         }
 
-        if (!sched.current_work_decoded) {
+        if (dispatched && !sched.current_work_decoded) {
             SYSTEM_decode_and_apply_coinbase(GLOBAL_STATE, sched.current_work);
             sched.current_work_decoded = true;
         }
 
-        if (GLOBAL_STATE->ASIC_initalized) {
+        if (dispatched) {
             sched.current_work_sent = true;
+            sched.sent_work_epoch = dispatch_epoch;
+            sched.current_version_mask = sched.current_work->version_mask;
 
             advance_work_cursor(&sched,
                                 GLOBAL_STATE->DEVICE_CONFIG.family.asic.hw_version_mask,
                                 GLOBAL_STATE->DEVICE_CONFIG.family.asic.packet_midstates,
-                                built);
+                                true);
         }
     }
 }
