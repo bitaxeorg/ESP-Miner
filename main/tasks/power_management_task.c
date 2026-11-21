@@ -25,6 +25,13 @@
 #define TPS546_THROTTLE_TEMP 105.0
 #define TPS546_MAX_TEMP 145.0
 
+// Physically plausible temperature envelope shared by the VR and ASIC
+// readings. A value outside it (e.g. a corrupted PMBus read yielding 16384 C)
+// is a sensor fault, not heat, and must never be acted upon.
+// Consecutive polls with a plausible over-limit reading required before a
+// permanent downgrade is written to NVS. One spurious sample is not evidence.
+#define OVERHEAT_CONSECUTIVE_READINGS 2
+
 #define ASIC_REDUCTION 100.0
 
 static const char * TAG = "power_management";

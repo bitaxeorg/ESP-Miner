@@ -13,6 +13,15 @@
 #define POLL_TIME_MS 100
 #define LOG_TIME_MS 2000
 
+// Issue #2119: piso de fan dirigido pela temperatura do regulador (VR).
+// O PID continua seguindo o ASIC (chip_temp_avg/chip_temp2_avg) inalterado;
+// apenas elevamos a saida minima do fan quando o VR esta quente.
+// O limite fica acima da faixa de operacao normal (VR tipicamente abaixo de
+// 70C em 601a) para nao alterar o comportamento atual; so entra antes do
+// trip termico de 105C (TPS546_THROTTLE_TEMP).
+#define VR_FAN_FLOOR_TEMP_C 75.0f
+#define VR_FAN_FLOOR_MIN_PERC 60.0f
+
 #define PID_P 5.0
 #define PID_I 0.1
 #define PID_D 2.0
@@ -111,6 +120,16 @@ void FAN_CONTROLLER_task(void * pvParameters)
                     }
                     
                     pid_compute(&pid);
+
+                    // Issue #2119: piso de fan dirigido pelo VR. Se o
+                    // regulador estiver quente e a leitura for plausivel,
+                    // garante uma saida minima independente da sintonia do
+                    // PID (ASIC). Nao mexe em ganhos, setpoint nem limites do PID.
+                    if (temp_is_plausible(power_management->vr_temp) &&
+                        power_management->vr_temp > VR_FAN_FLOOR_TEMP_C &&
+                        pid_output < VR_FAN_FLOOR_MIN_PERC) {
+                        pid_output = VR_FAN_FLOOR_MIN_PERC;
+                    }
 
                     // Uncomment for debugging PID output directly after compute
                     // ESP_LOGD(TAG, "DEBUG: PID raw output: %.2f%%, Input: %.1f, SetPoint: %.1f", pid_output, pid_input, pid_setPoint);
