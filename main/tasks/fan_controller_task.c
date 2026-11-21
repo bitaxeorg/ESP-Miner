@@ -13,12 +13,12 @@
 #define POLL_TIME_MS 100
 #define LOG_TIME_MS 2000
 
-// Issue #2119: piso de fan dirigido pela temperatura do regulador (VR).
-// O PID continua seguindo o ASIC (chip_temp_avg/chip_temp2_avg) inalterado;
-// apenas elevamos a saida minima do fan quando o VR esta quente.
-// O limite fica acima da faixa de operacao normal (VR tipicamente abaixo de
-// 70C em 601a) para nao alterar o comportamento atual; so entra antes do
-// trip termico de 105C (TPS546_THROTTLE_TEMP).
+// Issue #2119: fan floor driven by the regulator (VR) temperature.
+// The PID keeps following the ASIC sensors (chip_temp_avg/chip_temp2_avg)
+// unchanged; we only raise the minimum fan output when the VR is hot.
+// The threshold sits above the normal operating range (VR is typically below
+// 70 C on a 601a) so current behaviour is untouched; it only engages before
+// the 105 C thermal trip (TPS546_THROTTLE_TEMP).
 #define VR_FAN_FLOOR_TEMP_C 75.0f
 #define VR_FAN_FLOOR_MIN_PERC 60.0f
 
@@ -121,20 +121,23 @@ void FAN_CONTROLLER_task(void * pvParameters)
                     
                     pid_compute(&pid);
 
-                    // Issue #2119: piso de fan dirigido pelo VR. Se o
-                    // regulador estiver quente e a leitura for plausivel,
-                    // garante uma saida minima independente da sintonia do
-                    // PID (ASIC). Nao mexe em ganhos, setpoint nem limites do PID.
+                    // Issue #2119: VR-driven fan floor. When the regulator is
+                    // hot and the reading is plausible, guarantee a minimum
+                    // output regardless of the ASIC-tuned PID. The floor is
+                    // applied to a copy: writing pid_output would feed the
+                    // forced value back into the PID state and cause the
+                    // controller to oscillate.
+                    float fan_output = pid_output;
                     if (temp_is_plausible(power_management->vr_temp) &&
                         power_management->vr_temp > VR_FAN_FLOOR_TEMP_C &&
-                        pid_output < VR_FAN_FLOOR_MIN_PERC) {
-                        pid_output = VR_FAN_FLOOR_MIN_PERC;
+                        fan_output < VR_FAN_FLOOR_MIN_PERC) {
+                        fan_output = VR_FAN_FLOOR_MIN_PERC;
                     }
 
                     // Uncomment for debugging PID output directly after compute
                     // ESP_LOGD(TAG, "DEBUG: PID raw output: %.2f%%, Input: %.1f, SetPoint: %.1f", pid_output, pid_input, pid_setPoint);
 
-                    update_fan_speed(GLOBAL_STATE, pid_output, "Auto");
+                    update_fan_speed(GLOBAL_STATE, fan_output, "Auto");
 
                     log_counter += POLL_TIME_MS;
                     if (log_counter >= LOG_TIME_MS) {
