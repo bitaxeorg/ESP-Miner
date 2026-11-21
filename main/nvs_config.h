@@ -32,6 +32,7 @@ typedef enum {
 
     NVS_CONFIG_USE_CUSTOM_WWW,    
     NVS_CONFIG_LAST_FW_FINGERPRINT,
+    NVS_CONFIG_FAN_SCALE_V2,
     
     NVS_CONFIG_STATISTICS_FREQUENCY,
     
@@ -83,6 +84,14 @@ typedef enum {
     NVS_CONFIG_TPS546_SYNC_CONFIG,
     NVS_CONFIG_TPS546_FREQUENCY,
     NVS_CONFIG_NOMINAL_VOLTAGE,
+
+    // Configuracao definida pelo usuario ANTES de uma reducao por overheat.
+    // Permite restaurar frequencia/tensao depois que o aparelho estabiliza.
+    // Sem isso, um unico disparo de overheat rebaixa a placa para sempre
+    // (650->550 MHz, 1246->1146 mV) e o usuario so percebe pela queda de hashrate.
+    NVS_CONFIG_USER_FREQUENCY,
+    NVS_CONFIG_USER_VOLTAGE,
+
     NVS_CONFIG_COUNT
 } NvsConfigKey;
 
