@@ -1,4 +1,5 @@
 #include "esp_log.h"
+#include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "global_state.h"
@@ -157,9 +158,6 @@ void POWER_MANAGEMENT_task(void * pvParameters)
     int64_t stable_since_us = 0;
     int restore_attempts = 0;
 
-    mining_watchdog_t watchdog = { .started_us = esp_timer_get_time() };
-    watchdog_reset_signals(&watchdog, sys_module, watchdog.started_us);
-
     while (1) {
         if (GLOBAL_STATE->SELF_TEST_MODULE.is_finished) {
             ESP_LOGI(TAG, "Stopped");
@@ -282,9 +280,9 @@ void POWER_MANAGEMENT_task(void * pvParameters)
             }
         }
 
-        // Recuperacao pos-overheat: se a placa esta abaixo da config do usuario
-        // e passou tempo suficiente sem esquentar, devolve a config original.
-        // Uma reducao por overheat nao pode ser permanente.
+        // Post-overheat recovery: if the board is below the user's configured
+        // operating point and has stayed cool long enough, restore the original
+        // settings. A reduction caused by one overheat event must not be permanent.
         if (stable_since_us > 0 && restore_attempts < RESTORE_MAX_ATTEMPTS
             && nvs_config_has_key(NVS_CONFIG_USER_FREQUENCY)) {
             float user_freq = nvs_config_get_float(NVS_CONFIG_USER_FREQUENCY);
@@ -293,29 +291,34 @@ void POWER_MANAGEMENT_task(void * pvParameters)
             uint16_t cur_volt = nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE);
 
             if (user_freq <= cur_freq + 1.0f) {
-                // Ja esta na config do usuario: nada a restaurar.
+                // Already at the user's setting: nothing to restore, but drop the
+                // saved keys so a future overheat can record a fresh baseline.
+                nvs_config_clear_key(NVS_CONFIG_USER_FREQUENCY);
+                nvs_config_clear_key(NVS_CONFIG_USER_VOLTAGE);
                 stable_since_us = 0;
             } else {
-                // Reavalia a temperatura AGORA: o bloco de overheat acima pode
-                // ter atualizado as leituras durante o resfriamento.
-                bool vr_ok = temp_is_plausible(power_management->vr_temp)
-                             && power_management->vr_temp < TPS546_THROTTLE_TEMP - 20;
-                bool asic_ok = (!temp_is_plausible(power_management->chip_temp_avg)
-                                || power_management->chip_temp_avg < THROTTLE_TEMP - 10)
-                               && (!temp_is_plausible(power_management->chip_temp2_avg)
-                                   || power_management->chip_temp2_avg < THROTTLE_TEMP - 10);
+                // Re-read temperatures NOW: the overheat block above may have
+                // refreshed the readings during cooling.
+                bool vr_ok = power_management->vr_temp < TPS546_THROTTLE_TEMP - 20;
+                bool asic_ok = (power_management->chip_temp_avg < THROTTLE_TEMP - 10)
+                               && (power_management->chip_temp2_avg < THROTTLE_TEMP - 10);
 
                 if (vr_ok && asic_ok) {
                     if (esp_timer_get_time() - stable_since_us >= RESTORE_STABLE_US) {
-                        ESP_LOGW(TAG, "Restaurando config do usuario apos %d min estavel: %.0f MHz / %umV (era %.0f MHz / %umV)",
+                        ESP_LOGW(TAG, "Restoring user config after %d min stable: %.0f MHz / %umV (was %.0f MHz / %umV)",
                                  (int)(RESTORE_STABLE_US / 60000000LL), user_freq, user_volt, cur_freq, cur_volt);
                         nvs_config_set_float(NVS_CONFIG_ASIC_FREQUENCY, user_freq);
                         nvs_config_set_u16(NVS_CONFIG_ASIC_VOLTAGE, user_volt);
+                        // Clear the saved baseline: the running config is the user's
+                        // again, so the next overheat starts a new cycle instead of
+                        // restoring a stale value.
+                        nvs_config_clear_key(NVS_CONFIG_USER_FREQUENCY);
+                        nvs_config_clear_key(NVS_CONFIG_USER_VOLTAGE);
                         restore_attempts++;
                         stable_since_us = 0;
                     }
                 } else {
-                    // Esquentou de novo: a janela de estabilidade recomeca.
+                    // Heated up again: restart the stability window.
                     stable_since_us = esp_timer_get_time();
                 }
             }

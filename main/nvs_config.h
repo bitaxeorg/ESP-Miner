@@ -141,6 +141,9 @@ void nvs_config_set_float(NvsConfigKey key, float value);
 bool nvs_config_get_bool(NvsConfigKey key);
 void nvs_config_set_bool(NvsConfigKey key, bool value);
 bool nvs_config_has_key(NvsConfigKey key);
+
+/** Clear a user-defined key from NVS. Returns true on success. */
+bool nvs_config_clear_key(NvsConfigKey key);
 Settings *nvs_config_get_settings(NvsConfigKey key);
 
 #endif // MAIN_NVS_CONFIG_H
