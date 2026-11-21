@@ -3,6 +3,22 @@
 
 #include <esp_err.h>
 #include <stdint.h>
+#include <stdbool.h>
+
+// Physically plausible temperature envelope shared by the VR and ASIC
+// readings. A value outside it (e.g. a corrupted PMBus read yielding 16384 C)
+// is a sensor fault, not heat, and must never be acted upon.
+#ifndef TEMP_PLAUSIBLE_MIN
+#define TEMP_PLAUSIBLE_MIN (-40.0f)
+#define TEMP_PLAUSIBLE_MAX 150.0f
+#endif
+
+// Returns true when the temperature reading can be trusted. Shared between
+// power_management_task and fan_controller_task so the check is not duplicated.
+static inline bool temp_is_plausible(float temp_c)
+{
+    return temp_c >= TEMP_PLAUSIBLE_MIN && temp_c <= TEMP_PLAUSIBLE_MAX;
+}
 
 typedef struct GlobalState GlobalState;
 typedef struct DeviceConfig DeviceConfig;
