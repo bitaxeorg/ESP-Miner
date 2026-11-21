@@ -83,6 +83,14 @@ typedef enum {
     NVS_CONFIG_TPS546_SYNC_CONFIG,
     NVS_CONFIG_TPS546_FREQUENCY,
     NVS_CONFIG_NOMINAL_VOLTAGE,
+
+    // Configuracao definida pelo usuario ANTES de uma reducao por overheat.
+    // Permite restaurar frequencia/tensao depois que o aparelho estabiliza.
+    // Sem isso, um unico disparo de overheat rebaixa a placa para sempre
+    // (650->550 MHz, 1246->1146 mV) e o usuario so percebe pela queda de hashrate.
+    NVS_CONFIG_USER_FREQUENCY,
+    NVS_CONFIG_USER_VOLTAGE,
+
     NVS_CONFIG_COUNT
 } NvsConfigKey;
 
@@ -133,6 +141,9 @@ void nvs_config_set_float(NvsConfigKey key, float value);
 bool nvs_config_get_bool(NvsConfigKey key);
 void nvs_config_set_bool(NvsConfigKey key, bool value);
 bool nvs_config_has_key(NvsConfigKey key);
+
+/** Clear a user-defined key from NVS. Returns true on success. */
+bool nvs_config_clear_key(NvsConfigKey key);
 Settings *nvs_config_get_settings(NvsConfigKey key);
 
 #endif // MAIN_NVS_CONFIG_H
