@@ -207,6 +207,7 @@ int TPS546_get_frequency(void);
 void TPS546_set_frequency(int);
 int TPS546_get_temperature(void);
 float TPS546_get_vin(void);
+float TPS546_get_iin(void);
 float TPS546_get_iout(void);
 float TPS546_get_vout(void);
 esp_err_t TPS546_set_vout(float volts);
