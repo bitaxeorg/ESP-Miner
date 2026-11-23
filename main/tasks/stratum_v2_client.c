@@ -16,7 +16,7 @@
 #include "libbase58.h"
 #include "device_config.h"
 #include "esp_heap_caps.h"
-#include "difficulty_controller.h"
+#include "power_management_task.h"
 
 #include <string.h>
 #include <stdlib.h>
@@ -420,7 +420,6 @@ static void stratum_v2_handle_set_target(GlobalState *GLOBAL_STATE, uint16_t poo
     POOL_set_difficulty(GLOBAL_STATE, pool_idx, pdiff);
 
     ESP_LOGI(TAG, "Set pool difficulty: %g", pdiff);
-    difficulty_controller_update(GLOBAL_STATE);
 }
 
 static void stratum_v2_handle_set_extranonce_prefix(sv2_conn_t *conn,
@@ -494,7 +493,7 @@ esp_err_t stratum_v2_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
         ESP_LOGE(TAG, "Failed to allocate sv2_conn");
         return ESP_ERR_NO_MEM;
     }
-    conn->version_mask = BIP320_VERSION_ROLLING_MASK;
+    conn->version_mask = BIP323_VERSION_ROLLING_MASK;
 
     pthread_mutex_lock(&s_v2_conn_mutex);
     s_v2_conns[pool_idx] = conn;
@@ -533,8 +532,15 @@ esp_err_t stratum_v2_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
 
     int64_t connect_start_us = esp_timer_get_time();
 
-    esp_err_t ret = esp_transport_connect(transport, conn_info.host_ip, port, TRANSPORT_TIMEOUT_MS);
-    if (ret != ESP_OK) {
+    esp_err_t ret = stratum_socket_connect_async(transport, conn_info.host_ip, port,
+                                                 TRANSPORT_TIMEOUT_MS, stratum_reconnect_requested);
+    if (ret == ESP_ERR_INVALID_STATE) {
+        ESP_LOGI(TAG, "Shutdown/reconnect requested during connection attempt");
+        esp_transport_close(transport);
+        esp_transport_destroy(transport);
+        run_result = ESP_ERR_INVALID_STATE;
+        goto cleanup;
+    } else if (ret != ESP_OK) {
         ESP_LOGE(TAG, "TCP connect failed to %s:%d (%s) (err %d)", stratum_url, port, conn_info.host_ip, ret);
         stratum_set_pool_error(GLOBAL_STATE, pool_idx, "Pool unreachable");
         esp_transport_close(transport);
@@ -643,8 +649,7 @@ esp_err_t stratum_v2_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
 
     // 3. Send OpenMiningChannel
     {
-        float expected_gh = GLOBAL_STATE->POWER_MANAGEMENT_MODULE.expected_hashrate;
-        float hash_rate = (expected_gh > 0.0f) ? (expected_gh * 1e9f) : 1e12f;
+        float hash_rate = POWER_MANAGEMENT_get_nominal_hashrate(GLOBAL_STATE) * 1e9;
         int frame_len;
 
         if (channel_type == SV2_CHANNEL_EXTENDED) {
@@ -736,7 +741,6 @@ esp_err_t stratum_v2_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
                  channel_id, group_channel_id,
                  sv2_channel_type_to_string(channel_type));
         ESP_LOGI(TAG, "Set pool difficulty: %g", pdiff);
-        difficulty_controller_update(GLOBAL_STATE);
     }
 
     {
