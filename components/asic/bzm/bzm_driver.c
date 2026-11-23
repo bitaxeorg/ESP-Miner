@@ -503,7 +503,11 @@ float bzm_driver_read_temperature(bzm_device_t *state)
 
 bool bzm_driver_get_telemetry_snapshot(bzm_telemetry_store_t * snapshot)
 {
-    return bzm_serial_get_telemetry_snapshot(&TRANSPORT, snapshot);
+    if (BZM_STATE == NULL || snapshot == NULL) return false;
+    pthread_mutex_lock(&REACTOR_LOCK);
+    bool copied = bzm_serial_get_telemetry_snapshot(&TRANSPORT, snapshot);
+    pthread_mutex_unlock(&REACTOR_LOCK);
+    return copied;
 }
 
 static bool driver_live_mining_check(void)
@@ -1098,6 +1102,11 @@ bzm_bringup_outcome_t bzm_driver_step_frequency_domains(
     bool allow_initial_jump, bzm_bringup_report_t *report,
     float *actual_mhz)
 {
+    if (BZM_STATE == NULL) {
+        if (actual_mhz != NULL) *actual_mhz = 0;
+        driver_report(report, BZM_BRINGUP_REASON_PREREQUISITE);
+        return BZM_BRINGUP_BAD;
+    }
     pthread_mutex_lock(&REACTOR_LOCK);
     if (!DRIVER_TRANSPORT_READY || !DRIVER_IO_OK || bzm_driver_has_io_fault() ||
         !DRIVER_BRINGUP.running ||
@@ -1152,6 +1161,7 @@ bool bzm_driver_hold_reset(void)
 
 void bzm_driver_set_dispatch_authorizer(bzm_dispatch_authorizer_t authorize, void * context)
 {
+    if (BZM_STATE == NULL) return;
     pthread_mutex_lock(&REACTOR_LOCK);
     bzm_dispatch_gate_set(&DRIVER_DISPATCH_GATE, authorize, context);
     pthread_mutex_unlock(&REACTOR_LOCK);
@@ -1159,6 +1169,7 @@ void bzm_driver_set_dispatch_authorizer(bzm_dispatch_authorizer_t authorize, voi
 
 void bzm_driver_set_operation_authorizer(bzm_dispatch_authorizer_t authorize, void * context)
 {
+    if (BZM_STATE == NULL) return;
     pthread_mutex_lock(&REACTOR_LOCK);
     DRIVER_OPERATION_AUTHORIZE = authorize;
     DRIVER_OPERATION_AUTHORIZE_CONTEXT = context;
@@ -1167,7 +1178,7 @@ void bzm_driver_set_operation_authorizer(bzm_dispatch_authorizer_t authorize, vo
 
 size_t bzm_driver_poll(uint16_t timeout_ms)
 {
-    if (timeout_ms == 0)
+    if (BZM_STATE == NULL || timeout_ms == 0)
         return 0;
     pthread_mutex_lock(&REACTOR_LOCK);
     size_t frames = DRIVER_TRANSPORT_READY ? bzm_serial_poll(&TRANSPORT, timeout_ms).frames_emitted : 0;

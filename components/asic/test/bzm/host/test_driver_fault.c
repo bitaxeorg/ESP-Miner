@@ -444,6 +444,20 @@ static void test_temperature_loss_cuts_power(void)
     puts("temperature loss: partial and total telemetry failures cut power despite live UART results");
 }
 
+static void test_unallocated_driver(void)
+{
+    CHECK(!bzm_driver_state_init(NULL));
+    bzm_telemetry_store_t telemetry = {0};
+    CHECK(!bzm_driver_get_telemetry_snapshot(&telemetry));
+    CHECK(bzm_driver_poll(1) == 0);
+    bzm_driver_set_dispatch_authorizer(authorize, NULL);
+    bzm_driver_set_operation_authorizer(authorize, NULL);
+    bzm_bringup_report_t report;
+    float frequency = 1;
+    CHECK(bzm_driver_step_frequency_domains(NULL, false, &report, &frequency) == BZM_BRINGUP_BAD);
+    CHECK(report.reason == BZM_BRINGUP_REASON_PREREQUISITE && frequency == 0);
+}
+
 int main(void)
 {
     const bzm_platform_ops_t platform = {
@@ -452,6 +466,7 @@ int main(void)
         .serial_write = write_bytes, .serial_clear_rx = clear_rx,
     };
     CHECK(bzm_platform_bind(&platform, NULL));
+    test_unallocated_driver();
     test_receive_faults();
     test_drain_fault();
     test_timeouts_and_restart();
