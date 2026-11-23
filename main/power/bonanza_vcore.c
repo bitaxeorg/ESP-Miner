@@ -12,6 +12,28 @@
 #include "bzm/control.h"
 #include "bzm/power.h"
 #include "global_state.h"
+
+const TPS546_CONFIG TPS546_CONFIG_BONANZA_1004 = {
+    .TPS546_INIT_PHASE = TPS546_INIT_PHASE_MULTI,
+    .TPS546_INIT_VIN_ON = 11.0f,
+    .TPS546_INIT_VIN_OFF = 10.5f,
+    .TPS546_INIT_VIN_UV_WARN_LIMIT = 11.0f,
+    .TPS546_INIT_VIN_OV_FAULT_LIMIT = 14.0f,
+    .TPS546_INIT_SCALE_LOOP = 0.125f,
+    .TPS546_INIT_VOUT_MIN = 2.1f,
+    .TPS546_INIT_VOUT_MAX = 3.2f,
+    .TPS546_INIT_VOUT_COMMAND = 2.8f,
+    .TPS546_INIT_IOUT_OC_WARN_LIMIT = 50.0f,
+    .TPS546_INIT_IOUT_OC_FAULT_LIMIT = 55.0f,
+    .TPS546_INIT_STACK_CONFIG = TPS546_SINGLE_PHASE_STACK_CONFIG,
+    .TPS546_INIT_SYNC_CONFIG = 0x10,
+    .TPS546_INIT_FREQUENCY = 325,
+    .TPS546_INIT_COMPENSATION_CONFIG = {0x13, 0x11, 0x8c, 0x1d, 0x08},
+    .TPS546_USE_ENABLE_PIN = true, /* The trip handler removes core power through EN/UVLO. */
+    .TPS546_CHECK_STARTUP_WRITES = true,
+    .TPS546_VOUT_BOUNDS_FIRST = true, /* Floating VSEL can start with a 1.5 V maximum. */
+};
+
 static const char *TAG = "bonanza_vcore";
 static float minimum_input_voltage;
 esp_err_t BONANZA_VCORE_init(GlobalState *GLOBAL_STATE, TPS546_CONFIG config)

@@ -13,24 +13,31 @@ typedef void *i2c_master_dev_handle_t;
 
 static uint8_t registers[256][8];
 static uint8_t first_byte_written[256];
-static unsigned writes[256], write_count, fail_write_at;
-static int fail_read, ignored_write;
+static unsigned writes[256], first_write_at[256], write_count, fail_write_at;
+static int fail_read, fail_read_once;
 static TickType_t ticks;
 
 static esp_err_t tps_read(i2c_master_dev_handle_t device, uint8_t reg, uint8_t *data, size_t length)
 {
     (void)device;
     if (reg == fail_read) return ESP_FAIL;
+    if (reg == fail_read_once) {
+        fail_read_once = -1;
+        return ESP_FAIL;
+    }
     TEST_ASSERT_LESS_OR_EQUAL_UINT32(sizeof(registers[reg]), length);
     memcpy(data, registers[reg], length);
     return ESP_OK;
 }
 static esp_err_t tps_write(uint8_t reg, const uint8_t *data, size_t length)
 {
-    if (writes[reg] == 0 && length == 1) first_byte_written[reg] = data[0];
+    ++write_count;
+    if (writes[reg] == 0) {
+        first_write_at[reg] = write_count;
+        if (length == 1) first_byte_written[reg] = data[0];
+    }
     ++writes[reg];
-    if (++write_count == fail_write_at) return ESP_FAIL;
-    if (reg == ignored_write) return ESP_OK; /* PMBus may ACK a rejected write. */
+    if (write_count == fail_write_at) return ESP_FAIL;
     if (reg == 0x21 && length == 2) {
         uint16_t command = data[0] | ((uint16_t)data[1] << 8);
         uint16_t minimum = registers[0x2b][0] | ((uint16_t)registers[0x2b][1] << 8);
@@ -71,17 +78,19 @@ static TickType_t tps_ticks(void) { return ticks; }
 #define vTaskDelay tps_delay
 #define xTaskGetTickCount tps_ticks
 #include "main/power/TPS546.c"
+#include "main/power/bonanza_vcore.h"
 
 static void reset_pmbus(void)
 {
     memset(registers, 0, sizeof(registers));
     memset(first_byte_written, 0, sizeof(first_byte_written));
     memset(writes, 0, sizeof(writes));
+    memset(first_write_at, 0, sizeof(first_write_at));
     write_count = fail_write_at = ticks = 0;
-    fail_read = ignored_write = -1;
+    fail_read = fail_read_once = -1;
     tps546_config = TPS546_CONFIG_BONANZA_1004;
     tps546_power_good_grace_until = 0;
-    registers[PMBUS_VOUT_MODE][0] = 0x17; /* ULINEAR16, exponent -9. */
+    registers[PMBUS_VOUT_MODE][0] = 0x97; /* Factory default: relative, exponent -9. */
     registers[PMBUS_INTERLEAVE][0] = 0x10;
     registers[PMBUS_VOUT_OV_FAULT_RESPONSE][0] = 0xbd;
     registers[PMBUS_VOUT_UV_FAULT_RESPONSE][0] = 0xbe;
@@ -105,8 +114,11 @@ TEST_CASE("Bonanza regulator initializes its board profile with output off", "[a
     reset_pmbus();
     TEST_ASSERT_EQUAL(ESP_OK, TPS546_init(TPS546_CONFIG_BONANZA_1004));
     TEST_ASSERT_EQUAL_HEX8(OPERATION_OFF, registers[PMBUS_OPERATION][0]);
+    TEST_ASSERT_EQUAL_UINT32(2, writes[PMBUS_ON_OFF_CONFIG]);
+    TEST_ASSERT_EQUAL_HEX8(0x1f, first_byte_written[PMBUS_ON_OFF_CONFIG]);
     TEST_ASSERT_EQUAL_HEX8(0x1f, registers[PMBUS_ON_OFF_CONFIG][0]);
     TEST_ASSERT_EQUAL_HEX8(0x97, registers[PMBUS_VOUT_MODE][0]);
+    TEST_ASSERT_EQUAL_UINT32(0, writes[PMBUS_VOUT_MODE]);
     TEST_ASSERT_EQUAL_HEX8(0xff, registers[PMBUS_PHASE][0]);
     TEST_ASSERT_EQUAL_HEX8(0x10, registers[PMBUS_SYNC_CONFIG][0]);
     TEST_ASSERT_EQUAL_HEX16(0x0010, word(PMBUS_INTERLEAVE));
@@ -114,26 +126,13 @@ TEST_CASE("Bonanza regulator initializes its board profile with output off", "[a
     TEST_ASSERT_EQUAL_HEX16(0x0599, word(PMBUS_VOUT_COMMAND));
     TEST_ASSERT_EQUAL_HEX16(0x0433, word(PMBUS_VOUT_MIN));
     TEST_ASSERT_EQUAL_HEX16(0x0666, word(PMBUS_VOUT_MAX));
+    TEST_ASSERT_LESS_THAN_UINT32(first_write_at[PMBUS_VOUT_MIN], first_write_at[PMBUS_VOUT_MAX]);
+    TEST_ASSERT_LESS_THAN_UINT32(first_write_at[PMBUS_VOUT_COMMAND], first_write_at[PMBUS_VOUT_MIN]);
     TEST_ASSERT_EQUAL_INT(325, TPS546_get_frequency());
     TEST_ASSERT_EQUAL_HEX16(INIT_PIN_DETECT_OVERRIDE, word(PMBUS_PIN_DETECT_OVERRIDE));
     TEST_ASSERT_EQUAL_UINT32(0, writes[PMBUS_INTERLEAVE]);
     TEST_ASSERT_EQUAL_UINT32(0, writes[PMBUS_VOUT_OV_FAULT_RESPONSE]);
     TEST_ASSERT_EQUAL_UINT32(0, writes[PMBUS_VOUT_UV_FAULT_RESPONSE]);
-}
-
-TEST_CASE("TPS546 initial and full configuration honor enable-pin control", "[asic][tps546]")
-{
-    for (unsigned use_enable_pin = 0; use_enable_pin <= 1; ++use_enable_pin) {
-        reset_pmbus();
-        TPS546_CONFIG config = TPS546_CONFIG_BONANZA_1004;
-        config.TPS546_USE_ENABLE_PIN = use_enable_pin;
-        const uint8_t expected = use_enable_pin ? 0x1f : 0x1b;
-        TEST_ASSERT_EQUAL(ESP_OK, TPS546_init(config));
-        TEST_ASSERT_EQUAL_UINT32(2, writes[PMBUS_ON_OFF_CONFIG]);
-        TEST_ASSERT_EQUAL_HEX8(expected, first_byte_written[PMBUS_ON_OFF_CONFIG]);
-        TEST_ASSERT_EQUAL_HEX8(expected, registers[PMBUS_ON_OFF_CONFIG][0]);
-        TEST_ASSERT_EQUAL_HEX8(OPERATION_OFF, registers[PMBUS_OPERATION][0]);
-    }
 }
 
 TEST_CASE("Bonanza 1004 programs Anvil compensation on D24A and D24S", "[asic][bonanza][tps546]")
@@ -160,14 +159,18 @@ TEST_CASE("Existing TPS546 profiles keep their voltage, phase and enable behavio
     for (size_t i = 0; i < sizeof(profiles) / sizeof(profiles[0]); ++i) {
         reset_pmbus();
         const TPS546_CONFIG *profile = profiles[i];
-        registers[PMBUS_VOUT_MODE][0] = 0x97;
+        set_word(PMBUS_VOUT_MAX, 0x0b00); // 5.5 V, includes each legacy profile's initial target.
         set_word(PMBUS_INTERLEAVE, 0x0020);
         TEST_ASSERT_EQUAL(ESP_OK, TPS546_init(*profile));
         TEST_ASSERT_EQUAL_HEX8(OPERATION_OFF, registers[PMBUS_OPERATION][0]);
+        TEST_ASSERT_EQUAL_UINT32(2, writes[PMBUS_ON_OFF_CONFIG]);
+        TEST_ASSERT_EQUAL_HEX8(0x1f, first_byte_written[PMBUS_ON_OFF_CONFIG]);
         TEST_ASSERT_EQUAL_HEX8(0x1b, registers[PMBUS_ON_OFF_CONFIG][0]);
         TEST_ASSERT_EQUAL_HEX8(profile->TPS546_INIT_SYNC_CONFIG, registers[PMBUS_SYNC_CONFIG][0]);
         TEST_ASSERT_EQUAL_HEX16(profile->TPS546_INIT_STACK_CONFIG, word(PMBUS_STACK_CONFIG));
         TEST_ASSERT_EQUAL_HEX16((uint16_t)(profile->TPS546_INIT_VOUT_COMMAND * 512.0f), word(PMBUS_VOUT_COMMAND));
+        TEST_ASSERT_LESS_THAN_UINT32(first_write_at[PMBUS_VOUT_MAX], first_write_at[PMBUS_VOUT_COMMAND]);
+        TEST_ASSERT_LESS_THAN_UINT32(first_write_at[PMBUS_VOUT_MIN], first_write_at[PMBUS_VOUT_MAX]);
         TEST_ASSERT_EQUAL_HEX8(profile->TPS546_INIT_PHASE, registers[PMBUS_PHASE][0]);
         TEST_ASSERT_EQUAL_HEX16(INIT_PIN_DETECT_OVERRIDE, word(PMBUS_PIN_DETECT_OVERRIDE));
         TEST_ASSERT_EQUAL_HEX16(0x0020, word(PMBUS_INTERLEAVE));
@@ -177,6 +180,43 @@ TEST_CASE("Existing TPS546 profiles keep their voltage, phase and enable behavio
         TEST_ASSERT_EQUAL_HEX8(OPERATION_ON, registers[PMBUS_OPERATION][0]);
         TEST_ASSERT_EQUAL(ESP_OK, TPS546_set_vout(0));
     }
+}
+
+TEST_CASE("Legacy TPS546 initialization retains its setup error handling", "[asic][tps546]")
+{
+    for (unsigned failure = 1; failure <= 2; ++failure) {
+        reset_pmbus();
+        fail_write_at = failure;
+        TEST_ASSERT_EQUAL(ESP_OK, TPS546_init(TPS546_CONFIG_DEFAULT));
+        TEST_ASSERT_EQUAL_HEX8(0x1b, registers[PMBUS_ON_OFF_CONFIG][0]);
+    }
+
+    reset_pmbus();
+    fail_read_once = PMBUS_VOUT_MODE;
+    TEST_ASSERT_EQUAL(ESP_OK, TPS546_init(TPS546_CONFIG_DEFAULT));
+}
+
+TEST_CASE("TPS546 startup leaves the programmed voltage mode unchanged", "[asic][tps546]")
+{
+    const TPS546_CONFIG *profiles[] = {&TPS546_CONFIG_DEFAULT, &TPS546_CONFIG_BONANZA_1004};
+    for (size_t i = 0; i < sizeof(profiles) / sizeof(profiles[0]); ++i) {
+        reset_pmbus();
+        registers[PMBUS_VOUT_MODE][0] = 0x17;
+        TEST_ASSERT_EQUAL(ESP_OK, TPS546_init(*profiles[i]));
+        TEST_ASSERT_EQUAL_HEX8(0x17, registers[PMBUS_VOUT_MODE][0]);
+        TEST_ASSERT_EQUAL_UINT32(0, writes[PMBUS_VOUT_MODE]);
+    }
+}
+
+TEST_CASE("TPS546 configuration can retain enable control without requiring setup writes", "[asic][tps546]")
+{
+    reset_pmbus();
+    TPS546_CONFIG config = TPS546_CONFIG_DEFAULT;
+    config.TPS546_USE_ENABLE_PIN = true;
+    fail_write_at = 2;
+    TEST_ASSERT_EQUAL(ESP_OK, TPS546_init(config));
+    TEST_ASSERT_EQUAL_HEX8(0x1f, registers[PMBUS_ON_OFF_CONFIG][0]);
+    TEST_ASSERT_EQUAL_UINT32(0, writes[PMBUS_VOUT_MODE]);
 }
 
 TEST_CASE("Bonanza voltage changes preserve the relative protection thresholds", "[asic][bonanza][tps546]")
@@ -215,9 +255,9 @@ TEST_CASE("Bonanza D24S uses relative limits and preserves the voltage exponent"
     TEST_ASSERT_EQUAL_UINT32(0, writes[PMBUS_VOUT_MODE]);
 }
 
-TEST_CASE("Bonanza relative-mode setup requires successful disable and mode writes", "[asic][bonanza][tps546]")
+TEST_CASE("Bonanza startup requires successful output-off and enable-control writes", "[asic][bonanza][tps546]")
 {
-    for (unsigned failure = 1; failure <= 3; ++failure) {
+    for (unsigned failure = 1; failure <= 2; ++failure) {
         reset_pmbus();
         fail_write_at = failure;
         TEST_ASSERT_NOT_EQUAL(ESP_OK, TPS546_init(TPS546_CONFIG_BONANZA_1004));
@@ -225,14 +265,9 @@ TEST_CASE("Bonanza relative-mode setup requires successful disable and mode writ
         TEST_ASSERT_EQUAL_UINT32(0, writes[PMBUS_VOUT_COMMAND]);
     }
     reset_pmbus();
-    fail_read = PMBUS_VOUT_MODE;
-    TEST_ASSERT_NOT_EQUAL(ESP_OK, TPS546_init(TPS546_CONFIG_BONANZA_1004));
-    TEST_ASSERT_EQUAL_UINT32(0, writes[PMBUS_VOUT_COMMAND]);
-    reset_pmbus();
-    ignored_write = PMBUS_VOUT_MODE;
-    TEST_ASSERT_NOT_EQUAL(ESP_OK, TPS546_init(TPS546_CONFIG_BONANZA_1004));
-    TEST_ASSERT_EQUAL_HEX8(OPERATION_OFF, registers[PMBUS_OPERATION][0]);
-    TEST_ASSERT_EQUAL_UINT32(0, writes[PMBUS_VOUT_COMMAND]);
+    fail_read_once = PMBUS_VOUT_MODE;
+    TEST_ASSERT_EQUAL(ESP_OK, TPS546_init(TPS546_CONFIG_BONANZA_1004));
+    TEST_ASSERT_EQUAL_UINT32(0, writes[PMBUS_VOUT_MODE]);
 }
 
 TEST_CASE("Bonanza power validation can use the existing regulator status snapshot", "[asic][bonanza][tps546]")
