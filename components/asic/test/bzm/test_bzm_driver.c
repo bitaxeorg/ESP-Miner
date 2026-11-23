@@ -17,6 +17,7 @@
 #define bzm_driver_process_result test_driver_process_work
 #define bzm_driver_read_temperature test_driver_read_temperature
 #define bzm_driver_hashrate_counter_snapshot test_driver_hashrate_snapshot
+#define bzm_driver_sample_hashrate test_driver_sample_hashrate
 #define bzm_driver_get_hashrate_measurement test_driver_hashrate_measurement
 #define bzm_driver_has_io_fault test_driver_has_io_fault
 #define bzm_driver_work_replacement_snapshot test_driver_replacement_snapshot
@@ -188,7 +189,8 @@ static void fixture_init(void)
     startup_reset_asserted = false;
     missing_starts = bridge_reset_calls = 0;
     bridge_reset_result = BZM_OK;
-    clock_steps = 0;
+    telemetry_polls = clock_steps = 0;
+    telemetry_missing = false;
     reported_fault = false;
     fail_clock = fresh_on_copy = false;
     memset(&test_state, 0, sizeof(test_state));
@@ -216,27 +218,28 @@ TEST_CASE("BZM cached measurements do not consume work or wait for the reactor a
 {
     fixture_init();
     test_state.can_submit = allow_dispatch;
-    bzm_hashrate_sample(&BZM_STATE->hashrate[0], 0, 1000000, true);
-    bzm_hashrate_sample(&BZM_STATE->hashrate[0], 512, 2000000, true);
+    float interval, current;
+    TEST_ASSERT_FALSE(bzm_driver_sample_hashrate(&test_state, 1000000, &interval, &current));
     atomic_store(&HASHRATE_DIFFICULTY_ONE_COUNTERS[0], 512);
     uint64_t timestamp;
     float rate;
     pthread_mutex_lock(&REACTOR_LOCK);
+    TEST_ASSERT_TRUE(bzm_driver_sample_hashrate(&test_state, 2000000, &interval, &current));
     for (unsigned i = 0; i < 100; ++i) {
         TEST_ASSERT_TRUE(bzm_driver_get_hashrate_measurement(&test_state, 0, &timestamp, &rate));
-        TEST_ASSERT_FLOAT_WITHIN(0.001f, 1099.5116f, rate);
+        TEST_ASSERT_FLOAT_WITHIN(0.001f, 2199.0233f, rate);
         TEST_ASSERT_TRUE((uint64_t)(2000000) == (uint64_t)(timestamp));
     }
     pthread_mutex_unlock(&REACTOR_LOCK);
-    TEST_ASSERT_EQUAL_UINT(2, BZM_STATE->hashrate[0].count);
+    TEST_ASSERT_EQUAL_UINT(1, BZM_STATE->hashrate[0].count);
     TEST_ASSERT_TRUE((uint64_t)(512) == (uint64_t)(atomic_load(&HASHRATE_DIFFICULTY_ONE_COUNTERS[0])));
     TEST_ASSERT_TRUE(bzm_driver_clear_work(&test_state));
     uint32_t counters[BZM_MAX_ASIC_COUNT];
     TEST_ASSERT_TRUE(bzm_driver_hashrate_counter_snapshot(&test_state, counters, BZM_MAX_ASIC_COUNT));
     TEST_ASSERT_EQUAL_UINT32(512, counters[0]);
     TEST_ASSERT_TRUE(bzm_driver_get_hashrate_measurement(&test_state, 0, &timestamp, &rate));
-    TEST_ASSERT_FLOAT_WITHIN(0.001f, 1099.5116f, rate);
-    TEST_ASSERT_EQUAL_UINT(2, BZM_STATE->hashrate[0].count);
+    TEST_ASSERT_FLOAT_WITHIN(0.001f, 2199.0233f, rate);
+    TEST_ASSERT_EQUAL_UINT(1, BZM_STATE->hashrate[0].count);
     test_state.initialized = false;
     TEST_ASSERT_TRUE(bzm_driver_get_hashrate_measurement(&test_state, 0, &timestamp, &rate));
     TEST_ASSERT_EQUAL_FLOAT(0, rate);
@@ -246,6 +249,62 @@ TEST_CASE("BZM cached measurements do not consume work or wait for the reactor a
     TEST_ASSERT_EQUAL_FLOAT(0, rate);
     TEST_ASSERT_FALSE(bzm_driver_get_hashrate_measurement(&test_state, 4, &timestamp, &rate));
     TEST_ASSERT_FALSE(bzm_driver_get_hashrate_measurement(NULL, 0, &timestamp, &rate));
+    fixture_destroy();
+}
+
+TEST_CASE("BZM driver holds history while inactive and measures only fresh intervals on resume", "[asic][bzm][hashrate]")
+{
+    fixture_init();
+    test_state.can_submit = allow_dispatch;
+    test_state.initialized = false;
+    float interval, current;
+    TEST_ASSERT_FALSE(bzm_driver_sample_hashrate(&test_state, 1000000, &interval, &current));
+    TEST_ASSERT_EQUAL_FLOAT(0, interval);
+    TEST_ASSERT_EQUAL_FLOAT(0, current);
+
+    test_state.initialized = true;
+    atomic_store(&HASHRATE_DIFFICULTY_ONE_COUNTERS[0], 10000);
+    TEST_ASSERT_FALSE(bzm_driver_sample_hashrate(&test_state, 2000000, &interval, &current));
+    TEST_ASSERT_EQUAL_FLOAT(0, interval);
+    TEST_ASSERT_EQUAL_FLOAT(0, current);
+    TEST_ASSERT_EQUAL_UINT(0, BZM_STATE->hashrate[0].count);
+
+    atomic_fetch_add(&HASHRATE_DIFFICULTY_ONE_COUNTERS[0], 512);
+    TEST_ASSERT_TRUE(bzm_driver_sample_hashrate(&test_state, 3000000, &interval, &current));
+    TEST_ASSERT_FLOAT_WITHIN(0.001f, 2199.0233f, interval);
+    TEST_ASSERT_EQUAL_FLOAT(interval, current);
+    TEST_ASSERT_TRUE(bzm_driver_sample_hashrate(&test_state, 4000000, &interval, &current));
+    TEST_ASSERT_EQUAL_FLOAT(0, interval);
+    TEST_ASSERT_FLOAT_WITHIN(0.001f, 1099.5116f, current);
+
+    authorized = false;
+    // The I/O task sees this pause between monitor polls.
+    bzm_driver_service(&test_state);
+    authorized = true;
+    atomic_fetch_add(&HASHRATE_DIFFICULTY_ONE_COUNTERS[0], 1024);
+    TEST_ASSERT_FALSE(bzm_driver_sample_hashrate(&test_state, 5000000, &interval, &current));
+    TEST_ASSERT_EQUAL_FLOAT(0, interval);
+    TEST_ASSERT_EQUAL_FLOAT(0, current);
+    TEST_ASSERT_EQUAL_UINT(2, BZM_STATE->hashrate[0].count);
+
+    authorized = false;
+    for (unsigned second = 6; second <= 67; ++second) {
+        TEST_ASSERT_FALSE(bzm_driver_sample_hashrate(&test_state, second * UINT64_C(1000000), &interval, &current));
+        TEST_ASSERT_EQUAL_FLOAT(0, interval);
+        TEST_ASSERT_EQUAL_FLOAT(0, current);
+    }
+    TEST_ASSERT_EQUAL_UINT(2, BZM_STATE->hashrate[0].count);
+
+    authorized = true;
+    atomic_fetch_add(&HASHRATE_DIFFICULTY_ONE_COUNTERS[0], 2048);
+    TEST_ASSERT_FALSE(bzm_driver_sample_hashrate(&test_state, 68000000, &interval, &current));
+    TEST_ASSERT_EQUAL_FLOAT(0, interval);
+    TEST_ASSERT_EQUAL_FLOAT(0, current);
+    atomic_fetch_add(&HASHRATE_DIFFICULTY_ONE_COUNTERS[0], 256);
+    TEST_ASSERT_TRUE(bzm_driver_sample_hashrate(&test_state, 69000000, &interval, &current));
+    TEST_ASSERT_FLOAT_WITHIN(0.001f, 1099.5116f, interval);
+    TEST_ASSERT_FLOAT_WITHIN(0.001f, 1099.5116f, current);
+    TEST_ASSERT_EQUAL_UINT(3, BZM_STATE->hashrate[0].count);
     fixture_destroy();
 }
 

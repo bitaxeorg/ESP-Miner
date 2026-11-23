@@ -44,6 +44,9 @@ float bzm_driver_read_temperature(bzm_device_t * state);
 bool bzm_driver_hashrate_counter_snapshot(bzm_device_t *state,
                                    uint32_t *difficulty_one_counters,
                                    size_t counter_count);
+// Called once per monitor poll. Returns true when an active interval was measured.
+bool bzm_driver_sample_hashrate(bzm_device_t *state, uint64_t time_us,
+                                float *interval_hashrate, float *current_hashrate);
 bool bzm_driver_get_hashrate_measurement(bzm_device_t *state, uint8_t asic_nr,
                                          uint64_t *time_us, float *hashrate);
 

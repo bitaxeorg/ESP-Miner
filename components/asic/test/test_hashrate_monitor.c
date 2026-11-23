@@ -12,6 +12,7 @@
 
 #define TEST_STUB_GLOBAL_STATE_H
 #include "main/global_state.h"
+#include "asic.h"
 
 static unsigned allocations, fail_allocation, outstanding, deletes;
 static unsigned average_scan_checks;
@@ -43,10 +44,16 @@ static void monitor_delete(TaskHandle_t task) { (void)task; ++deletes; }
 static void monitor_noinit(SystemModule *system, float interval_hashrate);
 static void monitor_delay(TickType_t ticks);
 static void monitor_delay_until(TickType_t *wake, TickType_t ticks);
+static asic_hashrate_sample_t monitor_sample_hashrate(GlobalState *s);
+static void monitor_read(GlobalState *s);
+esp_err_t monitor_total_measurement(GlobalState *s, uint8_t asic, asic_domain_measurement_t *measurement);
+esp_err_t monitor_domain_measurement(GlobalState *s, uint8_t asic, uint8_t domain,
+                                   asic_domain_measurement_t *measurement);
 #define heap_caps_calloc monitor_calloc
 #define heap_caps_malloc monitor_malloc
 #define heap_caps_free monitor_free
 #define ASIC_read_registers monitor_read
+#define ASIC_sample_hashrate monitor_sample_hashrate
 #define ASIC_get_domain_measurement monitor_domain_measurement
 #define ASIC_get_asic_measurement monitor_total_measurement
 #define SYSTEM_noinit_update monitor_noinit
@@ -70,11 +77,12 @@ static void monitor_delay_until(TickType_t *wake, TickType_t ticks);
 static GlobalState *state;
 static jmp_buf task_done;
 static unsigned sample, test_asics, test_domains;
-static unsigned pause_sample, end_sample, headline_count;
+static const unsigned startup_sample = 2;
+static unsigned pause_sample, resume_sample, end_sample, history_count;
 static bool from_shares, direct_register;
 static uint32_t counters[4][9];
-static float *history, headline_history[60];
-static double sums[4][9], headline_sum;
+static float *history, total_history[60], previous_averages[3];
+static double sums[4][9], total_sum;
 static unsigned domain_measurement_calls;
 static bzm_hashrate_t (*software_rates)[9];
 
@@ -108,16 +116,30 @@ esp_err_t monitor_domain_measurement(GlobalState *s, uint8_t asic, uint8_t domai
     return get_measurement(s, asic, domain + 1, measurement);
 }
 
-static void sample_software_rates(GlobalState *s)
+#undef ASIC_sample_hashrate
+static asic_hashrate_sample_t monitor_sample_hashrate(GlobalState *s)
 {
-    if (!from_shares) return;
+    if (!from_shares) return ASIC_sample_hashrate(s);
+
+    asic_hashrate_sample_t result = {0};
     for (unsigned a = 0; a < test_asics; ++a) {
         for (unsigned d = 0; d <= test_domains; ++d) {
-            bzm_hashrate_sample(&software_rates[a][d], counters[a][d],
-                (uint64_t)(sample + 1) * 1000000,
-                s->ASIC_initalized && !s->SYSTEM_MODULE.mining_paused);
+            bzm_hashrate_t *rate = &software_rates[a][d];
+            if (s->SYSTEM_MODULE.mining_paused) {
+                rate->baseline_valid = false;
+                continue;
+            }
+            float interval;
+            bool valid = bzm_hashrate_sample(rate, counters[a][d],
+                                             (uint64_t)(sample + 1) * 1000000, &interval);
+            if (d == 0) {
+                result.interval_valid |= valid;
+                result.interval_hashrate += interval;
+                result.current_hashrate += rate->rate;
+            }
         }
     }
+    return result;
 }
 
 static uint32_t credits(unsigned asic, unsigned domain)
@@ -132,7 +154,7 @@ static uint32_t hashrate_register(unsigned asic)
 {
     return sample % 3 == 0 ? 0 : (sample % 2 ? 1000000 : 2000000) * (asic + 1);
 }
-void monitor_read(GlobalState *s)
+static void monitor_read(GlobalState *s)
 {
     uint64_t time_us = (uint64_t)(sample + 1) * 1000000;
     for (unsigned a = 0; a < test_asics; ++a) {
@@ -142,12 +164,14 @@ void monitor_read(GlobalState *s)
         }
         for (unsigned d = 0; d <= test_domains; ++d) {
             counters[a][d] += credits(a, d);
-            monitor_register_read(s, d == 0 ? REGISTER_TOTAL_COUNT : REGISTER_DOMAIN_0_COUNT + d - 1,
-                                  a, counters[a][d], time_us);
+            if (!from_shares) {
+                monitor_register_read(s, d == 0 ? REGISTER_TOTAL_COUNT : REGISTER_DOMAIN_0_COUNT + d - 1,
+                                      a, counters[a][d], time_us);
+            }
         }
     }
 }
-static void monitor_delay(TickType_t ticks) { (void)ticks; sample_software_rates(state); }
+static void monitor_delay(TickType_t ticks) { TEST_ASSERT_EQUAL_UINT32(pdMS_TO_TICKS(100), ticks); }
 
 static void assert_json_rates(void)
 {
@@ -175,66 +199,64 @@ static void assert_json_rates(void)
 static void monitor_noinit(SystemModule *system, float interval_hashrate)
 {
     const float unit_ghs = 4294967296.0 / 1e9;
-    unsigned count = sample < 60 ? sample + 1 : 60;
     float total_raw = 0, total_mean = 0;
-    bool visible = state->ASIC_initalized && !system->mining_paused;
+    bool initialized = sample >= startup_sample && (sample <= pause_sample || sample >= resume_sample);
+    bool complete = initialized && (!from_shares || sample != pause_sample) &&
+                    (direct_register || (sample != startup_sample && sample != resume_sample));
+    unsigned next_count = history_count + 1 < 60 ? history_count + 1 : 60;
     for (unsigned a = 0; a < test_asics; ++a) {
         for (unsigned d = 0; d <= test_domains; ++d) {
-            float raw = sample > 0 && sample <= pause_sample
+            float raw = complete
                 ? (direct_register ? hashrate_register(a) * (1048576.0f / 1e9f) : credits(a, d) * unit_ghs) : 0;
-            if (a == 3 && sample == 2) TEST_ASSERT_TRUE(raw > UINT16_MAX);
-            float mean = 0;
+            if (a == 3 && sample == 4 && d == 0) TEST_ASSERT_TRUE(raw > UINT16_MAX);
+            float expected = raw;
             if (from_shares) {
-                float *series = history + (a * (test_domains + 1) + d) * 60;
-                sums[a][d] -= series[sample % 60];
-                series[sample % 60] = visible ? raw : 0;
-                sums[a][d] += visible ? raw : 0;
-                mean = sums[a][d] / count;
+                if (complete) {
+                    float *series = history + (a * (test_domains + 1) + d) * 60;
+                    unsigned slot = history_count % 60;
+                    sums[a][d] += (double)raw - series[slot];
+                    series[slot] = raw;
+                    expected = sums[a][d] / next_count;
+                }
+            } else {
+                measurement_t *measurement = d == 0 ? &state->HASHRATE_MONITOR_MODULE.total_measurement[a]
+                    : &state->HASHRATE_MONITOR_MODULE.domain_measurements[a][d - 1];
+                TEST_ASSERT_FLOAT_WITHIN(0.002f, raw, measurement->hashrate);
             }
-            measurement_t *measurement = d == 0 ? &state->HASHRATE_MONITOR_MODULE.total_measurement[a]
-                : &state->HASHRATE_MONITOR_MODULE.domain_measurements[a][d - 1];
-            TEST_ASSERT_FLOAT_WITHIN(0.002f, raw, measurement->hashrate);
-            float tolerance = fmaxf(0.002f, mean * 1e-6f);
             unsigned scans = average_scan_checks;
             float reported = d == 0 ? monitor_asic_rate(state, a) : monitor_domain_rate(state, a, d - 1);
             TEST_ASSERT_EQUAL_UINT32(scans, average_scan_checks);
-            float expected = from_shares ? (visible ? mean : 0) : raw;
-            TEST_ASSERT_FLOAT_WITHIN(fmaxf(tolerance, raw * 1e-6f), expected, reported);
-            if (d == 0) { total_raw += raw; total_mean += mean; }
+            TEST_ASSERT_FLOAT_WITHIN(fmaxf(0.002f, expected * 1e-6f), expected, reported);
+            if (d == 0) { total_raw += raw; total_mean += expected; }
         }
     }
     TEST_ASSERT_FLOAT_WITHIN(0.002f, total_raw, interval_hashrate);
-    {
-        unsigned slot = headline_count % 60;
-        headline_sum -= headline_history[slot];
-        headline_history[slot] = total_raw;
-        headline_sum += total_raw;
-        ++headline_count;
+    bool valid = from_shares ? complete : total_raw > 0;
+    if (valid) {
+        unsigned slot = history_count % 60;
+        total_sum += (double)total_raw - total_history[slot];
+        total_history[slot] = total_raw;
+        ++history_count;
+    } else {
+        TEST_ASSERT_EQUAL_FLOAT(previous_averages[0], system->hashrate_1m);
+        TEST_ASSERT_EQUAL_FLOAT(previous_averages[1], system->hashrate_10m);
+        TEST_ASSERT_EQUAL_FLOAT(previous_averages[2], system->hashrate_1h);
     }
-    float headline_mean = headline_count ? headline_sum / (headline_count < 60 ? headline_count : 60) : 0;
-    float tolerance = fmaxf(0.002f, headline_mean * 1e-6f);
-
-    TEST_ASSERT_FLOAT_WITHIN(tolerance, headline_mean, system->hashrate_1m);
-    float expected_current = visible ? (from_shares ? total_mean : total_raw) : 0;
-    TEST_ASSERT_FLOAT_WITHIN(tolerance, expected_current, system->current_hashrate);
-    TEST_ASSERT_EQUAL_UINT32(headline_count, poll_count);
-    if (from_shares && test_asics == 1 && (sample == 59 || sample == 599 || sample == 3599)) {
+    previous_averages[0] = system->hashrate_1m;
+    previous_averages[1] = system->hashrate_10m;
+    previous_averages[2] = system->hashrate_1h;
+    float history_mean = history_count ? total_sum / (history_count < 60 ? history_count : 60) : 0;
+    TEST_ASSERT_FLOAT_WITHIN(fmaxf(0.002f, history_mean * 1e-6f), history_mean, system->hashrate_1m);
+    TEST_ASSERT_FLOAT_WITHIN(fmaxf(0.002f, total_mean * 1e-6f), total_mean, system->current_hashrate);
+    TEST_ASSERT_EQUAL_UINT32(history_count, poll_count);
+    if (from_shares && test_asics == 1 && (history_count == 60 || history_count == 600 || history_count == 3600)) {
         float mean = 256 * unit_ghs;
         TEST_ASSERT_FLOAT_WITHIN(0.002f, mean, system->hashrate_1m);
         TEST_ASSERT_FLOAT_WITHIN(0.002f, mean, system->hashrate_10m);
         TEST_ASSERT_FLOAT_WITHIN(0.002f, mean, system->hashrate_1h);
     }
-    if (from_shares && test_asics == 1 && sample == 7199) {
-        TEST_ASSERT_EQUAL_FLOAT(0, system->hashrate_1m);
-        TEST_ASSERT_EQUAL_FLOAT(0, system->hashrate_10m);
-        TEST_ASSERT_EQUAL_FLOAT(0, system->hashrate_1h);
-    }
-    if (!from_shares && sample == end_sample - 1) {
-        TEST_ASSERT_EQUAL_FLOAT(0, system->hashrate_1m);
-        TEST_ASSERT_EQUAL_FLOAT(0, system->current_hashrate);
-    }
-    if (sample == 1 || sample == 2 || sample == 59 || sample == pause_sample ||
-        sample == pause_sample + 1 || sample == pause_sample + 2 || sample == end_sample - 1) {
+    if (sample == startup_sample || sample == startup_sample + 1 || sample == pause_sample ||
+        sample == pause_sample + 1 || sample == resume_sample || sample == resume_sample + 1) {
         assert_json_rates();
     }
     TEST_ASSERT_EQUAL_FLOAT(0, monitor_asic_rate(NULL, 0));
@@ -246,29 +268,35 @@ static void monitor_delay_until(TickType_t *wake, TickType_t ticks)
     (void)wake;
     TEST_ASSERT_EQUAL_UINT32(pdMS_TO_TICKS(1000), ticks);
     ++sample;
+    if (sample == startup_sample || sample == resume_sample) {
+        state->ASIC_initalized = true;
+        state->SYSTEM_MODULE.mining_paused = false;
+    }
     if (sample == pause_sample) state->SYSTEM_MODULE.mining_paused = true;
-    if (sample == pause_sample + 1) state->ASIC_initalized = false;
-    if (sample == pause_sample + 2) state->SYSTEM_MODULE.mining_paused = false;
-    if (!state->ASIC_initalized) sample_software_rates(state);
+    if (sample == pause_sample + 1) {
+        state->ASIC_initalized = false;
+        memset(counters, 0, sizeof(counters));
+    }
     if (sample == end_sample) longjmp(task_done, 1);
 }
 static void run_monitor(AsicConfig asic, unsigned asics, unsigned domains)
 {
     state = calloc(1, sizeof(*state));
     TEST_ASSERT_NOT_NULL(state);
-    state->ASIC_initalized = true;
     state->DEVICE_CONFIG.family.asic = asic;
     from_shares = asic.id == BZM;
     direct_register = !from_shares && asic.id == BM1397;
-    pause_sample = from_shares ? 3600 : 119;
-    end_sample = from_shares ? 7200 : 180;
+    pause_sample = from_shares ? 3603 : 122;
+    resume_sample = pause_sample + 62;
+    end_sample = resume_sample + 5;
     state->DEVICE_CONFIG.family.asic_count = test_asics = asics;
     state->DEVICE_CONFIG.family.asic.hash_domains = test_domains = domains;
-    sample = poll_count = allocations = fail_allocation = deletes = headline_count = 0;
+    sample = poll_count = allocations = fail_allocation = deletes = history_count = 0;
     software_rates = from_shares ? calloc(asics, sizeof(*software_rates)) : NULL;
     if (from_shares) TEST_ASSERT_NOT_NULL(software_rates);
-    headline_sum = 0;
-    memset(headline_history, 0, sizeof(headline_history));
+    total_sum = 0;
+    memset(total_history, 0, sizeof(total_history));
+    memset(previous_averages, 0, sizeof(previous_averages));
     TEST_ASSERT_EQUAL_UINT32(0, outstanding);
     memset(counters, 0, sizeof(counters));
     history = from_shares ? calloc(asics * (domains + 1) * 60, sizeof(*history)) : NULL;
@@ -291,7 +319,7 @@ static void run_monitor(AsicConfig asic, unsigned asics, unsigned domains)
     software_rates = NULL;
 }
 
-TEST_CASE("Current hashrate averages sparse raw intervals and cuts off on pause and startup", "[asic][hashrate]")
+TEST_CASE("Bonanza hashrate counts active zero samples and holds history through startup and pause/resume", "[asic][hashrate]")
 {
     run_monitor(ASIC_BZM, 1, 1);
 }
@@ -307,7 +335,7 @@ TEST_CASE("Four software-measured ASICs expose rates without common smoothing al
 
 }
 
-TEST_CASE("Register-backed Bitmain ASICs keep instantaneous rates and allocate no smoothing history", "[asic][hashrate]")
+TEST_CASE("Bitmain startup and pause/resume preserve upstream live rates and positive-sample history", "[asic][hashrate]")
 {
     const AsicConfig asics[] = {ASIC_BM1397, ASIC_BM1366, ASIC_BM1368, ASIC_BM1370, ASIC_BM1373};
     for (unsigned i = 0; i < sizeof(asics) / sizeof(asics[0]); ++i) {

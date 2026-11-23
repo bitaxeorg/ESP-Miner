@@ -2,6 +2,27 @@
 #include "bzm/driver.h"
 #include "global_state.h"
 
+asic_hashrate_sample_t ASIC_sample_hashrate(GlobalState *state)
+{
+    asic_hashrate_sample_t sample = {0};
+    if (state->DEVICE_CONFIG.family.asic.id == BZM) {
+        sample.interval_valid = BZM_sample_hashrate(state, &sample.interval_hashrate, &sample.current_hashrate);
+        return sample;
+    }
+
+    HashrateMonitorModule *monitor = &state->HASHRATE_MONITOR_MODULE;
+    pthread_mutex_lock(&monitor->lock);
+    for (unsigned asic = 0; asic < state->DEVICE_CONFIG.family.asic_count; ++asic) {
+        sample.interval_hashrate += monitor->total_measurement[asic].hashrate;
+        sample.error_hashrate += monitor->error_measurement[asic].hashrate;
+    }
+    pthread_mutex_unlock(&monitor->lock);
+
+    sample.current_hashrate = sample.interval_hashrate;
+    sample.interval_valid = sample.interval_hashrate > 0.0f;
+    return sample;
+}
+
 float ASIC_get_temperature(GlobalState *state)
 {
     if (state == NULL || !state->DEVICE_CONFIG.family.asic.native_temperature) return -1;

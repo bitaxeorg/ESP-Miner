@@ -4,8 +4,6 @@
 
 #include "bm1397.h"
 #include "bzm/driver.h"
-#include "hashrate_monitor_task.h"
-#include "esp_timer.h"
 #include "bm1366.h"
 #include "bm1368.h"
 #include "bm1370.h"
@@ -220,17 +218,8 @@ double ASIC_get_asic_job_frequency_ms(GlobalState * GLOBAL_STATE)
 void ASIC_read_registers(GlobalState * GLOBAL_STATE)
 {
     switch (GLOBAL_STATE->DEVICE_CONFIG.family.asic.id) {
-        case BZM: {
-            uint32_t counters[BZM_MAX_ASIC_COUNT];
-            if (BZM_hashrate_counter_snapshot(GLOBAL_STATE, counters, BZM_MAX_ASIC_COUNT)) {
-                uint64_t now = esp_timer_get_time();
-                for (uint8_t chip = 0; chip < GLOBAL_STATE->DEVICE_CONFIG.family.asic_count; ++chip) {
-                    hashrate_monitor_register_read(GLOBAL_STATE, REGISTER_TOTAL_COUNT, chip, counters[chip], now);
-                    hashrate_monitor_register_read(GLOBAL_STATE, REGISTER_DOMAIN_0_COUNT, chip, counters[chip], now);
-                }
-            }
+        case BZM:
             return;
-        }
         case BM1397:
             BM1397_read_registers(GLOBAL_STATE);
             break;

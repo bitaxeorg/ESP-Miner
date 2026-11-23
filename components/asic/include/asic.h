@@ -14,6 +14,13 @@ typedef struct {
     float hashrate;
 } asic_domain_measurement_t;
 
+typedef struct {
+    float interval_hashrate;
+    float current_hashrate;
+    float error_hashrate;
+    bool interval_valid; // Whether this sample advances hashrate history.
+} asic_hashrate_sample_t;
+
 uint8_t ASIC_init(GlobalState * GLOBAL_STATE);
 /* Returns driver-owned storage valid until the next call, or NULL when no
  * usable response is available. Non-register results include the matched job
@@ -29,6 +36,7 @@ void ASIC_set_frequency(GlobalState * GLOBAL_STATE);
 void ASIC_set_nonce_space(GlobalState * GLOBAL_STATE);
 double ASIC_get_asic_job_frequency_ms(GlobalState * GLOBAL_STATE);
 void ASIC_read_registers(GlobalState * GLOBAL_STATE);
+asic_hashrate_sample_t ASIC_sample_hashrate(GlobalState *state);
 float ASIC_get_temperature(GlobalState *state);
 esp_err_t ASIC_get_asic_measurement(GlobalState * GLOBAL_STATE, uint8_t asic_nr,
                                     asic_domain_measurement_t * measurement);

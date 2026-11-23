@@ -13,7 +13,7 @@
 #define BZM_job_frequency_ms adapter_test_job_frequency_ms
 #define BZM_process_work adapter_test_process_work
 #define BZM_read_temperature adapter_test_read_temperature
-#define BZM_hashrate_counter_snapshot adapter_test_hashrate_snapshot
+#define BZM_sample_hashrate adapter_test_sample_hashrate
 #define BZM_get_hashrate_measurement adapter_test_hashrate_measurement
 #define BZM_has_io_fault adapter_test_has_io_fault
 #define BZM_work_replacement_snapshot adapter_test_replacement_snapshot

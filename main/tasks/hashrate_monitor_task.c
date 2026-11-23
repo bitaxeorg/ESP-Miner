@@ -30,17 +30,6 @@ static float hashrate_1h[HASHRATE_1H_SIZE];
 
 static const char *TAG = "hashrate_monitor";
 
-static float sum_hashrates(measurement_t * measurement, int asic_count)
-{
-    if (asic_count == 1) return measurement[0].hashrate;
-
-    float total = 0;
-    for (int asic_nr = 0; asic_nr < asic_count; asic_nr++) {
-        total += measurement[asic_nr].hashrate;
-    }
-    return total;
-}
-
 void hashrate_monitor_reset_measurements(void *pvParameters)
 {
     GlobalState * GLOBAL_STATE = (GlobalState *)pvParameters;    
@@ -207,30 +196,22 @@ void hashrate_monitor_task(void *pvParameters)
         }
         was_asic_initialized = is_asic_initialized;
 
-        float interval_hashrate = 0;
+        asic_hashrate_sample_t sample = {0};
         if (is_asic_initialized) {
             ASIC_read_registers(GLOBAL_STATE);
             vTaskDelay(100 / portTICK_PERIOD_MS);
 
-            pthread_mutex_lock(&HASHRATE_MONITOR_MODULE->lock);
-            float current_hashrate = sum_hashrates(HASHRATE_MONITOR_MODULE->total_measurement, asic_count);
-            float error_hashrate = sum_hashrates(HASHRATE_MONITOR_MODULE->error_measurement, asic_count);
-            pthread_mutex_unlock(&HASHRATE_MONITOR_MODULE->lock);
-
-            interval_hashrate = current_hashrate;
-            SYSTEM_MODULE->error_percentage = current_hashrate > 0 ? error_hashrate / current_hashrate * 100.f : 0;
+            sample = ASIC_sample_hashrate(GLOBAL_STATE);
+            SYSTEM_MODULE->error_percentage = sample.interval_hashrate > 0
+                ? sample.error_hashrate / sample.interval_hashrate * 100.f : 0;
         }
 
-        float reported_hashrate = 0;
-        if (is_asic_initialized && !SYSTEM_MODULE->mining_paused) {
-            for (int asic = 0; asic < asic_count; ++asic) {
-                reported_hashrate += hashrate_monitor_get_asic_rate(GLOBAL_STATE, asic);
-            }
+        SYSTEM_MODULE->current_hashrate = sample.current_hashrate;
+        if (sample.interval_valid) {
+            update_hashrate_averages(SYSTEM_MODULE, sample.interval_hashrate);
         }
-        SYSTEM_MODULE->current_hashrate = reported_hashrate;
-        update_hashrate_averages(SYSTEM_MODULE, interval_hashrate);
 
-        SYSTEM_noinit_update(SYSTEM_MODULE, interval_hashrate);
+        SYSTEM_noinit_update(SYSTEM_MODULE, sample.interval_hashrate);
 
         vTaskDelayUntil(&taskWakeTime, POLL_RATE / portTICK_PERIOD_MS);
     }

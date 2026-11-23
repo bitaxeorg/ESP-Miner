@@ -4,6 +4,7 @@
 #include "bzm/result.h"
 #include "bzm/serial_buffers.h"
 #include "bzm/serial.h"
+#include "esp_timer.h"
 #include "global_state.h"
 #include "create_jobs_task.h"
 #include <stdio.h>
@@ -120,11 +121,11 @@ float BZM_read_temperature(GlobalState *state)
     (void)state;
     return bzm_driver_read_temperature(NULL);
 }
-bool BZM_hashrate_counter_snapshot(GlobalState *state, uint32_t *counters, size_t count)
+bool BZM_sample_hashrate(GlobalState *state, float *interval_hashrate, float *current_hashrate)
 {
     if (!state) return false;
     bzm_device_t device = device_view(state);
-    return bzm_driver_hashrate_counter_snapshot(&device, counters, count);
+    return bzm_driver_sample_hashrate(&device, esp_timer_get_time(), interval_hashrate, current_hashrate);
 }
 bool BZM_get_hashrate_measurement(GlobalState *state, uint8_t asic_nr,
                                   uint64_t *time_us, float *hashrate)

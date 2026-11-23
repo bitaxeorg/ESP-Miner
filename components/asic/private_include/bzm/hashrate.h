@@ -14,11 +14,11 @@ typedef struct {
     float rate;
     unsigned count;
     unsigned next;
-    bool sampled;
-    bool active;
+    bool baseline_valid;
 } bzm_hashrate_t;
 
-void bzm_hashrate_sample(bzm_hashrate_t *measurement, uint64_t counter,
-                         uint64_t time_us, bool active);
+// The first reading establishes a baseline. A complete interval can have zero results.
+bool bzm_hashrate_sample(bzm_hashrate_t *measurement, uint64_t counter,
+                        uint64_t time_us, float *interval_hashrate);
 
 #endif

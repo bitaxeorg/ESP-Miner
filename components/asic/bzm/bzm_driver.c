@@ -394,14 +394,48 @@ static bool hashrate_active(const bzm_device_t *state)
            (!state->can_submit || state->can_submit(state->context));
 }
 
+static void invalidate_hashrate_baselines(void)
+{
+    for (unsigned asic = 0; asic < BZM_MAX_ASIC_COUNT; ++asic) {
+        BZM_STATE->hashrate[asic].baseline_valid = false;
+    }
+}
+
+bool bzm_driver_sample_hashrate(bzm_device_t *state, uint64_t time_us,
+                                float *interval_hashrate, float *current_hashrate)
+{
+    if (!interval_hashrate || !current_hashrate) return false;
+    *interval_hashrate = 0;
+    *current_hashrate = 0;
+    if (!BZM_STATE || !state || state->asic_count > BZM_MAX_ASIC_COUNT) return false;
+
+    pthread_mutex_lock(&BZM_STATE->hashrate_lock);
+    bool valid = false;
+    if (hashrate_active(state)) {
+        for (unsigned asic = 0; asic < state->asic_count; ++asic) {
+            bzm_hashrate_t *sample = &BZM_STATE->hashrate[asic];
+            uint64_t counter = atomic_load_explicit(&HASHRATE_DIFFICULTY_ONE_COUNTERS[asic], memory_order_relaxed);
+            float interval;
+            valid |= bzm_hashrate_sample(sample, counter, time_us, &interval);
+            *interval_hashrate += interval;
+            *current_hashrate += sample->rate;
+        }
+    } else {
+        invalidate_hashrate_baselines();
+    }
+    pthread_mutex_unlock(&BZM_STATE->hashrate_lock);
+    return valid;
+}
+
 bool bzm_driver_get_hashrate_measurement(bzm_device_t *state, uint8_t asic_nr,
                                          uint64_t *time_us, float *hashrate)
 {
     if (!state || !time_us || !hashrate || !BZM_STATE ||
         state->asic_count > BZM_MAX_ASIC_COUNT || asic_nr >= state->asic_count) return false;
     pthread_mutex_lock(&BZM_STATE->hashrate_lock);
-    *time_us = BZM_STATE->hashrate[asic_nr].time_us;
-    *hashrate = hashrate_active(state) ? BZM_STATE->hashrate[asic_nr].rate : 0;
+    const bzm_hashrate_t *sample = &BZM_STATE->hashrate[asic_nr];
+    *time_us = sample->time_us;
+    *hashrate = sample->baseline_valid && hashrate_active(state) ? sample->rate : 0;
     pthread_mutex_unlock(&BZM_STATE->hashrate_lock);
     return true;
 }
@@ -1208,14 +1242,12 @@ void bzm_driver_service(bzm_device_t *state)
     else if (bzm_control_get_safety_status(&status) == BZM_OK &&
              status.fault == BZM_CONTROL_FAULT_ASIC_TRIP)
         device_fault(state, "BZM ASIC trip");
-    bool active = hashrate_active(state);
-    uint64_t now_us = bzm_now_us();
-    pthread_mutex_lock(&BZM_STATE->hashrate_lock);
-    for (uint8_t asic = 0; asic < state->asic_count && asic < BZM_MAX_ASIC_COUNT; ++asic) {
-        uint64_t counter = atomic_load_explicit(&HASHRATE_DIFFICULTY_ONE_COUNTERS[asic], memory_order_relaxed);
-        bzm_hashrate_sample(&BZM_STATE->hashrate[asic], counter, now_us, active);
+    // Discard the baseline even when a stop falls between two monitor polls.
+    if (!hashrate_active(state)) {
+        pthread_mutex_lock(&BZM_STATE->hashrate_lock);
+        invalidate_hashrate_baselines();
+        pthread_mutex_unlock(&BZM_STATE->hashrate_lock);
     }
-    pthread_mutex_unlock(&BZM_STATE->hashrate_lock);
 }
 
 uint8_t bzm_driver_init(bzm_device_t *state)

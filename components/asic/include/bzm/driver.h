@@ -23,9 +23,7 @@ bool BZM_clear_work(GlobalState * state);
 double BZM_job_frequency_ms(GlobalState *state);
 task_result * BZM_process_work(GlobalState * state);
 float BZM_read_temperature(GlobalState * state);
-bool BZM_hashrate_counter_snapshot(GlobalState *state,
-                                   uint32_t *difficulty_one_counters,
-                                   size_t counter_count);
+bool BZM_sample_hashrate(GlobalState *state, float *interval_hashrate, float *current_hashrate);
 bool BZM_get_hashrate_measurement(GlobalState *state, uint8_t asic_nr,
                                   uint64_t *time_us, float *hashrate);
 
