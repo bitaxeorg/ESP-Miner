@@ -62,7 +62,7 @@ bool adapter_mock_state_init(bzm_device_t *device) { last_device = *device; retu
 uint8_t adapter_mock_init(bzm_device_t *device)
 {
     bzm_device_record_frequency(device, 800);
-    device->difficulty_power = 0;
+    device->difficulty_power = 4;
     return startup_count;
 }
 bool adapter_mock_set_difficulty(bzm_device_t *device, uint8_t power)
@@ -135,7 +135,7 @@ TEST_CASE("BZM ESP adapter owns task retry, application callbacks and result con
     TEST_ASSERT_EQUAL_UINT8(4, BZM_init(&state));
     TEST_ASSERT_EQUAL_UINT32(2, task_calls);
     TEST_ASSERT_EQUAL_FLOAT(800, state.POWER_MANAGEMENT_MODULE.actual_frequency);
-    TEST_ASSERT_EQUAL_UINT8(0, state.current_difficulty_power);
+    TEST_ASSERT_EQUAL_UINT8(4, state.SYSTEM_MODULE.current_difficulty_power);
     difficulty_ok = true;
     BZM_set_difficulty(&state, 9);
     TEST_ASSERT_EQUAL_UINT8(9, applied_difficulty);

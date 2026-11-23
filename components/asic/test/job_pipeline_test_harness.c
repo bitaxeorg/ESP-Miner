@@ -6,6 +6,7 @@
 #include <string.h>
 
 #include "asic.h"
+#include "esp_timer.h"
 #include "global_state.h"
 #include "system.h"
 
@@ -17,6 +18,7 @@ static size_t harness_event_count;
 static size_t harness_event_index;
 static job_pipeline_harness_result_t *harness_result;
 static int harness_job_frequency_ms;
+static uint64_t harness_now_us;
 static GlobalState harness_state;
 static job_pipeline_harness_config_t harness_config;
 static bool harness_notification_pending;
@@ -29,6 +31,11 @@ static BaseType_t fake_task_notify(TaskHandle_t task, uint32_t value, eNotifyAct
     harness_notification = value;
     harness_notification_pending = true;
     return pdPASS;
+}
+
+static int64_t fake_esp_timer_get_time(void)
+{
+    return (int64_t)harness_now_us;
 }
 
 static BaseType_t fake_task_notify_wait(
@@ -44,19 +51,21 @@ static BaseType_t fake_task_notify_wait(
     if (harness_result->wait_count < JOB_PIPELINE_HARNESS_MAX_EVENTS)
         harness_result->wait_ticks[harness_result->wait_count++] = ticks_to_wait;
 
-    while (!harness_notification_pending && harness_event_index < harness_event_count) {
+    if (!harness_notification_pending && harness_event_index < harness_event_count) {
         const job_pipeline_harness_event_t *event;
         do {
             event = &harness_events[harness_event_index++];
+            harness_now_us += (uint64_t)event->advance_ms * 1000ULL;
             if (event->type == JOB_PIPELINE_HARNESS_NOTIFY) {
                 fake_task_notify(harness_state.create_jobs_task_handle, event->slot, eSetValueWithOverwrite);
+            } else if (event->type == JOB_PIPELINE_HARNESS_CLEAR) {
+                fake_task_notify(harness_state.create_jobs_task_handle, CREATE_JOBS_NOTIFY_CLEAR_WORK, eSetValueWithOverwrite);
             } else if (event->type == JOB_PIPELINE_HARNESS_REFRESH) {
                 // The driver has pending assignments when it requests a wakeup.
                 harness_job_frequency_ms = 0;
                 create_jobs_refresh(&harness_state);
             }
         } while (event->coalesce_next && harness_event_index < harness_event_count);
-        break;
     }
     if (harness_notification_pending) {
         *notification_value = harness_notification;
@@ -64,12 +73,6 @@ static BaseType_t fake_task_notify_wait(
         return pdTRUE;
     }
     return pdFALSE;
-}
-
-static void spy_task_delay(TickType_t ticks)
-{
-    (void)ticks;
-    harness_result->delay_count++;
 }
 
 void spy_asic_send_work(GlobalState *state, const asic_job_t *job)
@@ -110,9 +113,10 @@ static void spy_asic_set_version_mask(GlobalState *state, uint32_t mask)
     harness_result->version_masks[harness_result->version_mask_count++] = mask;
 }
 
-static double stub_asic_get_job_frequency(GlobalState *state)
+static float stub_asic_get_job_frequency(GlobalState *state, uint32_t version_mask)
 {
     (void)state;
+    (void)version_mask;
     return harness_job_frequency_ms;
 }
 
@@ -123,39 +127,31 @@ static void spy_decode_coinbase(GlobalState *state, const miner_job_t *job)
     harness_result->coinbase_decode_count++;
 }
 
-static void stub_difficulty_controller_update(GlobalState *state)
-{
-    (void)state;
-}
-
 #ifdef xTaskNotifyWait
 #undef xTaskNotifyWait
-#endif
-#ifdef vTaskDelay
-#undef vTaskDelay
 #endif
 #ifdef xTaskNotify
 #undef xTaskNotify
 #endif
 #define xTaskNotify fake_task_notify
 #define xTaskNotifyWait fake_task_notify_wait
-#define vTaskDelay spy_task_delay
+#define esp_timer_get_time fake_esp_timer_get_time
 #define ASIC_send_work spy_asic_send_work
 #define ASIC_send_job test_asic_send_job
 #define ASIC_clear_work spy_asic_clear_work
 #define ASIC_set_version_mask spy_asic_set_version_mask
 #define ASIC_get_asic_job_frequency_ms stub_asic_get_job_frequency
 #define SYSTEM_decode_and_apply_coinbase spy_decode_coinbase
-#define difficulty_controller_update stub_difficulty_controller_update
+#define POOL_resolve_notified_job(gs, notify) miner_job_get_slot((size_t)(notify))
 #include "main/tasks/create_jobs_task.c"
-#undef difficulty_controller_update
+#undef POOL_resolve_notified_job
 #undef SYSTEM_decode_and_apply_coinbase
 #undef ASIC_get_asic_job_frequency_ms
 #undef ASIC_set_version_mask
 #undef ASIC_send_work
 #undef ASIC_send_job
 #undef ASIC_clear_work
-#undef vTaskDelay
+#undef esp_timer_get_time
 #undef xTaskNotifyWait
 #undef xTaskNotify
 
@@ -171,10 +167,10 @@ void job_pipeline_harness_run(
 
     memset(result, 0, sizeof(*result));
     harness_state = (GlobalState) {
-        .DEVICE_CONFIG.family.asic.hardware_version_rolling =
-            config.hardware_version_rolling,
-        .DEVICE_CONFIG.family.asic.software_midstates =
-            config.software_midstates,
+        .DEVICE_CONFIG.family.asic.hw_version_mask = config.hw_version_mask,
+        .DEVICE_CONFIG.family.asic.packet_midstates =
+            (config.packet_midstates > 0) ? config.packet_midstates : 1,
+        .DEVICE_CONFIG.family.asic.driver_managed_work = config.driver_managed_work,
         .ASIC_initalized = config.asic_initialized,
         .create_jobs_task_handle = (void *)1,
     };
@@ -186,6 +182,7 @@ void job_pipeline_harness_run(
     harness_job_frequency_ms = config.job_frequency_ms;
     harness_config = config;
     harness_notification_pending = false;
+    harness_now_us = 1000000ULL;
     mining_allocator_fault_injector_reset(config.allocation_failure_at);
     mining_hash_fault_injector_reset(config.hash_failure_at);
 

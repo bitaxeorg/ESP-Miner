@@ -7,7 +7,6 @@
 #include "asic_common.h"
 #include "serial.h"
 #include "asic_reset.h"
-#include "difficulty_controller.h"
 #include "nvs_config.h"
 #include "vcore.h"
 #include <stdio.h>
@@ -32,17 +31,23 @@ uint8_t asic_initialize(GlobalState *GLOBAL_STATE, asic_init_mode_t mode, uint32
             ASIC_set_frequency(GLOBAL_STATE);
             if (!GLOBAL_STATE->SYSTEM_MODULE.hardware_fault) {
                 GLOBAL_STATE->ASIC_initalized = true;
-                difficulty_controller_update(GLOBAL_STATE);
-                vTaskDelay(pdMS_TO_TICKS(stabilization_delay_ms));
-                return chips;
+                uint8_t difficulty_power = calculate_effective_asic_difficulty(
+                    POWER_MANAGEMENT_get_nominal_hashrate(GLOBAL_STATE));
+                ASIC_set_difficulty(GLOBAL_STATE, difficulty_power);
+                if (!GLOBAL_STATE->SYSTEM_MODULE.hardware_fault) {
+                    vTaskDelay(pdMS_TO_TICKS(stabilization_delay_ms));
+                    return chips;
+                }
             }
         }
         VCORE_set_voltage(GLOBAL_STATE, 0.0f);
         GLOBAL_STATE->ASIC_initalized = false;
-        GLOBAL_STATE->SYSTEM_MODULE.hardware_fault = true;
-        snprintf(GLOBAL_STATE->SYSTEM_MODULE.hardware_fault_msg,
-                 sizeof(GLOBAL_STATE->SYSTEM_MODULE.hardware_fault_msg), "%s initialization failed",
-                 GLOBAL_STATE->DEVICE_CONFIG.family.asic.name);
+        if (!GLOBAL_STATE->SYSTEM_MODULE.hardware_fault) {
+            GLOBAL_STATE->SYSTEM_MODULE.hardware_fault = true;
+            snprintf(GLOBAL_STATE->SYSTEM_MODULE.hardware_fault_msg,
+                     sizeof(GLOBAL_STATE->SYSTEM_MODULE.hardware_fault_msg), "%s initialization failed",
+                     GLOBAL_STATE->DEVICE_CONFIG.family.asic.name);
+        }
         GLOBAL_STATE->SYSTEM_MODULE.asic_status = GLOBAL_STATE->SYSTEM_MODULE.hardware_fault_msg;
         return 0;
     }
@@ -123,7 +128,8 @@ uint8_t asic_initialize(GlobalState *GLOBAL_STATE, asic_init_mode_t mode, uint32
     SERIAL_clear_buffer();
 
     GLOBAL_STATE->ASIC_initalized = true;
-    difficulty_controller_update(GLOBAL_STATE);
+    uint8_t difficulty_power = calculate_effective_asic_difficulty(GLOBAL_STATE->POWER_MANAGEMENT_MODULE.expected_hashrate);
+    ASIC_set_difficulty(GLOBAL_STATE, difficulty_power);
     
     if (stabilization_delay_ms > 0) {
         ESP_LOGI(TAG, "Waiting %u ms for tasks to stabilize...", stabilization_delay_ms);

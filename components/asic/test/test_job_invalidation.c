@@ -5,6 +5,7 @@
 #include "bzm/reactor.h"
 #include "bzm/protocol.h"
 #include "miner_job.h"
+#include "freertos/FreeRTOS.h"
 #include "unity.h"
 #include "utils.h"
 
@@ -84,7 +85,7 @@ static invalidation_fixture_t *fixture_init(bool bonanza)
         miner_job_t *job = miner_job_get_slot(slot);
         job->type = JOB_TYPE_SV2_STANDARD;
         job->version = 0x20000004;
-        job->version_mask = 0x00006000;
+        job->version_mask = 0x0000e000;
         job->ntime = 0x65010203;
         job->nbits = 0x1705dd01;
         job->coinbase_prefix_len = 0;
@@ -102,7 +103,8 @@ static invalidation_fixture_t *fixture_init(bool bonanza)
 static job_pipeline_harness_config_t fixture_config(invalidation_fixture_t *fixture)
 {
     return (job_pipeline_harness_config_t){
-        .asic_initialized = true, .job_frequency_ms = 1, .software_midstates = 1,
+        .asic_initialized = true, .job_frequency_ms = 1,
+        .driver_managed_work = fixture->bonanza, .packet_midstates = fixture->bonanza ? 4 : 1,
         .on_send = send_work, .on_clear = clear_work, .context = fixture,
     };
 }
@@ -114,7 +116,7 @@ static void fixture_destroy(invalidation_fixture_t *fixture)
     free(fixture);
 }
 
-TEST_CASE("clean activation retires old BZM and Bitmain results before replacement",
+TEST_CASE("clean activation retires old BZM results and preserves Bitmain slots",
           "[asic][job-task][invalidation]")
 {
     for (unsigned backend = 0; backend < 2; ++backend) {
@@ -126,9 +128,9 @@ TEST_CASE("clean activation retires old BZM and Bitmain results before replaceme
         job_pipeline_harness_result_t result;
         job_pipeline_harness_run(fixture_config(fixture), events, 2, &result);
         TEST_ASSERT_EQUAL_UINT32(2, result.job_count);
-        TEST_ASSERT_EQUAL_UINT32(1, result.clears_before_send[0]);
-        TEST_ASSERT_EQUAL_UINT32(2, result.clears_before_send[1]);
-        TEST_ASSERT_FALSE(result_valid(fixture, 0, NULL));
+        TEST_ASSERT_EQUAL_UINT32(fixture->bonanza ? 1 : 0, result.clears_before_send[0]);
+        TEST_ASSERT_EQUAL_UINT32(fixture->bonanza ? 2 : 0, result.clears_before_send[1]);
+        TEST_ASSERT_EQUAL(!fixture->bonanza, result_valid(fixture, 0, NULL));
         asic_job_t job;
         TEST_ASSERT_TRUE(result_valid(fixture, 1, &job));
         TEST_ASSERT_EQUAL_STRING("clean", job.job_id);
@@ -145,7 +147,7 @@ TEST_CASE("non-clean notifications preserve prior BZM and Bitmain work and targe
         const job_pipeline_harness_event_t events[] = {
             {.type = JOB_PIPELINE_HARNESS_NOTIFY, .slot = 0},
             {.type = JOB_PIPELINE_HARNESS_NOTIFY, .slot = 2},
-            {.type = JOB_PIPELINE_HARNESS_TIMEOUT},
+            {.type = JOB_PIPELINE_HARNESS_TIMEOUT, .advance_ms = 1},
         };
         job_pipeline_harness_result_t result;
         job_pipeline_harness_run(fixture_config(fixture), events, 3, &result);
@@ -163,52 +165,67 @@ TEST_CASE("non-clean notifications preserve prior BZM and Bitmain work and targe
 TEST_CASE("refresh wakes cached work without invalidation and waits for an initial job",
           "[asic][job-task][refresh]")
 {
-    for (unsigned backend = 0; backend < 2; ++backend) {
-        invalidation_fixture_t *fixture = fixture_init(backend == 0);
-        const job_pipeline_harness_event_t events[] = {
-            {.type = JOB_PIPELINE_HARNESS_REFRESH},
-            {.type = JOB_PIPELINE_HARNESS_NOTIFY, .slot = 0},
-            {.type = JOB_PIPELINE_HARNESS_REFRESH},
-        };
-        job_pipeline_harness_config_t config = fixture_config(fixture);
-        config.job_frequency_ms = 200000;
-        job_pipeline_harness_result_t result;
-        job_pipeline_harness_run(config, events, 3, &result);
-        TEST_ASSERT_EQUAL_UINT32(2, result.job_count);
-        TEST_ASSERT_EQUAL_UINT32(1, result.delay_count);
-        TEST_ASSERT_EQUAL_STRING("old", result.jobs[1]->job_id);
-        TEST_ASSERT_EQUAL_UINT32(1, result.clear_count);
-        TEST_ASSERT_EQUAL_UINT32(result.clears_before_send[0], result.clears_before_send[1]);
-        TEST_ASSERT_NOT_EQUAL(result.jobs[0]->version, result.jobs[1]->version);
-        TEST_ASSERT_TRUE(result_valid(fixture, 0, NULL));
-        TEST_ASSERT_TRUE(result_valid(fixture, 1, NULL));
-        fixture_destroy(fixture);
-    }
+    invalidation_fixture_t *fixture = fixture_init(true);
+    const job_pipeline_harness_event_t events[] = {
+        {.type = JOB_PIPELINE_HARNESS_REFRESH},
+        {.type = JOB_PIPELINE_HARNESS_NOTIFY, .slot = 0},
+        {.type = JOB_PIPELINE_HARNESS_REFRESH},
+    };
+    job_pipeline_harness_config_t config = fixture_config(fixture);
+    config.job_frequency_ms = 200000;
+    job_pipeline_harness_result_t result;
+    job_pipeline_harness_run(config, events, 3, &result);
+    TEST_ASSERT_EQUAL_UINT32(2, result.job_count);
+    TEST_ASSERT_EQUAL_UINT32(portMAX_DELAY, result.wait_ticks[0]);
+    TEST_ASSERT_EQUAL_STRING("old", result.jobs[1]->job_id);
+    TEST_ASSERT_EQUAL_UINT32(1, result.clear_count);
+    TEST_ASSERT_EQUAL_UINT32(result.clears_before_send[0], result.clears_before_send[1]);
+    TEST_ASSERT_NOT_EQUAL(result.jobs[0]->version, result.jobs[1]->version);
+    TEST_ASSERT_TRUE(result_valid(fixture, 0, NULL));
+    TEST_ASSERT_TRUE(result_valid(fixture, 1, NULL));
+    fixture_destroy(fixture);
 }
 
 TEST_CASE("refresh cannot overwrite pending clean or non-clean notifications",
           "[asic][job-task][refresh]")
 {
-    for (unsigned backend = 0; backend < 2; ++backend) {
-        for (unsigned pending = 0; pending < 2; ++pending) {
-            invalidation_fixture_t *fixture = fixture_init(backend == 0);
-            const job_pipeline_harness_event_t events[] = {
-                {.type = JOB_PIPELINE_HARNESS_NOTIFY, .slot = 0},
-                {.type = JOB_PIPELINE_HARNESS_NOTIFY, .slot = pending + 1, .coalesce_next = true},
-                {.type = JOB_PIPELINE_HARNESS_REFRESH},
-                {.type = JOB_PIPELINE_HARNESS_TIMEOUT},
-            };
-            job_pipeline_harness_result_t result;
-            job_pipeline_harness_config_t config = fixture_config(fixture);
-            config.job_frequency_ms = 200000;
-            job_pipeline_harness_run(config, events, 4, &result);
-            TEST_ASSERT_EQUAL_UINT32(3, result.wait_count);
-            TEST_ASSERT_EQUAL_UINT32(0, result.wait_ticks[2]);
-            TEST_ASSERT_EQUAL_UINT32(pending == 0 ? 3 : 2, result.job_count);
-            TEST_ASSERT_EQUAL_STRING(pending == 0 ? "clean" : "following", result.jobs[1]->job_id);
-            TEST_ASSERT_TRUE(result_valid(fixture, result.job_count - 1, NULL));
-            TEST_ASSERT_EQUAL(pending == 1, result_valid(fixture, 0, NULL));
-            fixture_destroy(fixture);
-        }
+    for (unsigned pending = 0; pending < 2; ++pending) {
+        invalidation_fixture_t *fixture = fixture_init(true);
+        const job_pipeline_harness_event_t events[] = {
+            {.type = JOB_PIPELINE_HARNESS_NOTIFY, .slot = 0},
+            {.type = JOB_PIPELINE_HARNESS_NOTIFY, .slot = pending + 1, .coalesce_next = true},
+            {.type = JOB_PIPELINE_HARNESS_REFRESH},
+            {.type = JOB_PIPELINE_HARNESS_TIMEOUT},
+        };
+        job_pipeline_harness_result_t result;
+        job_pipeline_harness_config_t config = fixture_config(fixture);
+        config.job_frequency_ms = 200000;
+        job_pipeline_harness_run(config, events, 4, &result);
+        TEST_ASSERT_EQUAL_UINT32(3, result.wait_count);
+        TEST_ASSERT_EQUAL_UINT32(0, result.wait_ticks[2]);
+        TEST_ASSERT_EQUAL_UINT32(pending == 0 ? 3 : 2, result.job_count);
+        TEST_ASSERT_EQUAL_STRING(pending == 0 ? "clean" : "following", result.jobs[1]->job_id);
+        TEST_ASSERT_TRUE(result_valid(fixture, result.job_count - 1, NULL));
+        TEST_ASSERT_EQUAL(pending == 1, result_valid(fixture, 0, NULL));
+        fixture_destroy(fixture);
     }
+}
+
+TEST_CASE("BZM refresh preserves pending pool clear and cannot revive cleared work",
+          "[asic][job-task][refresh]")
+{
+    invalidation_fixture_t *fixture = fixture_init(true);
+    const job_pipeline_harness_event_t events[] = {
+        {.type = JOB_PIPELINE_HARNESS_NOTIFY, .slot = 0},
+        {.type = JOB_PIPELINE_HARNESS_CLEAR, .coalesce_next = true},
+        {.type = JOB_PIPELINE_HARNESS_REFRESH},
+        {.type = JOB_PIPELINE_HARNESS_REFRESH},
+        {.type = JOB_PIPELINE_HARNESS_NOTIFY, .slot = 1},
+    };
+    job_pipeline_harness_result_t result;
+    job_pipeline_harness_run(fixture_config(fixture), events, 5, &result);
+    TEST_ASSERT_EQUAL_UINT32(2, result.job_count);
+    TEST_ASSERT_EQUAL_UINT32(portMAX_DELAY, result.wait_ticks[2]);
+    TEST_ASSERT_EQUAL_STRING("clean", result.jobs[1]->job_id);
+    fixture_destroy(fixture);
 }

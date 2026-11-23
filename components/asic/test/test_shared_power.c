@@ -34,7 +34,8 @@ static esp_err_t shared_flush(uart_port_t port);
 #define ASIC_set_max_baud shared_max_baud
 #define asic_hold_reset_low shared_hold_reset
 #define asic_reset shared_reset
-#define difficulty_controller_update shared_difficulty
+#define ASIC_set_difficulty shared_difficulty
+#define POWER_MANAGEMENT_get_nominal_hashrate shared_nominal_hashrate
 #define asic_initialize shared_initialize
 #define SERIAL_init shared_serial_init
 #define SERIAL_is_initialized shared_serial_ready
@@ -54,6 +55,7 @@ static float saved_frequency, applied_frequency, applied_voltage, chip_temp;
 static uint16_t saved_voltage;
 static float board_input_mv;
 static unsigned chip_inits, clock_writes, serial_calls, resets, cooling_delays, polls;
+static uint8_t applied_difficulty;
 static bool overheat, edit_settings, fail_init;
 static esp_err_t shutdown_error;
 
@@ -80,7 +82,7 @@ float shared_chip_temp2(GlobalState *s) { (void)s; return -1; }
 float shared_min_frequency(GlobalState *s) { return s->DEVICE_CONFIG.family.asic.min_frequency_mhz; }
 void shared_frequency(GlobalState *s) { ++clock_writes; applied_frequency = s->POWER_MANAGEMENT_MODULE.frequency_value; }
 void shared_nonce_space(GlobalState *s) { (void)s; }
-void shared_difficulty(GlobalState *s) { (void)s; }
+void shared_difficulty(GlobalState *s, uint8_t power) { (void)s; applied_difficulty = power; }
 uint8_t shared_asic_init(GlobalState *s) { ++chip_inits; return fail_init ? 0 : s->DEVICE_CONFIG.family.asic_count; }
 int shared_max_baud(GlobalState *s) { (void)s; return 1000000; }
 esp_err_t shared_hold_reset(void) { ++resets; return ESP_OK; }
@@ -109,6 +111,7 @@ static void fixture(AsicConfig asic)
     saved_frequency = asic.default_frequency_mhz;
     saved_voltage = asic.default_voltage_mv;
     applied_frequency = applied_voltage = 0;
+    applied_difficulty = UINT8_MAX;
     chip_temp = 40;
     board_input_mv = 12000;
     chip_inits = clock_writes = serial_calls = resets = cooling_delays = polls = 0;
@@ -131,6 +134,7 @@ TEST_CASE("Shared power stops BZM at 800 MHz and restores saved settings on resu
     TEST_ASSERT_FALSE(state.ASIC_initalized);
     TEST_ASSERT_EQUAL_UINT8(4, mining_start(&state));
     TEST_ASSERT_EQUAL_FLOAT(1100, applied_frequency);
+    TEST_ASSERT_EQUAL_UINT8(8, applied_difficulty);
     TEST_ASSERT_FLOAT_WITHIN(0.001f, 2.95f, applied_voltage);
     TEST_ASSERT_TRUE(state.ASIC_initalized);
     TEST_ASSERT_EQUAL_UINT32(0, serial_calls);
@@ -182,6 +186,7 @@ TEST_CASE("Shared power applies live BZM settings through the common interfaces"
     edit_settings = true;
     shared_power_task(&state);
     TEST_ASSERT_EQUAL_FLOAT(900, applied_frequency);
+    TEST_ASSERT_EQUAL_UINT8(8, applied_difficulty);
     TEST_ASSERT_FLOAT_WITHIN(0.001f, 2.9f, applied_voltage);
     TEST_ASSERT_EQUAL_UINT32(1, clock_writes);
 }

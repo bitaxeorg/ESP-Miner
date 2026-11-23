@@ -10,6 +10,7 @@ typedef struct {
     bool pools_unavailable, mining_paused, hardware_fault, overheat_mode;
     char hardware_fault_msg[64];
     const char *asic_status;
+    uint8_t current_difficulty_power;
 } SystemModule;
 typedef struct GlobalState {
     DeviceConfig DEVICE_CONFIG;
@@ -17,7 +18,6 @@ typedef struct GlobalState {
     SystemModule SYSTEM_MODULE;
     struct { bool is_active, is_finished; } SELF_TEST_MODULE;
     bool ASIC_initalized;
-    uint8_t current_difficulty_power;
 } GlobalState;
 
 #endif

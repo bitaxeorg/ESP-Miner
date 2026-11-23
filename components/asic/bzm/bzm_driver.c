@@ -1091,7 +1091,7 @@ bzm_bringup_outcome_t bzm_driver_start(bzm_device_t *state, const bzm_bringup_te
     }
     /* Prime every engine with fresh work, including after resume. */
     start_work_replacement_locked(config.engine_count);
-    state->difficulty_power = 0; // Let the controller apply its initial value immediately.
+    state->difficulty_power = BZM_INITIAL_LEAD_ZEROS - 32;
     pthread_mutex_unlock(&REACTOR_LOCK);
     return BZM_BRINGUP_GOOD;
 

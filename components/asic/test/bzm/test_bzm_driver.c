@@ -578,7 +578,7 @@ TEST_CASE("BZM startup primes every engine and waits for board dispatch authoriz
     TEST_ASSERT_TRUE(DRIVER_BRINGUP.running);
     TEST_ASSERT_FALSE(startup_reset_asserted);
     TEST_ASSERT_EQUAL_UINT32(1, startup_chip_calls);
-    TEST_ASSERT_EQUAL_UINT8(0, test_state.difficulty_power);
+    TEST_ASSERT_EQUAL_UINT8(REACTOR.config.lead_zeros - 32, test_state.difficulty_power);
     TEST_ASSERT_EQUAL_UINT8_ARRAY(bzm_asic_wire_ids, TRANSPORT.asic_ids, BZM_MAX_ASIC_COUNT);
     TEST_ASSERT_EQUAL_UINT16(BZM_ENGINE_ROWS, REFILL_REMAINING);
     TEST_ASSERT_EQUAL_UINT16(BZM_ENGINE_ROWS, BZM_STATE->work_replacement_remaining);

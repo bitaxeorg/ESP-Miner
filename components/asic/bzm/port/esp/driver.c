@@ -39,7 +39,7 @@ static bzm_device_t device_view(GlobalState *state)
         .core_count = state->DEVICE_CONFIG.family.asic.core_count,
         .target_frequency_mhz = state->POWER_MANAGEMENT_MODULE.frequency_value,
         .actual_frequency_mhz = state->POWER_MANAGEMENT_MODULE.actual_frequency,
-        .difficulty_power = state->current_difficulty_power,
+        .difficulty_power = state->SYSTEM_MODULE.current_difficulty_power,
         .initialized = state->ASIC_initalized, .context = state,
         .can_submit = can_submit, .report_fault = report_fault,
         .frequency_changed = frequency_changed,
@@ -75,7 +75,7 @@ uint8_t BZM_init(GlobalState *state)
         return 0;
     }
     state->POWER_MANAGEMENT_MODULE.actual_frequency = device.actual_frequency_mhz;
-    state->current_difficulty_power = device.difficulty_power;
+    state->SYSTEM_MODULE.current_difficulty_power = device.difficulty_power;
     return count;
 }
 void BZM_set_frequency(GlobalState *state)
