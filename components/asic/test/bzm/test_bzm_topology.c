@@ -103,19 +103,33 @@ TEST_CASE("BZM topology rejects all four disabled engines", "[asic][bzm][topolog
     }
 }
 
-TEST_CASE("BZM topology identifiers round trip for every usable engine", "[asic][bzm][topology]")
+TEST_CASE("BZM direct lookup preserves column-major grid and stack numbering", "[asic][bzm][topology]")
 {
-    for (uint16_t index = 0; index < BZM_TOPOLOGY_ENGINE_COUNT; ++index) {
-        bzm_engine_location_t expected;
-        bzm_engine_location_t actual;
-        TEST_ASSERT_TRUE(bzm_topology_activation_at(index, BZM_ENGINE_STACK_BOTTOM, &expected));
+    uint16_t next_engine = 0;
+    uint16_t next_on_stack[BZM_ENGINE_STACK_COUNT] = {0};
+    for (uint8_t column = 0; column < BZM_TOPOLOGY_COLUMNS; ++column) {
+        for (uint8_t row = 0; row < 64; ++row) {
+            uint16_t id = ((uint16_t)column << 6) | row;
+            bool disabled = id == 0x100 || id == 0x140 || id == 0x153 || id == 0x2d3;
+            bzm_engine_location_t physical, by_stack;
+            bool valid = bzm_topology_from_physical_id(id, &physical);
+            TEST_ASSERT_EQUAL(row < BZM_TOPOLOGY_ROWS && !disabled, valid);
+            if (!valid) continue;
 
-        TEST_ASSERT_TRUE(bzm_topology_from_physical_id(expected.physical_id, &actual));
-        assert_same_engine(&expected, &actual);
-
-        TEST_ASSERT_TRUE(bzm_topology_stack_engine_at(expected.stack, expected.stack_index, &actual));
-        assert_same_engine(&expected, &actual);
+            bzm_engine_stack_t stack = row < 10 ? BZM_ENGINE_STACK_BOTTOM : BZM_ENGINE_STACK_TOP;
+            TEST_ASSERT_EQUAL_UINT16(id, physical.physical_id);
+            TEST_ASSERT_EQUAL_UINT16(next_engine, physical.topology_index);
+            TEST_ASSERT_EQUAL_INT(stack, physical.stack);
+            TEST_ASSERT_EQUAL_UINT16(next_on_stack[stack], physical.stack_index);
+            TEST_ASSERT_TRUE(bzm_topology_stack_engine_at(stack, next_on_stack[stack], &by_stack));
+            assert_same_engine(&physical, &by_stack);
+            ++next_engine;
+            ++next_on_stack[stack];
+        }
     }
+    TEST_ASSERT_EQUAL_UINT16(BZM_TOPOLOGY_ENGINE_COUNT, next_engine);
+    TEST_ASSERT_EQUAL_UINT16(BZM_TOPOLOGY_STACK_ENGINE_COUNT, next_on_stack[BZM_ENGINE_STACK_BOTTOM]);
+    TEST_ASSERT_EQUAL_UINT16(BZM_TOPOLOGY_STACK_ENGINE_COUNT, next_on_stack[BZM_ENGINE_STACK_TOP]);
 }
 
 TEST_CASE("BZM balanced pairs cover both stacks exactly once", "[asic][bzm][topology][balance]")

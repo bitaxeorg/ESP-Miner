@@ -36,6 +36,12 @@ foreach(test transport manufacturing hash platform driver_fault driver_backlog d
     add_test(NAME bzm_${test} COMMAND bzm_test_${test})
 endforeach()
 
+# Count topology function entries so a grid scan is detectable without a timing threshold.
+add_executable(bzm_test_topology_cost test_topology_cost.c "${ASIC_DIR}/bzm/bzm_topology.c")
+target_include_directories(bzm_test_topology_cost PRIVATE "${ASIC_DIR}/include")
+target_compile_options(bzm_test_topology_cost PRIVATE -Wall -Wextra -Werror -Wpedantic -O0 -finstrument-functions)
+add_test(NAME bzm_topology_cost COMMAND bzm_test_topology_cost)
+
 set(BZM_HEADER_CHECK_SOURCES)
 foreach(header balanced_ramp board bringup chain controls dispatch_gate
                frame_parser frequency platform posix power protocol registers

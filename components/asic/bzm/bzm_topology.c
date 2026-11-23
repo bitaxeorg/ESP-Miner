@@ -29,60 +29,68 @@ static bool stack_is_valid(bzm_engine_stack_t stack)
     return stack == BZM_ENGINE_STACK_BOTTOM || stack == BZM_ENGINE_STACK_TOP;
 }
 
+enum { ROWS_PER_STACK = BZM_TOPOLOGY_ROWS / BZM_ENGINE_STACK_COUNT };
+
 static bzm_engine_stack_t stack_for_row(uint8_t row)
 {
-    return row < (BZM_TOPOLOGY_ROWS / 2U) ? BZM_ENGINE_STACK_BOTTOM : BZM_ENGINE_STACK_TOP;
+    return row < ROWS_PER_STACK ? BZM_ENGINE_STACK_BOTTOM : BZM_ENGINE_STACK_TOP;
+}
+
+/* Disabled engines in column-major order. Compact indexes skip these slots. */
+static const struct {
+    uint8_t row;
+    uint8_t column;
+} disabled_engines[] = {
+    {0, 4}, {0, 5}, {19, 5}, {19, 11},
+};
+
+enum { DISABLED_ENGINE_COUNT = sizeof(disabled_engines) / sizeof(disabled_engines[0]) };
+_Static_assert(BZM_TOPOLOGY_ENGINE_COUNT + DISABLED_ENGINE_COUNT == BZM_TOPOLOGY_GRID_ENGINE_COUNT,
+               "disabled engine list must account for every missing coordinate");
+
+static uint16_t grid_index(uint8_t row, uint8_t column)
+{
+    return column * BZM_TOPOLOGY_ROWS + row;
+}
+
+static uint16_t stack_grid_index(uint8_t row, uint8_t column)
+{
+    return column * ROWS_PER_STACK + row % ROWS_PER_STACK;
 }
 
 bool bzm_topology_coordinate_is_valid(uint8_t row, uint8_t column)
 {
-    if (row >= BZM_TOPOLOGY_ROWS || column >= BZM_TOPOLOGY_COLUMNS) {
-        return false;
+    if (row >= BZM_TOPOLOGY_ROWS || column >= BZM_TOPOLOGY_COLUMNS) return false;
+    for (size_t i = 0; i < DISABLED_ENGINE_COUNT; ++i) {
+        if (row == disabled_engines[i].row && column == disabled_engines[i].column) return false;
     }
-
-    return !((row == 0U && (column == 4U || column == 5U)) || (row == 19U && (column == 5U || column == 11U)));
+    return true;
 }
 
-static bool locate_coordinate(uint8_t requested_row, uint8_t requested_column, bzm_engine_location_t * engine)
+static bool locate_coordinate(uint8_t row, uint8_t column, bzm_engine_location_t *engine)
 {
-    if (engine == NULL || !bzm_topology_coordinate_is_valid(requested_row, requested_column)) {
+    if (engine == NULL || row >= BZM_TOPOLOGY_ROWS || column >= BZM_TOPOLOGY_COLUMNS) {
         return false;
     }
 
-    uint16_t topology_index = 0;
-    uint16_t bottom_index = 0;
-    uint16_t top_index = 0;
-
-    for (uint8_t column = 0; column < BZM_TOPOLOGY_COLUMNS; ++column) {
-        for (uint8_t row = 0; row < BZM_TOPOLOGY_ROWS; ++row) {
-            if (!bzm_topology_coordinate_is_valid(row, column))
-                continue;
-
-            bzm_engine_stack_t stack = stack_for_row(row);
-            uint16_t stack_index = stack == BZM_ENGINE_STACK_BOTTOM ? bottom_index : top_index;
-
-            if (row == requested_row && column == requested_column) {
-                *engine = (bzm_engine_location_t){
-                    .row = row,
-                    .column = column,
-                    .stack = stack,
-                    .physical_id = ((uint16_t) column << 6) | row,
-                    .topology_index = topology_index,
-                    .stack_index = stack_index,
-                };
-                return true;
-            }
-
-            ++topology_index;
-            if (stack == BZM_ENGINE_STACK_BOTTOM) {
-                ++bottom_index;
-            } else {
-                ++top_index;
-            }
-        }
+    bzm_engine_stack_t stack = stack_for_row(row);
+    uint16_t position = grid_index(row, column);
+    uint16_t topology_index = position;
+    uint16_t stack_index = stack_grid_index(row, column);
+    for (size_t i = 0; i < DISABLED_ENGINE_COUNT; ++i) {
+        uint16_t hole = grid_index(disabled_engines[i].row, disabled_engines[i].column);
+        if (hole > position) break;
+        if (hole == position) return false;
+        --topology_index;
+        if (stack_for_row(disabled_engines[i].row) == stack) --stack_index;
     }
 
-    return false;
+    *engine = (bzm_engine_location_t){
+        .row = row, .column = column, .stack = stack,
+        .physical_id = ((uint16_t)column << 6) | row,
+        .topology_index = topology_index, .stack_index = stack_index,
+    };
+    return true;
 }
 
 bool bzm_topology_from_physical_id(uint16_t physical_id, bzm_engine_location_t * engine)
@@ -101,20 +109,16 @@ bool bzm_topology_stack_engine_at(bzm_engine_stack_t stack, uint16_t stack_index
         return false;
     }
 
-    uint16_t current = 0;
-    for (uint8_t column = 0; column < BZM_TOPOLOGY_COLUMNS; ++column) {
-        for (uint8_t row = 0; row < BZM_TOPOLOGY_ROWS; ++row) {
-            if (!bzm_topology_coordinate_is_valid(row, column) || stack_for_row(row) != stack) {
-                continue;
-            }
-            if (current == stack_index) {
-                return locate_coordinate(row, column, engine);
-            }
-            ++current;
+    uint16_t position = stack_index;
+    for (size_t i = 0; i < DISABLED_ENGINE_COUNT; ++i) {
+        uint8_t row = disabled_engines[i].row;
+        if (stack_for_row(row) == stack && stack_grid_index(row, disabled_engines[i].column) <= position) {
+            ++position;
         }
     }
-
-    return false;
+    uint8_t row = position % ROWS_PER_STACK;
+    if (stack == BZM_ENGINE_STACK_TOP) row += ROWS_PER_STACK;
+    return locate_coordinate(row, position / ROWS_PER_STACK, engine);
 }
 
 bool bzm_topology_balanced_pair_at(uint16_t pair_index, bzm_engine_pair_t * pair)
