@@ -43,8 +43,11 @@ static void mining_stop(GlobalState * GLOBAL_STATE)
     ASIC_set_nonce_space(GLOBAL_STATE);
 
     // Cut ASIC power and hold in reset
-    VCORE_set_voltage(GLOBAL_STATE, 0.0f);
-    asic_hold_reset_low();
+    const VcoreDriver *driver = GLOBAL_STATE->DEVICE_CONFIG.vcore_driver;
+    esp_err_t shutdown_err = VCORE_set_voltage(GLOBAL_STATE, 0.0f);
+    if (shutdown_err != ESP_OK || !driver || !driver->asserts_reset_on_shutdown) {
+        asic_hold_reset_low();
+    }
 
     // Mark uninitialized immediately so tasks stop issuing UART commands
     GLOBAL_STATE->ASIC_initalized = false;

@@ -55,6 +55,7 @@ static uint16_t saved_voltage;
 static float board_input_mv;
 static unsigned chip_inits, clock_writes, serial_calls, resets, cooling_delays, polls;
 static bool overheat, edit_settings, fail_init;
+static esp_err_t shutdown_error;
 
 uint16_t shared_get_u16(NvsConfigKey key) { return key == NVS_CONFIG_ASIC_VOLTAGE ? saved_voltage : 100; }
 void shared_set_u16(NvsConfigKey key, uint16_t value) { if (key == NVS_CONFIG_ASIC_VOLTAGE) saved_voltage = value; }
@@ -62,7 +63,12 @@ float shared_get_float(NvsConfigKey key) { (void)key; return saved_frequency; }
 void shared_set_float(NvsConfigKey key, float value) { (void)key; saved_frequency = value; }
 bool shared_get_bool(NvsConfigKey key) { return key == NVS_CONFIG_OVERHEAT_MODE && overheat; }
 void shared_set_bool(NvsConfigKey key, bool value) { if (key == NVS_CONFIG_OVERHEAT_MODE) overheat = value; }
-esp_err_t shared_voltage(GlobalState *s, float volts) { (void)s; applied_voltage = volts; return ESP_OK; }
+esp_err_t shared_voltage(GlobalState *s, float volts)
+{
+    (void)s;
+    applied_voltage = volts;
+    return volts == 0 ? shutdown_error : ESP_OK;
+}
 int16_t shared_voltage_mv(GlobalState *s) { (void)s; return applied_voltage * 1000; }
 int16_t shared_min_voltage(GlobalState *s) { return s->DEVICE_CONFIG.family.asic.id == BZM ? 2100 : 1000; }
 esp_err_t shared_check_fault(GlobalState *s) { (void)s; return ESP_OK; }
@@ -107,11 +113,13 @@ static void fixture(AsicConfig asic)
     board_input_mv = 12000;
     chip_inits = clock_writes = serial_calls = resets = cooling_delays = polls = 0;
     overheat = edit_settings = fail_init = false;
+    shutdown_error = ESP_OK;
 }
 
 TEST_CASE("Shared power stops BZM at 800 MHz and restores saved settings on resume", "[asic][power][shared]")
 {
     fixture(ASIC_BZM);
+    state.DEVICE_CONFIG.vcore_driver = &BONANZA_VCORE_DRIVER;
     saved_frequency = 1100; saved_voltage = 2950;
     shared_init_frequency(&state);
     TEST_ASSERT_EQUAL_FLOAT(800, state.POWER_MANAGEMENT_MODULE.actual_frequency);
@@ -119,6 +127,7 @@ TEST_CASE("Shared power stops BZM at 800 MHz and restores saved settings on resu
     mining_stop(&state);
     TEST_ASSERT_EQUAL_FLOAT(800, applied_frequency);
     TEST_ASSERT_EQUAL_FLOAT(0, applied_voltage);
+    TEST_ASSERT_EQUAL_UINT32(0, resets);
     TEST_ASSERT_FALSE(state.ASIC_initalized);
     TEST_ASSERT_EQUAL_UINT8(4, mining_start(&state));
     TEST_ASSERT_EQUAL_FLOAT(1100, applied_frequency);
@@ -127,9 +136,20 @@ TEST_CASE("Shared power stops BZM at 800 MHz and restores saved settings on resu
     TEST_ASSERT_EQUAL_UINT32(0, serial_calls);
 }
 
+TEST_CASE("Shared power falls back to ASIC reset when board shutdown fails", "[asic][power][shared]")
+{
+    fixture(ASIC_BZM);
+    state.DEVICE_CONFIG.vcore_driver = &BONANZA_VCORE_DRIVER;
+    shutdown_error = ESP_FAIL;
+    mining_stop(&state);
+    TEST_ASSERT_EQUAL_UINT32(1, resets);
+    TEST_ASSERT_FALSE(state.ASIC_initalized);
+}
+
 TEST_CASE("Shared power shuts down BZM after the driver reports a hardware fault", "[asic][power][shared]")
 {
     fixture(ASIC_BZM);
+    state.DEVICE_CONFIG.vcore_driver = &BONANZA_VCORE_DRIVER;
     applied_voltage = 2.95f;
     state.SYSTEM_MODULE.hardware_fault = true;
     shared_power_task(&state);
@@ -138,7 +158,7 @@ TEST_CASE("Shared power shuts down BZM after the driver reports a hardware fault
     TEST_ASSERT_EQUAL_FLOAT(0, state.POWER_MANAGEMENT_MODULE.expected_hashrate);
     TEST_ASSERT_FALSE(state.ASIC_initalized);
     TEST_ASSERT_TRUE(state.SYSTEM_MODULE.hardware_fault);
-    TEST_ASSERT_EQUAL_UINT32(1, resets);
+    TEST_ASSERT_EQUAL_UINT32(0, resets);
     TEST_ASSERT_EQUAL_UINT32(1, clock_writes);
     TEST_ASSERT_EQUAL_UINT32(0, chip_inits);
 }
@@ -173,6 +193,7 @@ TEST_CASE("Shared power retains the Bitmain stop frequency and UART initializati
     TEST_ASSERT_EQUAL_FLOAT(50, state.POWER_MANAGEMENT_MODULE.actual_frequency);
     mining_stop(&state);
     TEST_ASSERT_EQUAL_FLOAT(50, applied_frequency);
+    TEST_ASSERT_EQUAL_UINT32(1, resets);
     TEST_ASSERT_EQUAL_UINT8(4, mining_start(&state));
     TEST_ASSERT_GREATER_THAN_UINT32(0, serial_calls);
     TEST_ASSERT_TRUE(state.ASIC_initalized);

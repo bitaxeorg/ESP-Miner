@@ -186,4 +186,5 @@ esp_err_t BONANZA_VCORE_set_voltage(GlobalState *state, float volts)
 const VcoreDriver BONANZA_VCORE_DRIVER = {
     .init = BONANZA_VCORE_init,
     .set_voltage = BONANZA_VCORE_set_voltage,
+    .asserts_reset_on_shutdown = true,
 };
