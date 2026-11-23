@@ -139,11 +139,6 @@ static void setup_ble_set_status(const char *status)
 #endif
 }
 
-static uint16_t setup_ble_primary_pool_index(void)
-{
-    return nvs_config_get_u16(NVS_CONFIG_PRIMARY_POOL_INDEX);
-}
-
 static void setup_ble_json_set_string(cJSON *root, const char *key, const char *value)
 {
     cJSON *item = cJSON_CreateString(value);
@@ -181,7 +176,7 @@ static void setup_ble_load_current_config(void)
     setup_ble_state.pool_port[0] = '\0';
     setup_ble_state.pool_user[0] = '\0';
 
-    char *pool_json = nvs_config_get_string_indexed(NVS_CONFIG_POOL, setup_ble_primary_pool_index());
+    char *pool_json = nvs_config_get_string_indexed(NVS_CONFIG_POOL, 0);
     if (pool_json != NULL) {
         cJSON *root = cJSON_Parse(pool_json);
         if (root != NULL) {
@@ -272,8 +267,7 @@ static esp_err_t setup_ble_apply_config(void)
                         setup_ble_state.written[SETUP_BLE_FIELD_POOL_PASSWORD];
 
     if (pool_changed) {
-        uint16_t pool_index = setup_ble_primary_pool_index();
-        char *pool_json = nvs_config_get_string_indexed(NVS_CONFIG_POOL, pool_index);
+        char *pool_json = nvs_config_get_string_indexed(NVS_CONFIG_POOL, 0);
         cJSON *root = NULL;
         if (pool_json != NULL && strlen(pool_json) > 0) {
             root = cJSON_Parse(pool_json);
@@ -306,7 +300,7 @@ static esp_err_t setup_ble_apply_config(void)
             setup_ble_set_status("ERROR_POOL_ALLOC");
             return ESP_ERR_NO_MEM;
         }
-        nvs_config_set_string_indexed(NVS_CONFIG_POOL, pool_index, json_str);
+        nvs_config_set_string_indexed(NVS_CONFIG_POOL, 0, json_str);
         free(json_str);
     }
 

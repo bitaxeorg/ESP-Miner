@@ -18,7 +18,6 @@
 #include "i2c_bitaxe.h"
 #include "adc.h"
 #include "nvs_config.h"
-#include "miner_job.h"
 #include "self_test.h"
 #include "asic.h"
 #include "bap/bap.h"
@@ -234,8 +233,6 @@ void app_main(void)
     }
 
     WEBHOOK_ALERTS_notify_startup();
-
-    miner_job_pool_init();
 
     if (system_init_ret == ESP_OK) {
         if (asic_initialize(&GLOBAL_STATE, ASIC_INIT_COLD_BOOT, 0) == 0) {
