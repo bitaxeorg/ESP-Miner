@@ -167,6 +167,26 @@ static void test_errors_and_recovery(void)
     bzm_serial_transport_deinit(&t);
 }
 
+static void test_nonblocking_result_reads(void)
+{
+    bzm_serial_transport_t transport;
+    fixture_t fixture;
+    init(&transport, &fixture);
+    const uint8_t frame[] = {0x1e, 0x01, 0x83, 0x45, 0x78, 0x56, 0x34, 0x12, 0x17, 0x0d};
+    bzm_raw_result_t result;
+    uint64_t started = fixture.now;
+    CHECK(!bzm_serial_read_result(&transport, &result, 0));
+    CHECK(fixture.now == started);
+    feed(&fixture, frame, 4);
+    CHECK(!bzm_serial_read_result(&transport, &result, 0));
+    CHECK(fixture.cursor == 4);
+    feed(&fixture, frame + 4, sizeof(frame) - 4);
+    CHECK(bzm_serial_read_result(&transport, &result, 0));
+    CHECK(result.asic_id == 0x1e && result.nonce == 0x12345678 && result.engine_id == 0x345);
+    CHECK(!bzm_serial_read_result(&transport, &result, 0));
+    bzm_serial_transport_deinit(&transport);
+}
+
 static void test_poll_results(void)
 {
     bzm_serial_transport_t t;
@@ -313,10 +333,11 @@ int main(void)
     test_two_devices();
     test_interleaved_replies();
     test_errors_and_recovery();
+    test_nonblocking_result_reads();
     test_poll_results();
     test_work_wire_bytes();
     test_runtime_preserves_nonce_quarters();
     test_multicast_encoding();
-    puts("BZM host transport: 8 scenarios passed");
+    puts("BZM host transport: 9 scenarios passed");
     return 0;
 }

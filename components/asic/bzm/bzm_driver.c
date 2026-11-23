@@ -334,9 +334,7 @@ double bzm_driver_job_frequency_ms(bzm_device_t *state)
 static bzm_result_t * driver_receive_result(bzm_device_t * state)
 {
     (void) state;
-    if (BZM_STATE == NULL || !INITIALIZED ||
-        (DRIVER_TRANSPORT_READY && !DRIVER_BRINGUP.running)) {
-        // Let the lower-priority power task finish clearing the shared initialized state.
+    if (BZM_STATE == NULL) {
         bzm_sleep_ms(1);
         return NULL;
     }
@@ -344,7 +342,14 @@ static bzm_result_t * driver_receive_result(bzm_device_t * state)
     bzm_raw_result_t raw;
     static bzm_result_t event;
     pthread_mutex_lock(&REACTOR_LOCK);
-    bool received = bzm_serial_read_result(&TRANSPORT, &raw, 20);
+    if (!INITIALIZED || (DRIVER_TRANSPORT_READY && !DRIVER_BRINGUP.running)) {
+        pthread_mutex_unlock(&REACTOR_LOCK);
+        // Let the lower-priority power task finish clearing the shared initialized state.
+        bzm_sleep_ms(1);
+        return NULL;
+    }
+
+    bool received = bzm_serial_read_result(&TRANSPORT, &raw, 0);
     if (received && bzm_reactor_results_quarantined(&REACTOR)) {
         pthread_mutex_unlock(&REACTOR_LOCK);
         bzm_sleep_ms(1);
@@ -359,9 +364,9 @@ static bzm_result_t * driver_receive_result(bzm_device_t * state)
         return NULL;
     }
     /* The lower-priority Stratum task must be able to acquire REACTOR_LOCK
-     * to retire a disconnected pool. Repeated timed reads followed by an
-     * immediate lock reacquisition otherwise starve that transition when
-     * all arriving results are stale. Block outside the lock for one tick;
+     * to retire a disconnected pool. Repeated reads followed by an immediate
+     * lock reacquisition otherwise starve that transition when the UART is
+     * empty or all arriving results are stale. Block outside the lock for one tick;
      * taskYIELD alone cannot schedule a lower-priority waiter. */
     if (!mapped)
         bzm_sleep_ms(1);

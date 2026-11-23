@@ -608,6 +608,8 @@ bool bzm_serial_read_result(bzm_serial_transport_t * transport, bzm_raw_result_t
         return false;
     if (dequeue_result(transport, result))
         return true;
+    if (timeout_ms == 0)
+        return bzm_serial_poll(transport, 0).status == BZM_OK && dequeue_result(transport, result);
 
     uint64_t deadline = transport->ops.now_us(transport->context) + (uint64_t) timeout_ms * 1000;
     while (true) {

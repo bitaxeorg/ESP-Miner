@@ -148,6 +148,7 @@ bool bzm_transport_program_flush(uint16_t engine_count, bzm_register_writer_t wr
 /* Send a full-domain job using the persistent nonce partitions set at startup. */
 bool bzm_serial_write_work(void * context, const bzm_work_t * work);
 bool bzm_serial_flush(void * context);
+/* A zero timeout drains buffered UART bytes once without waiting for input. */
 bool bzm_serial_read_result(bzm_serial_transport_t * transport, bzm_raw_result_t * result, uint16_t timeout_ms);
 
 #ifdef __cplusplus

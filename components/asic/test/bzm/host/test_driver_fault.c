@@ -21,12 +21,17 @@ static struct {
     unsigned safe_off_calls;
     char fault_reason[80];
     unsigned sleeps;
+    bool expect_unlocked_sleep;
 } fixture;
 
 static int64_t now_us(void *context) { (void)context; return fixture.now; }
 static void sleep_us(void *context, uint32_t us)
 {
     (void)context;
+    if (fixture.expect_unlocked_sleep) {
+        CHECK(pthread_mutex_trylock(&REACTOR_LOCK) == 0);
+        CHECK(pthread_mutex_unlock(&REACTOR_LOCK) == 0);
+    }
     fixture.now += us;
     ++fixture.sleeps;
 }
@@ -458,6 +463,18 @@ static void test_unallocated_driver(void)
     CHECK(report.reason == BZM_BRINGUP_REASON_PREREQUISITE && frequency == 0);
 }
 
+static void test_result_idle_does_not_wait_for_uart_under_lock(void)
+{
+    start_driver();
+    fixture.expect_unlocked_sleep = true;
+    int64_t started = fixture.now;
+    unsigned sleeps = fixture.sleeps;
+    CHECK(bzm_driver_process_result(&device) == NULL);
+    CHECK(fixture.reads == 1 && fixture.sleeps == sleeps + 1);
+    CHECK(fixture.now - started == 1000);
+    fixture.expect_unlocked_sleep = false;
+}
+
 int main(void)
 {
     const bzm_platform_ops_t platform = {
@@ -467,6 +484,7 @@ int main(void)
     };
     CHECK(bzm_platform_bind(&platform, NULL));
     test_unallocated_driver();
+    test_result_idle_does_not_wait_for_uart_under_lock();
     test_receive_faults();
     test_drain_fault();
     test_timeouts_and_restart();
