@@ -14,6 +14,7 @@ static int vcore_gpio_level(gpio_num_t pin);
 #define BZM_control_set_5v_enabled vcore_set_5v
 #define BZM_control_set_core_enabled vcore_set_core
 #define BZM_control_safe_off vcore_safe_off
+#define BZM_control_get_safety_status vcore_safety_status
 #define BZM_control_clear_safety_fault vcore_clear_fault
 #define BZM_hold_reset vcore_hold_reset
 #define BZM_get_state vcore_asic_state
@@ -24,6 +25,7 @@ static int vcore_gpio_level(gpio_num_t pin);
 #include "main/power/bonanza_vcore.c"
 
 static bool core_enabled, five_volt_enabled, asic_running, fail_pgood;
+static bool trip_latched;
 static bool fail_reset, fail_5v_off, fail_vout_off, fail_core_off, fail_fault_clear, fail_runtime_write;
 static float rail_voltage;
 static unsigned rail_starts, voltage_writes, fault_clears;
@@ -66,6 +68,14 @@ esp_err_t vcore_safe_off(bzm_control_status_t *status)
     record_operation('S');
     core_enabled = five_volt_enabled = asic_running = false;
     *status = (bzm_control_status_t){.valid = true};
+    return ESP_OK;
+}
+esp_err_t vcore_safety_status(bzm_control_status_t *status)
+{
+    *status = (bzm_control_status_t){
+        .valid = true, .core_enabled = core_enabled, .five_volt_enabled = five_volt_enabled,
+        .fault = trip_latched ? BZM_CONTROL_FAULT_ASIC_TRIP : BZM_CONTROL_FAULT_NONE,
+    };
     return ESP_OK;
 }
 esp_err_t vcore_clear_fault(bzm_control_status_t *status)
@@ -112,7 +122,8 @@ static void fixture(void)
     configured_pins = BONANZA_1004_CONTROL_PINS;
     state.DEVICE_CONFIG.pins.bzm = &configured_pins;
     state.DEVICE_CONFIG.TPS546 = true;
-    rail_enabled = core_enabled = five_volt_enabled = asic_running = fail_pgood = false;
+    core_enabled = five_volt_enabled = asic_running = fail_pgood = false;
+    trip_latched = false;
     fail_reset = fail_5v_off = fail_vout_off = fail_core_off = fail_fault_clear = fail_runtime_write = false;
     rail_voltage = 0;
     rail_starts = voltage_writes = fault_clears = operation_count = 0;
@@ -158,6 +169,42 @@ TEST_CASE("Bonanza pause powers down both rails and resume repeats electrical st
     TEST_ASSERT_EQUAL_FLOAT(2.8f, rail_voltage);
 }
 
+TEST_CASE("Bonanza startup rereads rail state after an independent safe-off", "[asic][bonanza][vcore]")
+{
+    fixture();
+    TEST_ASSERT_EQUAL(ESP_OK, test_vcore_set_voltage(&state, 2.9f));
+    bzm_control_status_t status;
+    TEST_ASSERT_EQUAL(ESP_OK, vcore_safe_off(&status));
+    TEST_ASSERT_EQUAL(ESP_OK, test_vcore_set_voltage(&state, 2.9f));
+    TEST_ASSERT_TRUE(core_enabled);
+    TEST_ASSERT_TRUE(five_volt_enabled);
+    TEST_ASSERT_EQUAL_UINT32(2, rail_starts);
+    TEST_ASSERT_EQUAL_FLOAT(2.8f, rail_voltage);
+}
+
+TEST_CASE("Bonanza voltage requests cannot rearm a stopped active chain or latched trip", "[asic][bonanza][vcore]")
+{
+    for (unsigned failure = 0; failure < 3; ++failure) {
+        fixture();
+        TEST_ASSERT_EQUAL(ESP_OK, test_vcore_set_voltage(&state, 2.9f));
+        bzm_control_status_t status;
+        TEST_ASSERT_EQUAL(ESP_OK, vcore_safe_off(&status));
+        trip_latched = failure == 1;
+        state.ASIC_initalized = failure == 0;
+        if (failure == 2) {
+            state.SYSTEM_MODULE.hardware_fault = true;
+            strcpy(state.SYSTEM_MODULE.hardware_fault_msg, "temperature telemetry lost");
+        }
+        TEST_ASSERT_EQUAL(ESP_ERR_INVALID_STATE, test_vcore_set_voltage(&state, 2.9f));
+        TEST_ASSERT_FALSE(core_enabled);
+        TEST_ASSERT_FALSE(five_volt_enabled);
+        TEST_ASSERT_EQUAL_UINT32(1, rail_starts);
+        TEST_ASSERT_EQUAL_UINT32(1, fault_clears);
+        TEST_ASSERT_TRUE(state.SYSTEM_MODULE.hardware_fault);
+        if (failure == 2) TEST_ASSERT_EQUAL_STRING("temperature telemetry lost", state.SYSTEM_MODULE.hardware_fault_msg);
+    }
+}
+
 TEST_CASE("Bonanza invalid voltage and failed PGOOD cannot leave the rail enabled", "[asic][bonanza][vcore]")
 {
     fixture();
@@ -167,7 +214,6 @@ TEST_CASE("Bonanza invalid voltage and failed PGOOD cannot leave the rail enable
     TEST_ASSERT_NOT_EQUAL(ESP_OK, test_vcore_set_voltage(&state, 2.8f));
     TEST_ASSERT_FALSE(core_enabled);
     TEST_ASSERT_FALSE(five_volt_enabled);
-    TEST_ASSERT_FALSE(rail_enabled);
     TEST_ASSERT_EQUAL_FLOAT(0, rail_voltage);
 }
 
@@ -184,7 +230,6 @@ TEST_CASE("Bonanza shutdown attempts every step and reports reset or rail errors
         operation_count = 0;
         TEST_ASSERT_EQUAL(failure == 0 ? ESP_FAIL : ESP_ERR_TIMEOUT, test_vcore_set_voltage(&state, 0));
         TEST_ASSERT_EQUAL_STRING("R5VD", operations);
-        TEST_ASSERT_FALSE(rail_enabled);
         TEST_ASSERT_EQUAL_UINT32(1, fault_clears);
     }
 }
@@ -201,7 +246,6 @@ TEST_CASE("Bonanza runtime voltage failures hold reset and disable both rails", 
         TEST_ASSERT_FALSE(asic_running);
         TEST_ASSERT_FALSE(core_enabled);
         TEST_ASSERT_FALSE(five_volt_enabled);
-        TEST_ASSERT_FALSE(rail_enabled);
         TEST_ASSERT_EQUAL_FLOAT(0, rail_voltage);
         TEST_ASSERT_TRUE(state.SYSTEM_MODULE.hardware_fault);
         TEST_ASSERT_EQUAL_STRING("BZM rail configuration failed", state.SYSTEM_MODULE.hardware_fault_msg);
@@ -218,7 +262,6 @@ TEST_CASE("Bonanza startup cannot enable the rail when fault clearing fails", "[
     TEST_ASSERT_EQUAL_UINT32(0, rail_starts);
     TEST_ASSERT_FALSE(core_enabled);
     TEST_ASSERT_FALSE(five_volt_enabled);
-    TEST_ASSERT_FALSE(rail_enabled);
     TEST_ASSERT_TRUE(state.SYSTEM_MODULE.hardware_fault);
 }
 

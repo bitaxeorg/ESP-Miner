@@ -122,18 +122,25 @@ static const bzm_power_ops_t BONANZA_POWER_OPS = {
 
 /* Only the regulator calls need serialization; mining policy stays in the shared task. */
 static pthread_mutex_t voltage_lock = PTHREAD_MUTEX_INITIALIZER;
-static bool rail_enabled;
 
 /* Lifecycle helpers run with voltage_lock held. Startup always uses 2.8 V. */
 static esp_err_t prepare_startup_power(GlobalState *state)
 {
-    if (rail_enabled) return ESP_OK;
     bzm_control_status_t status;
-    esp_err_t err = BZM_control_safe_off(&status);
+    esp_err_t err = BZM_control_get_safety_status(&status);
+    if (err != ESP_OK) return err;
+    if (!status.valid || status.fault != BZM_CONTROL_FAULT_NONE || state->SYSTEM_MODULE.hardware_fault)
+        return ESP_ERR_INVALID_STATE;
+    if (status.core_enabled && status.five_volt_enabled) return ESP_OK;
+
+    // An active chain with a missing rail must go through shutdown before startup.
+    if (state->ASIC_initalized) return ESP_ERR_INVALID_STATE;
+    err = BZM_control_safe_off(&status);
+    if (err == ESP_OK && (!status.valid || status.fault != BZM_CONTROL_FAULT_NONE))
+        return ESP_ERR_INVALID_STATE;
     if (err == ESP_OK) err = BZM_control_clear_safety_fault(&status);
     if (err == ESP_OK) err = bzm_power_set_rail_enabled(&BONANZA_POWER_OPS, state, true);
     if (err == ESP_OK) err = BZM_control_set_5v_enabled(true);
-    rail_enabled = err == ESP_OK;
     return err;
 }
 
@@ -146,7 +153,6 @@ static esp_err_t shutdown_power(GlobalState *state)
 {
     bool reset = BZM_hold_reset();
     esp_err_t err = bzm_power_set_rail_enabled(&BONANZA_POWER_OPS, state, false);
-    rail_enabled = false;
     return err == ESP_OK && !reset ? ESP_FAIL : err;
 }
 
@@ -166,9 +172,11 @@ esp_err_t BONANZA_VCORE_set_voltage(GlobalState *state, float volts)
         }
         if (err != ESP_OK) {
             (void)shutdown_power(state);
-            state->SYSTEM_MODULE.hardware_fault = true;
-            snprintf(state->SYSTEM_MODULE.hardware_fault_msg,
-                     sizeof(state->SYSTEM_MODULE.hardware_fault_msg), "BZM rail configuration failed");
+            if (!state->SYSTEM_MODULE.hardware_fault) {
+                state->SYSTEM_MODULE.hardware_fault = true;
+                snprintf(state->SYSTEM_MODULE.hardware_fault_msg,
+                         sizeof(state->SYSTEM_MODULE.hardware_fault_msg), "BZM rail configuration failed");
+            }
         }
     }
     pthread_mutex_unlock(&voltage_lock);
