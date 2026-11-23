@@ -3,6 +3,7 @@
 #define bzm_port_serial_prepare_session fixture_serial_prepare
 #define bzm_control_set_asic_reset fixture_reset
 #define bzm_control_pulse_asic_reset fixture_pulse
+#define bzm_control_safe_off fixture_safe_off
 #define bzm_bringup_start fixture_chip_start
 #include "components/asic/bzm/bzm_driver.c"
 
@@ -11,12 +12,14 @@ static struct {
     bool read_error;
     bool byte_before_error;
     bool exercise_startup, fail_tdm_once, fail_next_read, reply_to_registers, reset_asserted;
-    uint8_t reply[6];
+    uint8_t reply[10];
     size_t reply_length, reply_cursor;
     uint32_t tdm_control;
     unsigned writes, tdm_reads, activation_writes, read_errors;
     unsigned reads;
     unsigned faults;
+    unsigned safe_off_calls;
+    char fault_reason[80];
     unsigned sleeps;
 } fixture;
 
@@ -83,7 +86,7 @@ static int write_bytes(void *context, const uint8_t *data, size_t size)
             fixture.reply[1] = BZM_FRAME_REGISTER;
             for (unsigned i = 0; i < 4; ++i) fixture.reply[i + 2] = (uint8_t)(value >> (8 * i));
             fixture.reply_cursor = 0;
-            fixture.reply_length = sizeof(fixture.reply);
+            fixture.reply_length = 6;
         } else if ((data[2] & 0xf0) == 0x20) {
             if (control && offset == BZM_LOCAL_REG_UART_TDM_CONTROL) {
                 CHECK(size >= 18);
@@ -105,7 +108,7 @@ static bzm_status_t clear_rx(void *context)
 static void report_fault(void *context, const char *reason)
 {
     (void)context;
-    CHECK(strcmp(reason, "BZM transport failed") == 0);
+    snprintf(fixture.fault_reason, sizeof(fixture.fault_reason), "%s", reason);
     ++fixture.faults;
 }
 
@@ -116,6 +119,16 @@ bzm_status_t fixture_serial_prepare(int baud)
 }
 bzm_status_t fixture_reset(bool released) { fixture.reset_asserted = !released; return BZM_OK; }
 bzm_status_t fixture_pulse(void) { fixture.reset_asserted = false; return BZM_OK; }
+bzm_status_t fixture_safe_off(bzm_control_status_t *status)
+{
+    CHECK(fixture.reset_asserted);
+    ++fixture.safe_off_calls;
+    *status = (bzm_control_status_t){
+        .valid = true, .state = BZM_CONTROL_STATE_SAFE_OFF, .asic_reset_asserted = true,
+        .fan_full = true, .fan_percent = 100,
+    };
+    return BZM_OK;
+}
 bzm_bringup_outcome_t fixture_chip_start(bzm_bringup_state_t *state, const bzm_bringup_ops_t *ops,
                                         void *context, const bzm_bringup_telemetry_policy_t *policy,
                                         bzm_bringup_report_t *report)
@@ -172,6 +185,7 @@ static void test_receive_faults(void)
         if (path == 0) {
             bzm_driver_service(&device);
             CHECK(fixture.faults == 1);
+            CHECK(strcmp(fixture.fault_reason, "BZM transport failed") == 0);
         } else if (path == 1) {
             CHECK(bzm_driver_process_result(&device) == NULL);
         } else if (path == 2) {
@@ -349,8 +363,6 @@ static void test_temperature_filter(void)
     }
     temperature_poll(-1, false);
     CHECK(bzm_driver_read_temperature(&device) == -1);
-    bzm_driver_service(&device);
-    CHECK(fixture.faults == 0 && !bzm_driver_has_io_fault());
 
     temperature_poll(55, true);
     CHECK(bzm_driver_read_temperature(&device) == 55);
@@ -386,6 +398,52 @@ static void test_temperature_filter(void)
     puts("temperature filter: three bad polls ignored, persistent failure returned, hot peers preserved, recovery and reset passed");
 }
 
+static void test_temperature_loss_cuts_power(void)
+{
+    for (unsigned missing = 1; missing <= BZM_MAX_ASIC_COUNT; missing += BZM_MAX_ASIC_COUNT - 1) {
+        start_driver();
+        temperature_poll(50, true);
+        bzm_driver_service(&device);
+
+        for (unsigned pass = 0; pass <= 6; ++pass) {
+            fixture.now += 2001000;
+            // Recovery inside the grace period resets the count.
+            unsigned first_fresh = pass == 2 ? 0 : missing;
+            for (unsigned asic = first_fresh; asic < BZM_MAX_ASIC_COUNT; ++asic)
+                temperature_sample(asic, 50, true);
+            static const uint8_t nonce[] = {0x1e, 0x01, 0x83, 0x45, 0x78, 0x56, 0x34, 0x12, 0x17, 0x0d};
+            memcpy(fixture.reply, nonce, sizeof(nonce));
+            fixture.reply_length = sizeof(nonce);
+            fixture.reply_cursor = 0;
+            bzm_driver_service(&device);
+            CHECK(fixture.reply_cursor == sizeof(nonce));
+            CHECK(TRANSPORT.io.parser.emitted_frames == pass + 1);
+            CHECK(!bzm_driver_has_io_fault());
+            if (pass < 6) CHECK(fixture.faults == 0 && fixture.safe_off_calls == 0);
+        }
+        CHECK(fixture.safe_off_calls == 1 && fixture.faults == 1);
+        CHECK(strcmp(fixture.fault_reason, "BZM ASIC 0x0a temperature telemetry lost") == 0);
+        CHECK(fixture.reset_asserted && !DRIVER_BRINGUP.running);
+        CHECK(!driver_send_work(&device, &(asic_job_t){0}));
+        temperature_poll(50, true);
+        bzm_driver_service(&device);
+        CHECK(fixture.safe_off_calls == 1 && fixture.faults == 1);
+    }
+
+    start_driver();
+    device.initialized = false;
+    for (unsigned pass = 0; pass < 6; ++pass) {
+        temperature_poll(-1, false);
+        bzm_driver_service(&device);
+    }
+    CHECK(fixture.safe_off_calls == 0 && fixture.faults == 0);
+    device.initialized = true;
+    CHECK(bzm_driver_hold_reset());
+    bzm_driver_service(&device);
+    CHECK(fixture.safe_off_calls == 0 && fixture.faults == 0);
+    puts("temperature loss: partial and total telemetry failures cut power despite live UART results");
+}
+
 int main(void)
 {
     const bzm_platform_ops_t platform = {
@@ -401,6 +459,7 @@ int main(void)
     test_startup_read_error_stops_activation();
     test_latched_fault_blocks_later_writes();
     test_temperature_filter();
+    test_temperature_loss_cuts_power();
     bzm_serial_transport_deinit(&TRANSPORT);
     bzm_job_store_destroy(&BZM_STATE->job_store);
     CHECK(pthread_mutex_destroy(&REACTOR_LOCK) == 0);
