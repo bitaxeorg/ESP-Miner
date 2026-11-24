@@ -128,16 +128,45 @@ esp_err_t bzm_gpio_init(const BzmPins *pin_config)
     ESP_RETURN_ON_ERROR(ledc_channel_config(&channel), TAG, "fan PWM configuration failed");
     pwm_ready = true;
     ESP_RETURN_ON_ERROR(ledc_stop(FAN_MODE, FAN_CHANNEL, 0), TAG, "full fan speed failed");
-    ESP_RETURN_ON_ERROR(gpio_set_intr_type(pins.asic_trip, GPIO_INTR_POSEDGE), TAG, "trip interrupt failed");
-    ESP_RETURN_ON_ERROR(gpio_isr_handler_add(pins.asic_trip, trip_isr, NULL), TAG, "trip handler failed");
-    ESP_RETURN_ON_ERROR(gpio_set_intr_type(pins.fan_tach, GPIO_INTR_NEGEDGE), TAG, "tach interrupt failed");
-    ESP_RETURN_ON_ERROR(gpio_isr_handler_add(pins.fan_tach, tach_isr, NULL), TAG, "tach handler failed");
+    esp_err_t err = ESP_OK;
+    bool trip_isr_added = false;
+    bool tach_isr_added = false;
+    bool timer_created = false;
+    err = gpio_set_intr_type(pins.asic_trip, GPIO_INTR_POSEDGE);
+    if (err != ESP_OK) goto fail;
+    err = gpio_isr_handler_add(pins.asic_trip, trip_isr, NULL);
+    if (err != ESP_OK) goto fail;
+    trip_isr_added = true;
+    err = gpio_set_intr_type(pins.fan_tach, GPIO_INTR_NEGEDGE);
+    if (err != ESP_OK) goto fail;
+    err = gpio_isr_handler_add(pins.fan_tach, tach_isr, NULL);
+    if (err != ESP_OK) goto fail;
+    tach_isr_added = true;
     tach_window_start_us = esp_timer_get_time();
     esp_timer_create_args_t args = {.callback = monitor, .name = "bonanza_io"};
-    ESP_RETURN_ON_ERROR(esp_timer_create(&args, &monitor_timer), TAG, "monitor creation failed");
-    ESP_RETURN_ON_ERROR(esp_timer_start_periodic(monitor_timer, 100000), TAG, "monitor start failed");
+    err = esp_timer_create(&args, &monitor_timer);
+    if (err != ESP_OK) goto fail;
+    timer_created = true;
+    err = esp_timer_start_periodic(monitor_timer, 100000);
+    if (err != ESP_OK) goto fail;
     ready = true;
     return ESP_OK;
+
+fail:
+    if (timer_created && monitor_timer != NULL) {
+        (void)esp_timer_delete(monitor_timer);
+        monitor_timer = NULL;
+    }
+    if (tach_isr_added) {
+        (void)gpio_isr_handler_remove(pins.fan_tach);
+        (void)gpio_set_intr_type(pins.fan_tach, GPIO_INTR_DISABLE);
+    }
+    if (trip_isr_added) {
+        (void)gpio_isr_handler_remove(pins.asic_trip);
+        (void)gpio_set_intr_type(pins.asic_trip, GPIO_INTR_DISABLE);
+    }
+    ESP_LOGE(TAG, "Bonanza GPIO initialization failed: %s", esp_err_to_name(err));
+    return err;
 }
 
 static void status_locked(bzm_control_status_t *status)
@@ -195,7 +224,8 @@ static esp_err_t set_output(gpio_num_t pin, bool enabled)
     check_locked();
     if (enabled && (fault != BZM_CONTROL_FAULT_NONE ||
         (pin == pins.asic_reset && !gpio_get_level(pins.enable_5v)) ||
-        (pin == pins.enable_5v && (gpio_get_level(pins.asic_reset) || fan_percent != 100)))) err = ESP_ERR_INVALID_STATE;
+        (pin == pins.enable_5v && (!gpio_get_level(pins.core_enable) ||
+         gpio_get_level(pins.asic_reset) || fan_percent != 100)))) err = ESP_ERR_INVALID_STATE;
     else if (pin == pins.core_enable && !enabled) {
         safe_outputs_locked();
         err = ESP_OK;
@@ -203,6 +233,10 @@ static esp_err_t set_output(gpio_num_t pin, bool enabled)
         err = ESP_OK;
         if (pin == pins.enable_5v && !enabled) err = gpio_set_level(pins.asic_reset, 0);
         if (err == ESP_OK) err = gpio_set_level(pin, enabled);
+        if (err == ESP_OK && !enabled && (pin == pins.asic_reset || pin == pins.enable_5v)) {
+            if (pwm_ready) (void)ledc_stop(FAN_MODE, FAN_CHANNEL, 0);
+            fan_percent = 100;
+        }
     }
     portEXIT_CRITICAL(&lock);
     return err;

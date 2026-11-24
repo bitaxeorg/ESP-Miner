@@ -27,6 +27,7 @@ boardversion,data,string,1004
 rotation,data,u16,0
 display,data,string,NONE
 autofanspeed,data,u16,1
+minfanspeed,data,u16,36
 fanspeed,data,u16,100
 selftest,data,u16,0
 overheat_mode,data,u16,0

@@ -12,15 +12,30 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "psa/crypto.h"
+#include <stdio.h>
+
+static bzm_status_t esp_err_to_bzm(esp_err_t err)
+{
+    switch (err) {
+    case ESP_OK: return BZM_OK;
+    case ESP_ERR_INVALID_ARG: return BZM_ERR_INVALID_ARG;
+    case ESP_ERR_INVALID_STATE: return BZM_ERR_INVALID_STATE;
+    case ESP_ERR_NOT_SUPPORTED: return BZM_ERR_NOT_SUPPORTED;
+    case ESP_ERR_NO_MEM: return BZM_ERR_NO_MEM;
+    case ESP_ERR_TIMEOUT: return BZM_ERR_TIMEOUT;
+    default: return BZM_ERR_IO;
+    }
+}
 
 static int64_t now_us(void *ctx) { (void)ctx; return esp_timer_get_time(); }
 static void sleep_us(void *ctx, uint32_t us)
 {
     (void)ctx;
+    if (us == 0) return;
     if (us < 1000) esp_rom_delay_us(us);
     else {
-        TickType_t ticks = pdMS_TO_TICKS(us / 1000U);
-        vTaskDelay(ticks ? ticks : 1);
+        uint64_t ms = ((uint64_t)us + 999U) / 1000U;
+        vTaskDelay(pdMS_TO_TICKS(ms) + 1);
     }
 }
 static void *allocate(void *ctx, size_t count, size_t size, bool large)
@@ -46,37 +61,42 @@ static void log_message(void *ctx, char level, const char *tag, const char *form
     (void)ctx;
     esp_log_level_t severity = level == 'E' ? ESP_LOG_ERROR : level == 'W' ? ESP_LOG_WARN :
                                level == 'I' ? ESP_LOG_INFO : level == 'D' ? ESP_LOG_DEBUG : ESP_LOG_VERBOSE;
-    esp_log_writev(severity, tag, format, args);
-    esp_log_write(severity, tag, "\n");
+    char line[256];
+    int n = vsnprintf(line, sizeof(line) - 1, format, args);
+    if (n < 0) return;
+    size_t len = (size_t)n < sizeof(line) - 1 ? (size_t)n : sizeof(line) - 2;
+    line[len] = '\n';
+    line[len + 1] = '\0';
+    esp_log_write(severity, tag, "%s", line);
 }
-static bzm_status_t serial_init(void *ctx) { (void)ctx; return BZM_SERIAL_init(); }
+static bzm_status_t serial_init(void *ctx) { (void)ctx; return esp_err_to_bzm(BZM_SERIAL_init()); }
 static bool serial_ready(void *ctx) { (void)ctx; return SERIAL_is_initialized(); }
-static bzm_status_t serial_baud(void *ctx, int baud) { (void)ctx; return BZM_SERIAL_set_baud(baud); }
-static bzm_status_t serial_wait(void *ctx, uint32_t ms) { (void)ctx; return BZM_SERIAL_wait_tx_done(ms); }
+static bzm_status_t serial_baud(void *ctx, int baud) { (void)ctx; return esp_err_to_bzm(BZM_SERIAL_set_baud(baud)); }
+static bzm_status_t serial_wait(void *ctx, uint32_t ms) { (void)ctx; return esp_err_to_bzm(BZM_SERIAL_wait_tx_done(ms)); }
 static int serial_write(void *ctx, const uint8_t *data, size_t size)
 { (void)ctx; return SERIAL_send((uint8_t *)data, (int)size, false); }
 static int16_t serial_read(void *ctx, uint8_t *data, uint16_t size, uint16_t ms)
 { (void)ctx; return BZM_SERIAL_rx(data, size, ms); }
-static bzm_status_t serial_clear(void *ctx) { (void)ctx; return uart_flush_input(UART_NUM_1); }
+static bzm_status_t serial_clear(void *ctx) { (void)ctx; return esp_err_to_bzm(uart_flush_input(UART_NUM_1)); }
 
-static bzm_status_t control_init(void *ctx, const char * board_version) { (void)ctx; return BZM_control_init(board_version, NULL); }
+static bzm_status_t control_init(void *ctx, const char * board_version) { (void)ctx; return esp_err_to_bzm(BZM_control_init(board_version, NULL)); }
 
-static bzm_status_t control_get_safety_status(void *ctx, bzm_control_status_t * status) { (void)ctx; return BZM_control_get_safety_status(status); }
+static bzm_status_t control_get_safety_status(void *ctx, bzm_control_status_t * status) { (void)ctx; return esp_err_to_bzm(BZM_control_get_safety_status(status)); }
 
-static bzm_status_t control_clear_safety_fault(void *ctx, bzm_control_status_t * status) { (void)ctx; return BZM_control_clear_safety_fault(status); }
+static bzm_status_t control_clear_safety_fault(void *ctx, bzm_control_status_t * status) { (void)ctx; return esp_err_to_bzm(BZM_control_clear_safety_fault(status)); }
 
-static bzm_status_t control_safe_off(void *ctx, bzm_control_status_t * status) { (void)ctx; return BZM_control_safe_off(status); }
+static bzm_status_t control_safe_off(void *ctx, bzm_control_status_t * status) { (void)ctx; return esp_err_to_bzm(BZM_control_safe_off(status)); }
 
-static bzm_status_t control_set_5v_enabled(void *ctx, bool enabled) { (void)ctx; return BZM_control_set_5v_enabled(enabled); }
+static bzm_status_t control_set_5v_enabled(void *ctx, bool enabled) { (void)ctx; return esp_err_to_bzm(BZM_control_set_5v_enabled(enabled)); }
 
-static bzm_status_t control_set_asic_reset(void *ctx, bool high) { (void)ctx; return BZM_control_set_asic_reset(high); }
+static bzm_status_t control_set_asic_reset(void *ctx, bool high) { (void)ctx; return esp_err_to_bzm(BZM_control_set_asic_reset(high)); }
 
-static bzm_status_t control_set_fan_percent(void *ctx, float percent) { (void)ctx; return BZM_control_set_fan_percent(percent); }
+static bzm_status_t control_set_fan_percent(void *ctx, float percent) { (void)ctx; return esp_err_to_bzm(BZM_control_set_fan_percent(percent)); }
 
-static bzm_status_t control_get_fan_rpm(void *ctx, uint16_t * rpm) { (void)ctx; return BZM_control_get_fan_rpm(rpm); }
+static bzm_status_t control_get_fan_rpm(void *ctx, uint16_t * rpm) { (void)ctx; return esp_err_to_bzm(BZM_control_get_fan_rpm(rpm)); }
 
-static bzm_status_t control_set_core_enabled(void *ctx, bool enabled) { (void)ctx; return BZM_control_set_core_enabled(enabled); }
-static bzm_status_t control_reset_bridge(void *ctx) { (void)ctx; return BZM_control_reset_bridge(); }
+static bzm_status_t control_set_core_enabled(void *ctx, bool enabled) { (void)ctx; return esp_err_to_bzm(BZM_control_set_core_enabled(enabled)); }
+static bzm_status_t control_reset_bridge(void *ctx) { (void)ctx; return esp_err_to_bzm(BZM_control_reset_bridge()); }
 
 bool bzm_platform_esp_init(void)
 {

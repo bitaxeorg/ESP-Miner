@@ -5,8 +5,10 @@
 
 esp_err_t control_test_reset_pin(gpio_num_t pin);
 int control_test_power_good(gpio_num_t pin);
+void control_test_tx_wait(uint8_t uart_no);
 #define gpio_reset_pin control_test_reset_pin
 #define gpio_get_level control_test_power_good
+#define esp_rom_output_tx_wait_idle control_test_tx_wait
 #define BZM_control_init control_test_init
 #define BZM_control_get_safety_status control_test_status
 #define BZM_control_clear_safety_fault control_test_clear
@@ -25,12 +27,17 @@ int control_test_power_good(gpio_num_t pin);
 static unsigned init_calls;
 static esp_err_t init_result;
 static gpio_num_t reset_pins[4];
-static unsigned pin_reset_calls, fail_pin_reset;
+static unsigned pin_reset_calls, fail_pin_reset, tx_wait_calls;
 static bzm_control_status_t control_status;
 static unsigned swd_reset_calls;
 static esp_err_t swd_reset_result;
 static bool trip_after_reset;
 static bool power_good;
+void control_test_tx_wait(uint8_t uart_no)
+{
+    TEST_ASSERT_EQUAL_UINT8(0, uart_no);
+    ++tx_wait_calls;
+}
 int control_test_power_good(gpio_num_t pin)
 {
     TEST_ASSERT_EQUAL(GPIO_NUM_11, pin);
@@ -65,7 +72,7 @@ esp_err_t control_test_gpio_status(bzm_control_status_t *status)
 static void control_fixture(void)
 {
     initialized = false;
-    init_calls = pin_reset_calls = fail_pin_reset = 0;
+    init_calls = pin_reset_calls = fail_pin_reset = tx_wait_calls = 0;
     init_result = ESP_OK;
     control_status = (bzm_control_status_t){.valid = true, .asic_reset_asserted = true};
     swd_reset_calls = 0;
@@ -198,4 +205,26 @@ TEST_CASE("Bonanza fault clear requires all local outputs safe and trip low", "[
     status.valid = false;
     TEST_ASSERT_FALSE(bzm_control_status_allows_fault_clear(&status));
     TEST_ASSERT_FALSE(bzm_control_status_allows_fault_clear(NULL));
+}
+
+TEST_CASE("Bonanza control validates all nine pins before releasing UART0", "[asic][bonanza][control]")
+{
+    control_fixture();
+    BzmPins collide = BONANZA_1004_CONTROL_PINS;
+    collide.bridge_swclk = collide.core_enable;
+    TEST_ASSERT_EQUAL(ESP_ERR_INVALID_ARG, control_test_init("1004", &collide));
+    TEST_ASSERT_EQUAL_UINT32(0, tx_wait_calls);
+    TEST_ASSERT_EQUAL_UINT32(0, pin_reset_calls);
+    TEST_ASSERT_EQUAL_UINT32(0, init_calls);
+
+    BzmPins bad_control = BONANZA_1004_CONTROL_PINS;
+    bad_control.asic_trip = GPIO_NUM_NC;
+    TEST_ASSERT_EQUAL(ESP_ERR_INVALID_ARG, control_test_init("1004", &bad_control));
+    TEST_ASSERT_EQUAL_UINT32(0, tx_wait_calls);
+    TEST_ASSERT_EQUAL_UINT32(0, pin_reset_calls);
+    TEST_ASSERT_EQUAL_UINT32(0, init_calls);
+
+    TEST_ASSERT_EQUAL(ESP_OK, control_test_init("1004", &BONANZA_1004_CONTROL_PINS));
+    TEST_ASSERT_EQUAL_UINT32(1, tx_wait_calls);
+    TEST_ASSERT_EQUAL_UINT32(2, pin_reset_calls);
 }

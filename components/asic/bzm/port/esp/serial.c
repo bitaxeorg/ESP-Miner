@@ -109,5 +109,6 @@ static TickType_t timeout_ticks(uint32_t timeout_ms)
 int16_t BZM_SERIAL_rx(uint8_t * buf, uint16_t size, uint16_t timeout_ms)
 {
     if (buf == NULL || size == 0 || !SERIAL_is_initialized()) return -1;
+    if (size > INT16_MAX) size = INT16_MAX;
     return SERIAL_rx_ticks(buf, size, timeout_ticks(timeout_ms));
 }

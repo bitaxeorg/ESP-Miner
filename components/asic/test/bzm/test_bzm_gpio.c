@@ -23,6 +23,10 @@ static esp_err_t gpio_test_config(const gpio_config_t *c) { ++hardware_calls; co
 static esp_err_t gpio_test_intr(gpio_num_t pin, gpio_int_type_t type) { ++hardware_calls; (void)pin; (void)type; return ESP_OK; }
 static esp_err_t gpio_test_handler(gpio_num_t pin, gpio_isr_t fn, void *arg)
 { ++hardware_calls; (void)arg; handlers[pin] = fn; return ESP_OK; }
+static esp_err_t gpio_test_handler_remove(gpio_num_t pin)
+{ ++hardware_calls; handlers[pin] = NULL; return ESP_OK; }
+static esp_err_t start_timer_error;
+static unsigned deleted_timers;
 static esp_err_t gpio_test_timer(const ledc_timer_config_t *c)
 {
     ++hardware_calls;
@@ -55,7 +59,9 @@ static int64_t gpio_test_time(void) { return clock_us; }
 static esp_err_t gpio_test_create_timer(const esp_timer_create_args_t *args, esp_timer_handle_t *timer)
 { ++hardware_calls; timer_callback = args->callback; *timer = (void *)1; return ESP_OK; }
 static esp_err_t gpio_test_start_timer(esp_timer_handle_t timer, uint64_t period)
-{ ++hardware_calls; (void)timer; TEST_ASSERT_TRUE(period == 100000); return ESP_OK; }
+{ ++hardware_calls; (void)timer; TEST_ASSERT_TRUE(period == 100000); return start_timer_error; }
+static esp_err_t gpio_test_delete_timer(esp_timer_handle_t timer)
+{ ++hardware_calls; (void)timer; ++deleted_timers; return ESP_OK; }
 
 static esp_err_t gpio_test_direction(gpio_num_t pin, gpio_mode_t mode)
 { ++hardware_calls; TEST_ASSERT_EQUAL_INT(expected_pins.asic_reset, pin); TEST_ASSERT_EQUAL(GPIO_MODE_INPUT_OUTPUT, mode); return ESP_OK; }
@@ -66,6 +72,7 @@ static esp_err_t gpio_test_direction(gpio_num_t pin, gpio_mode_t mode)
 #define gpio_config gpio_test_config
 #define gpio_set_intr_type gpio_test_intr
 #define gpio_isr_handler_add gpio_test_handler
+#define gpio_isr_handler_remove gpio_test_handler_remove
 #define ledc_timer_config gpio_test_timer
 #define ledc_channel_config gpio_test_channel
 #define ledc_stop gpio_test_stop
@@ -74,6 +81,7 @@ static esp_err_t gpio_test_direction(gpio_num_t pin, gpio_mode_t mode)
 #define esp_timer_get_time gpio_test_time
 #define esp_timer_create gpio_test_create_timer
 #define esp_timer_start_periodic gpio_test_start_timer
+#define esp_timer_delete gpio_test_delete_timer
 #define bzm_gpio_init gpio_test_init
 #define bzm_gpio_get_safety_status gpio_test_status
 #define bzm_gpio_safe_off gpio_test_safe_off
@@ -96,7 +104,9 @@ static void gpio_fixture_with_pins(const BzmPins *config)
     tach_sample_us = 0;
     tach_edges = fan_rpm = 0;
     fan_percent = requested_fan_percent = 100;
-    duty_error = update_error = ESP_OK;
+    duty_error = update_error = start_timer_error = ESP_OK;
+    deleted_timers = 0;
+    monitor_timer = NULL;
     trip_on_duty = false;
     clock_us = 1000000;
     TEST_ASSERT_EQUAL(ESP_OK, gpio_test_init(config));
@@ -378,4 +388,52 @@ TEST_CASE("Bonanza GPIO retains its map and rejects retargeting after initializa
     TEST_ASSERT_EQUAL_INT(0, levels[config.asic_reset]);
     handlers[expected_pins.asic_trip](NULL);
     assert_safe();
+}
+
+TEST_CASE("Bonanza GPIO forces full fan on reset or 5V disable and requires core before 5V", "[asic][bonanza][gpio]")
+{
+    gpio_fixture();
+    /* 5 V enable must be rejected while core_enable is LOW. */
+    TEST_ASSERT_EQUAL(ESP_ERR_INVALID_STATE, gpio_test_5v(true));
+    TEST_ASSERT_EQUAL_INT(0, levels[expected_pins.enable_5v]);
+
+    enable_outputs();
+    TEST_ASSERT_EQUAL_UINT8(50, fan_percent);
+    TEST_ASSERT_TRUE(pwm_running);
+    /* Asserting ASIC reset forces full fan speed while preserving requested_fan_percent. */
+    TEST_ASSERT_EQUAL(ESP_OK, gpio_test_reset(false));
+    TEST_ASSERT_FALSE(pwm_running);
+    TEST_ASSERT_EQUAL_UINT8(100, fan_percent);
+    TEST_ASSERT_EQUAL(ESP_OK, gpio_test_reset(true));
+    TEST_ASSERT_TRUE(pwm_running);
+    TEST_ASSERT_EQUAL_UINT8(50, fan_percent);
+
+    /* Disabling 5 V forces full fan speed so 5 V can be re-enabled cleanly. */
+    TEST_ASSERT_EQUAL(ESP_OK, gpio_test_5v(false));
+    TEST_ASSERT_EQUAL_INT(0, levels[expected_pins.asic_reset]);
+    TEST_ASSERT_FALSE(pwm_running);
+    TEST_ASSERT_EQUAL_UINT8(100, fan_percent);
+    TEST_ASSERT_EQUAL(ESP_OK, gpio_test_5v(true));
+    TEST_ASSERT_EQUAL(ESP_OK, gpio_test_reset(true));
+    TEST_ASSERT_EQUAL_UINT8(50, fan_percent);
+}
+
+TEST_CASE("Bonanza GPIO cleans up ISRs and timer on partial init failure", "[asic][bonanza][gpio]")
+{
+    memset(levels, 0, sizeof(levels));
+    memset(handlers, 0, sizeof(handlers));
+    expected_pins = BONANZA_1004_CONTROL_PINS;
+    ready = pwm_ready = pins_bound = false;
+    monitor_timer = NULL;
+    deleted_timers = 0;
+    start_timer_error = ESP_FAIL;
+    TEST_ASSERT_EQUAL(ESP_FAIL, gpio_test_init(&BONANZA_1004_CONTROL_PINS));
+    TEST_ASSERT_FALSE(ready);
+    TEST_ASSERT_NULL(monitor_timer);
+    TEST_ASSERT_EQUAL_UINT32(1, deleted_timers);
+    TEST_ASSERT_NULL(handlers[expected_pins.asic_trip]);
+    TEST_ASSERT_NULL(handlers[expected_pins.fan_tach]);
+    start_timer_error = ESP_OK;
+    TEST_ASSERT_EQUAL(ESP_OK, gpio_test_init(&BONANZA_1004_CONTROL_PINS));
+    TEST_ASSERT_TRUE(ready);
 }

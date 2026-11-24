@@ -20,6 +20,7 @@ static int vcore_gpio_level(gpio_num_t pin);
 #define BZM_get_state vcore_asic_state
 #define TPS546_init vcore_tps_init
 #define TPS546_set_vout vcore_tps_set
+#define TPS546_clear_faults vcore_tps_clear_faults
 #define TPS546_snapshot_status vcore_tps_status
 #define TPS546_log_snapshot vcore_tps_log
 #include "main/power/bonanza_vcore.c"
@@ -27,8 +28,10 @@ static int vcore_gpio_level(gpio_num_t pin);
 static bool core_enabled, five_volt_enabled, asic_running, fail_pgood;
 static bool trip_latched;
 static bool fail_reset, fail_5v_off, fail_vout_off, fail_core_off, fail_fault_clear, fail_runtime_write;
+static uint16_t latched_status_word;
+static unsigned pgood_sticky_polls;
 static float rail_voltage;
-static unsigned rail_starts, voltage_writes, fault_clears;
+static unsigned rail_starts, voltage_writes, fault_clears, tps_fault_clears;
 static char operations[64];
 static unsigned operation_count;
 static GlobalState state;
@@ -96,6 +99,10 @@ bool vcore_asic_state(bzm_bringup_state_t *asic) { *asic = (bzm_bringup_state_t)
 static int vcore_gpio_level(gpio_num_t pin)
 {
     TEST_ASSERT_EQUAL_INT(configured_pins.core_power_good, pin);
+    if (pgood_sticky_polls > 0) {
+        --pgood_sticky_polls;
+        return 1;
+    }
     return !fail_pgood && core_enabled && rail_voltage > 0;
 }
 esp_err_t vcore_tps_init(TPS546_CONFIG value) { (void)value; return ESP_OK; }
@@ -107,10 +114,17 @@ esp_err_t vcore_tps_set(float voltage)
     rail_voltage = voltage;
     return ESP_OK;
 }
+esp_err_t vcore_tps_clear_faults(void)
+{
+    record_operation('L');
+    ++tps_fault_clears;
+    latched_status_word = 0;
+    return ESP_OK;
+}
 esp_err_t vcore_tps_status(TPS546_StatusSnapshot *snapshot)
 {
-    *snapshot = (TPS546_StatusSnapshot){.operation = 0x80, .vout_command = rail_voltage,
-        .read_vout = rail_voltage, .read_vin = 12, .read_temp1 = 40};
+    *snapshot = (TPS546_StatusSnapshot){.status_word = latched_status_word, .operation = 0x80,
+        .vout_command = rail_voltage, .read_vout = rail_voltage, .read_vin = 12, .read_temp1 = 40};
     return ESP_OK;
 }
 void vcore_tps_log(const TPS546_StatusSnapshot *snapshot) { (void)snapshot; }
@@ -125,8 +139,10 @@ static void fixture(void)
     core_enabled = five_volt_enabled = asic_running = fail_pgood = false;
     trip_latched = false;
     fail_reset = fail_5v_off = fail_vout_off = fail_core_off = fail_fault_clear = fail_runtime_write = false;
+    latched_status_word = 0;
+    pgood_sticky_polls = 0;
     rail_voltage = 0;
-    rail_starts = voltage_writes = fault_clears = operation_count = 0;
+    rail_starts = voltage_writes = fault_clears = tps_fault_clears = operation_count = 0;
     TEST_ASSERT_EQUAL(ESP_OK, test_vcore_init(&state, TPS546_CONFIG_BONANZA_1004));
     operation_count = 0;
     operations[0] = '\0';
@@ -138,11 +154,11 @@ TEST_CASE("Bonanza shared voltage setter preserves startup rail then applies liv
     TEST_ASSERT_EQUAL(ESP_OK, test_vcore_set_voltage(&state, 2.5f));
     TEST_ASSERT_EQUAL_FLOAT(2.8f, rail_voltage);
     TEST_ASSERT_TRUE(five_volt_enabled);
-    TEST_ASSERT_EQUAL_STRING("SC5EVF", operations);
+    TEST_ASSERT_EQUAL_STRING("SVCL5EVF", operations);
     TEST_ASSERT_EQUAL(ESP_OK, test_vcore_set_voltage(&state, 3.0f));
     TEST_ASSERT_EQUAL_FLOAT(2.8f, rail_voltage);
     TEST_ASSERT_EQUAL_UINT32(1, rail_starts);
-    TEST_ASSERT_EQUAL_UINT32(1, voltage_writes);
+    TEST_ASSERT_EQUAL_UINT32(2, voltage_writes);
     TEST_ASSERT_EQUAL_UINT32(1, fault_clears);
     asic_running = true;
     TEST_ASSERT_EQUAL(ESP_OK, test_vcore_set_voltage(&state, 2.5f));
@@ -150,7 +166,7 @@ TEST_CASE("Bonanza shared voltage setter preserves startup rail then applies liv
     TEST_ASSERT_EQUAL(ESP_OK, test_vcore_set_voltage(&state, 3.0f));
     TEST_ASSERT_EQUAL_FLOAT(3.0f, rail_voltage);
     TEST_ASSERT_EQUAL_UINT32(1, rail_starts);
-    TEST_ASSERT_EQUAL_UINT32(3, voltage_writes);
+    TEST_ASSERT_EQUAL_UINT32(4, voltage_writes);
     TEST_ASSERT_EQUAL_UINT32(1, fault_clears);
 }
 
@@ -258,7 +274,7 @@ TEST_CASE("Bonanza startup cannot enable the rail when fault clearing fails", "[
     fixture();
     fail_fault_clear = true;
     TEST_ASSERT_EQUAL(ESP_ERR_TIMEOUT, test_vcore_set_voltage(&state, 2.9f));
-    TEST_ASSERT_EQUAL_STRING("SCR5VD", operations);
+    TEST_ASSERT_EQUAL_STRING("SVCR5VD", operations);
     TEST_ASSERT_EQUAL_UINT32(0, rail_starts);
     TEST_ASSERT_FALSE(core_enabled);
     TEST_ASSERT_FALSE(five_volt_enabled);
@@ -282,4 +298,28 @@ TEST_CASE("Bonanza power initialization rejects absent control pins before enabl
     TEST_ASSERT_EQUAL_UINT32(0, operation_count);
     TEST_ASSERT_EQUAL_UINT32(0, rail_starts);
     TEST_ASSERT_EQUAL_UINT32(0, voltage_writes);
+}
+
+TEST_CASE("Bonanza startup clears latched PMBus warnings and waits for PGOOD discharge", "[asic][bonanza][vcore]")
+{
+    fixture();
+    latched_status_word = TPS546_STATUS_TEMP;
+    pgood_sticky_polls = 3;
+    TEST_ASSERT_EQUAL(ESP_OK, test_vcore_set_voltage(&state, 2.9f));
+    TEST_ASSERT_EQUAL_UINT32(1, tps_fault_clears);
+    TEST_ASSERT_EQUAL_HEX16(0, latched_status_word);
+    TEST_ASSERT_FALSE(state.SYSTEM_MODULE.hardware_fault);
+
+    asic_running = true;
+    latched_status_word = TPS546_STATUS_INPUT;
+    TEST_ASSERT_EQUAL(ESP_OK, test_vcore_set_voltage(&state, 3.0f));
+    TEST_ASSERT_EQUAL_UINT32(2, tps_fault_clears);
+    TEST_ASSERT_EQUAL_FLOAT(3.0f, rail_voltage);
+
+    /* If PGOOD stays stuck HIGH after safe-off, startup must fail before enabling the rail. */
+    fixture();
+    pgood_sticky_polls = 100;
+    TEST_ASSERT_EQUAL(ESP_ERR_TIMEOUT, test_vcore_set_voltage(&state, 2.8f));
+    TEST_ASSERT_EQUAL_UINT32(0, rail_starts);
+    TEST_ASSERT_TRUE(state.SYSTEM_MODULE.hardware_fault);
 }

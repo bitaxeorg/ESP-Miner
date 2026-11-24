@@ -44,19 +44,45 @@ esp_err_t BONANZA_VCORE_init(GlobalState *GLOBAL_STATE, TPS546_CONFIG config)
     minimum_input_voltage = config.TPS546_INIT_VIN_OFF;
     return TPS546_init(config);
 }
-static esp_err_t bonanza_set_5v_enabled(void *context, bool enabled)
+static bzm_status_t bonanza_esp_to_bzm(esp_err_t err)
 {
-    (void)context;
-    return BZM_control_set_5v_enabled(enabled);
+    switch (err) {
+    case ESP_OK: return BZM_OK;
+    case ESP_ERR_INVALID_ARG: return BZM_ERR_INVALID_ARG;
+    case ESP_ERR_INVALID_STATE: return BZM_ERR_INVALID_STATE;
+    case ESP_ERR_NOT_SUPPORTED: return BZM_ERR_NOT_SUPPORTED;
+    case ESP_ERR_NO_MEM: return BZM_ERR_NO_MEM;
+    case ESP_ERR_TIMEOUT: return BZM_ERR_TIMEOUT;
+    default: return BZM_ERR_IO;
+    }
 }
 
-static esp_err_t bonanza_set_regulator_enabled(void *context, bool enabled)
+static esp_err_t bonanza_bzm_to_esp(bzm_status_t status)
 {
-    (void)context;
-    return BZM_control_set_core_enabled(enabled);
+    switch (status) {
+    case BZM_OK: return ESP_OK;
+    case BZM_ERR_INVALID_ARG: return ESP_ERR_INVALID_ARG;
+    case BZM_ERR_INVALID_STATE: return ESP_ERR_INVALID_STATE;
+    case BZM_ERR_NOT_SUPPORTED: return ESP_ERR_NOT_SUPPORTED;
+    case BZM_ERR_NO_MEM: return ESP_ERR_NO_MEM;
+    case BZM_ERR_TIMEOUT: return ESP_ERR_TIMEOUT;
+    default: return ESP_FAIL;
+    }
 }
 
-static esp_err_t bonanza_set_vout(void *context, float volts)
+static bzm_status_t bonanza_set_5v_enabled(void *context, bool enabled)
+{
+    (void)context;
+    return bonanza_esp_to_bzm(BZM_control_set_5v_enabled(enabled));
+}
+
+static bzm_status_t bonanza_set_regulator_enabled(void *context, bool enabled)
+{
+    (void)context;
+    return bonanza_esp_to_bzm(BZM_control_set_core_enabled(enabled));
+}
+
+static bzm_status_t bonanza_set_vout(void *context, float volts)
 {
     GlobalState *state = context;
     if (volts != 0.0f &&
@@ -64,24 +90,27 @@ static esp_err_t bonanza_set_vout(void *context, float volts)
         ESP_LOGE(TAG,
                  "Bonanza TPS rail request %.3fV is outside 2.1..3.2V",
                  volts);
-        return ESP_ERR_INVALID_ARG;
+        return BZM_ERR_INVALID_ARG;
     }
-    return state->DEVICE_CONFIG.TPS546 ? TPS546_set_vout(volts)
-                                       : ESP_ERR_INVALID_STATE;
+    return bonanza_esp_to_bzm(state->DEVICE_CONFIG.TPS546 ? TPS546_set_vout(volts)
+                                                          : ESP_ERR_INVALID_STATE);
 }
 
-static esp_err_t bonanza_validate_power(void *context, float expected_vout)
+static bzm_status_t bonanza_validate_power(void *context, float expected_vout)
 {
     GlobalState *state = context;
     if (!bzm_power_runtime_voltage_is_allowed(expected_vout) ||
         gpio_get_level(state->DEVICE_CONFIG.pins.bzm->core_power_good) == 0) {
         ESP_LOGE(TAG, "TPS546 PGOOD remained low");
-        return ESP_FAIL;
+        return BZM_ERR_IO;
     }
 
     TPS546_StatusSnapshot snapshot;
-    ESP_RETURN_ON_ERROR(TPS546_snapshot_status(&snapshot), TAG,
-                        "TPS546 status/telemetry read failed");
+    esp_err_t snap_err = TPS546_snapshot_status(&snapshot);
+    if (snap_err != ESP_OK) {
+        ESP_LOGE(TAG, "TPS546 status/telemetry read failed");
+        return bonanza_esp_to_bzm(snap_err);
+    }
     if ((snapshot.status_word &
          (TPS546_STATUS_VOUT | TPS546_STATUS_IOUT |
           TPS546_STATUS_INPUT | TPS546_STATUS_PGOOD |
@@ -101,9 +130,9 @@ static esp_err_t bonanza_validate_power(void *context, float expected_vout)
         ESP_LOGE(TAG,
                  "TPS546 %.3fV command/status/telemetry validation failed",
                  expected_vout);
-        return ESP_FAIL;
+        return BZM_ERR_IO;
     }
-    return ESP_OK;
+    return BZM_OK;
 }
 
 static void bonanza_power_delay(void *context, uint32_t delay_ms)
@@ -123,6 +152,22 @@ static const bzm_power_ops_t BONANZA_POWER_OPS = {
 /* Only the regulator calls need serialization; mining policy stays in the shared task. */
 static pthread_mutex_t voltage_lock = PTHREAD_MUTEX_INITIALIZER;
 
+static esp_err_t wait_pgood_low(const GlobalState *state)
+{
+    const unsigned max_wait_ms = 200;
+    const unsigned step_ms = 10;
+    for (unsigned waited = 0; waited <= max_wait_ms; waited += step_ms) {
+        if (gpio_get_level(state->DEVICE_CONFIG.pins.bzm->core_power_good) == 0) {
+            return ESP_OK;
+        }
+        if (waited < max_wait_ms) {
+            vTaskDelay(pdMS_TO_TICKS(step_ms));
+        }
+    }
+    ESP_LOGE(TAG, "TPS546 PGOOD did not discharge low after safe-off");
+    return ESP_ERR_TIMEOUT;
+}
+
 /* Lifecycle helpers run with voltage_lock held. Startup always uses 2.8 V. */
 static esp_err_t prepare_startup_power(GlobalState *state)
 {
@@ -138,21 +183,32 @@ static esp_err_t prepare_startup_power(GlobalState *state)
     err = BZM_control_safe_off(&status);
     if (err == ESP_OK && (!status.valid || status.fault != BZM_CONTROL_FAULT_NONE))
         return ESP_ERR_INVALID_STATE;
+    /* Command OPERATION_OFF before re-enabling EN/UVLO so an earlier runtime
+     * voltage (up to 3.2 V) cannot be briefly applied before 2.8 V is set. */
+    if (err == ESP_OK && state->DEVICE_CONFIG.TPS546) err = TPS546_set_vout(0.0f);
+    if (err == ESP_OK) err = wait_pgood_low(state);
     if (err == ESP_OK) err = BZM_control_clear_safety_fault(&status);
-    if (err == ESP_OK) err = bzm_power_set_rail_enabled(&BONANZA_POWER_OPS, state, true);
+    /* Clear historical latched PMBus warnings (such as OT_WARN after overheat
+     * recovery) before enabling and validating the startup rail. */
+    if (err == ESP_OK && state->DEVICE_CONFIG.TPS546) err = TPS546_clear_faults();
+    if (err == ESP_OK) err = bonanza_bzm_to_esp(bzm_power_set_rail_enabled(&BONANZA_POWER_OPS, state, true));
     if (err == ESP_OK) err = BZM_control_set_5v_enabled(true);
     return err;
 }
 
 static esp_err_t apply_runtime_voltage(GlobalState *state, float volts)
 {
-    return bzm_power_set_runtime_voltage(&BONANZA_POWER_OPS, state, volts);
+    if (state->DEVICE_CONFIG.TPS546) {
+        esp_err_t err = TPS546_clear_faults();
+        if (err != ESP_OK) return err;
+    }
+    return bonanza_bzm_to_esp(bzm_power_set_runtime_voltage(&BONANZA_POWER_OPS, state, volts));
 }
 
 static esp_err_t shutdown_power(GlobalState *state)
 {
     bool reset = BZM_hold_reset();
-    esp_err_t err = bzm_power_set_rail_enabled(&BONANZA_POWER_OPS, state, false);
+    esp_err_t err = bonanza_bzm_to_esp(bzm_power_set_rail_enabled(&BONANZA_POWER_OPS, state, false));
     return err == ESP_OK && !reset ? ESP_FAIL : err;
 }
 
