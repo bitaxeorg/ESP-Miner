@@ -139,6 +139,9 @@ bzm_bringup_outcome_t test_driver_chip_start(bzm_bringup_state_t *state, const b
     }
     ((bzm_serial_transport_t *)context)->ops.write = test_startup_nonce_write;
     *state = (bzm_bringup_state_t){.running = true, .clock_mhz = 800};
+    for (unsigned chip = 0; chip < BZM_BRINGUP_ASIC_COUNT; ++chip)
+        for (unsigned pll = 0; pll < BZM_BRINGUP_PLL_COUNT; ++pll)
+            state->domain_clock_mhz[chip][pll] = 800.0f;
     *report = (bzm_bringup_report_t){0};
     return BZM_BRINGUP_GOOD;
 }
@@ -623,13 +626,16 @@ bzm_bringup_outcome_t test_driver_clock_step(bzm_bringup_state_t *state, const b
     (void)ops; (void)ctx;
     ++clock_steps;
     TEST_ASSERT_FALSE(jump);
-    TEST_ASSERT_TRUE(fabsf(targets[0][0] - state->clock_mhz) <= 25.001f);
     *report = (bzm_bringup_report_t){.reason = fail_clock ? BZM_BRINGUP_REASON_IO : BZM_BRINGUP_REASON_NONE};
     if (fail_clock) return BZM_BRINGUP_BAD;
+    float sum = 0;
     for (unsigned chip = 0; chip < BZM_BRINGUP_ASIC_COUNT; ++chip)
-        for (unsigned pll = 0; pll < BZM_BRINGUP_PLL_COUNT; ++pll)
-            TEST_ASSERT_EQUAL_FLOAT(targets[0][0], targets[chip][pll]);
-    state->clock_mhz = targets[0][0];
+        for (unsigned pll = 0; pll < BZM_BRINGUP_PLL_COUNT; ++pll) {
+            TEST_ASSERT_TRUE(fabsf(targets[chip][pll] - state->domain_clock_mhz[chip][pll]) <= 25.001f);
+            state->domain_clock_mhz[chip][pll] = targets[chip][pll];
+            sum += targets[chip][pll];
+        }
+    state->clock_mhz = sum / (float)(BZM_BRINGUP_ASIC_COUNT * BZM_BRINGUP_PLL_COUNT);
     return BZM_BRINGUP_GOOD;
 }
 
@@ -710,6 +716,16 @@ TEST_CASE("BZM shared frequency entry ramps all PLLs and replaces work", "[asic]
     bzm_driver_set_frequency(&test_state);
     TEST_ASSERT_EQUAL_FLOAT(800, test_state.actual_frequency_mhz);
     TEST_ASSERT_FALSE(reported_fault);
+    /* Heterogeneous domains must converge per-domain without tripping off-grid/step limits. */
+    DRIVER_BRINGUP.domain_clock_mhz[0][0] = 850.0f;
+    DRIVER_BRINGUP.clock_mhz = 806.25f;
+    test_state.target_frequency_mhz = 825.0f;
+    bzm_driver_set_frequency(&test_state);
+    TEST_ASSERT_EQUAL_FLOAT(825.0f, test_state.actual_frequency_mhz);
+    TEST_ASSERT_FALSE(reported_fault);
+    for (unsigned chip = 0; chip < BZM_BRINGUP_ASIC_COUNT; ++chip)
+        for (unsigned pll = 0; pll < BZM_BRINGUP_PLL_COUNT; ++pll)
+            TEST_ASSERT_EQUAL_FLOAT(825.0f, DRIVER_BRINGUP.domain_clock_mhz[chip][pll]);
     fixture_destroy();
 }
 

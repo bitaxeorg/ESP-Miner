@@ -18,10 +18,13 @@ static bool can_submit(void *context)
 static void report_fault(void *context, const char *reason)
 {
     GlobalState *state = context;
-    state->SYSTEM_MODULE.hardware_fault = true;
+    if (state == NULL || __atomic_load_n(&state->SYSTEM_MODULE.hardware_fault, __ATOMIC_ACQUIRE)) {
+        return;
+    }
     snprintf(state->SYSTEM_MODULE.hardware_fault_msg,
              sizeof(state->SYSTEM_MODULE.hardware_fault_msg), "%s", reason);
     state->SYSTEM_MODULE.asic_status = state->SYSTEM_MODULE.hardware_fault_msg;
+    __atomic_store_n(&state->SYSTEM_MODULE.hardware_fault, true, __ATOMIC_RELEASE);
 }
 static void frequency_changed(void *context, float actual_mhz)
 {

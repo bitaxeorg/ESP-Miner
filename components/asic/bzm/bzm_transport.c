@@ -12,6 +12,8 @@ typedef struct
     bzm_serial_transport_t *transport;
     uint8_t asic_id;
     bool multicast;
+    bool (*authorize)(void *);
+    void *authorize_context;
 } serial_register_context_t;
 
 static bool addressed_asic(uint8_t asic_id)
@@ -428,11 +430,13 @@ bzm_serial_poll_result_t bzm_serial_poll(bzm_serial_transport_t *transport, uint
     return result;
 }
 
-static uint16_t remaining_ms(bzm_serial_transport_t *transport, uint64_t deadline_us)
+static uint16_t remaining_ms(bzm_serial_transport_t *transport, uint64_t start_us, uint64_t timeout_us)
 {
     uint64_t now = transport->ops.now_us(transport->context);
-    if (deadline_us <= now) return 0;
-    uint64_t rounded_ms = (deadline_us - now + 999U) / 1000U;
+    uint64_t elapsed = now - start_us;
+    if (elapsed >= timeout_us) return 0;
+    uint64_t remaining = timeout_us - elapsed;
+    uint64_t rounded_ms = remaining / 1000U + (remaining % 1000U != 0U);
     return rounded_ms > UINT16_MAX ? UINT16_MAX : (uint16_t) rounded_ms;
 }
 
@@ -450,6 +454,7 @@ bzm_serial_probe_result_t bzm_serial_probe_noop(bzm_serial_transport_t * transpo
 
     uint32_t discarded_before;
     uint32_t invalid_noop_before;
+    uint32_t emitted_before;
     transport_lock(transport);
     if (transport->io.noop_pending) {
         transport_unlock(transport);
@@ -460,6 +465,7 @@ bzm_serial_probe_result_t bzm_serial_probe_noop(bzm_serial_transport_t * transpo
     transport->io.noop_asic_id = asic_id;
     discarded_before = transport->io.parser.discarded_bytes;
     invalid_noop_before = transport->io.invalid_noop_frames;
+    emitted_before = transport->io.parser.emitted_frames;
     transport_unlock(transport);
 
     uint8_t request[4];
@@ -468,7 +474,7 @@ bzm_serial_probe_result_t bzm_serial_probe_noop(bzm_serial_transport_t * transpo
         goto IO_ERROR;
     }
 
-    uint64_t deadline = transport->ops.now_us(transport->context) + 150000;
+    uint64_t start_us = transport->ops.now_us(transport->context);
     while (true) {
         transport_lock(transport);
         bool ready = transport->io.noop_ready;
@@ -480,7 +486,7 @@ bzm_serial_probe_result_t bzm_serial_probe_noop(bzm_serial_transport_t * transpo
         if (ready)
             return BZM_SERIAL_PROBE_RESPONSE;
 
-        uint16_t wait_ms = remaining_ms(transport, deadline);
+        uint16_t wait_ms = remaining_ms(transport, start_us, 150000);
         if (wait_ms == 0)
             break;
         if (bzm_serial_poll(transport, wait_ms).status != BZM_OK) goto IO_ERROR;
@@ -488,12 +494,19 @@ bzm_serial_probe_result_t bzm_serial_probe_noop(bzm_serial_transport_t * transpo
 
     transport_lock(transport);
     bool malformed_response =
-        transport->io.parser.discarded_bytes != discarded_before || transport->io.invalid_noop_frames != invalid_noop_before;
+        transport->io.parser.discarded_bytes != discarded_before ||
+        transport->io.invalid_noop_frames != invalid_noop_before ||
+        transport->io.parser.emitted_frames != emitted_before ||
+        transport->io.parser.buffered_length != 0;
+    transport->io.parser.buffered_length = 0;
     transport->io.noop_pending = false;
     transport->io.noop_ready = false;
     transport_unlock(transport);
-    clear_partial_frame(transport);
-    return malformed_response ? BZM_SERIAL_PROBE_IO_ERROR : BZM_SERIAL_PROBE_NO_RESPONSE;
+    if (malformed_response) {
+        transport->ops.clear_rx(transport->context);
+        return BZM_SERIAL_PROBE_IO_ERROR;
+    }
+    return BZM_SERIAL_PROBE_NO_RESPONSE;
 
 IO_ERROR:
     transport_lock(transport);
@@ -523,11 +536,10 @@ static bool serial_read_register_op(void * context, uint8_t asic_id, uint16_t en
     /* Match the BIRDS TDM synchronous-register contract. A reply may take a
      * full second to surface while ordinary telemetry and results remain
      * active on the same stream. */
-    uint64_t deadline =
-        transport->ops.now_us(transport->context) + BZM_REGISTER_REPLY_TIMEOUT_US;
+    uint64_t start_us = transport->ops.now_us(transport->context);
     bool received = false;
     while (!(received = bzm_serial_take_register_reply(transport, asic_id, data, data_len))) {
-        uint16_t wait_ms = remaining_ms(transport, deadline);
+        uint16_t wait_ms = remaining_ms(transport, start_us, BZM_REGISTER_REPLY_TIMEOUT_US);
         if (wait_ms == 0)
             break;
         if (bzm_serial_poll(transport, wait_ms).status != BZM_OK) break;
@@ -552,7 +564,10 @@ bool bzm_serial_read_register(bzm_serial_transport_t * transport, uint8_t asic_i
 static bool serial_register_writer(void * context, uint16_t engine_id, uint8_t offset, const void * data, size_t data_len)
 {
     serial_register_context_t * writer = context;
-    if (writer != NULL && writer->multicast) {
+    if (writer == NULL || (writer->authorize != NULL && !writer->authorize(writer->authorize_context))) {
+        return false;
+    }
+    if (writer->multicast) {
         uint8_t encoded[(32 + 6) * 2];
         if (engine_id >= BZM_ENGINE_ROWS) return false;
         size_t length = bzm_transport_encode_multicast(writer->asic_id, engine_id,
@@ -560,7 +575,7 @@ static bool serial_register_writer(void * context, uint16_t engine_id, uint8_t o
         return length != 0 && writer->transport->ops.write(
             writer->transport->context, encoded, length) == (int)length;
     }
-    return writer != NULL && serial_write_register_raw(writer->transport, writer->asic_id, engine_id, offset, data, data_len);
+    return serial_write_register_raw(writer->transport, writer->asic_id, engine_id, offset, data, data_len);
 }
 
 bool bzm_serial_write_work(void * context, const bzm_work_t * work)
@@ -582,15 +597,19 @@ bool bzm_serial_write_work(void * context, const bzm_work_t * work)
         work, serial_register_writer, &writer);
 }
 
-bool bzm_serial_flush(void * context)
+bool bzm_serial_flush_authorized(bzm_serial_transport_t * transport,
+                                 bool (*authorize)(void *), void * authorize_context)
 {
-    bzm_serial_transport_t * transport = context;
     if (transport == NULL || !transport->io.initialized)
+        return false;
+    if (authorize != NULL && !authorize(authorize_context))
         return false;
 
     serial_register_context_t writer = {
         .transport = transport,
         .asic_id = BZM_ALL_ASICS,
+        .authorize = authorize,
+        .authorize_context = authorize_context,
     };
     bool success = transport->asic_count != 0 &&
         bzm_transport_program_flush(
@@ -602,6 +621,11 @@ bool bzm_serial_flush(void * context)
     return success;
 }
 
+bool bzm_serial_flush(void * context)
+{
+    return bzm_serial_flush_authorized(context, NULL, NULL);
+}
+
 bool bzm_serial_read_result(bzm_serial_transport_t * transport, bzm_raw_result_t * result, uint16_t timeout_ms)
 {
     if (transport == NULL || !transport->io.initialized || result == NULL)
@@ -611,9 +635,10 @@ bool bzm_serial_read_result(bzm_serial_transport_t * transport, bzm_raw_result_t
     if (timeout_ms == 0)
         return bzm_serial_poll(transport, 0).status == BZM_OK && dequeue_result(transport, result);
 
-    uint64_t deadline = transport->ops.now_us(transport->context) + (uint64_t) timeout_ms * 1000;
+    uint64_t start_us = transport->ops.now_us(transport->context);
+    uint64_t timeout_us = (uint64_t) timeout_ms * 1000;
     while (true) {
-        uint16_t wait_ms = remaining_ms(transport, deadline);
+        uint16_t wait_ms = remaining_ms(transport, start_us, timeout_us);
         if (wait_ms == 0)
             return false;
         if (bzm_serial_poll(transport, wait_ms).status != BZM_OK) return false;

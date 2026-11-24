@@ -327,6 +327,60 @@ static void test_multicast_encoding(void)
                                          &value, 1, encoded, sizeof(encoded) - 1) == 0);
 }
 
+static void test_probe_malformed_and_broadcast_rejection(void)
+{
+    bzm_serial_transport_t t;
+    fixture_t f;
+    init(&t, &f);
+
+    /* Truncated NOOP response (3 bytes) must fail as IO_ERROR and clear RX. */
+    const uint8_t truncated[] = {0xfa, 0x0f, '2'};
+    f.cursor = 0;
+    f.length = sizeof(truncated);
+    memcpy(f.rx, truncated, sizeof(truncated));
+    f.clears = 0;
+    CHECK(bzm_serial_probe_noop(&t, 0xfa) == BZM_SERIAL_PROBE_IO_ERROR);
+    CHECK(f.clears == 1 && t.io.parser.buffered_length == 0);
+
+    /* Single garbage byte must fail as IO_ERROR and clear RX. */
+    f.rx[0] = 0x55;
+    f.cursor = 0;
+    f.length = 1;
+    f.clears = 0;
+    CHECK(bzm_serial_probe_noop(&t, 0xfa) == BZM_SERIAL_PROBE_IO_ERROR);
+    CHECK(f.clears == 1 && t.io.parser.buffered_length == 0);
+
+    /* Unexpected non-NOOP frame during probe must fail as IO_ERROR. */
+    const uint8_t unexpected[] = {0x0a, BZM_FRAME_RESULT, 1, 2, 3, 4, 5, 6, 7, 8};
+    memcpy(f.rx, unexpected, sizeof(unexpected));
+    f.cursor = 0;
+    f.length = sizeof(unexpected);
+    f.clears = 0;
+    CHECK(bzm_serial_probe_noop(&t, 0x0a) == BZM_SERIAL_PROBE_IO_ERROR);
+    CHECK(f.clears == 1);
+
+    /* Broadcast ASIC ID 0xfa must be rejected for RESULT and TELEMETRY frames. */
+    const uint8_t broadcast_frames[] = {
+        0xfa, BZM_FRAME_RESULT, 1, 2, 3, 4, 5, 6, 7, 8,
+        0xfa, BZM_FRAME_TELEMETRY, 1, 2, 3, 4, 5, 6, 7, 8,
+    };
+    bzm_serial_parser_stats_t before, after;
+    CHECK(bzm_serial_get_parser_stats(&t, &before));
+    CHECK(bzm_serial_transport_ingest_bytes(&t, broadcast_frames, sizeof(broadcast_frames), 1000) == 0);
+    CHECK(bzm_serial_get_parser_stats(&t, &after));
+    CHECK(after.emitted_frames == before.emitted_frames);
+    CHECK(after.discarded_bytes > before.discarded_bytes);
+
+    /* Clock near UINT64_MAX must not wrap timeout deadline to immediate expiry. */
+    bzm_serial_transport_deinit(&t);
+    init(&t, &f);
+    f.now = UINT64_MAX - 50000ULL;
+    f.cursor = f.length = 0;
+    CHECK(bzm_serial_probe_noop(&t, 0x0a) == BZM_SERIAL_PROBE_NO_RESPONSE);
+    CHECK(f.now - (UINT64_MAX - 50000ULL) >= 150000ULL);
+    bzm_serial_transport_deinit(&t);
+}
+
 int main(void)
 {
     test_adapter_contract();
@@ -338,6 +392,7 @@ int main(void)
     test_work_wire_bytes();
     test_runtime_preserves_nonce_quarters();
     test_multicast_encoding();
-    puts("BZM host transport: 9 scenarios passed");
+    test_probe_malformed_and_broadcast_rejection();
+    puts("BZM host transport: 10 scenarios passed");
     return 0;
 }

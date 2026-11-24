@@ -9,7 +9,7 @@ static bool program_work(const bzm_work_t *work,
                          void *writer_context,
                          bool include_nonce_range)
 {
-    if (work == NULL || writer == NULL) {
+    if (work == NULL || writer == NULL || work->logical_sequence > 0x3f) {
         return false;
     }
 

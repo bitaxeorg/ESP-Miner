@@ -4,6 +4,8 @@
 
 #include <string.h>
 
+#define BZM_JOB_STORE_MAX_GENERATION ((UINT64_MAX >> 8) - 1U)
+
 bool bzm_job_store_init(bzm_job_store_t *store)
 {
     return bzm_job_store_init_with_memory(store, false);
@@ -48,7 +50,9 @@ bool bzm_job_store_store_generated(bzm_job_store_t *store,
     pthread_mutex_lock(&store->lock);
     uint8_t slot = (uint8_t)(store->next_slot++ % store->capacity);
     uint64_t generation = store->next_generation++;
-    if (store->next_generation == 0) store->next_generation = 1;
+    if (store->next_generation == 0 || store->next_generation > BZM_JOB_STORE_MAX_GENERATION) {
+        store->next_generation = 1;
+    }
     bzm_work_handle_t generated = (generation << 8) | slot;
     bzm_job_store_entry_t *entry = &store->entries[slot];
     entry->template = *template;
@@ -118,6 +122,8 @@ void bzm_job_store_invalidate_all(bzm_job_store_t *store)
         store->entries[i].valid = false;
     }
     store->next_slot = 0;
-    if (++store->next_generation == 0) store->next_generation = 1;
+    if (++store->next_generation == 0 || store->next_generation > BZM_JOB_STORE_MAX_GENERATION) {
+        store->next_generation = 1;
+    }
     pthread_mutex_unlock(&store->lock);
 }

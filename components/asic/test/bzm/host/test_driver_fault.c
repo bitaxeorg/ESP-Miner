@@ -35,7 +35,8 @@ static void sleep_us(void *context, uint32_t us)
     fixture.now += us;
     ++fixture.sleeps;
 }
-static bool authorize(void *context) { (void)context; return true; }
+static bool allow_dispatch = true;
+static bool authorize(void *context) { (void)context; return allow_dispatch; }
 static int16_t read_bytes(void *context, uint8_t *data, uint16_t size, uint16_t timeout_ms)
 {
     (void)context;
@@ -454,6 +455,10 @@ static void test_unallocated_driver(void)
     CHECK(!bzm_driver_state_init(NULL));
     bzm_telemetry_store_t telemetry = {0};
     CHECK(!bzm_driver_get_telemetry_snapshot(&telemetry));
+    uint32_t gen = 0, completed = 0;
+    bool pending = false;
+    CHECK(!bzm_driver_work_replacement_snapshot(&gen, &completed, &pending));
+    bzm_driver_set_frequency(NULL);
     CHECK(bzm_driver_poll(1) == 0);
     bzm_driver_set_dispatch_authorizer(authorize, NULL);
     bzm_driver_set_operation_authorizer(authorize, NULL);
@@ -461,6 +466,73 @@ static void test_unallocated_driver(void)
     float frequency = 1;
     CHECK(bzm_driver_step_frequency_domains(NULL, false, &report, &frequency) == BZM_BRINGUP_BAD);
     CHECK(report.reason == BZM_BRINGUP_REASON_PREREQUISITE && frequency == 0);
+}
+
+static bool fail_on_first_dispatch_check(void *context)
+{
+    unsigned *remaining = context;
+    if (*remaining == 0) {
+        allow_dispatch = false;
+        return false;
+    }
+    --(*remaining);
+    return true;
+}
+
+static void test_cancelled_dispatch_never_flushes_or_faults(void)
+{
+    start_driver();
+    /* Authorize the top-level check, then revoke authorization right before engine write. */
+    unsigned allow_checks = 1;
+    allow_dispatch = true;
+    bzm_driver_set_dispatch_authorizer(fail_on_first_dispatch_check, &allow_checks);
+    unsigned writes_before = fixture.writes;
+    asic_job_t job = {.version = 0x20000000, .ntime = 0x65000000, .nbits = 0x1d00ffff};
+    CHECK(!driver_send_work(&device, &job));
+    /* Cancellation must NOT trigger bzm_serial_flush (~2832 writes) and must NOT latch io_failed. */
+    CHECK(fixture.writes == writes_before);
+    CHECK(!bzm_driver_has_io_fault());
+
+    /* Also verify BZM_ASSIGN_FLUSH_REQUIRED respects cancelled dispatch without latching io_failed. */
+    allow_dispatch = true;
+    start_driver();
+    REACTOR.next_engine_sequence[REACTOR.next_engine] = 63;
+    allow_checks = 1;
+    allow_dispatch = true;
+    bzm_driver_set_dispatch_authorizer(fail_on_first_dispatch_check, &allow_checks);
+    writes_before = fixture.writes;
+    CHECK(!driver_send_work(&device, &job));
+    CHECK(fixture.writes == writes_before);
+    CHECK(!bzm_driver_has_io_fault());
+    allow_dispatch = true;
+    bzm_driver_set_dispatch_authorizer(authorize, NULL);
+    puts("dispatch cancel: revoked authorization skips UART flush and avoids io_failed latch");
+}
+
+static void test_io_fault_service_fails_closed_and_invalidates_jobs(void)
+{
+    start_driver();
+    asic_job_t job = {.version = 0x20000000, .ntime = 0x65000000, .nbits = 0x1d00ffff};
+    bzm_work_handle_t handle = BZM_WORK_HANDLE_INVALID;
+    CHECK(bzm_job_store_store_generated(&BZM_STATE->job_store, &job, &handle));
+    CHECK(bzm_job_store_contains(&BZM_STATE->job_store, handle));
+
+    fixture.read_error = true;
+    bzm_driver_service(&device);
+    CHECK(bzm_driver_has_io_fault());
+    CHECK(fixture.safe_off_calls == 1);
+    CHECK(fixture.reset_asserted && !DRIVER_BRINGUP.running && !INITIALIZED);
+    CHECK(!bzm_job_store_contains(&BZM_STATE->job_store, handle));
+    /* Second service call does not repeat safe_off once already failed closed. */
+    bzm_driver_service(&device);
+    CHECK(fixture.safe_off_calls == 1);
+
+    /* bzm_driver_hold_reset increments work_epoch so submit_job with can_submit==NULL stops cleanly. */
+    start_driver();
+    unsigned epoch_before = atomic_load(&BZM_STATE->work_epoch);
+    CHECK(bzm_driver_hold_reset());
+    CHECK(atomic_load(&BZM_STATE->work_epoch) == epoch_before + 1);
+    puts("service fail-closed: I/O fault cuts power once, invalidates job store, and advances work epoch");
 }
 
 static void test_result_idle_does_not_wait_for_uart_under_lock(void)
@@ -493,6 +565,8 @@ int main(void)
     test_latched_fault_blocks_later_writes();
     test_temperature_filter();
     test_temperature_loss_cuts_power();
+    test_cancelled_dispatch_never_flushes_or_faults();
+    test_io_fault_service_fails_closed_and_invalidates_jobs();
     bzm_serial_transport_deinit(&TRANSPORT);
     bzm_job_store_destroy(&BZM_STATE->job_store);
     CHECK(pthread_mutex_destroy(&REACTOR_LOCK) == 0);

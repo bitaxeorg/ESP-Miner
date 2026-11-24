@@ -44,3 +44,22 @@ TEST_CASE("BZM sampling uses elapsed time and does not append duplicate reads", 
     TEST_ASSERT_FLOAT_WITHIN(0.001f, 2199.0233f, interval);
     TEST_ASSERT_EQUAL_UINT(2, rate.count);
 }
+
+TEST_CASE("BZM sampling guards NULL inputs and counter regression without poisoning history", "[asic][bzm][hashrate]")
+{
+    bzm_hashrate_t rate = {0};
+    float interval = 123.0f;
+    TEST_ASSERT_FALSE(bzm_hashrate_sample(NULL, 0, 1000000, &interval));
+    TEST_ASSERT_FALSE(bzm_hashrate_sample(&rate, 0, 1000000, NULL));
+
+    TEST_ASSERT_FALSE(bzm_hashrate_sample(&rate, 1000, 1000000, &interval));
+    TEST_ASSERT_TRUE(bzm_hashrate_sample(&rate, 1512, 2000000, &interval));
+    TEST_ASSERT_FLOAT_WITHIN(0.001f, 2199.0233f, rate.rate);
+    /* Counter regression resets baseline rather than underflowing uint64_t and poisoning sum. */
+    TEST_ASSERT_FALSE(bzm_hashrate_sample(&rate, 100, 3000000, &interval));
+    TEST_ASSERT_EQUAL_FLOAT(0, interval);
+    TEST_ASSERT_EQUAL_FLOAT(0, rate.rate);
+    TEST_ASSERT_TRUE(bzm_hashrate_sample(&rate, 612, 4000000, &interval));
+    TEST_ASSERT_FLOAT_WITHIN(0.001f, 2199.0233f, interval);
+    TEST_ASSERT_FLOAT_WITHIN(0.001f, 2199.0233f, rate.rate);
+}

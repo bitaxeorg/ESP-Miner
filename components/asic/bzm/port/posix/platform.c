@@ -42,5 +42,6 @@ static bzm_status_t sha256(void *ctx, const uint8_t *data, size_t size, uint8_t 
 
 void bzm_platform_posix_defaults(bzm_platform_ops_t *ops)
 {
+    if (ops == NULL) return;
     *ops = (bzm_platform_ops_t){.now_us = now_us, .sleep_us = sleep_us, .log = log_message, .sha256 = sha256};
 }

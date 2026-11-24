@@ -46,6 +46,7 @@ void bzm_log(char level, const char *tag, const char *format, ...)
 }
 void bzm_log_hex(const char *tag, const void *data, size_t size)
 {
+    if (data == NULL || size == 0 || !platform.log) return;
     const uint8_t *bytes = data;
     for (size_t offset = 0; offset < size; offset += 16) {
         char line[49];

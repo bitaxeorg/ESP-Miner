@@ -12,7 +12,8 @@ bool bzm_work_build(const bzm_work_ref_t *source, uint16_t engine_id,
 {
     if (source == NULL || source->template == NULL || work == NULL ||
         source->handle == BZM_WORK_HANDLE_INVALID ||
-        engine_id >= BZM_MAX_ENGINE_COUNT || timestamp_count > 0x7f ||
+        engine_id >= BZM_MAX_ENGINE_COUNT || logical_sequence >= 63 ||
+        timestamp_count > 0x7f ||
         source->template->ntime > UINT32_MAX - timestamp_count) {
         return false;
     }

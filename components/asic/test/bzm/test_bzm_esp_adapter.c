@@ -152,6 +152,9 @@ TEST_CASE("BZM ESP adapter owns task retry, application callbacks and result con
     TEST_ASSERT_TRUE(state.SYSTEM_MODULE.hardware_fault);
     TEST_ASSERT_EQUAL_STRING("fixture fault", state.SYSTEM_MODULE.hardware_fault_msg);
     TEST_ASSERT_FALSE(last_device.can_submit(last_device.context));
+    /* Subsequent fault reports must preserve the initial root-cause message. */
+    last_device.report_fault(last_device.context, "secondary fault");
+    TEST_ASSERT_EQUAL_STRING("fixture fault", state.SYSTEM_MODULE.hardware_fault_msg);
     share = (bzm_result_t){
         .job_valid = true, .job = {.ntime = 100, .version = 0x20000000},
         .final_ntime = 101, .final_version = 0x20002000, .nonce = 42,

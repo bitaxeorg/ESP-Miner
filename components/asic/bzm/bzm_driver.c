@@ -75,6 +75,12 @@ typedef struct {
 } bzm_driver_state_t;
 
 static bzm_driver_state_t *BZM_STATE;
+static pthread_mutex_t bzm_state_init_lock = PTHREAD_MUTEX_INITIALIZER;
+
+static inline bzm_driver_state_t *driver_state_load(void)
+{
+    return __atomic_load_n(&BZM_STATE, __ATOMIC_ACQUIRE);
+}
 
 #define REACTOR (BZM_STATE->reactor)
 #define TRANSPORT (BZM_STATE->transport)
@@ -103,21 +109,30 @@ bool bzm_driver_state_init(bzm_device_t *state)
     if (state == NULL) {
         return false;
     }
-    if (BZM_STATE != NULL) return true;
+    if (driver_state_load() != NULL) return true;
+
+    pthread_mutex_lock(&bzm_state_init_lock);
+    if (driver_state_load() != NULL) {
+        pthread_mutex_unlock(&bzm_state_init_lock);
+        return true;
+    }
 
     bzm_driver_state_t *allocated = bzm_calloc(1, sizeof(*allocated), true);
     if (allocated == NULL) {
+        pthread_mutex_unlock(&bzm_state_init_lock);
         BZM_LOGE(TAG, "Unable to allocate Bonanza driver state");
         return false;
     }
     if (pthread_mutex_init(&allocated->reactor_lock, NULL) != 0) {
         bzm_free(allocated);
+        pthread_mutex_unlock(&bzm_state_init_lock);
         return false;
     }
     allocated->last_temperature = -1.0f;
     if (pthread_mutex_init(&allocated->hashrate_lock, NULL) != 0) {
         pthread_mutex_destroy(&allocated->reactor_lock);
         bzm_free(allocated);
+        pthread_mutex_unlock(&bzm_state_init_lock);
         return false;
     }
     allocated->request_work = state->request_work;
@@ -133,9 +148,11 @@ bool bzm_driver_state_init(bzm_device_t *state)
         pthread_mutex_destroy(&allocated->hashrate_lock);
         pthread_mutex_destroy(&allocated->reactor_lock);
         bzm_free(allocated);
+        pthread_mutex_unlock(&bzm_state_init_lock);
         return false;
     }
-    BZM_STATE = allocated;
+    __atomic_store_n(&BZM_STATE, allocated, __ATOMIC_RELEASE);
+    pthread_mutex_unlock(&bzm_state_init_lock);
     BZM_LOGI(TAG, "Allocated %u bytes of Bonanza driver state",
              (unsigned)sizeof(*allocated));
     return true;
@@ -197,7 +214,7 @@ int bzm_driver_set_max_baud(void)
 static bool driver_send_work(bzm_device_t * state, const asic_job_t * template)
 {
     (void) state;
-    if (BZM_STATE == NULL || template == NULL) return false;
+    if (driver_state_load() == NULL || template == NULL) return false;
 
     pthread_mutex_lock(&REACTOR_LOCK);
     if (!INITIALIZED || bzm_driver_has_io_fault() ||
@@ -214,7 +231,14 @@ static bool driver_send_work(bzm_device_t * state, const asic_job_t * template)
         bzm_reactor_assign(&REACTOR, template, NULL);
     if (status == BZM_ASSIGN_FLUSH_REQUIRED) {
         if (!bzm_reactor_begin_flush(&REACTOR)) {
+            bool flush_cancelled = DRIVER_TRANSPORT_READY &&
+                !bzm_dispatch_gate_is_authorized(&DRIVER_DISPATCH_GATE);
             pthread_mutex_unlock(&REACTOR_LOCK);
+            if (flush_cancelled) {
+                BZM_LOGI(TAG,
+                         "BZM flush barrier cancelled after dispatch authorization was withdrawn");
+                return false;
+            }
             atomic_store_explicit(&BZM_STATE->io_failed, true, memory_order_release);
             BZM_LOGE(TAG, "Unable to complete BZM flush barrier");
             return false;
@@ -274,7 +298,7 @@ static bool driver_send_work(bzm_device_t * state, const asic_job_t * template)
 
 bool bzm_driver_clear_work(bzm_device_t * state)
 {
-    if (BZM_STATE == NULL) return true;
+    if (driver_state_load() == NULL) return true;
     atomic_fetch_add_explicit(&BZM_STATE->work_epoch, 1, memory_order_acq_rel);
     (void) state;
     pthread_mutex_lock(&REACTOR_LOCK);
@@ -297,7 +321,7 @@ bool bzm_driver_clear_work(bzm_device_t * state)
 
 bool bzm_driver_set_difficulty(bzm_device_t *state, uint8_t difficulty_power)
 {
-    if (BZM_STATE == NULL || state == NULL || difficulty_power < 4 || difficulty_power > 31)
+    if (driver_state_load() == NULL || state == NULL || difficulty_power < 4 || difficulty_power > 31)
         return false;
     pthread_mutex_lock(&REACTOR_LOCK);
     bool ready = INITIALIZED && !bzm_driver_has_io_fault();
@@ -316,7 +340,7 @@ bool bzm_driver_set_difficulty(bzm_device_t *state, uint8_t difficulty_power)
 
 double bzm_driver_job_frequency_ms(bzm_device_t *state)
 {
-    if (BZM_STATE == NULL || (state && (!state->initialized ||
+    if (driver_state_load() == NULL || (state && (!state->initialized ||
         (state->can_submit && !state->can_submit(state->context)))))
         return BZM_IDLE_CHECK_INTERVAL_MS;
     pthread_mutex_lock(&REACTOR_LOCK);
@@ -334,7 +358,7 @@ double bzm_driver_job_frequency_ms(bzm_device_t *state)
 static bzm_result_t * driver_receive_result(bzm_device_t * state)
 {
     (void) state;
-    if (BZM_STATE == NULL) {
+    if (driver_state_load() == NULL) {
         bzm_sleep_ms(1);
         return NULL;
     }
@@ -377,7 +401,7 @@ bool bzm_driver_hashrate_counter_snapshot(bzm_device_t *state,
                                    uint32_t *difficulty_one_counters,
                                    size_t counter_count)
 {
-    if (BZM_STATE == NULL || state == NULL || difficulty_one_counters == NULL ||
+    if (driver_state_load() == NULL || state == NULL || difficulty_one_counters == NULL ||
         counter_count < state->asic_count ||
         state->asic_count > BZM_MAX_ASIC_COUNT) {
         return false;
@@ -408,7 +432,7 @@ bool bzm_driver_sample_hashrate(bzm_device_t *state, uint64_t time_us,
     if (!interval_hashrate || !current_hashrate) return false;
     *interval_hashrate = 0;
     *current_hashrate = 0;
-    if (!BZM_STATE || !state || state->asic_count > BZM_MAX_ASIC_COUNT) return false;
+    if (!driver_state_load() || !state || state->asic_count > BZM_MAX_ASIC_COUNT) return false;
 
     pthread_mutex_lock(&BZM_STATE->hashrate_lock);
     bool valid = false;
@@ -431,7 +455,7 @@ bool bzm_driver_sample_hashrate(bzm_device_t *state, uint64_t time_us,
 bool bzm_driver_get_hashrate_measurement(bzm_device_t *state, uint8_t asic_nr,
                                          uint64_t *time_us, float *hashrate)
 {
-    if (!state || !time_us || !hashrate || !BZM_STATE ||
+    if (!state || !time_us || !hashrate || !driver_state_load() ||
         state->asic_count > BZM_MAX_ASIC_COUNT || asic_nr >= state->asic_count) return false;
     pthread_mutex_lock(&BZM_STATE->hashrate_lock);
     const bzm_hashrate_t *sample = &BZM_STATE->hashrate[asic_nr];
@@ -443,7 +467,7 @@ bool bzm_driver_get_hashrate_measurement(bzm_device_t *state, uint8_t asic_nr,
 
 bool bzm_driver_work_replacement_snapshot(uint32_t *generation, uint32_t *completed, bool *pending)
 {
-    if (generation == NULL || completed == NULL || pending == NULL) return false;
+    if (driver_state_load() == NULL || generation == NULL || completed == NULL || pending == NULL) return false;
     pthread_mutex_lock(&REACTOR_LOCK);
     *pending = INITIALIZED && BZM_STATE->work_replacement_remaining != 0;
     *generation = (uint32_t)atomic_load_explicit(
@@ -495,7 +519,7 @@ static void update_temperature_locked(void)
 float bzm_driver_read_temperature(bzm_device_t *state)
 {
     (void)state;
-    if (BZM_STATE == NULL) return -1.0f;
+    if (driver_state_load() == NULL) return -1.0f;
     pthread_mutex_lock(&REACTOR_LOCK);
     float temperature = -1.0f;
     if (INITIALIZED && TRANSPORT.asic_count != 0) {
@@ -508,7 +532,7 @@ float bzm_driver_read_temperature(bzm_device_t *state)
 
 bool bzm_driver_get_telemetry_snapshot(bzm_telemetry_store_t * snapshot)
 {
-    if (BZM_STATE == NULL || snapshot == NULL) return false;
+    if (driver_state_load() == NULL || snapshot == NULL) return false;
     pthread_mutex_lock(&REACTOR_LOCK);
     bool copied = bzm_serial_get_telemetry_snapshot(&TRANSPORT, snapshot);
     pthread_mutex_unlock(&REACTOR_LOCK);
@@ -966,18 +990,33 @@ static bool driver_mining_dispatch_checkpoint(void * context)
            bzm_dispatch_gate_is_authorized(&DRIVER_DISPATCH_GATE);
 }
 
+static bool driver_mining_flush_allowed(void * context)
+{
+    (void) context;
+    return DRIVER_TRANSPORT_READY && !bzm_driver_has_io_fault() &&
+           DRIVER_BRINGUP.running && bzm_dispatch_gate_is_authorized(&DRIVER_DISPATCH_GATE);
+}
+
+static bool driver_mining_flush(void * context)
+{
+    return bzm_serial_flush_authorized(context, driver_mining_flush_allowed, NULL);
+}
+
 static const bzm_transport_ops_t DRIVER_MINING_OPS = {
     .write_work = driver_mining_write_work,
     .dispatch_checkpoint = driver_mining_dispatch_checkpoint,
-    .flush = bzm_serial_flush,
+    .flush = driver_mining_flush,
 };
 
 static bool driver_fail_closed_locked(void)
 {
+    atomic_fetch_add_explicit(&BZM_STATE->work_epoch, 1, memory_order_acq_rel);
     INITIALIZED = false;
     DRIVER_TRANSPORT_READY = false;
     DRIVER_IO_OK = false;
     TRANSPORT.asic_count = 0;
+    bzm_job_store_invalidate_all(&BZM_STATE->job_store);
+    reset_result_dedup();
     bzm_bringup_init(&DRIVER_BRINGUP);
     DRIVER_BALANCED_RAMP = (bzm_balanced_ramp_report_t){0};
 
@@ -1025,6 +1064,8 @@ bzm_bringup_outcome_t bzm_driver_start(bzm_device_t *state, const bzm_bringup_te
     }
 
     INITIALIZED = false;
+    bzm_job_store_invalidate_all(&BZM_STATE->job_store);
+    reset_result_dedup();
     LAST_TEMPERATURE = -1.0f;
     LAST_TEMPERATURE_US = 0;
     memset(BZM_STATE->temperature_filters, 0, sizeof(BZM_STATE->temperature_filters));
@@ -1107,7 +1148,7 @@ bzm_bringup_outcome_t bzm_driver_step_frequency_domains(
     bool allow_initial_jump, bzm_bringup_report_t *report,
     float *actual_mhz)
 {
-    if (BZM_STATE == NULL) {
+    if (driver_state_load() == NULL) {
         if (actual_mhz != NULL) *actual_mhz = 0;
         driver_report(report, BZM_BRINGUP_REASON_PREREQUISITE);
         return BZM_BRINGUP_BAD;
@@ -1129,16 +1170,23 @@ bzm_bringup_outcome_t bzm_driver_step_frequency_domains(
         driver_report(report, BZM_BRINGUP_REASON_IO);
         return BZM_BRINGUP_BAD;
     }
+    bzm_bringup_report_t local_report = {0};
+    bzm_bringup_report_t *step_report = report != NULL ? report : &local_report;
     bzm_bringup_outcome_t outcome =
         bzm_bringup_live_frequency_domains_step(
             &DRIVER_BRINGUP, &DRIVER_LIVE_FREQUENCY_OPS, &TRANSPORT,
-            target_mhz, allow_initial_jump, report);
+            target_mhz, allow_initial_jump, step_report);
     if (outcome == BZM_BRINGUP_GOOD) {
         /* Keep mining live; replace work that crossed the PLL transition. */
         bzm_reactor_invalidate_work(&REACTOR);
         bzm_serial_discard_pending_results(&TRANSPORT);
         // A PLL transition also preserves the logical pool-job identity.
         start_work_replacement_locked(REACTOR.config.engine_count);
+    } else if (step_report->reason != BZM_BRINGUP_REASON_INVALID_ARGUMENT &&
+               step_report->reason != BZM_BRINGUP_REASON_PREREQUISITE) {
+        /* Hardware PLL dividers may have been written before verification failed. */
+        bzm_reactor_invalidate_work(&REACTOR);
+        bzm_serial_discard_pending_results(&TRANSPORT);
     }
     if (actual_mhz != NULL) *actual_mhz = DRIVER_BRINGUP.clock_mhz;
     pthread_mutex_unlock(&REACTOR_LOCK);
@@ -1147,7 +1195,7 @@ bzm_bringup_outcome_t bzm_driver_step_frequency_domains(
 
 bool bzm_driver_get_state(bzm_bringup_state_t * state)
 {
-    if (BZM_STATE == NULL || state == NULL)
+    if (driver_state_load() == NULL || state == NULL)
         return false;
     pthread_mutex_lock(&REACTOR_LOCK);
     *state = DRIVER_BRINGUP;
@@ -1157,7 +1205,7 @@ bool bzm_driver_get_state(bzm_bringup_state_t * state)
 
 bool bzm_driver_hold_reset(void)
 {
-    if (BZM_STATE == NULL) return bzm_control_set_asic_reset(false) == BZM_OK;
+    if (driver_state_load() == NULL) return bzm_control_set_asic_reset(false) == BZM_OK;
     pthread_mutex_lock(&REACTOR_LOCK);
     bool held = driver_fail_closed_locked();
     pthread_mutex_unlock(&REACTOR_LOCK);
@@ -1166,7 +1214,7 @@ bool bzm_driver_hold_reset(void)
 
 void bzm_driver_set_dispatch_authorizer(bzm_dispatch_authorizer_t authorize, void * context)
 {
-    if (BZM_STATE == NULL) return;
+    if (driver_state_load() == NULL) return;
     pthread_mutex_lock(&REACTOR_LOCK);
     bzm_dispatch_gate_set(&DRIVER_DISPATCH_GATE, authorize, context);
     pthread_mutex_unlock(&REACTOR_LOCK);
@@ -1174,7 +1222,7 @@ void bzm_driver_set_dispatch_authorizer(bzm_dispatch_authorizer_t authorize, voi
 
 void bzm_driver_set_operation_authorizer(bzm_dispatch_authorizer_t authorize, void * context)
 {
-    if (BZM_STATE == NULL) return;
+    if (driver_state_load() == NULL) return;
     pthread_mutex_lock(&REACTOR_LOCK);
     DRIVER_OPERATION_AUTHORIZE = authorize;
     DRIVER_OPERATION_AUTHORIZE_CONTEXT = context;
@@ -1183,7 +1231,7 @@ void bzm_driver_set_operation_authorizer(bzm_dispatch_authorizer_t authorize, vo
 
 size_t bzm_driver_poll(uint16_t timeout_ms)
 {
-    if (BZM_STATE == NULL || timeout_ms == 0)
+    if (driver_state_load() == NULL || timeout_ms == 0)
         return 0;
     pthread_mutex_lock(&REACTOR_LOCK);
     size_t frames = DRIVER_TRANSPORT_READY ? bzm_serial_poll(&TRANSPORT, timeout_ms).frames_emitted : 0;
@@ -1213,7 +1261,7 @@ const bzm_result_t *bzm_driver_process_result(bzm_device_t *state)
 
 void bzm_driver_submit_job(bzm_device_t *state, const asic_job_t *job)
 {
-    if (BZM_STATE == NULL || state == NULL || job == NULL) return;
+    if (driver_state_load() == NULL || state == NULL || job == NULL) return;
     unsigned epoch = atomic_load_explicit(&BZM_STATE->work_epoch, memory_order_acquire);
     while (state->initialized && !bzm_driver_has_io_fault() &&
            (state->can_submit == NULL || state->can_submit(state->context)) &&
@@ -1225,7 +1273,7 @@ void bzm_driver_submit_job(bzm_device_t *state, const asic_job_t *job)
 
 bool bzm_driver_has_io_fault(void)
 {
-    return BZM_STATE == NULL ||
+    return driver_state_load() == NULL ||
         atomic_load_explicit(&BZM_STATE->io_failed, memory_order_acquire);
 }
 
@@ -1278,15 +1326,37 @@ static void check_mining_temperature(bzm_device_t *state)
 
 void bzm_driver_service(bzm_device_t *state)
 {
-    if (state == NULL || BZM_STATE == NULL) return;
+    if (state == NULL || driver_state_load() == NULL) return;
     bzm_driver_poll(1);
     bzm_control_status_t status;
-    if (bzm_driver_has_io_fault()) device_fault(state, "BZM transport failed");
-    else if (bzm_control_get_safety_status(&status) == BZM_OK &&
-             status.fault == BZM_CONTROL_FAULT_ASIC_TRIP)
+    if (bzm_driver_has_io_fault()) {
+        bool need_safe_off = false;
+        pthread_mutex_lock(&REACTOR_LOCK);
+        if (INITIALIZED || DRIVER_BRINGUP.running) {
+            driver_fail_closed_locked();
+            need_safe_off = true;
+        }
+        pthread_mutex_unlock(&REACTOR_LOCK);
+        if (need_safe_off) {
+            bzm_control_status_t off_status;
+            if (bzm_control_safe_off(&off_status) != BZM_OK || !off_status.valid ||
+                off_status.core_enabled || off_status.five_volt_enabled ||
+                !off_status.asic_reset_asserted || !off_status.fan_full) {
+                BZM_LOGE(TAG, "Unable to verify safe shutdown after transport fault");
+            }
+        }
+        device_fault(state, "BZM transport failed");
+    } else if (bzm_control_get_safety_status(&status) == BZM_OK &&
+               status.fault == BZM_CONTROL_FAULT_ASIC_TRIP) {
+        pthread_mutex_lock(&REACTOR_LOCK);
+        if (INITIALIZED || DRIVER_BRINGUP.running) {
+            driver_fail_closed_locked();
+        }
+        pthread_mutex_unlock(&REACTOR_LOCK);
         device_fault(state, "BZM ASIC trip");
-    else
+    } else {
         check_mining_temperature(state);
+    }
     // Discard the baseline even when a stop falls between two monitor polls.
     if (!hashrate_active(state)) {
         pthread_mutex_lock(&BZM_STATE->hashrate_lock);
@@ -1332,27 +1402,49 @@ uint8_t bzm_driver_init(bzm_device_t *state)
 
 void bzm_driver_set_frequency(bzm_device_t *state)
 {
+    if (state == NULL) return;
     bzm_bringup_state_t asic;
     if (!bzm_driver_get_state(&asic) || !asic.running) return;
     bzm_frequency_target_t target;
     if (!bzm_frequency_resolve_target(state->target_frequency_mhz, &target)) return;
-    while (fabsf(asic.clock_mhz - target.actual_mhz) >= 0.001f) {
-        float delta = target.actual_mhz - asic.clock_mhz;
-        float next = asic.clock_mhz + fmaxf(-BZM_FREQUENCY_RAMP_STEP_MHZ,
-                                           fminf(BZM_FREQUENCY_RAMP_STEP_MHZ, delta));
+    for (;;) {
+        bool needs_step = false;
         float domains[BZM_BRINGUP_ASIC_COUNT][BZM_BRINGUP_PLL_COUNT];
-        for (size_t chip = 0; chip < BZM_BRINGUP_ASIC_COUNT; ++chip)
-            for (size_t pll = 0; pll < BZM_BRINGUP_PLL_COUNT; ++pll) domains[chip][pll] = next;
-        bzm_bringup_report_t report;
-        if (bzm_driver_step_frequency_domains((const float (*)[BZM_BRINGUP_PLL_COUNT])domains, false, &report, &asic.clock_mhz) != BZM_BRINGUP_GOOD) {
+        for (size_t chip = 0; chip < BZM_BRINGUP_ASIC_COUNT; ++chip) {
+            for (size_t pll = 0; pll < BZM_BRINGUP_PLL_COUNT; ++pll) {
+                float current = asic.domain_clock_mhz[chip][pll];
+                float delta = target.actual_mhz - current;
+                if (fabsf(delta) >= 0.001f) {
+                    needs_step = true;
+                    domains[chip][pll] = current + fmaxf(-BZM_FREQUENCY_RAMP_STEP_MHZ,
+                                                         fminf(BZM_FREQUENCY_RAMP_STEP_MHZ, delta));
+                } else {
+                    domains[chip][pll] = current;
+                }
+            }
+        }
+        if (!needs_step) return;
+        bzm_bringup_report_t report = {0};
+        if (bzm_driver_step_frequency_domains((const float (*)[BZM_BRINGUP_PLL_COUNT])domains,
+                                              false, &report, &asic.clock_mhz) != BZM_BRINGUP_GOOD) {
+            bzm_bringup_state_t after;
+            bzm_control_status_t safety = {0};
+            bool clean_stop = report.reason == BZM_BRINGUP_REASON_PREREQUISITE &&
+                !bzm_driver_has_io_fault() &&
+                (!bzm_driver_get_state(&after) || !after.running) &&
+                (bzm_control_get_safety_status(&safety) != BZM_OK ||
+                 safety.fault == BZM_CONTROL_FAULT_NONE);
+            if (clean_stop) return;
             BZM_LOGE(TAG, "Frequency change failed: %s", bzm_bringup_reason_name(report.reason));
-            device_fault(state, "BZM frequency change failed");
             bzm_driver_hold_reset();
             bzm_control_status_t status;
             bzm_control_safe_off(&status);
+            device_fault(state, "BZM frequency change failed");
             return;
         }
         bzm_device_record_frequency(state, asic.clock_mhz);
+        if (!bzm_driver_get_state(&asic) || !asic.running) return;
         bzm_sleep_ms(100);
+        if (!bzm_driver_get_state(&asic) || !asic.running) return;
     }
 }

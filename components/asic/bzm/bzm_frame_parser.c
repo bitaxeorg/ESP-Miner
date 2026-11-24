@@ -65,6 +65,9 @@ static size_t expected_frame_length(bzm_frame_parser_t * parser, bool * valid_he
     size_t payload_length;
     switch (parser->buffer[1]) {
     case BZM_FRAME_RESULT:
+        if (!addressed_asic) {
+            return 0;
+        }
         payload_length = BZM_RESULT_FRAME_SIZE;
         break;
     case BZM_FRAME_REGISTER:
@@ -77,6 +80,9 @@ static size_t expected_frame_length(bzm_frame_parser_t * parser, bool * valid_he
         }
         break;
     case BZM_FRAME_TELEMETRY:
+        if (!addressed_asic) {
+            return 0;
+        }
         payload_length = BZM_TDM_TELEMETRY_PAYLOAD_SIZE;
         break;
     case BZM_FRAME_NOOP:
