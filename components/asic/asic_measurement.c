@@ -5,12 +5,14 @@
 asic_hashrate_sample_t ASIC_sample_hashrate(GlobalState *state)
 {
     asic_hashrate_sample_t sample = {0};
+    if (state == NULL) return sample;
     if (state->DEVICE_CONFIG.family.asic.id == BZM) {
         sample.interval_valid = BZM_sample_hashrate(state, &sample.interval_hashrate, &sample.current_hashrate);
         return sample;
     }
 
     HashrateMonitorModule *monitor = &state->HASHRATE_MONITOR_MODULE;
+    if (!monitor->is_initialized) return sample;
     pthread_mutex_lock(&monitor->lock);
     for (unsigned asic = 0; asic < state->DEVICE_CONFIG.family.asic_count; ++asic) {
         sample.interval_hashrate += monitor->total_measurement[asic].hashrate;

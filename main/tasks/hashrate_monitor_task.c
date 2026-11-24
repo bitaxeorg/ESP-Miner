@@ -97,20 +97,6 @@ static float calculate_avg_nan_safe(const float arr[], int size) {
     return (count > 0) ? (sum / count) : 0.0f;
 }
 
-float hashrate_monitor_get_asic_rate(void *state, uint8_t asic_nr)
-{
-    asic_domain_measurement_t measurement = {0};
-    ASIC_get_asic_measurement(state, asic_nr, &measurement);
-    return measurement.hashrate;
-}
-
-float hashrate_monitor_get_domain_rate(void *state, uint8_t asic_nr, uint8_t domain_nr)
-{
-    asic_domain_measurement_t measurement = {0};
-    ASIC_get_domain_measurement(state, asic_nr, domain_nr, &measurement);
-    return measurement.hashrate;
-}
-
 static void update_hashrate_averages(SystemModule * SYSTEM_MODULE, float interval_hashrate)
 {
     hashrate_1m[poll_count % HASHRATE_1M_SIZE] = interval_hashrate;

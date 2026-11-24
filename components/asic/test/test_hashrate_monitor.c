@@ -64,8 +64,6 @@ esp_err_t monitor_domain_measurement(GlobalState *s, uint8_t asic, uint8_t domai
 #define hashrate_monitor_task monitor_task
 #define hashrate_monitor_reset_measurements monitor_reset
 #define hashrate_monitor_register_read monitor_register_read
-#define hashrate_monitor_get_asic_rate monitor_asic_rate
-#define hashrate_monitor_get_domain_rate monitor_domain_rate
 #define update_hashrate monitor_update_hashrate
 #define update_hash_counter monitor_update_counter
 #undef isnanf
@@ -114,6 +112,20 @@ esp_err_t monitor_domain_measurement(GlobalState *s, uint8_t asic, uint8_t domai
 {
     ++domain_measurement_calls;
     return get_measurement(s, asic, domain + 1, measurement);
+}
+
+static float monitor_asic_rate(GlobalState *s, uint8_t asic)
+{
+    asic_domain_measurement_t m = {0};
+    monitor_total_measurement(s, asic, &m);
+    return m.hashrate;
+}
+
+static float monitor_domain_rate(GlobalState *s, uint8_t asic, uint8_t domain)
+{
+    asic_domain_measurement_t m = {0};
+    monitor_domain_measurement(s, asic, domain, &m);
+    return m.hashrate;
 }
 
 #undef ASIC_sample_hashrate

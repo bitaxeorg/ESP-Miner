@@ -4,9 +4,11 @@
 #include "main/global_state.h"
 #include "asic.h"
 
+#define ASIC_sample_hashrate measurement_test_sample
 #define ASIC_get_asic_measurement measurement_test_total
 #define ASIC_get_domain_measurement measurement_test_domain
 #define ASIC_get_temperature measurement_test_temperature
+#define BZM_sample_hashrate measurement_test_bzm_sample
 #define BZM_get_hashrate_measurement measurement_test_bzm
 #define BZM_read_temperature measurement_test_bzm_temperature
 #include "components/asic/asic_measurement.c"
@@ -14,6 +16,13 @@
 static bool software_available;
 static uint8_t requested_asic;
 static unsigned temperature_reads;
+bool measurement_test_bzm_sample(GlobalState *state, float *interval, float *current)
+{
+    (void)state;
+    *interval = 400;
+    *current = 350;
+    return software_available;
+}
 float measurement_test_bzm_temperature(GlobalState *state)
 {
     (void)state;
@@ -53,6 +62,12 @@ TEST_CASE("ASIC measurement interface returns Bitmain totals and domains without
     TEST_ASSERT_EQUAL(ESP_ERR_INVALID_ARG, ASIC_get_domain_measurement(state, 0, 4, &sample));
     atomic_store(&state->HASHRATE_MONITOR_MODULE.is_initialized, false);
     TEST_ASSERT_EQUAL(ESP_ERR_INVALID_STATE, ASIC_get_asic_measurement(state, 0, &sample));
+    asic_hashrate_sample_t rate_sample = ASIC_sample_hashrate(NULL);
+    TEST_ASSERT_FALSE(rate_sample.interval_valid);
+    TEST_ASSERT_EQUAL_FLOAT(0, rate_sample.current_hashrate);
+    rate_sample = ASIC_sample_hashrate(state);
+    TEST_ASSERT_FALSE(rate_sample.interval_valid);
+    TEST_ASSERT_EQUAL_FLOAT(0, rate_sample.current_hashrate);
     TEST_ASSERT_EQUAL(ESP_ERR_INVALID_ARG, ASIC_get_asic_measurement(NULL, 0, &sample));
     TEST_ASSERT_EQUAL(ESP_ERR_INVALID_ARG, ASIC_get_asic_measurement(state, 0, NULL));
     state->DEVICE_CONFIG.family = FAMILY_BONANZA;
