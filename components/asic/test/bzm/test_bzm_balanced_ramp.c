@@ -125,8 +125,8 @@ static void mock_delay(void * context, uint32_t delay_ms)
 static bool mock_telemetry(void * context, uint8_t asic_id, bzm_telemetry_sample_t * sample)
 {
     ramp_mock_t * mock = context;
-    (void) asic_id;
     *sample = (bzm_telemetry_sample_t){
+        .asic_id = asic_id,
         .received = true,
         .valid = mock->telemetry_valid,
         .ch0_mv = mock->ch0_mv,
@@ -328,4 +328,44 @@ TEST_CASE("BZM engine activation acknowledges all 944 engines and resets each AS
     TEST_ASSERT_EQUAL_UINT32(21720, mock.write_count);
     TEST_ASSERT_EQUAL_UINT32(8, mock.delay_count);
     TEST_ASSERT_EQUAL_UINT32(8, mock.total_delay_ms);
+}
+
+static bool mock_tripped_telemetry(void * context, uint8_t asic_id, bzm_telemetry_sample_t * sample)
+{
+    (void) context;
+    *sample = (bzm_telemetry_sample_t){
+        .asic_id = asic_id, .received = true, .valid = true, .trip = true,
+        .ch0_mv = 360.0f, .ch1_mv = 340.0f,
+    };
+    return true;
+}
+
+static bool mock_wrong_asic_telemetry(void * context, uint8_t asic_id, bzm_telemetry_sample_t * sample)
+{
+    (void) context;
+    *sample = (bzm_telemetry_sample_t){
+        .asic_id = (uint8_t)(asic_id + 0x0a), .received = true, .valid = true,
+        .ch0_mv = 360.0f, .ch1_mv = 340.0f,
+    };
+    return true;
+}
+
+TEST_CASE("BZM balanced ramp rejects tripped or mismatched-ASIC telemetry samples", "[asic][bzm][activation]")
+{
+    bzm_engine_pair_t pair;
+    TEST_ASSERT_TRUE(bzm_topology_balanced_pair_at(1, &pair));
+
+    ramp_mock_t mock = good_mock();
+    bzm_balanced_ramp_ops_t ops = MOCK_OPS;
+    ops.telemetry_sample = mock_tripped_telemetry;
+    bzm_balanced_ramp_report_t ramp = {0};
+    TEST_ASSERT_FALSE(bzm_balanced_ramp_commit_pair(&ramp, &ops, &mock, BZM_BRINGUP_FIRST_ASIC_ID, &pair));
+    TEST_ASSERT_EQUAL(BZM_BALANCED_RAMP_FAILURE_TELEMETRY, ramp.failure);
+    TEST_ASSERT_EQUAL_UINT32(0, mock.begin_count);
+
+    ops.telemetry_sample = mock_wrong_asic_telemetry;
+    ramp = (bzm_balanced_ramp_report_t){0};
+    TEST_ASSERT_FALSE(bzm_balanced_ramp_commit_pair(&ramp, &ops, &mock, BZM_BRINGUP_FIRST_ASIC_ID, &pair));
+    TEST_ASSERT_EQUAL(BZM_BALANCED_RAMP_FAILURE_TELEMETRY, ramp.failure);
+    TEST_ASSERT_EQUAL_UINT32(0, mock.begin_count);
 }

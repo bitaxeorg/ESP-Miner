@@ -809,3 +809,57 @@ TEST_CASE("BZM transport register reservations reject ambiguity and recover fram
     bzm_serial_transport_deinit(transport);
     free(transport);
 }
+
+TEST_CASE("BZM telemetry confirmation rejects stale unchanged ASICs without partial mutation and pairs CH2 culprit",
+          "[asic][bzm][telemetry][qemu-integration]")
+{
+    const bzm_telemetry_bounds_t bounds = {
+        .temperature_min_c = -20.0f, .temperature_max_c = 105.0f,
+        .ch0_min_mv = 300.0f, .ch0_max_mv = 800.0f,
+        .ch1_min_mv = 300.0f, .ch1_max_mv = 800.0f,
+        .ch2_abs_max_mv = 50.0f, .max_stack_spread_mv = 100.0f,
+    };
+
+    /* Unchanged ASIC aging past max_age_us must return INVALID, never GOOD. */
+    bzm_telemetry_confirmation_t confirmation;
+    bzm_telemetry_confirmation_init(&confirmation);
+    bzm_telemetry_store_t store = safe_confirmation_store(100);
+    store.samples[1].ch2_mv = 100.0f;
+    TEST_ASSERT_EQUAL(BZM_CH2_CONFIRMATION_PENDING,
+                      bzm_telemetry_confirmation_observe(&confirmation, &store, 150, 100, &bounds, true, 3, NULL, NULL));
+
+    /* Advance now_us to 250 so ASIC 0 (timestamp 100) is stale while ASIC 1..3 recover at 250. */
+    for (size_t i = 1; i < BZM_MAX_ASIC_COUNT; ++i) {
+        store.samples[i].timestamp_us = 250;
+        store.samples[i].ch2_mv = 0.0f;
+    }
+    TEST_ASSERT_EQUAL(BZM_CH2_CONFIRMATION_INVALID,
+                      bzm_telemetry_confirmation_observe(&confirmation, &store, 250, 100, &bounds, true, 3, NULL, NULL));
+
+    /* Partial mutation check: if ASIC 1 fails validation, ASIC 0 must remain untouched. */
+    bzm_telemetry_confirmation_init(&confirmation);
+    store = safe_confirmation_store(200);
+    store.samples[1].received = false;
+    TEST_ASSERT_EQUAL(BZM_CH2_CONFIRMATION_INVALID,
+                      bzm_telemetry_confirmation_observe(&confirmation, &store, 200, 100, &bounds, true, 3, NULL, NULL));
+    TEST_ASSERT_TRUE(confirmation.last_timestamp_us[0] == 0);
+
+    /* CH2 confirmation must pair culprit_asic_id with the ASIC holding the highest excursion count. */
+    bzm_ch2_confirmation_t ch2;
+    bzm_ch2_confirmation_init(&ch2);
+    store = safe_confirmation_store(100);
+    store.samples[1].ch2_mv = 75.0f;
+    uint8_t culprit = 0, observed = 0;
+    TEST_ASSERT_EQUAL(BZM_CH2_CONFIRMATION_PENDING,
+                      bzm_ch2_confirmation_observe(&ch2, &store, &bounds, 3, &culprit, &observed));
+    TEST_ASSERT_EQUAL_HEX8(0x14, culprit);
+    TEST_ASSERT_EQUAL_UINT8(1, observed);
+
+    store = safe_confirmation_store(200);
+    store.samples[0].ch2_mv = 75.0f;
+    store.samples[1].ch2_mv = 75.0f;
+    TEST_ASSERT_EQUAL(BZM_CH2_CONFIRMATION_PENDING,
+                      bzm_ch2_confirmation_observe(&ch2, &store, &bounds, 3, &culprit, &observed));
+    TEST_ASSERT_EQUAL_HEX8(0x14, culprit);
+    TEST_ASSERT_EQUAL_UINT8(2, observed);
+}

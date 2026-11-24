@@ -218,19 +218,27 @@ bzm_ch2_confirmation_result_t bzm_ch2_confirmation_observe(bzm_ch2_confirmation_
     }
 
     if (no_new_sample) {
+        uint8_t highest_count = 0;
+        size_t highest_index = 0;
         for (size_t index = 0; index < BZM_MAX_ASIC_COUNT; ++index) {
-            if (confirmation->consecutive_excursions[index] != 0) {
-                if (culprit_asic_id != NULL)
-                    *culprit_asic_id = bzm_asic_wire_ids[index];
-                if (observed_consecutive_samples != NULL)
-                    *observed_consecutive_samples = confirmation->consecutive_excursions[index];
-                break;
+            uint8_t count = confirmation->consecutive_excursions[index];
+            if (count > highest_count) {
+                highest_count = count;
+                highest_index = index;
             }
+        }
+        if (highest_count != 0) {
+            if (culprit_asic_id != NULL)
+                *culprit_asic_id = bzm_asic_wire_ids[highest_index];
+            if (observed_consecutive_samples != NULL)
+                *observed_consecutive_samples = highest_count;
         }
         return BZM_CH2_CONFIRMATION_NO_NEW_SAMPLE;
     }
 
     bzm_ch2_confirmation_result_t result = BZM_CH2_CONFIRMATION_GOOD;
+    uint8_t highest_count = 0;
+    size_t highest_index = 0;
     for (size_t index = 0; index < BZM_MAX_ASIC_COUNT; ++index) {
         const bzm_telemetry_sample_t * sample = &store->samples[index];
         confirmation->last_timestamp_us[index] = sample->timestamp_us;
@@ -242,14 +250,20 @@ bzm_ch2_confirmation_result_t bzm_ch2_confirmation_observe(bzm_ch2_confirmation_
         if (confirmation->consecutive_excursions[index] < UINT8_MAX)
             ++confirmation->consecutive_excursions[index];
         uint8_t count = confirmation->consecutive_excursions[index];
-        if (culprit_asic_id != NULL && (*culprit_asic_id == 0 || count >= required_consecutive_samples))
-            *culprit_asic_id = bzm_asic_wire_ids[index];
-        if (observed_consecutive_samples != NULL && count > *observed_consecutive_samples)
-            *observed_consecutive_samples = count;
+        if (count > highest_count) {
+            highest_count = count;
+            highest_index = index;
+        }
         if (count >= required_consecutive_samples)
             result = BZM_CH2_CONFIRMATION_CONTINUOUS;
         else if (result == BZM_CH2_CONFIRMATION_GOOD)
             result = BZM_CH2_CONFIRMATION_PENDING;
+    }
+    if (highest_count != 0) {
+        if (culprit_asic_id != NULL)
+            *culprit_asic_id = bzm_asic_wire_ids[highest_index];
+        if (observed_consecutive_samples != NULL)
+            *observed_consecutive_samples = highest_count;
     }
     return result;
 }
@@ -273,13 +287,18 @@ bzm_ch2_confirmation_result_t bzm_telemetry_confirmation_observe(
         required_consecutive_samples == 0 || required_consecutive_samples > BZM_CH2_CONFIRM_MAX_SAMPLES)
         return BZM_CH2_CONFIRMATION_INVALID;
 
+    for (size_t index = 0; index < BZM_MAX_ASIC_COUNT; ++index) {
+        const bzm_telemetry_sample_t * sample = &store->samples[index];
+        if (!sample->received || sample->asic_id != bzm_asic_wire_ids[index] || sample->timestamp_us == 0 ||
+            sample->timestamp_us < confirmation->last_timestamp_us[index] ||
+            !bzm_telemetry_sample_is_fresh(sample, now_us, max_age_us))
+            return BZM_CH2_CONFIRMATION_INVALID;
+    }
+
     bool any_new_sample = false;
     bool continuous = false;
     for (size_t index = 0; index < BZM_MAX_ASIC_COUNT; ++index) {
         const bzm_telemetry_sample_t * sample = &store->samples[index];
-        if (!sample->received || sample->asic_id != bzm_asic_wire_ids[index] || sample->timestamp_us == 0 ||
-            sample->timestamp_us < confirmation->last_timestamp_us[index])
-            return BZM_CH2_CONFIRMATION_INVALID;
         if (sample->timestamp_us == confirmation->last_timestamp_us[index])
             continue;
 
@@ -337,16 +356,20 @@ bzm_ch2_confirmation_result_t bzm_pll_lock_confirmation_observe(
         required_consecutive_samples > BZM_CH2_CONFIRM_MAX_SAMPLES)
         return BZM_CH2_CONFIRMATION_INVALID;
 
-    bool any_new_sample = false;
-    bool continuous = false;
-    uint8_t highest_count = 0;
-    size_t highest_index = 0;
     for (size_t index = 0; index < BZM_MAX_ASIC_COUNT; ++index) {
         const bzm_telemetry_sample_t * sample = &store->samples[index];
         if (!sample->received || sample->asic_id != bzm_asic_wire_ids[index] || sample->timestamp_us == 0 ||
             sample->timestamp_us < confirmation->last_timestamp_us[index] ||
             !bzm_telemetry_sample_is_fresh(sample, now_us, max_age_us))
             return BZM_CH2_CONFIRMATION_INVALID;
+    }
+
+    bool any_new_sample = false;
+    bool continuous = false;
+    uint8_t highest_count = 0;
+    size_t highest_index = 0;
+    for (size_t index = 0; index < BZM_MAX_ASIC_COUNT; ++index) {
+        const bzm_telemetry_sample_t * sample = &store->samples[index];
         if (sample->timestamp_us != confirmation->last_timestamp_us[index]) {
             any_new_sample = true;
             confirmation->last_timestamp_us[index] = sample->timestamp_us;

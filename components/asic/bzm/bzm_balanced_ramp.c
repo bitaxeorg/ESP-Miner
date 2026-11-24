@@ -168,6 +168,7 @@ bool bzm_balanced_ramp_commit_pair(bzm_balanced_ramp_report_t * ramp, const bzm_
 
     bzm_telemetry_sample_t sample = {0};
     if (!ops->telemetry_sample(ops_context, asic_id, &sample) || !sample.received || !sample.valid ||
+        sample.trip || sample.asic_id != asic_id ||
         !isfinite(sample.ch0_mv) || !isfinite(sample.ch1_mv)) {
         return fail(ramp, BZM_BALANCED_RAMP_FAILURE_TELEMETRY, asic_id, 0, 0, 1, sample.valid);
     }

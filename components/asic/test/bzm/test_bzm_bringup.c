@@ -740,6 +740,36 @@ TEST_CASE("bzm clocks require fresh recovery from one combined-lock frame anomal
     TEST_ASSERT_EQUAL_UINT16(2, mock.telemetry_snapshot_count);
 }
 
+TEST_CASE("bzm clocks confirm combined-lock anomaly when report is NULL", "[bzm_bringup]")
+{
+    bringup_mock_t mock = good_mock();
+    mock.telemetry_pll_unlock_id = 0x14;
+    mock.telemetry_pll_unlock_snapshots = 1;
+    bzm_bringup_state_t state;
+    bzm_bringup_telemetry_policy_t policy = telemetry_policy();
+    bzm_bringup_init(&state);
+
+    TEST_ASSERT_EQUAL(BZM_BRINGUP_GOOD, bzm_bringup_configure_clocks(&state, &MOCK_OPS, &mock, &policy, NULL));
+    TEST_ASSERT_EQUAL_UINT16(2, mock.telemetry_snapshot_count);
+}
+
+TEST_CASE("bzm clocks do not let an earlier ASIC PLL unlock mask a later ASIC trip", "[bzm_bringup]")
+{
+    bringup_mock_t mock = good_mock();
+    mock.telemetry_pll_unlock_id = 0x0a;
+    mock.telemetry_pll_unlock_snapshots = 1;
+    mock.telemetry_unsafe = true;
+    mock.telemetry_unsafe_id = 0x14;
+    bzm_bringup_state_t state;
+    bzm_bringup_report_t report;
+    bzm_bringup_telemetry_policy_t policy = telemetry_policy();
+    bzm_bringup_init(&state);
+
+    TEST_ASSERT_EQUAL(BZM_BRINGUP_BAD, bzm_bringup_configure_clocks(&state, &MOCK_OPS, &mock, &policy, &report));
+    TEST_ASSERT_EQUAL(BZM_BRINGUP_REASON_TELEMETRY_UNSAFE, report.reason);
+    TEST_ASSERT_EQUAL_UINT16(1, mock.telemetry_snapshot_count);
+}
+
 TEST_CASE("bzm clocks reject continuous combined-lock frame anomalies", "[bzm_bringup]")
 {
     bringup_mock_t mock = good_mock();

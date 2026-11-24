@@ -276,6 +276,8 @@ static bzm_bringup_outcome_t verify_telemetry(const bzm_bringup_ops_t * ops, voi
         }
     }
 
+    bzm_bringup_report_t local_report = {0};
+    bzm_bringup_report_t * active_report = report != NULL ? report : &local_report;
     bzm_telemetry_confirmation_t confirmation;
     bzm_telemetry_confirmation_init(&confirmation);
     uint8_t culprit_asic_id = 0;
@@ -283,20 +285,21 @@ static bzm_bringup_outcome_t verify_telemetry(const bzm_bringup_ops_t * ops, voi
     uint16_t attempt_limit = (uint16_t) policy->ch2_confirm_samples * BZM_BRINGUP_ASIC_COUNT;
     for (uint16_t attempt = 0; attempt <= attempt_limit; ++attempt) {
         uint64_t snapshot_now_us = ops->now_us(ops_context);
-        bzm_bringup_outcome_t outcome =
-            verify_telemetry_snapshot(&store, snapshot_now_us, configured_after_us, policy, require_clock_locks, report);
+        bzm_bringup_outcome_t outcome = verify_telemetry_snapshot(
+            &store, snapshot_now_us, configured_after_us, policy, require_clock_locks, active_report);
 
         /* CH2 excursions already pass the strict non-CH2 checks above. A
-         * combined-PLL bit loss is also confirmable when every non-clock
-         * field is otherwise safe. Missing, stale, pre-configuration,
-         * malformed, and all other unsafe samples remain immediate failures. */
+         * combined-PLL bit loss is also confirmable only when the entire chain
+         * passes every non-clock check (received, post-config, fresh, non-trip,
+         * thermal, CH0, CH1, stack spread, and non-CH2 voltage faults). */
         bool confirmable = outcome == BZM_BRINGUP_GOOD;
-        if (!confirmable && outcome == BZM_BRINGUP_BAD && report != NULL && report->reason == BZM_BRINGUP_REASON_TELEMETRY_UNSAFE &&
-            require_clock_locks) {
-            const bzm_telemetry_sample_t * sample = bzm_telemetry_store_get(&store, report->asic_id);
-            confirmable =
-                sample != NULL && !sample->pll_locked && !bzm_telemetry_sample_has_immediate_trip(sample) &&
-                bzm_telemetry_sample_is_safe_except_ch2(sample, snapshot_now_us, policy->max_age_us, &policy->bounds, false);
+        if (!confirmable && outcome == BZM_BRINGUP_BAD &&
+            active_report->reason == BZM_BRINGUP_REASON_TELEMETRY_UNSAFE && require_clock_locks) {
+            const bzm_telemetry_sample_t * sample = bzm_telemetry_store_get(&store, active_report->asic_id);
+            bzm_bringup_report_t relaxed_report = {0};
+            confirmable = sample != NULL && !sample->pll_locked &&
+                verify_telemetry_snapshot(&store, snapshot_now_us, configured_after_us, policy, false,
+                                          &relaxed_report) == BZM_BRINGUP_GOOD;
         }
         if (!confirmable)
             return outcome;
@@ -444,10 +447,23 @@ static bzm_bringup_outcome_t bzm_bringup_configure_clocks(bzm_bringup_state_t * 
         return set_report(report, BZM_BRINGUP_REASON_IO, BZM_ALL_ASICS, 0, BZM_LOCAL_REG_UART_TDM_CONTROL,
                           tdm_control & ~1U, 0);
     }
+    /* Retry bounded transient readback collisions if an in-flight TDM telemetry
+     * frame overlapped the disable write. */
     for (uint8_t index = 0; index < BZM_BRINGUP_ASIC_COUNT; ++index) {
         uint8_t asic_id = bzm_asic_wire_ids[index];
         uint32_t actual = 0;
-        if (!ops->read_u32(ops_context, asic_id, BZM_BRINGUP_CONTROL_ENGINE_ID, BZM_LOCAL_REG_UART_TDM_CONTROL, &actual)) {
+        bool read_ok = false;
+        for (uint8_t attempt = 0; attempt < 3U; ++attempt) {
+            if (ops->read_u32(ops_context, asic_id, BZM_BRINGUP_CONTROL_ENGINE_ID,
+                              BZM_LOCAL_REG_UART_TDM_CONTROL, &actual)) {
+                read_ok = true;
+                break;
+            }
+            if (attempt + 1U < 3U && ops->delay_ms != NULL) {
+                ops->delay_ms(ops_context, 5);
+            }
+        }
+        if (!read_ok) {
             return set_report(report, BZM_BRINGUP_REASON_IO, asic_id, 0, BZM_LOCAL_REG_UART_TDM_CONTROL,
                               tdm_control & ~1U, 0);
         }
@@ -696,6 +712,13 @@ static bzm_bringup_outcome_t program_live_broadcast_shortcut(
     return BZM_BRINGUP_GOOD;
 }
 
+static uint32_t report_mhz_u32(float mhz)
+{
+    if (!isfinite(mhz) || mhz <= 0.0f) return 0;
+    if (mhz >= (float)UINT32_MAX) return UINT32_MAX;
+    return (uint32_t)lroundf(mhz);
+}
+
 static bzm_bringup_outcome_t live_frequency_domains_step_once(
     bzm_bringup_state_t *state, const bzm_bringup_ops_t *ops,
     void *ops_context,
@@ -726,10 +749,8 @@ static bzm_bringup_outcome_t live_frequency_domains_step_once(
                 return live_frequency_report(
                     report,
                     BZM_BRINGUP_REASON_INVALID_ARGUMENT, asic, pll, 0,
-                    (uint32_t)lroundf(current),
-                    (uint32_t)lroundf(isfinite(target_mhz[asic][pll])
-                                         ? target_mhz[asic][pll]
-                                         : 0.0f));
+                    report_mhz_u32(current),
+                    report_mhz_u32(target_mhz[asic][pll]));
             }
 
             const float delta =
@@ -745,7 +766,7 @@ static bzm_bringup_outcome_t live_frequency_domains_step_once(
                         report,
                         BZM_BRINGUP_REASON_INVALID_ARGUMENT, asic, pll, 0,
                         (uint32_t)BZM_FREQUENCY_POWER_ON_MHZ,
-                        (uint32_t)lroundf(target_mhz[asic][pll]));
+                        report_mhz_u32(target_mhz[asic][pll]));
                 }
                 if (asic == 0 && pll == 0) {
                     shortcut_target = targets[asic][pll].actual_mhz;
@@ -754,16 +775,16 @@ static bzm_bringup_outcome_t live_frequency_domains_step_once(
                     return live_frequency_report(
                         report,
                         BZM_BRINGUP_REASON_INVALID_ARGUMENT, asic, pll, 0,
-                        (uint32_t)lroundf(shortcut_target),
-                        (uint32_t)lroundf(target_mhz[asic][pll]));
+                        report_mhz_u32(shortcut_target),
+                        report_mhz_u32(target_mhz[asic][pll]));
                 }
             } else if (changed[asic][pll] &&
                        delta > BZM_FREQUENCY_RAMP_STEP_MHZ + 0.001f) {
                 return live_frequency_report(
                     report,
                     BZM_BRINGUP_REASON_INVALID_ARGUMENT, asic, pll, 0,
-                    (uint32_t)lroundf(current),
-                    (uint32_t)lroundf(target_mhz[asic][pll]));
+                    report_mhz_u32(current),
+                    report_mhz_u32(target_mhz[asic][pll]));
             }
         }
     }
