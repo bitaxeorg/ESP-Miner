@@ -1016,6 +1016,8 @@ TEST_CASE("User address not in coinbase - payout status is not_found", "[coinbas
     TEST_ASSERT_EQUAL(ESP_OK, err);
     TEST_ASSERT_EQUAL(COINBASE_PAYOUT_UNKNOWN, result.payout_status);
     TEST_ASSERT_EQUAL_STRING("unknown", coinbase_payout_status_to_string(result.payout_status));
+    TEST_ASSERT_EQUAL_INT(0, result.output_count);
+    TEST_ASSERT_EQUAL_INT(1, result.total_output_count);
 }
 
 TEST_CASE("Mainnet account username starting with m does not trigger testnet", "[coinbase_decoder]")
