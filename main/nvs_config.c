@@ -129,6 +129,8 @@ static Settings settings[NVS_CONFIG_COUNT] = {
     [NVS_CONFIG_TPS546_SYNC_CONFIG]                    = {.nvs_key_name = "tps546_sync",    .type = TYPE_U16},
     [NVS_CONFIG_TPS546_FREQUENCY]                      = {.nvs_key_name = "tps546_freq",    .type = TYPE_U16},
     [NVS_CONFIG_NOMINAL_VOLTAGE]                       = {.nvs_key_name = "nominal_voltage", .type = TYPE_U16},
+    [NVS_CONFIG_USER_FREQUENCY]                        = {.nvs_key_name = "userFrequency", .type = TYPE_FLOAT},
+    [NVS_CONFIG_USER_VOLTAGE]                          = {.nvs_key_name = "userVoltage", .type = TYPE_U16},
 };
 
 Settings *nvs_config_get_settings(NvsConfigKey key)
@@ -953,5 +955,37 @@ bool nvs_config_has_key(NvsConfigKey key)
     bool result = setting->is_set;
     xSemaphoreGive(nvs_cache_mutex);
     return result;
+}
+
+/** Clear a user-defined key from NVS. Returns true on success. */
+bool nvs_config_clear_key(NvsConfigKey key)
+{
+    Settings *setting = nvs_config_get_settings(key);
+    if (!setting) {
+        ESP_LOGE(TAG, "Invalid key %d", key);
+        return false;
+    }
+    nvs_handle_t nvs_handle;
+    esp_err_t err = nvs_open_from_partition("default", "nvs_config", NVS_READWRITE, &nvs_handle);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to open NVS handle for key %d", key);
+        return false;
+    }
+    err = nvs_erase_key(nvs_handle, setting->nvs_key_name);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to erase key %s", setting->nvs_key_name);
+        nvs_close(nvs_handle);
+        return false;
+    }
+    err = nvs_commit(nvs_handle);
+    nvs_close(nvs_handle);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to commit NVS changes for key %s", setting->nvs_key_name);
+        return false;
+    }
+    xSemaphoreTake(nvs_cache_mutex, portMAX_DELAY);
+    setting->is_set = false;
+    xSemaphoreGive(nvs_cache_mutex);
+    return true;
 }
 
