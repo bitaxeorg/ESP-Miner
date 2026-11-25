@@ -80,6 +80,9 @@ static Settings settings[NVS_CONFIG_COUNT] = {
 
     [NVS_CONFIG_USE_CUSTOM_WWW]                        = {.nvs_key_name = "use_custom_www",  .type = TYPE_BOOL,  .default_value = {.b = false},                                         .rest_name = "useCustomWWW",                       .min = 0,  .max = 1},
     [NVS_CONFIG_LAST_FW_FINGERPRINT]                   = {.nvs_key_name = "last_fw_fp",      .type = TYPE_STR,   .default_value = {.str = ""}},
+    // Set once the fan percentage -> PWM duty scaling was corrected to use 2*PWM_F.
+    // Existing fan settings were calibrated against the old 1.37x over-drive.
+    [NVS_CONFIG_FAN_SCALE_V2]                          = {.nvs_key_name = "fan_scale_v2",    .type = TYPE_BOOL,  .default_value = {.b = false},                                         .min = 0,  .max = 1},
 
     [NVS_CONFIG_STATISTICS_FREQUENCY]                  = {.nvs_key_name = "statsFrequency",  .type = TYPE_U16,                                                                          .rest_name = "statsFrequency",                     .min = 0,  .max = UINT16_MAX},
 
@@ -129,6 +132,8 @@ static Settings settings[NVS_CONFIG_COUNT] = {
     [NVS_CONFIG_TPS546_SYNC_CONFIG]                    = {.nvs_key_name = "tps546_sync",    .type = TYPE_U16},
     [NVS_CONFIG_TPS546_FREQUENCY]                      = {.nvs_key_name = "tps546_freq",    .type = TYPE_U16},
     [NVS_CONFIG_NOMINAL_VOLTAGE]                       = {.nvs_key_name = "nominal_voltage", .type = TYPE_U16},
+    [NVS_CONFIG_USER_FREQUENCY]                        = {.nvs_key_name = "userFrequency", .type = TYPE_FLOAT},
+    [NVS_CONFIG_USER_VOLTAGE]                          = {.nvs_key_name = "userVoltage", .type = TYPE_U16},
 };
 
 Settings *nvs_config_get_settings(NvsConfigKey key)
@@ -465,6 +470,46 @@ static void nvs_task(void *pvParameters)
     }
 }
 
+
+// One-time migration for the fan percentage -> PWM duty fix (2*PWM_F scaling).
+//
+// Before the fix, EMC2101_set_fan_speed() scaled the requested percentage against
+// 63 while the register ceiling was 46, so every fan setting produced ~1.37x more
+// airflow than requested. Users calibrated minFanSpeed / manualFanSpeed against that
+// over-drive. After correcting the scaling, the same number yields ~27% less airflow,
+// which on a manual-mode board is a one-way path to an overheat trip.
+//
+// On first boot after the fix, multiply the stored fan percentages by the correction
+// factor (capped at 100) so the delivered airflow stays the same as before. The flag
+// makes this run exactly once.
+static void migrate_fan_scale_v2(void)
+{
+    uint16_t flag = 0;
+    if (nvs_get_u16(handle, settings[NVS_CONFIG_FAN_SCALE_V2].nvs_key_name, &flag) == ESP_OK && flag != 0) {
+        return;
+    }
+
+    const float factor = 63.0f / 46.0f;   // 1.3696 -- old ceiling over new ceiling
+
+    const NvsConfigKey keys[] = { NVS_CONFIG_MIN_FAN_SPEED, NVS_CONFIG_MANUAL_FAN_SPEED };
+    for (size_t i = 0; i < sizeof(keys) / sizeof(keys[0]); i++) {
+        uint16_t val = 0;
+        if (nvs_get_u16(handle, settings[keys[i]].nvs_key_name, &val) == ESP_OK) {
+            uint16_t cap = settings[keys[i]].max > 0 ? (uint16_t) settings[keys[i]].max : 100;
+            uint16_t scaled = (uint16_t) (val * factor + 0.5f);
+            if (scaled > cap) scaled = cap;
+            if (scaled != val) {
+                nvs_set_u16(handle, settings[keys[i]].nvs_key_name, scaled);
+                ESP_LOGI(TAG, "Fan scale migration: %s %u -> %u", settings[keys[i]].nvs_key_name, val, scaled);
+            }
+        }
+    }
+
+    nvs_set_u16(handle, settings[NVS_CONFIG_FAN_SCALE_V2].nvs_key_name, 1);
+    nvs_commit(handle);
+    ESP_LOGI(TAG, "Fan scale migration applied (factor %.3f), flag stored", factor);
+}
+
 esp_err_t nvs_config_init(void)
 {
     esp_err_t err = nvs_flash_init();
@@ -590,6 +635,8 @@ esp_err_t nvs_config_init(void)
             }
         }
     }
+
+    migrate_fan_scale_v2();
 
     nvs_save_queue = xQueueCreate(50, sizeof(ConfigUpdate));
 
