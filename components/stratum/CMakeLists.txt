@@ -11,7 +11,6 @@ SRCS
     "coinbase_decoder.c"
     "segwit_addr.c"
     "base58.c"
-    "miner_job.c"
 
 INCLUDE_DIRS
     "include"

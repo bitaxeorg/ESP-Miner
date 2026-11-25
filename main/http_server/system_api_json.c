@@ -16,6 +16,7 @@
 #include "hashrate_monitor_task.h"
 #include "statistics_task.h"
 #include "asic.h"
+#include "asic_common.h"
 #include "yyjson_utils.h"
 
 static const char *get_reset_reason_str(esp_reset_reason_t reason)
@@ -71,6 +72,7 @@ static void system_api_add_telemetry(yyjson_mut_doc *doc, yyjson_mut_val *root, 
     yyjson_mut_obj_add_uint(doc, root, "bestDiff", g->SYSTEM_MODULE.best_nonce_diff);
     yyjson_mut_obj_add_uint(doc, root, "bestSessionDiff", g->SYSTEM_MODULE.best_session_nonce_diff);
     yyjson_mut_obj_add_double(doc, root, "poolDifficulty", session ? session->pool_difficulty : 0.0);
+    yyjson_mut_obj_add_uint(doc, root, "asicDifficulty", (uint32_t)(1U << g->SYSTEM_MODULE.current_difficulty_power));
     yyjson_mut_obj_add_float(doc, root, "responseTime", session ? session->response_time : 0.0f);
     float rt_min = (session && session->response_time_min > 0.0f) ? session->response_time_min : (session ? session->last_response_time_min : 0.0f);
     float rt_max = (session && session->response_time_max > 0.0f) ? session->response_time_max : (session ? session->last_response_time_max : 0.0f);
