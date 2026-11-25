@@ -609,6 +609,18 @@ static esp_transport_handle_t create_mock_transport(mock_transport_data_t *data)
     return transport;
 }
 
+static char *test_receive_line(stratum_rx_stream_t *stream, esp_transport_handle_t transport)
+{
+    const char *line_buf = NULL;
+    size_t line_len = 0;
+    if (!stratum_rx_stream_read_line(stream, transport, &line_buf, &line_len, NULL)) {
+        return NULL;
+    }
+    char *copy = strndup(line_buf, line_len);
+    stratum_rx_stream_consume_line(stream, line_len);
+    return copy;
+}
+
 TEST_CASE("Receive fragmented JSON-RPC line", "[stratum][security]")
 {
     const char *json = "{\"id\":1,\"result\":true,\"error\":null}\n";
@@ -620,14 +632,14 @@ TEST_CASE("Receive fragmented JSON-RPC line", "[stratum][security]")
     esp_transport_handle_t transport = create_mock_transport(&mock);
     TEST_ASSERT_NOT_NULL(transport);
 
-    sv1_conn_t conn = { .transport = transport };
-    TEST_ASSERT_TRUE(STRATUM_V1_initialize_conn_buffer(&conn));
-    char *line = STRATUM_V1_receive_jsonrpc_line(&conn);
+    stratum_rx_stream_t stream = {0};
+    TEST_ASSERT_TRUE(stratum_rx_stream_init(&stream));
+    char *line = test_receive_line(&stream, transport);
     TEST_ASSERT_NOT_NULL(line);
     TEST_ASSERT_EQUAL_STRING("{\"id\":1,\"result\":true,\"error\":null}", line);
 
     free(line);
-    STRATUM_V1_free_conn_buffer(&conn);
+    stratum_rx_stream_free(&stream);
     esp_transport_destroy(transport);
 }
 
@@ -644,10 +656,10 @@ TEST_CASE("Receive preserves consecutive JSON-RPC lines", "[stratum][security]")
     esp_transport_handle_t transport = create_mock_transport(&mock);
     TEST_ASSERT_NOT_NULL(transport);
 
-    sv1_conn_t conn = { .transport = transport };
-    TEST_ASSERT_TRUE(STRATUM_V1_initialize_conn_buffer(&conn));
-    char *first = STRATUM_V1_receive_jsonrpc_line(&conn);
-    char *second = STRATUM_V1_receive_jsonrpc_line(&conn);
+    stratum_rx_stream_t stream = {0};
+    TEST_ASSERT_TRUE(stratum_rx_stream_init(&stream));
+    char *first = test_receive_line(&stream, transport);
+    char *second = test_receive_line(&stream, transport);
     TEST_ASSERT_NOT_NULL(first);
     TEST_ASSERT_NOT_NULL(second);
     TEST_ASSERT_EQUAL_STRING("{\"id\":1,\"result\":true}", first);
@@ -655,7 +667,7 @@ TEST_CASE("Receive preserves consecutive JSON-RPC lines", "[stratum][security]")
 
     free(first);
     free(second);
-    STRATUM_V1_free_conn_buffer(&conn);
+    stratum_rx_stream_free(&stream);
     esp_transport_destroy(transport);
 }
 
@@ -675,18 +687,18 @@ TEST_CASE("Receive rejects oversized JSON-RPC line", "[stratum][security]")
     esp_transport_handle_t transport = create_mock_transport(&mock);
     TEST_ASSERT_NOT_NULL(transport);
 
-    sv1_conn_t conn = { .transport = transport };
-    TEST_ASSERT_TRUE(STRATUM_V1_initialize_conn_buffer(&conn));
-    TEST_ASSERT_NULL(STRATUM_V1_receive_jsonrpc_line(&conn));
+    stratum_rx_stream_t stream = {0};
+    TEST_ASSERT_TRUE(stratum_rx_stream_init(&stream));
+    TEST_ASSERT_NULL(test_receive_line(&stream, transport));
 
-    TEST_ASSERT_TRUE(STRATUM_V1_initialize_conn_buffer(&conn));
+    TEST_ASSERT_TRUE(stratum_rx_stream_init(&stream));
     mock.data = "{}\n";
     mock.length = 3;
     mock.offset = 0;
-    char *line = STRATUM_V1_receive_jsonrpc_line(&conn);
+    char *line = test_receive_line(&stream, transport);
     TEST_ASSERT_EQUAL_STRING("{}", line);
     free(line);
-    STRATUM_V1_free_conn_buffer(&conn);
+    stratum_rx_stream_free(&stream);
     esp_transport_destroy(transport);
     free(json);
 }
@@ -709,17 +721,17 @@ TEST_CASE("Receive accepts maximum line and preserves the next line", "[stratum]
     esp_transport_handle_t transport = create_mock_transport(&mock);
     TEST_ASSERT_NOT_NULL(transport);
 
-    sv1_conn_t conn = { .transport = transport };
-    TEST_ASSERT_TRUE(STRATUM_V1_initialize_conn_buffer(&conn));
-    char *maximum_line = STRATUM_V1_receive_jsonrpc_line(&conn);
-    char *second_line = STRATUM_V1_receive_jsonrpc_line(&conn);
+    stratum_rx_stream_t stream = {0};
+    TEST_ASSERT_TRUE(stratum_rx_stream_init(&stream));
+    char *maximum_line = test_receive_line(&stream, transport);
+    char *second_line = test_receive_line(&stream, transport);
     TEST_ASSERT_NOT_NULL(maximum_line);
     TEST_ASSERT_EQUAL_size_t(STRATUM_V1_MAX_JSON_LINE_SIZE, strlen(maximum_line));
     TEST_ASSERT_EQUAL_STRING("{}", second_line);
 
     free(maximum_line);
     free(second_line);
-    STRATUM_V1_free_conn_buffer(&conn);
+    stratum_rx_stream_free(&stream);
     esp_transport_destroy(transport);
     free(data);
 }
@@ -735,11 +747,11 @@ TEST_CASE("Receive rejects embedded NUL", "[stratum][security]")
     esp_transport_handle_t transport = create_mock_transport(&mock);
     TEST_ASSERT_NOT_NULL(transport);
 
-    sv1_conn_t conn = { .transport = transport };
-    TEST_ASSERT_TRUE(STRATUM_V1_initialize_conn_buffer(&conn));
-    TEST_ASSERT_NULL(STRATUM_V1_receive_jsonrpc_line(&conn));
+    stratum_rx_stream_t stream = {0};
+    TEST_ASSERT_TRUE(stratum_rx_stream_init(&stream));
+    TEST_ASSERT_NULL(test_receive_line(&stream, transport));
 
-    STRATUM_V1_free_conn_buffer(&conn);
+    stratum_rx_stream_free(&stream);
     esp_transport_destroy(transport);
 }
 
@@ -829,24 +841,26 @@ TEST_CASE("Mine fragmented jobs with 110 1800 and 10000 coinbase payouts", "[str
     miner_job_t job = {0};
     StratumApiV1Message message = {0};
     StratumApiV1Message reply_msg = {0};
-    TEST_ASSERT_TRUE(stratum_rx_stream_init());
     for (size_t n = 0; n < sizeof(counts) / sizeof(counts[0]); ++n) {
         char *data = make_payout_notify(counts[n]);
         mock_transport_data_t mock = {.data = data, .length = strlen(data), .max_chunk = 733};
         esp_transport_handle_t transport = create_mock_transport(&mock);
         TEST_ASSERT_NOT_NULL(transport);
+        stratum_rx_stream_t stream = {0};
+        TEST_ASSERT_TRUE(stratum_rx_stream_init(&stream));
 
         int64_t rx_time_us = 0;
-        TEST_ASSERT_EQUAL(STRATUM_V1_RX_OK, STRATUM_V1_receive_message(transport, &message, &job, &rx_time_us));
+        TEST_ASSERT_EQUAL(STRATUM_V1_RX_OK, STRATUM_V1_receive_message(transport, &stream, &message, &job, &rx_time_us));
         TEST_ASSERT_EQUAL(MINING_NOTIFY, message.method);
         TEST_ASSERT_EQUAL_size_t(counts[n] * 43U - (counts[n] >= 253 ? 1U : 3U), job.coinbase_suffix_len);
 
-        TEST_ASSERT_EQUAL(STRATUM_V1_RX_OK, STRATUM_V1_receive_message(transport, &reply_msg, NULL, NULL));
+        TEST_ASSERT_EQUAL(STRATUM_V1_RX_OK, STRATUM_V1_receive_message(transport, &stream, &reply_msg, NULL, NULL));
         TEST_ASSERT_EQUAL(STRATUM_RESULT, reply_msg.method);
         TEST_ASSERT_EQUAL_INT(7, reply_msg.message_id);
         TEST_ASSERT_TRUE(reply_msg.response_success);
         STRATUM_V1_reset_message(&reply_msg);
 
+        stratum_rx_stream_free(&stream);
         free(data);
         esp_transport_destroy(transport);
         job.extranonce2_len = 4;
@@ -880,16 +894,16 @@ TEST_CASE("Receive reconnect clears a truncated large line", "[stratum][security
     mock_transport_data_t mock = {.data = data, .length = sizeof(data), .max_chunk = 731};
     esp_transport_handle_t transport = create_mock_transport(&mock);
     TEST_ASSERT_NOT_NULL(transport);
-    sv1_conn_t conn = { .transport = transport };
-    TEST_ASSERT_TRUE(STRATUM_V1_initialize_conn_buffer(&conn));
-    TEST_ASSERT_NULL(STRATUM_V1_receive_jsonrpc_line(&conn));
-    TEST_ASSERT_TRUE(STRATUM_V1_initialize_conn_buffer(&conn));
+    stratum_rx_stream_t stream = {0};
+    TEST_ASSERT_TRUE(stratum_rx_stream_init(&stream));
+    TEST_ASSERT_NULL(test_receive_line(&stream, transport));
+    TEST_ASSERT_TRUE(stratum_rx_stream_init(&stream));
     mock.data = "{}\n";
     mock.length = 3;
     mock.offset = 0;
-    char *line = STRATUM_V1_receive_jsonrpc_line(&conn);
+    char *line = test_receive_line(&stream, transport);
     TEST_ASSERT_EQUAL_STRING("{}", line);
     free(line);
-    STRATUM_V1_free_conn_buffer(&conn);
+    stratum_rx_stream_free(&stream);
     esp_transport_destroy(transport);
 }

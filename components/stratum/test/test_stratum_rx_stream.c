@@ -77,30 +77,32 @@ TEST_CASE("stratum_rx_stream splices large coinb2 across odd chunk boundaries", 
     };
     esp_transport_handle_t transport = create_stream_mock_transport(&mock);
     TEST_ASSERT_NOT_NULL(transport);
-    TEST_ASSERT_TRUE(stratum_rx_stream_init());
+    stratum_rx_stream_t stream = {0};
+    TEST_ASSERT_TRUE(stratum_rx_stream_init(&stream));
 
     const char *line_buf = NULL;
     size_t line_len = 0;
     size_t raw_len = 0;
-    TEST_ASSERT_TRUE(stratum_rx_stream_read_line(transport, &line_buf, &line_len, &raw_len));
+    TEST_ASSERT_TRUE(stratum_rx_stream_read_line(&stream, transport, &line_buf, &line_len, &raw_len));
     TEST_ASSERT_NOT_NULL(line_buf);
     TEST_ASSERT_EQUAL_size_t(offset - 1U, raw_len);
     TEST_ASSERT_NOT_NULL(strstr(line_buf, "\"01000000\",\"*\",[]"));
 
     size_t c2_len = 0;
-    TEST_ASSERT_FALSE(stratum_rx_stream_has_coinb2("0102", &c2_len));
-    TEST_ASSERT_TRUE(stratum_rx_stream_has_coinb2("*", &c2_len));
+    TEST_ASSERT_FALSE(stratum_rx_stream_has_coinb2(&stream, "0102", &c2_len));
+    TEST_ASSERT_TRUE(stratum_rx_stream_has_coinb2(&stream, "*", &c2_len));
     TEST_ASSERT_EQUAL_size_t(suffix_len, c2_len);
 
     size_t taken_len = 0;
-    uint8_t *taken = stratum_rx_stream_take_coinb2(&taken_len);
+    uint8_t *taken = stratum_rx_stream_take_coinb2(&stream, &taken_len);
     TEST_ASSERT_NOT_NULL(taken);
     TEST_ASSERT_EQUAL_size_t(suffix_len, taken_len);
     TEST_ASSERT_EQUAL_MEMORY(expected_suffix, taken, suffix_len);
-    TEST_ASSERT_FALSE(stratum_rx_stream_has_coinb2("*", NULL));
-    TEST_ASSERT_NULL(stratum_rx_stream_take_coinb2(NULL));
+    TEST_ASSERT_FALSE(stratum_rx_stream_has_coinb2(&stream, "*", NULL));
+    TEST_ASSERT_NULL(stratum_rx_stream_take_coinb2(&stream, NULL));
 
-    stratum_rx_stream_consume_line(line_len);
+    stratum_rx_stream_consume_line(&stream, line_len);
+    stratum_rx_stream_free(&stream);
     free(taken);
     free(json);
     free(expected_suffix);
@@ -133,23 +135,25 @@ TEST_CASE("stratum_rx_stream supports params before method and discards unconsum
     };
     esp_transport_handle_t transport = create_stream_mock_transport(&mock);
     TEST_ASSERT_NOT_NULL(transport);
-    TEST_ASSERT_TRUE(stratum_rx_stream_init());
+    stratum_rx_stream_t stream = {0};
+    TEST_ASSERT_TRUE(stratum_rx_stream_init(&stream));
 
     const char *line_buf = NULL;
     size_t line_len = 0;
-    TEST_ASSERT_TRUE(stratum_rx_stream_read_line(transport, &line_buf, &line_len, NULL));
+    TEST_ASSERT_TRUE(stratum_rx_stream_read_line(&stream, transport, &line_buf, &line_len, NULL));
     size_t c2_len = 0;
-    TEST_ASSERT_TRUE(stratum_rx_stream_has_coinb2("*", &c2_len));
+    TEST_ASSERT_TRUE(stratum_rx_stream_has_coinb2(&stream, "*", &c2_len));
     TEST_ASSERT_EQUAL_size_t(suffix_len, c2_len);
 
     // Consuming without taking coinb2 must automatically discard the buffer
-    stratum_rx_stream_consume_line(line_len);
-    TEST_ASSERT_FALSE(stratum_rx_stream_has_coinb2("*", NULL));
-    TEST_ASSERT_NULL(stratum_rx_stream_take_coinb2(NULL));
+    stratum_rx_stream_consume_line(&stream, line_len);
+    TEST_ASSERT_FALSE(stratum_rx_stream_has_coinb2(&stream, "*", NULL));
+    TEST_ASSERT_NULL(stratum_rx_stream_take_coinb2(&stream, NULL));
 
-    TEST_ASSERT_TRUE(stratum_rx_stream_read_line(transport, &line_buf, &line_len, NULL));
+    TEST_ASSERT_TRUE(stratum_rx_stream_read_line(&stream, transport, &line_buf, &line_len, NULL));
     TEST_ASSERT_EQUAL_STRING("{\"id\":2,\"result\":true}", line_buf);
-    stratum_rx_stream_consume_line(line_len);
+    stratum_rx_stream_consume_line(&stream, line_len);
+    stratum_rx_stream_free(&stream);
 
     free(json);
     esp_transport_destroy(transport);
@@ -181,14 +185,15 @@ TEST_CASE("stratum_rx_stream invalidates streamed coinb2 on odd length or invali
     };
     esp_transport_handle_t transport = create_stream_mock_transport(&mock);
     TEST_ASSERT_NOT_NULL(transport);
-    TEST_ASSERT_TRUE(stratum_rx_stream_init());
+    stratum_rx_stream_t stream = {0};
+    TEST_ASSERT_TRUE(stratum_rx_stream_init(&stream));
 
     const char *line_buf = NULL;
     size_t line_len = 0;
-    TEST_ASSERT_TRUE(stratum_rx_stream_read_line(transport, &line_buf, &line_len, NULL));
-    TEST_ASSERT_FALSE(stratum_rx_stream_has_coinb2("*", NULL));
-    TEST_ASSERT_NULL(stratum_rx_stream_take_coinb2(NULL));
-    stratum_rx_stream_consume_line(line_len);
+    TEST_ASSERT_TRUE(stratum_rx_stream_read_line(&stream, transport, &line_buf, &line_len, NULL));
+    TEST_ASSERT_FALSE(stratum_rx_stream_has_coinb2(&stream, "*", NULL));
+    TEST_ASSERT_NULL(stratum_rx_stream_take_coinb2(&stream, NULL));
+    stratum_rx_stream_consume_line(&stream, line_len);
     esp_transport_destroy(transport);
 
     // 2. Invalid hex character ('z') in even-length streamed coinb2
@@ -210,10 +215,11 @@ TEST_CASE("stratum_rx_stream invalidates streamed coinb2 on odd length or invali
     transport = create_stream_mock_transport(&mock);
     TEST_ASSERT_NOT_NULL(transport);
 
-    TEST_ASSERT_TRUE(stratum_rx_stream_read_line(transport, &line_buf, &line_len, NULL));
-    TEST_ASSERT_FALSE(stratum_rx_stream_has_coinb2("*", NULL));
-    TEST_ASSERT_NULL(stratum_rx_stream_take_coinb2(NULL));
-    stratum_rx_stream_consume_line(line_len);
+    TEST_ASSERT_TRUE(stratum_rx_stream_read_line(&stream, transport, &line_buf, &line_len, NULL));
+    TEST_ASSERT_FALSE(stratum_rx_stream_has_coinb2(&stream, "*", NULL));
+    TEST_ASSERT_NULL(stratum_rx_stream_take_coinb2(&stream, NULL));
+    stratum_rx_stream_consume_line(&stream, line_len);
+    stratum_rx_stream_free(&stream);
 
     free(json);
     esp_transport_destroy(transport);
@@ -240,11 +246,13 @@ TEST_CASE("stratum_rx_stream rejects oversized non-notify method", "[stratum][rx
     };
     esp_transport_handle_t transport = create_stream_mock_transport(&mock);
     TEST_ASSERT_NOT_NULL(transport);
-    TEST_ASSERT_TRUE(stratum_rx_stream_init());
+    stratum_rx_stream_t stream = {0};
+    TEST_ASSERT_TRUE(stratum_rx_stream_init(&stream));
 
     const char *line_buf = NULL;
     size_t line_len = 0;
-    TEST_ASSERT_FALSE(stratum_rx_stream_read_line(transport, &line_buf, &line_len, NULL));
+    TEST_ASSERT_FALSE(stratum_rx_stream_read_line(&stream, transport, &line_buf, &line_len, NULL));
+    stratum_rx_stream_free(&stream);
 
     free(json);
     esp_transport_destroy(transport);
@@ -316,14 +324,156 @@ TEST_CASE("stratum_rx_stream rejects coinb2 exceeding MAX_COINBASE_SUFFIX_LEN", 
     TEST_ASSERT_EQUAL(ESP_OK, esp_transport_set_context_data(transport, &gen));
     TEST_ASSERT_EQUAL(ESP_OK, esp_transport_set_func(transport, NULL, generated_notify_read,
                                                      NULL, NULL, NULL, NULL, NULL));
-    TEST_ASSERT_TRUE(stratum_rx_stream_init());
+    stratum_rx_stream_t stream = {0};
+    TEST_ASSERT_TRUE(stratum_rx_stream_init(&stream));
 
     const char *line_buf = NULL;
     size_t line_len = 0;
-    TEST_ASSERT_FALSE(stratum_rx_stream_read_line(transport, &line_buf, &line_len, NULL));
-    TEST_ASSERT_FALSE(stratum_rx_stream_has_coinb2("*", NULL));
-    TEST_ASSERT_NULL(stratum_rx_stream_take_coinb2(NULL));
+    TEST_ASSERT_FALSE(stratum_rx_stream_read_line(&stream, transport, &line_buf, &line_len, NULL));
+    TEST_ASSERT_FALSE(stratum_rx_stream_has_coinb2(&stream, "*", NULL));
+    TEST_ASSERT_NULL(stratum_rx_stream_take_coinb2(&stream, NULL));
+    stratum_rx_stream_free(&stream);
 
     esp_transport_destroy(transport);
 }
 
+TEST_CASE("stratum_rx_stream isolates two concurrent streams reading in turns", "[stratum][rx_stream]")
+{
+    const size_t suffix_len = 2400U;
+    uint8_t *expected_a = malloc(suffix_len);
+    uint8_t *expected_b = malloc(suffix_len);
+    TEST_ASSERT_NOT_NULL(expected_a);
+    TEST_ASSERT_NOT_NULL(expected_b);
+    for (size_t i = 0; i < suffix_len; ++i) {
+        expected_a[i] = (uint8_t)((i * 31U + 7U) & 0xFFU);
+        expected_b[i] = (uint8_t)((i * 53U + 113U) & 0xFFU);
+    }
+
+    size_t json_cap = suffix_len * 2U + 512U;
+    char *json_a = malloc(json_cap);
+    char *json_b = malloc(json_cap);
+    TEST_ASSERT_NOT_NULL(json_a);
+    TEST_ASSERT_NOT_NULL(json_b);
+
+    size_t off_a = (size_t)snprintf(
+        json_a, json_cap,
+        "{\"id\":null,\"method\":\"mining.notify\",\"params\":[\"poolA\","
+        "\"0000000000000000000000000000000000000000000000000000000000000000\","
+        "\"01000000\",\"");
+    bin2hex(expected_a, suffix_len, json_a + off_a, json_cap - off_a);
+    off_a += suffix_len * 2U;
+    off_a += (size_t)snprintf(
+        json_a + off_a, json_cap - off_a,
+        "\",[],\"20000000\",\"1705ae3a\",\"647025b5\",true]}\n{\"id\":11,\"result\":true}\n");
+
+    size_t off_b = (size_t)snprintf(
+        json_b, json_cap,
+        "{\"id\":null,\"method\":\"mining.notify\",\"params\":[\"poolB\","
+        "\"0000000000000000000000000000000000000000000000000000000000000000\","
+        "\"02000000\",\"");
+    bin2hex(expected_b, suffix_len, json_b + off_b, json_cap - off_b);
+    off_b += suffix_len * 2U;
+    off_b += (size_t)snprintf(
+        json_b + off_b, json_cap - off_b,
+        "\",[],\"20000000\",\"1705ae3a\",\"647025b5\",false]}\n{\"id\":22,\"result\":false}\n");
+
+    stream_mock_transport_t mock_a = { .data = json_a, .length = off_a, .max_chunk = 113 };
+    stream_mock_transport_t mock_b = { .data = json_b, .length = off_b, .max_chunk = 97 };
+    esp_transport_handle_t transport_a = create_stream_mock_transport(&mock_a);
+    esp_transport_handle_t transport_b = create_stream_mock_transport(&mock_b);
+    TEST_ASSERT_NOT_NULL(transport_a);
+    TEST_ASSERT_NOT_NULL(transport_b);
+
+    stratum_rx_stream_t stream_a = {0};
+    stratum_rx_stream_t stream_b = {0};
+    TEST_ASSERT_TRUE(stratum_rx_stream_init(&stream_a));
+    TEST_ASSERT_TRUE(stratum_rx_stream_init(&stream_b));
+
+    const char *line_a = NULL;
+    const char *line_b = NULL;
+    size_t len_a = 0;
+    size_t len_b = 0;
+
+    // Read line 1 from both streams before consuming either
+    TEST_ASSERT_TRUE(stratum_rx_stream_read_line(&stream_a, transport_a, &line_a, &len_a, NULL));
+    TEST_ASSERT_TRUE(stratum_rx_stream_read_line(&stream_b, transport_b, &line_b, &len_b, NULL));
+    TEST_ASSERT_NOT_NULL(strstr(line_a, "\"poolA\""));
+    TEST_ASSERT_NOT_NULL(strstr(line_b, "\"poolB\""));
+
+    size_t c2_len_a = 0;
+    size_t c2_len_b = 0;
+    TEST_ASSERT_TRUE(stratum_rx_stream_has_coinb2(&stream_a, "*", &c2_len_a));
+    TEST_ASSERT_TRUE(stratum_rx_stream_has_coinb2(&stream_b, "*", &c2_len_b));
+    TEST_ASSERT_EQUAL_size_t(suffix_len, c2_len_a);
+    TEST_ASSERT_EQUAL_size_t(suffix_len, c2_len_b);
+
+    uint8_t *taken_b = stratum_rx_stream_take_coinb2(&stream_b, &c2_len_b);
+    uint8_t *taken_a = stratum_rx_stream_take_coinb2(&stream_a, &c2_len_a);
+    TEST_ASSERT_NOT_NULL(taken_a);
+    TEST_ASSERT_NOT_NULL(taken_b);
+    TEST_ASSERT_EQUAL_MEMORY(expected_a, taken_a, suffix_len);
+    TEST_ASSERT_EQUAL_MEMORY(expected_b, taken_b, suffix_len);
+
+    stratum_rx_stream_consume_line(&stream_a, len_a);
+    stratum_rx_stream_consume_line(&stream_b, len_b);
+
+    // Read second lines in interleaved order
+    TEST_ASSERT_TRUE(stratum_rx_stream_read_line(&stream_b, transport_b, &line_b, &len_b, NULL));
+    TEST_ASSERT_TRUE(stratum_rx_stream_read_line(&stream_a, transport_a, &line_a, &len_a, NULL));
+    TEST_ASSERT_EQUAL_STRING("{\"id\":22,\"result\":false}", line_b);
+    TEST_ASSERT_EQUAL_STRING("{\"id\":11,\"result\":true}", line_a);
+    stratum_rx_stream_consume_line(&stream_a, len_a);
+    stratum_rx_stream_consume_line(&stream_b, len_b);
+
+    stratum_rx_stream_free(&stream_a);
+    stratum_rx_stream_free(&stream_b);
+    free(taken_a);
+    free(taken_b);
+    free(json_a);
+    free(json_b);
+    free(expected_a);
+    free(expected_b);
+    esp_transport_destroy(transport_a);
+    esp_transport_destroy(transport_b);
+}
+
+TEST_CASE("stratum_rx_stream_free discards unread bytes across reconnect", "[stratum][rx_stream]")
+{
+    const char *pool_a_data = "{\"id\":1,\"result\":true}\n{\"id\":2,\"result\":true}\n";
+    const char *pool_b_data = "{\"id\":99,\"result\":false}\n";
+    stream_mock_transport_t mock_a = {
+        .data = pool_a_data,
+        .length = strlen(pool_a_data),
+        .max_chunk = strlen(pool_a_data),
+    };
+    stream_mock_transport_t mock_b = {
+        .data = pool_b_data,
+        .length = strlen(pool_b_data),
+        .max_chunk = strlen(pool_b_data),
+    };
+    esp_transport_handle_t transport_a = create_stream_mock_transport(&mock_a);
+    esp_transport_handle_t transport_b = create_stream_mock_transport(&mock_b);
+    TEST_ASSERT_NOT_NULL(transport_a);
+    TEST_ASSERT_NOT_NULL(transport_b);
+
+    stratum_rx_stream_t stream = {0};
+    TEST_ASSERT_TRUE(stratum_rx_stream_init(&stream));
+
+    const char *line_buf = NULL;
+    size_t line_len = 0;
+    TEST_ASSERT_TRUE(stratum_rx_stream_read_line(&stream, transport_a, &line_buf, &line_len, NULL));
+    TEST_ASSERT_EQUAL_STRING("{\"id\":1,\"result\":true}", line_buf);
+    stratum_rx_stream_consume_line(&stream, line_len);
+
+    // Simulate closing connection A while line 2 is still buffered, then reconnecting to pool B
+    stratum_rx_stream_free(&stream);
+    TEST_ASSERT_TRUE(stratum_rx_stream_init(&stream));
+
+    TEST_ASSERT_TRUE(stratum_rx_stream_read_line(&stream, transport_b, &line_buf, &line_len, NULL));
+    TEST_ASSERT_EQUAL_STRING("{\"id\":99,\"result\":false}", line_buf);
+    stratum_rx_stream_consume_line(&stream, line_len);
+    stratum_rx_stream_free(&stream);
+
+    esp_transport_destroy(transport_a);
+    esp_transport_destroy(transport_b);
+}

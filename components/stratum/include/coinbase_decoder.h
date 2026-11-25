@@ -111,6 +111,7 @@ typedef struct {
     char scriptsig[MAX_SCRIPTSIG_STRING_LEN];
     coinbase_output_t outputs[MAX_COINBASE_TX_OUTPUTS];
     int output_count;
+    int total_output_count;         // total number of outputs in the coinbase transaction
     int others_count;               // outputs that did not fit in `outputs[]`
     uint64_t others_value_satoshis; // summed value of those outputs
     uint64_t total_value_satoshis;

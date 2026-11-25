@@ -27,7 +27,6 @@
 #include <sys/param.h>
 
 #define BUFFER_SIZE 1024
-#define JSON_RPC_BUFFER_LIMIT (STRATUM_V1_MAX_JSON_LINE_SIZE + 2U)
 #define BITCOIN_GENESIS_NTIME 1231006505
 #define MAX_ERROR_MSG_LEN 256
 static const char * TAG = "stratum_api";
@@ -70,186 +69,6 @@ esp_transport_handle_t STRATUM_V1_transport_init(tls_mode tls, const char * cert
         }
     }
     return transport;
-}
-
-bool STRATUM_V1_initialize_conn_buffer(sv1_conn_t *conn)
-{
-    if (!conn) return false;
-    free(conn->json_rpc_buffer);
-    conn->json_rpc_buffer = malloc(BUFFER_SIZE);
-    if (conn->json_rpc_buffer == NULL) {
-        ESP_LOGE(TAG, "Failed to allocate memory for JSON-RPC buffer");
-        conn->json_rpc_buffer_size = 0;
-        conn->json_rpc_buffer_len = 0;
-        return false;
-    }
-    conn->json_rpc_buffer_size = BUFFER_SIZE;
-    conn->json_rpc_buffer_len = 0;
-    conn->json_rpc_buffer[0] = '\0';
-    return true;
-}
-
-void STRATUM_V1_free_conn_buffer(sv1_conn_t *conn)
-{
-    if (!conn) return;
-    if (conn->json_rpc_buffer) {
-        free(conn->json_rpc_buffer);
-        conn->json_rpc_buffer = NULL;
-    }
-    conn->json_rpc_buffer_size = 0;
-    conn->json_rpc_buffer_len = 0;
-}
-
-static bool ensure_json_buffer_capacity(char **p_buffer, size_t *p_buffer_size, size_t required_size)
-{
-    if (required_size > JSON_RPC_BUFFER_LIMIT) {
-        return false;
-    }
-
-    if (required_size <= *p_buffer_size) {
-        return true;
-    }
-
-    size_t new_size = *p_buffer_size;
-    while (new_size < required_size && new_size < JSON_RPC_BUFFER_LIMIT) {
-        new_size = MIN(new_size + BUFFER_SIZE, JSON_RPC_BUFFER_LIMIT);
-    }
-
-    char *new_buffer = realloc(*p_buffer, new_size);
-    if (new_buffer == NULL) {
-        ESP_LOGE(TAG, "Failed to grow JSON-RPC receive buffer to %zu bytes", new_size);
-        return false;
-    }
-
-    *p_buffer = new_buffer;
-    *p_buffer_size = new_size;
-    return true;
-}
-
-char * STRATUM_V1_receive_jsonrpc_line(sv1_conn_t *conn)
-{
-    if (!conn || !conn->transport) {
-        return NULL;
-    }
-    if (conn->json_rpc_buffer == NULL) {
-        if (!STRATUM_V1_initialize_conn_buffer(conn)) {
-            return NULL;
-        }
-    }
-    char *line = NULL;
-    char recv_buffer[BUFFER_SIZE];
-    int nbytes;
-
-    char *newline_pos = memchr(conn->json_rpc_buffer, '\n', conn->json_rpc_buffer_len);
-    while (newline_pos == NULL) {
-        size_t receive_capacity =
-            (STRATUM_V1_MAX_JSON_LINE_SIZE + 1U) - conn->json_rpc_buffer_len;
-        size_t receive_size = MIN(sizeof(recv_buffer), receive_capacity);
-        nbytes = esp_transport_read(conn->transport, recv_buffer, receive_size,
-                                    TRANSPORT_TIMEOUT_MS);
-        if (nbytes < 0) {
-            const char *err_str;
-            switch(nbytes) {
-                case ERR_TCP_TRANSPORT_NO_MEM:
-                    err_str = "No memory available";
-                    break;
-                case ERR_TCP_TRANSPORT_CONNECTION_FAILED:
-                    err_str = "Connection failed";
-                    break;
-                case ERR_TCP_TRANSPORT_CONNECTION_CLOSED_BY_FIN:
-                    err_str = "Connection closed by peer";
-                    break;
-                default:
-                    err_str = "Unknown error";
-                    break;
-            }
-            ESP_LOGE(TAG, "Error: transport read failed: %s (code: %d)", err_str, nbytes);
-            conn->json_rpc_buffer_len = 0;
-            conn->json_rpc_buffer[0] = '\0';
-            return NULL;
-        }
-        if (nbytes > 0) {
-            if (memchr(recv_buffer, '\0', (size_t)nbytes) != NULL) {
-                ESP_LOGE(TAG, "JSON-RPC stream contains an embedded NUL byte");
-                conn->json_rpc_buffer_len = 0;
-                conn->json_rpc_buffer[0] = '\0';
-                return NULL;
-            }
-
-            size_t required_size = conn->json_rpc_buffer_len + (size_t)nbytes + 1U;
-            if (!ensure_json_buffer_capacity(&conn->json_rpc_buffer, &conn->json_rpc_buffer_size, required_size)) {
-                conn->json_rpc_buffer_len = 0;
-                conn->json_rpc_buffer[0] = '\0';
-                return NULL;
-            }
-
-            memcpy(conn->json_rpc_buffer + conn->json_rpc_buffer_len, recv_buffer,
-                   (size_t)nbytes);
-            conn->json_rpc_buffer_len += (size_t)nbytes;
-            conn->json_rpc_buffer[conn->json_rpc_buffer_len] = '\0';
-            newline_pos = memchr(conn->json_rpc_buffer, '\n', conn->json_rpc_buffer_len);
-
-            if (newline_pos == NULL &&
-                conn->json_rpc_buffer_len > STRATUM_V1_MAX_JSON_LINE_SIZE) {
-                ESP_LOGE(TAG, "JSON-RPC line exceeds %u bytes",
-                         STRATUM_V1_MAX_JSON_LINE_SIZE);
-                conn->json_rpc_buffer_len = 0;
-                conn->json_rpc_buffer[0] = '\0';
-                return NULL;
-            }
-        }
-    }
-
-    // Extract the line
-    if (newline_pos) {
-        size_t line_len = (size_t)(newline_pos - conn->json_rpc_buffer);
-        line = strndup(conn->json_rpc_buffer, line_len);  // Copy only up to \n
-        size_t remaining_len = conn->json_rpc_buffer_len - line_len - 1U;
-        if (remaining_len > 0) {
-            memmove(conn->json_rpc_buffer, newline_pos + 1, remaining_len);
-        }
-        conn->json_rpc_buffer_len = remaining_len;
-        conn->json_rpc_buffer[conn->json_rpc_buffer_len] = '\0';
-    }
-    return line;
-}
-
-stratum_v1_rx_status_t STRATUM_V1_receive_message(esp_transport_handle_t transport,
-                                                  StratumApiV1Message *message,
-                                                  miner_job_t *job,
-                                                  int64_t *receive_time_us)
-{
-    const char *line_buf = NULL;
-    size_t line_len = 0;
-    size_t raw_len = 0;
-    if (!stratum_rx_stream_read_line(transport, &line_buf, &line_len, &raw_len)) {
-        return STRATUM_V1_RX_TRANSPORT_ERROR;
-    }
-
-    int64_t parse_start_us = esp_timer_get_time();
-    int64_t rx_start_us = stratum_rx_stream_line_start_us();
-    if (receive_time_us != NULL) {
-        *receive_time_us = parse_start_us;
-    }
-
-    bool parsed = STRATUM_V1_parse(message, line_buf, job);
-    int64_t parse_done_us = esp_timer_get_time();
-    if (parsed) {
-        if (message->method == MINING_NOTIFY && job != NULL) {
-            if (rx_start_us > 0 && parse_start_us >= rx_start_us) {
-                int64_t rx_dt = parse_start_us - rx_start_us;
-                job->rx_time_us = (rx_dt > UINT32_MAX) ? UINT32_MAX : (uint32_t)rx_dt;
-            }
-            if (parse_done_us >= parse_start_us) {
-                int64_t parse_dt = parse_done_us - parse_start_us;
-                job->parse_time_us = (parse_dt > UINT32_MAX) ? UINT32_MAX : (uint32_t)parse_dt;
-            }
-        }
-        ESP_LOGI(TAG, "rx (%zu bytes): %.512s%s", raw_len, line_buf,
-                 raw_len > 512U ? "..." : "");
-    }
-    stratum_rx_stream_consume_line(line_len);
-    return parsed ? STRATUM_V1_RX_OK : STRATUM_V1_RX_PARSE_ERROR;
 }
 
 void STRATUM_V1_reset_message(StratumApiV1Message *message)
@@ -297,7 +116,7 @@ static stratum_method parse_method(yyjson_val *method_json)
     return METHOD_UNKNOWN;
 }
 
-static bool parse_mining_notify(yyjson_val *root, miner_job_t *job)
+static bool parse_mining_notify(yyjson_val *root, miner_job_t *job, stratum_rx_stream_t *stream)
 {
     if (!job) {
         ESP_LOGE(TAG, "NULL job destination in mining.notify");
@@ -364,7 +183,7 @@ static bool parse_mining_notify(yyjson_val *root, miner_job_t *job)
     const char *c2_str = yyjson_get_str(c2_item);
     size_t c2_str_len = strlen(c2_str);
     size_t c2_len = 0;
-    bool streamed_c2 = stratum_rx_stream_has_coinb2(c2_str, &c2_len);
+    bool streamed_c2 = (stream != NULL) && stratum_rx_stream_has_coinb2(stream, c2_str, &c2_len);
     if (streamed_c2) {
         if (c2_len == 0) {
             ESP_LOGE(TAG, "Empty streamed coinbase_2 in mining.notify");
@@ -455,7 +274,7 @@ static bool parse_mining_notify(yyjson_val *root, miner_job_t *job)
     }
     if (streamed_c2) {
         free(job->coinbase_suffix);
-        job->coinbase_suffix = stratum_rx_stream_take_coinb2(NULL);
+        job->coinbase_suffix = stratum_rx_stream_take_coinb2(stream, NULL);
     } else if (!miner_job_resize_coinbase_suffix(job, c2_len)) {
         ESP_LOGE(TAG, "Failed to allocate coinbase buffers (suffix=%zu bytes)", c2_len);
         return false;
@@ -729,7 +548,10 @@ static bool parse_result(yyjson_val *root, StratumApiV1Message *message)
     return false;
 }
 
-bool STRATUM_V1_parse(StratumApiV1Message *message, const char *stratum_json, miner_job_t *job)
+static bool parse_stratum_v1_message(StratumApiV1Message *message,
+                                     const char *stratum_json,
+                                     miner_job_t *job,
+                                     stratum_rx_stream_t *stream)
 {
     if (message == NULL || stratum_json == NULL) {
         return false;
@@ -800,7 +622,7 @@ bool STRATUM_V1_parse(StratumApiV1Message *message, const char *stratum_json, mi
             result = parse_result(root, message);
             break;
         case MINING_NOTIFY:
-            result = parse_mining_notify(root, job);
+            result = parse_mining_notify(root, job, stream);
             break;
         case MINING_SET_DIFFICULTY:
             result = parse_set_difficulty(root, message);
@@ -834,6 +656,54 @@ bool STRATUM_V1_parse(StratumApiV1Message *message, const char *stratum_json, mi
 
     yyjson_doc_free(doc);
     return result;
+}
+
+bool STRATUM_V1_parse(StratumApiV1Message *message, const char *stratum_json, miner_job_t *job)
+{
+    return parse_stratum_v1_message(message, stratum_json, job, NULL);
+}
+
+stratum_v1_rx_status_t STRATUM_V1_receive_message(esp_transport_handle_t transport,
+                                                  stratum_rx_stream_t *stream,
+                                                  StratumApiV1Message *message,
+                                                  miner_job_t *job,
+                                                  int64_t *receive_time_us)
+{
+    if (!transport || !stream) {
+        return STRATUM_V1_RX_TRANSPORT_ERROR;
+    }
+
+    const char *line_buf = NULL;
+    size_t line_len = 0;
+    size_t raw_len = 0;
+    if (!stratum_rx_stream_read_line(stream, transport, &line_buf, &line_len, &raw_len)) {
+        return STRATUM_V1_RX_TRANSPORT_ERROR;
+    }
+
+    int64_t parse_start_us = esp_timer_get_time();
+    int64_t rx_start_us = stratum_rx_stream_line_start_us(stream);
+    if (receive_time_us != NULL) {
+        *receive_time_us = parse_start_us;
+    }
+
+    bool parsed = parse_stratum_v1_message(message, line_buf, job, stream);
+    int64_t parse_done_us = esp_timer_get_time();
+    if (parsed) {
+        if (message->method == MINING_NOTIFY && job != NULL) {
+            if (rx_start_us > 0 && parse_start_us >= rx_start_us) {
+                int64_t rx_dt = parse_start_us - rx_start_us;
+                job->rx_time_us = (rx_dt > UINT32_MAX) ? UINT32_MAX : (uint32_t)rx_dt;
+            }
+            if (parse_done_us >= parse_start_us) {
+                int64_t parse_dt = parse_done_us - parse_start_us;
+                job->parse_time_us = (parse_dt > UINT32_MAX) ? UINT32_MAX : (uint32_t)parse_dt;
+            }
+        }
+        ESP_LOGI(TAG, "rx (%zu bytes): %.512s%s", raw_len, line_buf,
+                 raw_len > 512U ? "..." : "");
+    }
+    stratum_rx_stream_consume_line(stream, line_len);
+    return parsed ? STRATUM_V1_RX_OK : STRATUM_V1_RX_PARSE_ERROR;
 }
 
 static void debug_stratum_tx(const char * msg)
@@ -935,9 +805,9 @@ int STRATUM_V1_submit_share(esp_transport_handle_t transport, int send_uid, cons
         "{\"id\":%d,\"method\":\"mining.submit\",\"params\":[\"%s\",\"%s\",\"%s\",\"%08lx\",\"%08lx\",\"%08lx\"]}\n",
         send_uid, username, job_id, extranonce_2, ntime, nonce, version_bits);
 
-    int ret = stratum_socket_send_all(transport, submit_msg, strlen(submit_msg));
-
     if (out_sent_time_us) *out_sent_time_us = esp_timer_get_time();
+
+    int ret = stratum_socket_send_all(transport, submit_msg, strlen(submit_msg));
 
     debug_stratum_tx(submit_msg);
 

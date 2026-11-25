@@ -16,7 +16,7 @@
 #include "libbase58.h"
 #include "device_config.h"
 #include "esp_heap_caps.h"
-#include "difficulty_controller.h"
+#include "power_management_task.h"
 
 #include <string.h>
 #include <stdlib.h>
@@ -172,13 +172,17 @@ int stratum_v2_submit_share(GlobalState *GLOBAL_STATE, const asic_job_t *active_
         return -1;
     }
 
+    uint64_t now_us = esp_timer_get_time();
+    POOL_timing_record(GLOBAL_STATE, active_job->pool_id, sequence_number, now_us);
+
     int ret = sv2_noise_send(conn->noise_ctx, conn->transport, buf, len);
     if (ret >= 0) {
-        POOL_timing_record(GLOBAL_STATE, active_job->pool_id, sequence_number, esp_timer_get_time());
         if (sent_time_us) {
-            *sent_time_us = esp_timer_get_time();
+            *sent_time_us = now_us;
         }
         POOL_notify_submitted_share(GLOBAL_STATE, active_job->pool_id);
+    } else {
+        POOL_timing_record(GLOBAL_STATE, active_job->pool_id, sequence_number, 0);
     }
     pthread_mutex_unlock(&s_v2_conn_mutex);
     return ret;
@@ -426,7 +430,6 @@ static void stratum_v2_handle_set_target(GlobalState *GLOBAL_STATE, uint16_t poo
     POOL_set_difficulty(GLOBAL_STATE, pool_idx, pdiff);
 
     ESP_LOGI(TAG, "Set pool difficulty: %g", pdiff);
-    difficulty_controller_update(GLOBAL_STATE);
 }
 
 static void stratum_v2_handle_set_extranonce_prefix(sv2_conn_t *conn,
@@ -500,7 +503,7 @@ esp_err_t stratum_v2_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
         ESP_LOGE(TAG, "Failed to allocate sv2_conn");
         return ESP_ERR_NO_MEM;
     }
-    conn->version_mask = BIP320_VERSION_ROLLING_MASK;
+    conn->version_mask = BIP323_VERSION_ROLLING_MASK;
 
     pthread_mutex_lock(&s_v2_conn_mutex);
     s_v2_conns[pool_idx] = conn;
@@ -539,8 +542,15 @@ esp_err_t stratum_v2_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
 
     int64_t connect_start_us = esp_timer_get_time();
 
-    esp_err_t ret = esp_transport_connect(transport, conn_info.host_ip, port, TRANSPORT_TIMEOUT_MS);
-    if (ret != ESP_OK) {
+    esp_err_t ret = stratum_socket_connect_async(transport, conn_info.host_ip, port,
+                                                 TRANSPORT_TIMEOUT_MS, stratum_reconnect_requested);
+    if (ret == ESP_ERR_INVALID_STATE) {
+        ESP_LOGI(TAG, "Shutdown/reconnect requested during connection attempt");
+        esp_transport_close(transport);
+        esp_transport_destroy(transport);
+        run_result = ESP_ERR_INVALID_STATE;
+        goto cleanup;
+    } else if (ret != ESP_OK) {
         ESP_LOGE(TAG, "TCP connect failed to %s:%d (%s) (err %d)", stratum_url, port, conn_info.host_ip, ret);
         stratum_set_pool_error(GLOBAL_STATE, pool_idx, "Pool unreachable");
         esp_transport_close(transport);
@@ -579,9 +589,12 @@ esp_err_t stratum_v2_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
         ESP_LOGW(TAG, "No authority pubkey configured, server identity will not be verified");
     }
 
-    if (sv2_noise_handshake(noise_ctx, transport, has_auth ? auth_key : NULL) != 0) {
+    int hs_ret = sv2_noise_handshake(noise_ctx, transport, has_auth ? auth_key : NULL);
+    if (hs_ret != 0) {
         ESP_LOGE(TAG, "Noise handshake failed, reconnecting...");
-        stratum_set_pool_error(GLOBAL_STATE, pool_idx, "Auth failed - check key");
+        // A date failure means the key matched, so don't point the user at it.
+        stratum_set_pool_error(GLOBAL_STATE, pool_idx,
+                               hs_ret == SV2_NOISE_ERR_CERT_DATES ? "Certificate invalid" : "Auth failed - check key");
         goto cleanup;
     }
 
@@ -649,8 +662,7 @@ esp_err_t stratum_v2_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
 
     // 3. Send OpenMiningChannel
     {
-        float expected_gh = GLOBAL_STATE->POWER_MANAGEMENT_MODULE.expected_hashrate;
-        float hash_rate = (expected_gh > 0.0f) ? (expected_gh * 1e9f) : 1e12f;
+        float hash_rate = POWER_MANAGEMENT_get_nominal_hashrate(GLOBAL_STATE) * 1e9;
         int frame_len;
 
         if (channel_type == SV2_CHANNEL_EXTENDED) {
@@ -742,7 +754,6 @@ esp_err_t stratum_v2_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
                  channel_id, group_channel_id,
                  sv2_channel_type_to_string(channel_type));
         ESP_LOGI(TAG, "Set pool difficulty: %g", pdiff);
-        difficulty_controller_update(GLOBAL_STATE);
     }
 
     {
@@ -859,6 +870,10 @@ esp_err_t stratum_v2_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
                         ESP_LOGW(TAG, "Dropping SubmitSharesError for unsent sequence %lu (sent %lu)",
                                  (unsigned long)seq_num, (unsigned long)conn->sequence_number);
                         break;
+                    }
+                    float response_time_ms = POOL_timing_calculate_ms(GLOBAL_STATE, pool_idx, seq_num, esp_timer_get_time());
+                    if (response_time_ms >= 0) {
+                        POOL_record_response_time(GLOBAL_STATE, pool_idx, response_time_ms, 1);
                     }
                     ESP_LOGW(TAG, "Share rejected: %s", error_code);
                     POOL_notify_rejected_share(GLOBAL_STATE, pool_idx, error_code);

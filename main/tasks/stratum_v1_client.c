@@ -18,7 +18,7 @@
 #include <esp_heap_caps.h>
 #include "esp_transport_ssl.h"
 #include "freertos/task.h"
-#include "difficulty_controller.h"
+
 static const char *TAG = "stratum_v1";
 
 static sv1_conn_t *s_v1_conns[MAX_POOLS] = {0};
@@ -93,7 +93,8 @@ int stratum_v1_submit_share(GlobalState *GLOBAL_STATE, const asic_job_t *active_
     }
 
     int uid = conn->send_uid++;
-    uint64_t now = 0;
+    uint64_t now = esp_timer_get_time();
+    POOL_timing_record(GLOBAL_STATE, active_job->pool_id, (uint32_t)uid, now);
     int ret = STRATUM_V1_submit_share(
         conn->transport,
         uid,
@@ -103,14 +104,15 @@ int stratum_v1_submit_share(GlobalState *GLOBAL_STATE, const asic_job_t *active_
         active_job->ntime,
         nonce,
         version_bits,
-        &now);
+        NULL);
 
     if (ret >= 0) {
-        POOL_timing_record(GLOBAL_STATE, active_job->pool_id, (uint32_t)uid, now);
         if (sent_time_us) {
             *sent_time_us = now;
         }
         POOL_notify_submitted_share(GLOBAL_STATE, active_job->pool_id);
+    } else {
+        POOL_timing_record(GLOBAL_STATE, active_job->pool_id, (uint32_t)uid, 0);
     }
     pthread_mutex_unlock(&s_v1_conn_mutex);
     return ret;
@@ -144,7 +146,7 @@ void stratum_v1_close_connection(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
             esp_transport_destroy(conn->transport);
             conn->transport = NULL;
         }
-        STRATUM_V1_free_conn_buffer(conn);
+        stratum_rx_stream_free(&conn->rx_stream);
         clear_active_job_ids(conn->active_job_ids, &conn->active_job_ids_count);
         free(conn);
     }
@@ -191,8 +193,8 @@ esp_err_t stratum_v1_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
     diff_to_target(1.0, conn->pool_target);
     conn->version_mask = 0;
 
-    if (!STRATUM_V1_initialize_conn_buffer(conn)) {
-        ESP_LOGE(TAG, "Failed to initialize Stratum V1 buffer");
+    if (!stratum_rx_stream_init(&conn->rx_stream)) {
+        ESP_LOGE(TAG, "Failed to initialize Stratum V1 RX stream");
         free(conn);
         return ESP_ERR_NO_MEM;
     }
@@ -223,8 +225,15 @@ esp_err_t stratum_v1_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
         esp_transport_ssl_set_common_name(transport, stratum_url);
     }
 
-    esp_err_t ret = esp_transport_connect(transport, conn_info.host_ip, port, TRANSPORT_TIMEOUT_MS);
-    if (ret != ESP_OK) {
+    esp_err_t ret = stratum_socket_connect_async(transport, conn_info.host_ip, port,
+                                                 TRANSPORT_TIMEOUT_MS, stratum_reconnect_requested);
+    if (ret == ESP_ERR_INVALID_STATE) {
+        ESP_LOGI(TAG, "Reconnect requested during connection attempt, aborting");
+        esp_transport_close(transport);
+        esp_transport_destroy(transport);
+        stratum_v1_close_connection(GLOBAL_STATE, pool_idx);
+        return ESP_ERR_INVALID_STATE;
+    } else if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Transport unable to connect to %s:%d (errno %d)", stratum_url, port, ret);
         stratum_set_pool_error(GLOBAL_STATE, pool_idx, "Connection failed");
         esp_transport_close(transport);
@@ -265,7 +274,7 @@ esp_err_t stratum_v1_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
 
     StratumApiV1Message v1_msg = {0};
     esp_err_t run_result = ESP_OK;
-    uint8_t last_notified_slot = GLOBAL_STATE->active_job_slot_idx;
+    uint8_t last_notified_slot = GLOBAL_STATE->SYSTEM_MODULE.pool_sessions[pool_idx].active_job_slot_idx;
     uint8_t next_slot = 0;
 
     while (1) {
@@ -285,15 +294,6 @@ esp_err_t stratum_v1_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
         bool reconnect_requested = false;
 
         uint8_t active_slot = GLOBAL_STATE->SYSTEM_MODULE.pool_sessions[pool_idx].active_job_slot_idx;
-        for (uint8_t s = 0; s < 3U; s++) {
-            if (s != active_slot && s != last_notified_slot) {
-                miner_job_t *idle_job = POOL_get_job_slot(GLOBAL_STATE, pool_idx, s);
-                if (idle_job && idle_job->coinbase_suffix_len > 2048U) {
-                    miner_job_resize_coinbase_suffix(idle_job, 2048U);
-                    idle_job->coinbase_suffix_len = 0;
-                }
-            }
-        }
         while (next_slot == active_slot || next_slot == last_notified_slot) {
             next_slot = (uint8_t)((next_slot + 1U) % 3U);
         }
@@ -304,7 +304,7 @@ esp_err_t stratum_v1_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
             continue;
         }
 
-        stratum_v1_rx_status_t rx_status = STRATUM_V1_receive_message(conn->transport, &v1_msg, target_job, &receive_time_us);
+        stratum_v1_rx_status_t rx_status = STRATUM_V1_receive_message(conn->transport, &conn->rx_stream, &v1_msg, target_job, &receive_time_us);
         if (rx_status == STRATUM_V1_RX_TRANSPORT_ERROR) {
             if (stratum_reconnect_requested()) {
                 ESP_LOGI(TAG, "Reconnect requested during read");
@@ -378,7 +378,6 @@ esp_err_t stratum_v1_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
                 diff_to_target(requested_diff, conn->pool_target);
                 ESP_LOGI(TAG, "Set pool difficulty: %.2f", requested_diff);
                 POOL_set_difficulty(GLOBAL_STATE, pool_idx, requested_diff);
-                difficulty_controller_update(GLOBAL_STATE);
                 break;
             }
 

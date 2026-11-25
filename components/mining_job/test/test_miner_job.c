@@ -4,7 +4,7 @@
 #include <string.h>
 #include "esp_heap_caps.h"
 
-TEST_CASE("miner_job_get_slot indexing and buffer validity", "[stratum]")
+TEST_CASE("miner_job_get_slot indexing and buffer validity", "[mining_job]")
 {
     miner_job_pool_init();
 
@@ -35,7 +35,7 @@ TEST_CASE("miner_job_get_slot indexing and buffer validity", "[stratum]")
 }
 
 
-TEST_CASE("miner_job_is_rollable validation", "[stratum]")
+TEST_CASE("miner_job_is_rollable validation", "[mining_job]")
 {
     miner_job_t *job = miner_job_get_slot(2);
     TEST_ASSERT_FALSE(miner_job_is_rollable(NULL));
@@ -53,7 +53,7 @@ TEST_CASE("miner_job_is_rollable validation", "[stratum]")
     TEST_ASSERT_TRUE(miner_job_is_rollable(job));
 }
 
-TEST_CASE("coinbase suffix resize preserves storage on rejected size", "[stratum]")
+TEST_CASE("coinbase suffix resize preserves storage on rejected size", "[mining_job]")
 {
     miner_job_t job = {0};
     TEST_ASSERT_TRUE(miner_job_resize_coinbase_suffix(&job, 32));
@@ -70,7 +70,7 @@ TEST_CASE("coinbase suffix resize preserves storage on rejected size", "[stratum
     free(job.coinbase_suffix);
 }
 
-TEST_CASE("coinbase suffix allocation failure preserves job and permits recovery", "[stratum]")
+TEST_CASE("coinbase suffix allocation failure preserves job and permits recovery", "[mining_job]")
 {
     miner_job_t job = {0};
     TEST_ASSERT_TRUE(miner_job_resize_coinbase_suffix(&job, 32));
@@ -93,7 +93,7 @@ TEST_CASE("coinbase suffix allocation failure preserves job and permits recovery
     free(job.coinbase_suffix);
 }
 
-TEST_CASE("miner_job_pool_t isolates slots across pool sessions", "[stratum]")
+TEST_CASE("miner_job_pool_t isolates slots across pool sessions", "[mining_job]")
 {
     miner_job_pool_t primary_pool = {0};
     miner_job_pool_t fallback_pool = {0};
