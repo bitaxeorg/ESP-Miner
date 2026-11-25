@@ -146,7 +146,7 @@ void stratum_v1_close_connection(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
             esp_transport_destroy(conn->transport);
             conn->transport = NULL;
         }
-        STRATUM_V1_free_conn_buffer(conn);
+        stratum_rx_stream_free(&conn->rx_stream);
         clear_active_job_ids(conn->active_job_ids, &conn->active_job_ids_count);
         free(conn);
     }
@@ -193,8 +193,8 @@ esp_err_t stratum_v1_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
     diff_to_target(1.0, conn->pool_target);
     conn->version_mask = 0;
 
-    if (!STRATUM_V1_initialize_conn_buffer(conn)) {
-        ESP_LOGE(TAG, "Failed to initialize Stratum V1 buffer");
+    if (!stratum_rx_stream_init(&conn->rx_stream)) {
+        ESP_LOGE(TAG, "Failed to initialize Stratum V1 RX stream");
         free(conn);
         return ESP_ERR_NO_MEM;
     }
@@ -274,7 +274,7 @@ esp_err_t stratum_v1_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
 
     StratumApiV1Message v1_msg = {0};
     esp_err_t run_result = ESP_OK;
-    uint8_t last_notified_slot = GLOBAL_STATE->active_job_slot_idx;
+    uint8_t last_notified_slot = GLOBAL_STATE->SYSTEM_MODULE.pool_sessions[pool_idx].active_job_slot_idx;
     uint8_t next_slot = 0;
 
     while (1) {
@@ -294,15 +294,6 @@ esp_err_t stratum_v1_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
         bool reconnect_requested = false;
 
         uint8_t active_slot = GLOBAL_STATE->SYSTEM_MODULE.pool_sessions[pool_idx].active_job_slot_idx;
-        for (uint8_t s = 0; s < 3U; s++) {
-            if (s != active_slot && s != last_notified_slot) {
-                miner_job_t *idle_job = POOL_get_job_slot(GLOBAL_STATE, pool_idx, s);
-                if (idle_job && idle_job->coinbase_suffix_len > 2048U) {
-                    miner_job_resize_coinbase_suffix(idle_job, 2048U);
-                    idle_job->coinbase_suffix_len = 0;
-                }
-            }
-        }
         while (next_slot == active_slot || next_slot == last_notified_slot) {
             next_slot = (uint8_t)((next_slot + 1U) % 3U);
         }
@@ -313,7 +304,7 @@ esp_err_t stratum_v1_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
             continue;
         }
 
-        stratum_v1_rx_status_t rx_status = STRATUM_V1_receive_message(conn->transport, &v1_msg, target_job, &receive_time_us);
+        stratum_v1_rx_status_t rx_status = STRATUM_V1_receive_message(conn->transport, &conn->rx_stream, &v1_msg, target_job, &receive_time_us);
         if (rx_status == STRATUM_V1_RX_TRANSPORT_ERROR) {
             if (stratum_reconnect_requested()) {
                 ESP_LOGI(TAG, "Reconnect requested during read");
