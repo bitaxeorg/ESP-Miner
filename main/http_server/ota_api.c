@@ -17,6 +17,8 @@
 
 static const char *TAG = "ota_api";
 
+#define OTA_RECV_MAX_TIMEOUTS 10
+
 /**
  * @brief Performs streaming chunked OTA fallback when PSRAM is unavailable.
  */
@@ -37,16 +39,25 @@ static esp_err_t POST_OTA_update_streaming(httpd_req_t *req, const esp_partition
 
     if (esp_ota_begin(ota_partition, req->content_len, &ota_handle) != ESP_OK) {
         GLOBAL_STATE->SYSTEM_MODULE.is_firmware_update = false;
+        snprintf(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_status, 20, "Erase Error");
         HTTP_send_json_error(req, "500 Internal Server Error", "Failed to begin OTA erase");
         return ESP_FAIL;
     }
 
     int chunks = 0;
+    int timeouts = 0;
     while (remaining > 0) {
         int recv_len = httpd_req_recv(req, buf, MIN(remaining, sizeof(buf)));
 
         if (recv_len == HTTPD_SOCK_ERR_TIMEOUT) {
-            continue;
+            if (++timeouts <= OTA_RECV_MAX_TIMEOUTS) {
+                continue;
+            }
+            esp_ota_abort(ota_handle);
+            GLOBAL_STATE->SYSTEM_MODULE.is_firmware_update = false;
+            snprintf(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_status, 20, "Receive Timeout");
+            HTTP_send_json_error(req, "408 Request Timeout", "Receive Timeout");
+            return ESP_FAIL;
         } else if (recv_len <= 0) {
             esp_ota_abort(ota_handle);
             GLOBAL_STATE->SYSTEM_MODULE.is_firmware_update = false;
@@ -54,6 +65,7 @@ static esp_err_t POST_OTA_update_streaming(httpd_req_t *req, const esp_partition
             HTTP_send_json_error(req, "500 Internal Server Error", "Protocol Error");
             return ESP_FAIL;
         }
+        timeouts = 0;
 
         if (esp_ota_write(ota_handle, (const void *)buf, recv_len) != ESP_OK) {
             esp_ota_abort(ota_handle);
@@ -101,6 +113,8 @@ static esp_err_t POST_OTA_update_streaming(httpd_req_t *req, const esp_partition
 esp_err_t POST_OTA_update(httpd_req_t *req)
 {
     GlobalState *GLOBAL_STATE = (GlobalState *)httpd_get_global_user_ctx(req->handle);
+    if (!GLOBAL_STATE) return ESP_FAIL;
+
     if (is_network_allowed(req) != ESP_OK) {
         return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
     }
@@ -146,12 +160,20 @@ esp_err_t POST_OTA_update(httpd_req_t *req)
     size_t cur_len = 0;
     int remaining = content_len;
     int chunks = 0;
+    int timeouts = 0;
 
     while (remaining > 0) {
         int recv_len = httpd_req_recv(req, (char *)(ota_buf + cur_len), MIN(remaining, 4096));
 
         if (recv_len == HTTPD_SOCK_ERR_TIMEOUT) {
-            continue;
+            if (++timeouts <= OTA_RECV_MAX_TIMEOUTS) {
+                continue;
+            }
+            GLOBAL_STATE->SYSTEM_MODULE.is_firmware_update = false;
+            free(ota_buf);
+            snprintf(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_status, 20, "Receive Timeout");
+            HTTP_send_json_error(req, "408 Request Timeout", "Receive Timeout");
+            return ESP_FAIL;
         } else if (recv_len <= 0) {
             GLOBAL_STATE->SYSTEM_MODULE.is_firmware_update = false;
             free(ota_buf);
@@ -159,6 +181,7 @@ esp_err_t POST_OTA_update(httpd_req_t *req)
             HTTP_send_json_error(req, "500 Internal Server Error", "Protocol Error");
             return ESP_FAIL;
         }
+        timeouts = 0;
 
         cur_len += recv_len;
         remaining -= recv_len;
@@ -181,25 +204,33 @@ esp_err_t POST_OTA_update(httpd_req_t *req)
         ESP_LOGE(TAG, "Validation failed: Invalid ESP image header magic (0x%02x)", ota_buf[0]);
         GLOBAL_STATE->SYSTEM_MODULE.is_firmware_update = false;
         free(ota_buf);
+        snprintf(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_status, 20, "Invalid Image");
         HTTP_send_json_error(req, "400 Bad Request", "Invalid firmware binary format");
         return ESP_OK;
     }
 
     esp_app_desc_t app_desc;
     size_t app_desc_offset = sizeof(esp_image_header_t) + sizeof(esp_image_segment_header_t);
-    if (cur_len > app_desc_offset + sizeof(esp_app_desc_t)) {
-        memcpy(&app_desc, ota_buf + app_desc_offset, sizeof(esp_app_desc_t));
-        if (app_desc.magic_word != ESP_APP_DESC_MAGIC_WORD) {
-            ESP_LOGE(TAG, "Validation failed: Invalid app description magic (0x%08x)", (unsigned int)app_desc.magic_word);
-            GLOBAL_STATE->SYSTEM_MODULE.is_firmware_update = false;
-            free(ota_buf);
-            HTTP_send_json_error(req, "400 Bad Request", "Invalid firmware app description");
-            return ESP_OK;
-        }
-        ESP_LOGI(TAG, "Validated firmware image: project '%s', version '%s'", app_desc.project_name, app_desc.version);
+    if (cur_len < app_desc_offset + sizeof(esp_app_desc_t)) {
+        ESP_LOGE(TAG, "Validation failed: Firmware image too small (%u bytes)", (unsigned int)cur_len);
+        GLOBAL_STATE->SYSTEM_MODULE.is_firmware_update = false;
+        free(ota_buf);
+        snprintf(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_status, 20, "Invalid Image");
+        HTTP_send_json_error(req, "400 Bad Request", "Invalid firmware binary format");
+        return ESP_OK;
     }
+    memcpy(&app_desc, ota_buf + app_desc_offset, sizeof(esp_app_desc_t));
+    if (app_desc.magic_word != ESP_APP_DESC_MAGIC_WORD) {
+        ESP_LOGE(TAG, "Validation failed: Invalid app description magic (0x%08x)", (unsigned int)app_desc.magic_word);
+        GLOBAL_STATE->SYSTEM_MODULE.is_firmware_update = false;
+        free(ota_buf);
+        snprintf(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_status, 20, "Invalid Image");
+        HTTP_send_json_error(req, "400 Bad Request", "Invalid firmware app description");
+        return ESP_OK;
+    }
+    ESP_LOGI(TAG, "Validated firmware image: project '%s', version '%s'", app_desc.project_name, app_desc.version);
 
-    // Phase 3: Flash Erase & Write (PSRAM ➔ Flash)
+    // Phase 3: Flash Erase & Write (PSRAM -> Flash)
     snprintf(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_status, 20, "Flashing (0%%)");
     vTaskDelay(20 / portTICK_PERIOD_MS);
 
@@ -207,6 +238,7 @@ esp_err_t POST_OTA_update(httpd_req_t *req)
     if (esp_ota_begin(ota_partition, content_len, &ota_handle) != ESP_OK) {
         GLOBAL_STATE->SYSTEM_MODULE.is_firmware_update = false;
         free(ota_buf);
+        snprintf(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_status, 20, "Erase Error");
         HTTP_send_json_error(req, "500 Internal Server Error", "Failed to begin OTA erase");
         return ESP_FAIL;
     }
@@ -303,12 +335,20 @@ esp_err_t POST_WWW_update(httpd_req_t *req)
         size_t cur_len = 0;
         int remaining = content_len;
         int chunks = 0;
+        int timeouts = 0;
 
         while (remaining > 0) {
             int recv_len = httpd_req_recv(req, (char *)(www_buf + cur_len), MIN(remaining, 4096));
 
             if (recv_len == HTTPD_SOCK_ERR_TIMEOUT) {
-                continue;
+                if (++timeouts <= OTA_RECV_MAX_TIMEOUTS) {
+                    continue;
+                }
+                GLOBAL_STATE->SYSTEM_MODULE.is_firmware_update = false;
+                free(www_buf);
+                snprintf(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_status, 20, "Receive Timeout");
+                HTTP_send_json_error(req, "408 Request Timeout", "Receive Timeout");
+                return ESP_FAIL;
             } else if (recv_len <= 0) {
                 GLOBAL_STATE->SYSTEM_MODULE.is_firmware_update = false;
                 free(www_buf);
@@ -316,6 +356,7 @@ esp_err_t POST_WWW_update(httpd_req_t *req)
                 HTTP_send_json_error(req, "500 Internal Server Error", "Protocol Error");
                 return ESP_FAIL;
             }
+            timeouts = 0;
 
             cur_len += recv_len;
             remaining -= recv_len;
@@ -331,20 +372,37 @@ esp_err_t POST_WWW_update(httpd_req_t *req)
         }
 
         // Erase & Write WWW partition
-        snprintf(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_status, 20, "Flashing...");
+        snprintf(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_status, 20, "Erasing flash...");
         size_t erase_size = 65536;
         for (size_t offset = 0; offset < www_partition->size; offset += erase_size) {
             size_t size_to_erase = MIN(erase_size, www_partition->size - offset);
-            ESP_ERROR_CHECK(esp_partition_erase_range(www_partition, offset, size_to_erase));
+            if (esp_partition_erase_range(www_partition, offset, size_to_erase) != ESP_OK) {
+                GLOBAL_STATE->SYSTEM_MODULE.is_firmware_update = false;
+                free(www_buf);
+                snprintf(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_status, 20, "Erase Error");
+                HTTP_send_json_error(req, "500 Internal Server Error", "Failed to erase WWW partition");
+                return ESP_FAIL;
+            }
             vTaskDelay(10 / portTICK_PERIOD_MS);
         }
 
-        if (esp_partition_write(www_partition, 0, (const void *)www_buf, cur_len) != ESP_OK) {
-            GLOBAL_STATE->SYSTEM_MODULE.is_firmware_update = false;
-            free(www_buf);
-            snprintf(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_status, 20, "Write Error");
-            HTTP_send_json_error(req, "500 Internal Server Error", "Write Error");
-            return ESP_FAIL;
+        GLOBAL_STATE->SYSTEM_MODULE.firmware_update_percent = 0;
+        snprintf(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_status, 20, "Flashing (0%%)");
+        size_t write_offset = 0;
+        while (write_offset < cur_len) {
+            size_t chunk_size = MIN(65536, cur_len - write_offset);
+            if (esp_partition_write(www_partition, write_offset, (const void *)(www_buf + write_offset), chunk_size) != ESP_OK) {
+                GLOBAL_STATE->SYSTEM_MODULE.is_firmware_update = false;
+                free(www_buf);
+                snprintf(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_status, 20, "Write Error");
+                HTTP_send_json_error(req, "500 Internal Server Error", "Write Error");
+                return ESP_FAIL;
+            }
+            write_offset += chunk_size;
+            uint8_t flash_perc = (uint8_t)((write_offset * 100ULL) / cur_len);
+            GLOBAL_STATE->SYSTEM_MODULE.firmware_update_percent = flash_perc;
+            snprintf(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_status, 20, "Flashing (%d%%)", flash_perc);
+            vTaskDelay(10 / portTICK_PERIOD_MS);
         }
 
         free(www_buf);
@@ -356,27 +414,41 @@ esp_err_t POST_WWW_update(httpd_req_t *req)
         size_t erase_size = 65536;
         for (size_t offset = 0; offset < www_partition->size; offset += erase_size) {
             size_t size_to_erase = MIN(erase_size, www_partition->size - offset);
-            ESP_ERROR_CHECK(esp_partition_erase_range(www_partition, offset, size_to_erase));
+            if (esp_partition_erase_range(www_partition, offset, size_to_erase) != ESP_OK) {
+                GLOBAL_STATE->SYSTEM_MODULE.is_firmware_update = false;
+                snprintf(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_status, 20, "Erase Error");
+                HTTP_send_json_error(req, "500 Internal Server Error", "Failed to erase WWW partition");
+                return ESP_FAIL;
+            }
             vTaskDelay(10 / portTICK_PERIOD_MS);
         }
 
         char buf[1000];
         int remaining = content_len;
         int chunks = 0;
+        int timeouts = 0;
 
         while (remaining > 0) {
             int recv_len = httpd_req_recv(req, buf, MIN(remaining, sizeof(buf)));
 
             if (recv_len == HTTPD_SOCK_ERR_TIMEOUT) {
-                continue;
+                if (++timeouts <= OTA_RECV_MAX_TIMEOUTS) {
+                    continue;
+                }
+                GLOBAL_STATE->SYSTEM_MODULE.is_firmware_update = false;
+                snprintf(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_status, 20, "Receive Timeout");
+                HTTP_send_json_error(req, "408 Request Timeout", "Receive Timeout");
+                return ESP_FAIL;
             } else if (recv_len <= 0) {
                 GLOBAL_STATE->SYSTEM_MODULE.is_firmware_update = false;
                 snprintf(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_status, 20, "Protocol Error");
                 HTTP_send_json_error(req, "500 Internal Server Error", "Protocol Error");
                 return ESP_FAIL;
             }
+            timeouts = 0;
 
-            if (esp_partition_write(www_partition, www_partition->size - remaining, (const void *)buf, recv_len) != ESP_OK) {
+            size_t write_offset = content_len - remaining;
+            if (esp_partition_write(www_partition, write_offset, (const void *)buf, recv_len) != ESP_OK) {
                 GLOBAL_STATE->SYSTEM_MODULE.is_firmware_update = false;
                 snprintf(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_status, 20, "Write Error");
                 HTTP_send_json_error(req, "500 Internal Server Error", "Write Error");
@@ -396,12 +468,13 @@ esp_err_t POST_WWW_update(httpd_req_t *req)
         }
     }
 
-    httpd_resp_set_type(req, "text/plain");
-    httpd_resp_sendstr(req, "WWW update complete, rebooting now!\n");
     nvs_config_set_bool(NVS_CONFIG_USE_CUSTOM_WWW, true);
 
     GLOBAL_STATE->SYSTEM_MODULE.firmware_update_percent = 100;
     snprintf(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_status, 20, "Rebooting...");
+
+    httpd_resp_set_type(req, "text/plain");
+    httpd_resp_sendstr(req, "WWW update complete, rebooting now!\n");
     vTaskDelay(1000 / portTICK_PERIOD_MS);
     GLOBAL_STATE->SYSTEM_MODULE.is_firmware_update = false;
     esp_restart();

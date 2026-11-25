@@ -55,86 +55,60 @@ export class AppTopBarComponent implements OnInit, OnDestroy {
         this.wasOtaUpdating = true;
         const percent = info.firmwareUpdatePercent ?? 0;
         const status = info.firmwareUpdateStatus || 'Updating...';
-        const title = `Firmware Update`;
-        const message = status;
+        const title = 'Firmware Update';
 
         if (!this.otaToastRef) {
-          this.otaToastRef = this.toastr.info(message, title, {
+          this.otaToastRef = this.toastr.info(status, title, {
             disableTimeOut: true,
             tapToDismiss: false,
             closeButton: false,
             progressBar: true,
           });
-        } else {
-          if (this.otaToastRef.toastRef && this.otaToastRef.toastRef.componentInstance) {
-            const inst = this.otaToastRef.toastRef.componentInstance;
-            inst.title = title;
-            inst.message = message;
-            if (inst.toastPackage) {
-              inst.toastPackage.title = title;
-              inst.toastPackage.message = message;
-            }
-          }
-          if (this.otaToastRef.portal && this.otaToastRef.portal.location) {
-            const el = this.otaToastRef.portal.location.nativeElement as HTMLElement;
-            if (el) {
-              const titleEl = el.querySelector('.toast-title');
-              if (titleEl) titleEl.textContent = title;
-
-              const msgEl = el.querySelector('.toast-message');
-              if (msgEl) msgEl.textContent = message;
-
-              const progressEl = el.querySelector('.toast-progress') as HTMLElement;
-              if (progressEl) progressEl.style.width = `${percent}%`;
-            }
-          }
-          if (this.otaToastRef.portal && this.otaToastRef.portal.changeDetectorRef) {
-            this.otaToastRef.portal.changeDetectorRef.markForCheck();
-            this.otaToastRef.portal.changeDetectorRef.detectChanges();
-          }
-          this.cdr.detectChanges();
         }
+        this.updateOtaToast(title, status, percent);
       } else if (this.otaToastRef) {
         this.toastr.clear(this.otaToastRef.toastId);
         this.otaToastRef = null;
         if (this.wasOtaUpdating) {
-          this.toastr.success('Firmware update completed!');
           this.wasOtaUpdating = false;
+          const status = info.firmwareUpdateStatus;
+          if (status && status !== 'Rebooting...') {
+            this.toastr.error(status, 'Firmware Update Failed');
+          } else {
+            this.toastr.success('Firmware update completed!');
+          }
         }
       }
     });
 
     this.liveDataService.connected$.pipe(takeUntil(this.destroy$)).subscribe((connected: boolean) => {
       if (!connected && this.otaToastRef) {
-        const title = 'Firmware Update';
-        const message = 'Device is rebooting...';
-        if (this.otaToastRef.toastRef && this.otaToastRef.toastRef.componentInstance) {
-          const inst = this.otaToastRef.toastRef.componentInstance;
-          inst.title = title;
-          inst.message = message;
-          if (inst.toastPackage) {
-            inst.toastPackage.title = title;
-            inst.toastPackage.message = message;
-          }
-        }
-        if (this.otaToastRef.portal && this.otaToastRef.portal.location) {
-          const el = this.otaToastRef.portal.location.nativeElement as HTMLElement;
-          if (el) {
-            const titleEl = el.querySelector('.toast-title');
-            if (titleEl) titleEl.textContent = title;
-            const msgEl = el.querySelector('.toast-message');
-            if (msgEl) msgEl.textContent = message;
-            const progressEl = el.querySelector('.toast-progress') as HTMLElement;
-            if (progressEl) progressEl.style.width = '100%';
-          }
-        }
-        if (this.otaToastRef.portal && this.otaToastRef.portal.changeDetectorRef) {
-          this.otaToastRef.portal.changeDetectorRef.markForCheck();
-          this.otaToastRef.portal.changeDetectorRef.detectChanges();
-        }
-        this.cdr.detectChanges();
+        this.updateOtaToast('Firmware Update', 'Device is rebooting...', 100);
       }
     });
+  }
+
+  private updateOtaToast(title: string, message: string, percent: number) {
+    if (!this.otaToastRef) {
+      return;
+    }
+    const inst = this.otaToastRef.toastRef?.componentInstance;
+    if (inst) {
+      inst.title = title;
+      inst.message = message;
+      if (inst.toastPackage) {
+        inst.toastPackage.title = title;
+        inst.toastPackage.message = message;
+      }
+      if (typeof inst.width?.set === 'function') {
+        inst.width.set(percent);
+      }
+    }
+    if (this.otaToastRef.portal?.changeDetectorRef) {
+      this.otaToastRef.portal.changeDetectorRef.markForCheck();
+      this.otaToastRef.portal.changeDetectorRef.detectChanges();
+    }
+    this.cdr.detectChanges();
   }
 
   ngOnDestroy() {
