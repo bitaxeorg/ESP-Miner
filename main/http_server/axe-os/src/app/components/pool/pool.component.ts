@@ -397,6 +397,14 @@ export class PoolComponent implements OnInit {
     return userValue.includes(this.DEFAULT_BITCOIN_ADDRESS);
   }
 
+  isInsecureSv1(index: number): boolean {
+    if (!this.poolsArray) return false;
+    const poolGroup = this.poolsArray.at(index);
+    if (!poolGroup) return false;
+    return poolGroup.get('stratumProtocol')?.value !== 'SV2' &&
+      poolGroup.get('stratumTLS')?.value === 0;
+  }
+
   isAnyPoolUsingDefaultAddress(): boolean {
     if (!this.form || !this.poolsArray) return false;
     for (let i = 0; i < this.poolsArray.length; i++) {

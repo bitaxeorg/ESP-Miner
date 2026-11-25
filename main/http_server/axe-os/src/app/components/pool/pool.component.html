@@ -110,6 +110,15 @@
                 </div>
               </div>
 
+              @if (isInsecureSv1(i)) {
+                <div class="bg-yellow-100 dark:bg-yellow-950/20 border border-yellow-500 dark:border-yellow-800 text-yellow-900 dark:text-yellow-200 p-3 rounded flex items-start gap-2">
+                  <i class="pi pi-exclamation-triangle mt-1 shrink-0 text-yellow-700 dark:text-yellow-500"></i>
+                  <div class="text-sm">
+                    <strong>Unencrypted Stratum V1:</strong> plain-text Stratum V1 lets anyone on the path redirect and hijack this pool's hashrate. Use TLS or Stratum V2 instead.
+                  </div>
+                </div>
+              }
+
               <!-- User -->
               <div class="flex flex-col md:flex-row md:items-center gap-2">
                 <label [htmlFor]="'stratumUser_' + poolControl.get('id')?.value" class="w-full md:w-2/12 font-medium">User</label>
