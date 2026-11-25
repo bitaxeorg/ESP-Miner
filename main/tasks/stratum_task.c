@@ -12,6 +12,7 @@
 #include "stratum_v2_client.h"
 #include "connect.h"
 #include "system.h"
+#include <inttypes.h>
 #include <string.h>
 
 #define TAG "stratum_task"
@@ -23,24 +24,45 @@ typedef struct {
     asic_job_t job;
     uint32_t nonce;
     uint32_t rolled_version;
+    uint64_t found_time_us;
+    uint32_t session_id;
 } stratum_tx_item_t;
 
 static TaskHandle_t s_primary_task_handle = NULL;
 static TaskHandle_t s_fallback_task_handle = NULL;
 static GlobalState *s_global_state = NULL;
 static volatile bool s_should_reconnect[MAX_POOLS] = {false};
+static volatile uint32_t s_pool_session_id[MAX_POOLS] = {0};
+static QueueHandle_t s_tx_worker_queue = NULL;
 static QueueHandle_t s_share_tx_queue = NULL;
+static volatile uint32_t s_share_tx_dropped = 0;
+static volatile uint32_t s_share_tx_failed = 0;
 
-static int stratum_dispatch_share_tx(GlobalState *GLOBAL_STATE, const asic_job_t *active_job,
-                                     uint32_t nonce, uint32_t rolled_version, uint64_t *sent_time_us)
+static bool stratum_is_job_for_active_pool(const GlobalState *gs, const asic_job_t *active_job)
 {
-    uint16_t active_pool_idx = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback
-        ? GLOBAL_STATE->SYSTEM_MODULE.secondary_pool_index
-        : GLOBAL_STATE->SYSTEM_MODULE.primary_pool_index;
+    uint16_t active_pool_idx = gs->SYSTEM_MODULE.is_using_fallback
+        ? gs->SYSTEM_MODULE.secondary_pool_index
+        : gs->SYSTEM_MODULE.primary_pool_index;
 
     if (active_job->pool_id != (uint8_t)active_pool_idx) {
         ESP_LOGW(TAG, "Dropping share for stale pool %u (active pool is %u)",
                  active_job->pool_id, active_pool_idx);
+        return false;
+    }
+    return true;
+}
+
+static int stratum_dispatch_share_tx(GlobalState *GLOBAL_STATE, const asic_job_t *active_job,
+                                     uint32_t nonce, uint32_t rolled_version,
+                                     uint64_t found_time_us, uint32_t expected_session_id)
+{
+    if (!stratum_is_job_for_active_pool(GLOBAL_STATE, active_job)) {
+        return -1;
+    }
+
+    if (expected_session_id != s_pool_session_id[active_job->pool_id]) {
+        ESP_LOGW(TAG, "Dropping share for stale session (pool %u, job %s)",
+                 active_job->pool_id, active_job->job_id);
         return -1;
     }
 
@@ -49,11 +71,20 @@ static int stratum_dispatch_share_tx(GlobalState *GLOBAL_STATE, const asic_job_t
         return -1;
     }
 
-    int ret = driver->submit_share(GLOBAL_STATE, active_job, nonce, rolled_version, sent_time_us);
+    uint64_t sent_time_us = 0;
+    int ret = driver->submit_share(GLOBAL_STATE, active_job, nonce, rolled_version, &sent_time_us);
 
     if (ret < 0) {
-        ESP_LOGW(TAG, "Failed to submit share to socket for pool %u (ret: %d)",
-                 active_job->pool_id, ret);
+        s_share_tx_failed++;
+        ESP_LOGW(TAG, "Failed to submit share to socket for pool %u (ret: %d, total failed: %" PRIu32 ")",
+                 active_job->pool_id, ret, (uint32_t)s_share_tx_failed);
+        return ret;
+    }
+
+    if (sent_time_us > 0 && found_time_us > 0 && sent_time_us >= found_time_us) {
+        float process_time = (sent_time_us - found_time_us) / 1000.0f;
+        GLOBAL_STATE->SYSTEM_MODULE.process_time = process_time;
+        ESP_LOGI(TAG, "Processing time: %0.1f ms", process_time);
     }
     return ret;
 }
@@ -64,8 +95,9 @@ static void stratum_tx_task(void *pvParameters)
     stratum_tx_item_t item;
 
     while (1) {
-        if (xQueueReceive(s_share_tx_queue, &item, portMAX_DELAY) == pdTRUE) {
-            stratum_dispatch_share_tx(gs, &item.job, item.nonce, item.rolled_version, NULL);
+        if (xQueueReceive(s_tx_worker_queue, &item, portMAX_DELAY) == pdTRUE) {
+            stratum_dispatch_share_tx(gs, &item.job, item.nonce, item.rolled_version,
+                                      item.found_time_us, item.session_id);
         }
     }
 }
@@ -73,6 +105,7 @@ static void stratum_tx_task(void *pvParameters)
 void stratum_abort_pool(uint16_t pool_idx)
 {
     if (pool_idx >= MAX_POOLS) return;
+    s_pool_session_id[pool_idx]++;
     s_should_reconnect[pool_idx] = true;
     const stratum_driver_t *v1 = stratum_get_driver(STRATUM_PROTOCOL_V1);
     const stratum_driver_t *v2 = stratum_get_driver(STRATUM_PROTOCOL_V2);
@@ -155,6 +188,7 @@ static esp_err_t run_pool_session(GlobalState *gs, uint16_t pool_idx)
         return ESP_ERR_NOT_FOUND;
     }
 
+    s_pool_session_id[pool_idx]++;
     s_should_reconnect[pool_idx] = false;
     return driver->run(gs, pool_idx);
 }
@@ -227,6 +261,26 @@ void stratum_notify_pool_selection_changed(GlobalState *gs)
     }
 }
 
+static void stratum_init_share_tx_queue(GlobalState *GLOBAL_STATE)
+{
+    uint32_t caps = esp_psram_is_initialized() ? MALLOC_CAP_SPIRAM : MALLOC_CAP_8BIT;
+    QueueHandle_t q = xQueueCreateWithCaps(SHARE_TX_QUEUE_LEN, sizeof(stratum_tx_item_t), caps);
+    if (!q) {
+        ESP_LOGE(TAG, "Failed to create stratum share TX queue, falling back to synchronous submit");
+        return;
+    }
+
+    s_tx_worker_queue = q;
+    if (xTaskCreateWithCaps(stratum_tx_task, "stratum_tx", 8192, (void *)GLOBAL_STATE, 16, NULL, caps) != pdPASS) {
+        ESP_LOGE(TAG, "Failed to create stratum TX task, falling back to synchronous submit");
+        s_tx_worker_queue = NULL;
+        vQueueDeleteWithCaps(q);
+        return;
+    }
+
+    s_share_tx_queue = q;
+}
+
 void stratum_task(void *pvParameters)
 {
     GlobalState *GLOBAL_STATE = (GlobalState *)pvParameters;
@@ -244,14 +298,7 @@ void stratum_task(void *pvParameters)
     }
 
     if (is_primary && !s_share_tx_queue) {
-        s_share_tx_queue = xQueueCreateWithCaps(SHARE_TX_QUEUE_LEN, sizeof(stratum_tx_item_t), MALLOC_CAP_SPIRAM);
-        if (s_share_tx_queue) {
-            if (xTaskCreateWithCaps(stratum_tx_task, "stratum_tx", 8192, (void *)GLOBAL_STATE, 16, NULL, MALLOC_CAP_SPIRAM) != pdPASS) {
-                ESP_LOGE(TAG, "Failed to create stratum TX task");
-            }
-        } else {
-            ESP_LOGE(TAG, "Failed to create stratum share TX queue");
-        }
+        stratum_init_share_tx_queue(GLOBAL_STATE);
     }
 
     int retry_attempts = 0;
@@ -373,38 +420,46 @@ void stratum_task(void *pvParameters)
     }
 }
 
+void stratum_get_tx_stats(stratum_tx_stats_t *out_stats)
+{
+    if (!out_stats) {
+        return;
+    }
+    out_stats->queue_dropped = s_share_tx_dropped;
+    out_stats->tx_failed = s_share_tx_failed;
+}
+
 int stratum_submit_share(GlobalState *GLOBAL_STATE, const asic_job_t *active_job,
-                         uint32_t nonce, uint32_t rolled_version, uint64_t *sent_time_us)
+                         uint32_t nonce, uint32_t rolled_version,
+                         uint64_t found_time_us, bool is_block)
 {
     if (!GLOBAL_STATE || !active_job || active_job->pool_id >= MAX_POOLS) {
         return -1;
     }
 
-    uint16_t active_pool_idx = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback
-        ? GLOBAL_STATE->SYSTEM_MODULE.secondary_pool_index
-        : GLOBAL_STATE->SYSTEM_MODULE.primary_pool_index;
-    if (active_job->pool_id != (uint8_t)active_pool_idx) {
-        ESP_LOGW(TAG, "Dropping share for stale pool %u (active pool is %u)",
-                 active_job->pool_id, active_pool_idx);
+    if (!stratum_is_job_for_active_pool(GLOBAL_STATE, active_job)) {
         return -1;
     }
 
-    if (!s_share_tx_queue) {
-        return stratum_dispatch_share_tx(GLOBAL_STATE, active_job, nonce, rolled_version, sent_time_us);
+    uint32_t session_id = s_pool_session_id[active_job->pool_id];
+
+    if (is_block || !s_share_tx_queue) {
+        return stratum_dispatch_share_tx(GLOBAL_STATE, active_job, nonce, rolled_version,
+                                         found_time_us, session_id);
     }
 
     stratum_tx_item_t item = {
         .job = *active_job,
         .nonce = nonce,
         .rolled_version = rolled_version,
+        .found_time_us = found_time_us,
+        .session_id = session_id,
     };
 
-    if (sent_time_us) {
-        *sent_time_us = esp_timer_get_time();
-    }
-
     if (xQueueSend(s_share_tx_queue, &item, 0) != pdTRUE) {
-        ESP_LOGW(TAG, "Share TX queue full, dropping share for job %s", active_job->job_id);
+        s_share_tx_dropped++;
+        ESP_LOGW(TAG, "Share TX queue full, dropping share for job %s (total dropped: %" PRIu32 ")",
+                 active_job->job_id, (uint32_t)s_share_tx_dropped);
         return -1;
     }
 

@@ -25,9 +25,18 @@ void stratum_abort_pool(uint16_t pool_idx);
 // Abort active stratum connection immediately across all pools.
 void stratum_abort_connection(void);
 
+typedef struct {
+    uint32_t queue_dropped;
+    uint32_t tx_failed;
+} stratum_tx_stats_t;
+
 // Submit a found share to the active pool (dispatches to SV1 or SV2).
 int stratum_submit_share(GlobalState *GLOBAL_STATE, const asic_job_t *active_job,
-                         uint32_t nonce, uint32_t rolled_version, uint64_t *sent_time_us);
+                         uint32_t nonce, uint32_t rolled_version,
+                         uint64_t found_time_us, bool is_block);
+
+// Read share TX queue drop and dispatch failure counters.
+void stratum_get_tx_stats(stratum_tx_stats_t *out_stats);
 
 // Set connection error for the given pool without overwriting primary status while on fallback.
 void stratum_set_pool_error(GlobalState *gs, uint16_t pool_idx, const char *err_msg);
