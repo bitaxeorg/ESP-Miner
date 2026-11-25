@@ -33,6 +33,9 @@ TEST_CASE("stratum_timing wraparound and slot reuse", "[stratum_timing]")
     // Second ID wraps around and overwrites the slot
     stratum_timing_record(&tracker, id_second, 2100000ULL);
 
+    // Late response for the overwritten first ID must be ignored and must not clear the slot
+    TEST_ASSERT_EQUAL_FLOAT(-1.0f, stratum_timing_calculate_ms(&tracker, id_first, 2100300ULL));
+
     // Calculate for the second ID
     float latency_ms = stratum_timing_calculate_ms(&tracker, id_second, 2115500ULL);
     TEST_ASSERT_FLOAT_WITHIN(0.01f, 15.5f, latency_ms);
