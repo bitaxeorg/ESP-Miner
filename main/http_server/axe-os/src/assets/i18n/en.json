@@ -527,10 +527,6 @@
     "Unauthorized worker": {
       "explanation": "This worker has not been authorized — submit mining.authorize first."
     },
-    "Valid": {
-      "label": "Valid",
-      "explanation": "This is not a rejection reason - it indicates a valid share."
-    },
     "Worker mismatch": {
       "label": "Worker mismatch",
       "explanation": "The worker name sent does not match the expected or authenticated worker."

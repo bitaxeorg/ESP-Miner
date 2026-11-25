@@ -527,10 +527,6 @@
     "Unauthorized worker": {
       "explanation": "This worker has not been authorized — submit mining.authorize first."
     },
-    "Valid": {
-      "label": "Gültig",
-      "explanation": "Das ist kein Ablehnungsgrund - es zeigt einen gültigen Share an."
-    },
     "Worker mismatch": {
       "label": "Worker stimmt nicht",
       "explanation": "Der gesendete Worker-Name entspricht nicht dem erwarteten bzw. authentifizierten Worker."
