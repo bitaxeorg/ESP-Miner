@@ -26,6 +26,12 @@
 #include <sys/param.h>
 
 #define BUFFER_SIZE 1024
+
+// Quantos timeouts seguidos (de TRANSPORT_TIMEOUT_MS cada) sem receber um
+// unico byte antes de concluir que o pool esta surdo. 24 x 5 s = 120 s:
+// folgado para o silencio normal entre jobs, curto o suficiente para nao
+// ficar pendurado num pool que parou de responder (#1964).
+#define STRATUM_IDLE_TIMEOUTS_MAX 24
 #define JSON_RPC_BUFFER_LIMIT (STRATUM_V1_MAX_JSON_LINE_SIZE + 2U)
 #define BITCOIN_GENESIS_NTIME 1231006505
 #define MAX_ERROR_MSG_LEN 256
@@ -138,6 +144,10 @@ char * STRATUM_V1_receive_jsonrpc_line(sv1_conn_t *conn)
     char *line = NULL;
     char recv_buffer[BUFFER_SIZE];
     int nbytes;
+    // Silencio consecutivo do pool. esp_transport_read() devolve 0 no timeout,
+    // e o laco abaixo ignorava isso: girava para sempre com o pool "conectado"
+    // sem responder, entao o failover nunca era acionado (#1964).
+    int idle_timeouts = 0;
 
     char *newline_pos = memchr(conn->json_rpc_buffer, '\n', conn->json_rpc_buffer_len);
     while (newline_pos == NULL) {
@@ -167,7 +177,23 @@ char * STRATUM_V1_receive_jsonrpc_line(sv1_conn_t *conn)
             conn->json_rpc_buffer[0] = '\0';
             return NULL;
         }
+        if (nbytes == 0) {
+            // Timeout sem um byte. Entre jobs o silencio e normal, por isso o
+            // teto e alto: so quando passa de STRATUM_IDLE_TIMEOUTS_MAX e que
+            // concluimos que o pool esta surdo e devolvemos NULL para o
+            // chamador acionar reconexao/failover (#1964).
+            if (++idle_timeouts >= STRATUM_IDLE_TIMEOUTS_MAX) {
+                ESP_LOGE(TAG, "Pool sem enviar nada ha %d s - devolvendo para reconexao/failover",
+                         (int)(STRATUM_IDLE_TIMEOUTS_MAX * TRANSPORT_TIMEOUT_MS / 1000));
+                conn->json_rpc_buffer_len = 0;
+                conn->json_rpc_buffer[0] = '\0';
+                return NULL;
+            }
+            continue;
+        }
+
         if (nbytes > 0) {
+            idle_timeouts = 0;   // veio dado: o pool esta vivo
             if (memchr(recv_buffer, '\0', (size_t)nbytes) != NULL) {
                 ESP_LOGE(TAG, "JSON-RPC stream contains an embedded NUL byte");
                 conn->json_rpc_buffer_len = 0;
