@@ -405,10 +405,6 @@
     "case_sensitive_filter": "Groß-/Kleinschreibung beachten"
   },
   "share_rejection": {
-    "Above target": {
-      "label": "Difficulty zu niedrig",
-      "explanation": "Der eingereichte Share erfüllt die erforderliche Mindest-Difficulty nicht."
-    },
     "Authorization validation error": {
       "label": "Autorisierung ungültig",
       "explanation": "Die vom Miner angegebenen Zugangsdaten waren falsch oder nicht autorisiert."
@@ -417,21 +413,18 @@
       "label": "Konfiguration ungültig",
       "explanation": "Der Miner hat eine ungültige Mining-Konfiguration bzw. Einstellungen gesendet."
     },
-    "Difficulty too low": {
-      "label": "Difficulty zu niedrig",
-      "explanation": "{{share_rejection.difficulty-too-low.explanation}}"
-    },
     "difficulty-too-low": {
+      "aliases": [
+        "Above target",
+        "Difficulty too low"
+      ],
       "label": "Difficulty zu niedrig",
       "explanation": "Der eingereichte Share erfüllt die erforderliche Mindest-Difficulty nicht."
     },
-    "Duplicate": {
-      "label": "Duplikat",
-      "explanation": "Dieser Share wurde bereits eingereicht."
-    },
     "Duplicate share": {
+      "aliases": ["Duplicate"],
       "label": "Doppelter Share",
-      "explanation": "{{share_rejection.Duplicate.explanation}}"
+      "explanation": "Dieser Share wurde bereits eingereicht."
     },
     "Invalid array size": {
       "label": "Ungültige Array-Größe",
@@ -513,17 +506,12 @@
       "label": "Parameter kein Array",
       "explanation": "Das Parameterfeld war nicht als JSON-Array formatiert."
     },
-    "Stale": {
+    "stale-share": {
+      "aliases": [
+        "stale"
+      ],
       "label": "Stale",
       "explanation": "Während dieser Share eingereicht wurde, hat das Netzwerk bereits einen neuen Block gefunden; dadurch ist der Share ungültig."
-    },
-    "stale": {
-      "label": "{{share_rejection.Stale.label}}",
-      "explanation": "{{share_rejection.Stale.explanation}}"
-    },
-    "stale-share": {
-      "label": "{{share_rejection.Stale.label}}",
-      "explanation": "{{share_rejection.Stale.explanation}}"
     },
     "Subscription validation error": {
       "label": "Subscription ungültig",

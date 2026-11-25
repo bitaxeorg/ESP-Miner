@@ -405,10 +405,6 @@
     "case_sensitive_filter": "Case-sensitive filter"
   },
   "share_rejection": {
-    "Above target": {
-      "label": "Above target",
-      "explanation": "The submitted share does not meet the minimum required difficulty."
-    },
     "Authorization validation error": {
       "label": "Authorization validation error",
       "explanation": "The credentials provided by the miner were incorrect or not authorized."
@@ -417,21 +413,18 @@
       "label": "Configuration validation error",
       "explanation": "Invalid mining configuration or settings sent by the miner."
     },
-    "Difficulty too low": {
-      "label": "Difficulty too low",
-      "explanation": "{{share_rejection.difficulty-too-low.explanation}}"
-    },
     "difficulty-too-low": {
+      "aliases": [
+        "Above target",
+        "Difficulty too low"
+      ],
       "label": "Difficulty too low",
       "explanation": "The submitted share does not meet the minimum required difficulty."
     },
-    "Duplicate": {
-      "label": "Duplicate",
-      "explanation": "This share has already been submitted."
-    },
     "Duplicate share": {
+      "aliases": ["Duplicate"],
       "label": "Duplicate share",
-      "explanation": "{{share_rejection.Duplicate.explanation}}"
+      "explanation": "This share has already been submitted."
     },
     "Invalid array size": {
       "label": "Invalid array size",
@@ -513,17 +506,12 @@
       "label": "Params not array",
       "explanation": "The parameters field was not formatted as a JSON array."
     },
-    "Stale": {
-      "label": "Stale",
-      "explanation": "While this share was being submitted, the network had already found a new block, making this share invalid."
-    },
-    "stale": {
-      "label": "{{share_rejection.Stale.label}}",
-      "explanation": "{{share_rejection.Stale.explanation}}"
-    },
     "stale-share": {
-      "label": "{{share_rejection.Stale.label}}",
-      "explanation": "{{share_rejection.Stale.explanation}}"
+      "aliases": [
+        "stale"
+      ],
+      "label": "Stale share",
+      "explanation": "While this share was being submitted, the network had already found a new block, making this share invalid."
     },
     "Subscription validation error": {
       "label": "Subscription validation error",

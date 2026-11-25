@@ -26,6 +26,12 @@ describe('ShareRejectionExplanationService', () => {
     expect(service.getExplanation('This key does not exist')).toBeNull();
   });
 
+  it('should resolve aliases to the canonical entry', () => {
+    expect(service.getExplanation('Above Target'))
+      .toBe(i18n.t('share_rejection.difficulty-too-low.explanation'));
+    expect(service.getLabel('Above Target')).toBe('Difficulty too low');
+  });
+
   it('should return labels for known keys and fall back to raw text', () => {
     expect(service.getLabel('Above target')).toBe('Above target');
     expect(service.getLabel('This key does not exist')).toBe('This key does not exist');

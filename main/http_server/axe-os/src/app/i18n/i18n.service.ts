@@ -8,7 +8,7 @@ import es from '../../assets/i18n/es.json';
 
 export type Locale = 'en' | 'de' | 'es';
 
-type TranslationValue = string | { [key: string]: TranslationValue };
+type TranslationValue = string | string[] | { [key: string]: TranslationValue };
 type TranslationTable = Record<string, TranslationValue>;
 
 const DEFAULT_LOCALE: Locale = 'en';
@@ -74,6 +74,7 @@ export class I18nService {
     if (!template) {
       return null;
     }
+
 
     // Resolve embedded {{other.translation.key}} references, with cycle protection
     return template.replace(/\{\{([^{}]+)\}\}/g, (match, refKey: string) => {

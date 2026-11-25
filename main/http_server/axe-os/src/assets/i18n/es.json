@@ -405,10 +405,6 @@
     "case_sensitive_filter": "Filtro con distinción de mayúsculas"
   },
   "share_rejection": {
-    "Above target": {
-      "label": "Dificultad demasiado baja",
-      "explanation": "El Share enviado no cumple la dificultad mínima requerida."
-    },
     "Authorization validation error": {
       "label": "Autorización inválida",
       "explanation": "Las credenciales proporcionadas por el minero eran incorrectas o no estaban autorizadas."
@@ -417,19 +413,16 @@
       "label": "Configuración inválida",
       "explanation": "El minero envió una configuración o ajustes de minería inválidos."
     },
-    "Difficulty too low": {
-      "label": "Dificultad demasiado baja",
-      "explanation": "{{share_rejection.difficulty-too-low.explanation}}"
-    },
     "difficulty-too-low": {
+      "aliases": [
+        "Above target",
+        "Difficulty too low"
+      ],
       "label": "Dificultad demasiado baja",
       "explanation": "El Share enviado no cumple la dificultad mínima requerida."
     },
-    "Duplicate": {
-      "label": "Duplicado",
-      "explanation": "Este Share ya se había enviado."
-    },
     "Duplicate share": {
+      "aliases": ["Duplicate"],
       "label": "Share duplicado",
       "explanation": "Este Share ya se había enviado."
     },
@@ -513,17 +506,12 @@
       "label": "Parámetros no son array",
       "explanation": "El campo de parámetros no estaba formateado como un array JSON."
     },
-    "Stale": {
+    "stale-share": {
+      "aliases": [
+        "stale"
+      ],
       "label": "Stale",
       "explanation": "Mientras se enviaba este Share, la red ya había encontrado un nuevo bloque, por lo que el Share es inválido."
-    },
-    "stale": {
-      "label": "{{share_rejection.Stale.label}}",
-      "explanation": "{{share_rejection.Stale.explanation}}"
-    },
-    "stale-share": {
-      "label": "{{share_rejection.Stale.label}}",
-      "explanation": "{{share_rejection.Stale.explanation}}"
     },
     "Subscription validation error": {
       "label": "Suscripción inválida",
