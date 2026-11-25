@@ -188,6 +188,21 @@ int stratum_v2_submit_share(GlobalState *GLOBAL_STATE, const asic_job_t *active_
     return ret;
 }
 
+static uint8_t sv2_pick_job_slot(GlobalState *GLOBAL_STATE, uint16_t pool_idx,
+                                 const sv2_conn_t *conn, uint32_t job_id)
+{
+    uint8_t active_slot = GLOBAL_STATE->SYSTEM_MODULE.pool_sessions[pool_idx].active_job_slot_idx;
+    uint8_t slot = (uint8_t)(job_id % MINER_JOB_POOL_SIZE);
+    for (uint8_t i = 0; i < MINER_JOB_POOL_SIZE; i++) {
+        bool in_use = (slot == active_slot) || (conn->has_notified_slot && slot == conn->last_notified_slot);
+        if (!in_use) {
+            return slot;
+        }
+        slot = (uint8_t)((slot + 1U) % MINER_JOB_POOL_SIZE);
+    }
+    return (uint8_t)(job_id % MINER_JOB_POOL_SIZE);
+}
+
 static void stratum_v2_handle_new_extended_mining_job(GlobalState *GLOBAL_STATE, uint16_t pool_idx, sv2_conn_t *conn,
                                                        const uint8_t *payload, uint32_t len)
 {
@@ -198,7 +213,7 @@ static void stratum_v2_handle_new_extended_mining_job(GlobalState *GLOBAL_STATE,
 
     uint32_t job_id = (uint32_t)payload[4] | ((uint32_t)payload[5] << 8) |
                       ((uint32_t)payload[6] << 16) | ((uint32_t)payload[7] << 24);
-    uint8_t slot = (uint8_t)(job_id % MINER_JOB_POOL_SIZE);
+    uint8_t slot = sv2_pick_job_slot(GLOBAL_STATE, pool_idx, conn, job_id);
     miner_job_t *job = POOL_get_job_slot(GLOBAL_STATE, pool_idx, slot);
     if (!job) {
         ESP_LOGE(TAG, "Failed to allocate job slot for pool %u", pool_idx);
@@ -249,6 +264,8 @@ static void stratum_v2_handle_new_extended_mining_job(GlobalState *GLOBAL_STATE,
             POOL_set_difficulty(GLOBAL_STATE, pool_idx, target_to_diff(conn->target));
         }
         if (is_active_pool) {
+            conn->last_notified_slot = slot;
+            conn->has_notified_slot = true;
             SYSTEM_notify_new_ntime(GLOBAL_STATE, job->ntime);
             if (GLOBAL_STATE->create_jobs_task_handle) {
                 xTaskNotify(GLOBAL_STATE->create_jobs_task_handle,
@@ -279,7 +296,7 @@ static void stratum_v2_handle_new_mining_job(GlobalState *GLOBAL_STATE, uint16_t
         return;
     }
 
-    uint8_t slot = (uint8_t)(job_id % MINER_JOB_POOL_SIZE);
+    uint8_t slot = sv2_pick_job_slot(GLOBAL_STATE, pool_idx, conn, job_id);
     miner_job_t *job = POOL_get_job_slot(GLOBAL_STATE, pool_idx, slot);
     if (!job) {
         ESP_LOGE(TAG, "Failed to allocate job slot for pool %u", pool_idx);
@@ -317,6 +334,8 @@ static void stratum_v2_handle_new_mining_job(GlobalState *GLOBAL_STATE, uint16_t
             POOL_set_difficulty(GLOBAL_STATE, pool_idx, target_to_diff(conn->target));
         }
         if (is_active_pool) {
+            conn->last_notified_slot = slot;
+            conn->has_notified_slot = true;
             SYSTEM_notify_new_ntime(GLOBAL_STATE, job->ntime);
             if (GLOBAL_STATE->create_jobs_task_handle) {
                 xTaskNotify(GLOBAL_STATE->create_jobs_task_handle,
@@ -355,17 +374,23 @@ static void stratum_v2_handle_set_new_prev_hash(GlobalState *GLOBAL_STATE, uint1
     conn->prev_hash_nbits = nbits;
     conn->has_prev_hash = true;
 
-    uint8_t slot = (uint8_t)(job_id % MINER_JOB_POOL_SIZE);
-    miner_job_t *job = POOL_get_job_slot(GLOBAL_STATE, pool_idx, slot);
-    if (!job) {
-        ESP_LOGE(TAG, "Failed to allocate job slot for pool %u", pool_idx);
-        return;
-    }
-
     // SetNewPrevHash invalidates every queued future job except the one it
     // references (SV2 spec 5.3.17), whether or not that job is still in a slot.
-    bool job_valid = (conn->pending_jobs_valid & (1U << slot)) &&
-                     (uint32_t)strtoul(job->job_id, NULL, 10) == job_id;
+    uint8_t slot = 0;
+    miner_job_t *job = NULL;
+    bool job_valid = false;
+    for (uint8_t s = 0; s < MINER_JOB_POOL_SIZE; s++) {
+        if (!(conn->pending_jobs_valid & (1U << s))) {
+            continue;
+        }
+        miner_job_t *candidate = POOL_get_job_slot(GLOBAL_STATE, pool_idx, s);
+        if (candidate && (uint32_t)strtoul(candidate->job_id, NULL, 10) == job_id) {
+            slot = s;
+            job = candidate;
+            job_valid = true;
+            break;
+        }
+    }
     conn->pending_jobs_valid = 0;
 
     if (job_valid) {
@@ -391,6 +416,8 @@ static void stratum_v2_handle_set_new_prev_hash(GlobalState *GLOBAL_STATE, uint1
             POOL_set_difficulty(GLOBAL_STATE, pool_idx, target_to_diff(conn->target));
         }
         if (is_active_pool) {
+            conn->last_notified_slot = slot;
+            conn->has_notified_slot = true;
             SYSTEM_notify_new_ntime(GLOBAL_STATE, job->ntime);
             if (GLOBAL_STATE->create_jobs_task_handle) {
                 xTaskNotify(GLOBAL_STATE->create_jobs_task_handle,
@@ -510,7 +537,7 @@ esp_err_t stratum_v2_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
     pthread_mutex_unlock(&s_v2_conn_mutex);
 
     uint8_t *frame_buf = heap_caps_malloc(SV2_MAX_SEND_FRAME_SIZE, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-    uint8_t *recv_buf = heap_caps_malloc(SV2_MAX_RECV_FRAME_SIZE, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    uint8_t *recv_buf = heap_caps_malloc(SV2_MAX_RECV_FRAME_SIZE + SV2_NOISE_MAC_SIZE, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
 
     if (!frame_buf || !recv_buf) {
         ESP_LOGE(TAG, "Failed to allocate frame buffers");

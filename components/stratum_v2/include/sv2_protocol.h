@@ -125,6 +125,8 @@ typedef struct sv2_conn {
 
     // Bitmask of valid job template slots in s_job_pool
     uint16_t    pending_jobs_valid;
+    uint8_t     last_notified_slot;
+    bool        has_notified_slot;
 
     // Latest prev_hash state
     uint8_t prev_hash[32];

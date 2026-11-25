@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <time.h>
 #include <inttypes.h>
+#include <sys/param.h>
 
 #include "esp_log.h"
 #include "esp_random.h"
@@ -554,9 +555,53 @@ int sv2_noise_handshake(sv2_noise_ctx_t *ctx, esp_transport_handle_t transport,
     }
 
     // Step 16: Key split — derive send_key and recv_key
-    hkdf2(ctx->ck, (const uint8_t *)"", 0, ctx->send_key, ctx->recv_key);
+    uint8_t send_key[32];
+    uint8_t recv_key[32];
+    hkdf2(ctx->ck, (const uint8_t *)"", 0, send_key, recv_key);
 
-    // Import persistent PSA key handles for session
+    if (sv2_noise_init_session_keys(ctx, send_key, recv_key) != 0) {
+        memset(send_key, 0, sizeof(send_key));
+        memset(recv_key, 0, sizeof(recv_key));
+        return -1;
+    }
+    memset(send_key, 0, sizeof(send_key));
+    memset(recv_key, 0, sizeof(recv_key));
+
+    // Step 17: Zero ephemeral private key and temporaries
+    memset(ctx->e_priv, 0, 32);
+    memset(ctx->ck, 0, 32);
+    memset(ctx->h, 0, 32);
+
+    float hs_elapsed_ms = (float)(esp_timer_get_time() - hs_start_us) / 1000.0f;
+    ESP_LOGI(TAG, "Noise handshake complete (%.0f ms)", hs_elapsed_ms);
+    return 0;
+}
+
+int sv2_noise_init_session_keys(sv2_noise_ctx_t *ctx,
+                                const uint8_t send_key[32],
+                                const uint8_t recv_key[32])
+{
+    if (!ctx || !send_key || !recv_key) {
+        return -1;
+    }
+
+    if (psa_crypto_init() != PSA_SUCCESS) {
+        ESP_LOGE(TAG, "Failed to initialize PSA crypto");
+        return -1;
+    }
+
+    if (ctx->send_key_id != 0) {
+        psa_destroy_key(ctx->send_key_id);
+        ctx->send_key_id = 0;
+    }
+    if (ctx->recv_key_id != 0) {
+        psa_destroy_key(ctx->recv_key_id);
+        ctx->recv_key_id = 0;
+    }
+
+    memcpy(ctx->send_key, send_key, 32);
+    memcpy(ctx->recv_key, recv_key, 32);
+
     psa_key_attributes_t send_attr = PSA_KEY_ATTRIBUTES_INIT;
     psa_set_key_usage_flags(&send_attr, PSA_KEY_USAGE_ENCRYPT);
     psa_set_key_algorithm(&send_attr, PSA_ALG_CHACHA20_POLY1305);
@@ -577,25 +622,15 @@ int sv2_noise_handshake(sv2_noise_ctx_t *ctx, esp_transport_handle_t transport,
     if (psa_import_key(&recv_attr, ctx->recv_key, 32, &ctx->recv_key_id) != PSA_SUCCESS) {
         ESP_LOGE(TAG, "Failed to import recv_key");
         psa_reset_key_attributes(&recv_attr);
-        if (ctx->send_key_id != 0) {
-            psa_destroy_key(ctx->send_key_id);
-            ctx->send_key_id = 0;
-        }
+        psa_destroy_key(ctx->send_key_id);
+        ctx->send_key_id = 0;
         return -1;
     }
     psa_reset_key_attributes(&recv_attr);
 
-    // Step 17: Zero ephemeral private key and temporaries
-    memset(ctx->e_priv, 0, 32);
-    memset(ctx->ck, 0, 32);
-    memset(ctx->h, 0, 32);
-
     ctx->send_nonce = 0;
     ctx->recv_nonce = 0;
     ctx->handshake_complete = true;
-
-    float hs_elapsed_ms = (float)(esp_timer_get_time() - hs_start_us) / 1000.0f;
-    ESP_LOGI(TAG, "Noise handshake complete (%.0f ms)", hs_elapsed_ms);
     return 0;
 }
 
@@ -610,39 +645,77 @@ int sv2_noise_send(sv2_noise_ctx_t *ctx, esp_transport_handle_t transport,
 
     // Header-only frame: encrypt (6 -> 22 bytes) and send directly off the stack.
     if (payload_len <= 0) {
-        uint8_t enc_hdr[22];
+        uint8_t enc_hdr[SV2_FRAME_HEADER_SIZE + SV2_NOISE_MAC_SIZE];
         if (noise_encrypt(ctx->send_key_id, ctx->send_nonce++, NULL, 0,
                           frame, SV2_FRAME_HEADER_SIZE, enc_hdr) != 0) {
             return -1;
         }
-        return stratum_socket_send_all(transport, enc_hdr, 22) < 0 ? -1 : 0;
+        return stratum_socket_send_all(transport, enc_hdr, sizeof(enc_hdr)) < 0 ? -1 : 0;
     }
 
-    // Build the encrypted header and payload contiguously and send them in a
-    // single write, so a frame leaves as one TCP segment instead of a header
-    // segment followed by a payload segment.
-    int total_len = 22 + payload_len + 16;
-    uint8_t stack_buf[128];
-    uint8_t *out = (total_len <= (int)sizeof(stack_buf)) ? stack_buf : malloc(total_len);
-    if (!out) return -1;
+    // Single-chunk frame: build encrypted header and payload contiguously and send
+    // in a single write, so a frame leaves as one TCP segment.
+    if (payload_len <= SV2_NOISE_MAX_PLAINTEXT_CHUNK_SIZE) {
+        int total_len = SV2_FRAME_HEADER_SIZE + SV2_NOISE_MAC_SIZE + payload_len + SV2_NOISE_MAC_SIZE;
+        uint8_t stack_buf[128];
+        uint8_t *out = stack_buf;
+        if (total_len > (int)sizeof(stack_buf)) {
+            out = heap_caps_malloc(total_len, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+            if (!out) return -1;
+        }
 
-    // Encrypt header (nonce N) into out[0..21]
-    if (noise_encrypt(ctx->send_key_id, ctx->send_nonce++, NULL, 0,
-                      frame, SV2_FRAME_HEADER_SIZE, out) != 0) {
+        if (noise_encrypt(ctx->send_key_id, ctx->send_nonce++, NULL, 0,
+                          frame, SV2_FRAME_HEADER_SIZE, out) != 0) {
+            if (out != stack_buf) free(out);
+            return -1;
+        }
+
+        if (noise_encrypt(ctx->send_key_id, ctx->send_nonce++, NULL, 0,
+                          frame + SV2_FRAME_HEADER_SIZE, payload_len,
+                          out + SV2_FRAME_HEADER_SIZE + SV2_NOISE_MAC_SIZE) != 0) {
+            if (out != stack_buf) free(out);
+            return -1;
+        }
+
+        int ret = stratum_socket_send_all(transport, out, total_len) < 0 ? -1 : 0;
         if (out != stack_buf) free(out);
+        return ret;
+    }
+
+    // Multi-chunk frame (SV2 spec 4.6): encrypt header, then payload in chunks of
+    // SV2_NOISE_MAX_PLAINTEXT_CHUNK_SIZE bytes, each with its own MAC and nonce.
+    uint8_t enc_hdr[SV2_FRAME_HEADER_SIZE + SV2_NOISE_MAC_SIZE];
+    if (noise_encrypt(ctx->send_key_id, ctx->send_nonce++, NULL, 0,
+                      frame, SV2_FRAME_HEADER_SIZE, enc_hdr) != 0) {
+        return -1;
+    }
+    if (stratum_socket_send_all(transport, enc_hdr, sizeof(enc_hdr)) < 0) {
         return -1;
     }
 
-    // Encrypt payload (nonce N+1) into out[22..]
-    if (noise_encrypt(ctx->send_key_id, ctx->send_nonce++, NULL, 0,
-                      frame + SV2_FRAME_HEADER_SIZE, payload_len, out + 22) != 0) {
-        if (out != stack_buf) free(out);
+    uint8_t *chunk_buf = heap_caps_malloc(SV2_NOISE_MAX_PLAINTEXT_CHUNK_SIZE + SV2_NOISE_MAC_SIZE,
+                                          MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    if (!chunk_buf) {
         return -1;
     }
 
-    int ret = stratum_socket_send_all(transport, out, total_len) < 0 ? -1 : 0;
-    if (out != stack_buf) free(out);
-    return ret;
+    int offset = 0;
+    while (offset < payload_len) {
+        int chunk_plain = MIN(payload_len - offset, SV2_NOISE_MAX_PLAINTEXT_CHUNK_SIZE);
+        if (noise_encrypt(ctx->send_key_id, ctx->send_nonce++, NULL, 0,
+                          frame + SV2_FRAME_HEADER_SIZE + offset, chunk_plain, chunk_buf) != 0) {
+            free(chunk_buf);
+            return -1;
+        }
+        if (stratum_socket_send_all(transport, chunk_buf, chunk_plain + SV2_NOISE_MAC_SIZE) < 0) {
+            free(chunk_buf);
+            return -1;
+        }
+        offset += chunk_plain;
+    }
+
+    free(chunk_buf);
+    return 0;
 }
 
 int sv2_noise_recv(sv2_noise_ctx_t *ctx, esp_transport_handle_t transport,
@@ -656,13 +729,13 @@ int sv2_noise_recv(sv2_noise_ctx_t *ctx, esp_transport_handle_t transport,
     *payload_len_out = 0;
 
     // Receive and decrypt header (22 bytes -> 6 bytes)
-    uint8_t enc_hdr[22];
-    if (noise_recv_exact(transport, enc_hdr, 22, RECV_TIMEOUT_MS) != 0) {
+    uint8_t enc_hdr[SV2_FRAME_HEADER_SIZE + SV2_NOISE_MAC_SIZE];
+    if (noise_recv_exact(transport, enc_hdr, sizeof(enc_hdr), RECV_TIMEOUT_MS) != 0) {
         return -1;
     }
 
     if (noise_decrypt(ctx->recv_key_id, ctx->recv_nonce++, NULL, 0,
-                      enc_hdr, 22, hdr_out) != 0) {
+                      enc_hdr, sizeof(enc_hdr), hdr_out) != 0) {
         ESP_LOGE(TAG, "Failed to decrypt frame header");
         return -1;
     }
@@ -680,32 +753,23 @@ int sv2_noise_recv(sv2_noise_ctx_t *ctx, esp_transport_handle_t transport,
         return -1;
     }
 
-    // Receive and decrypt payload. Large frames need PSRAM: a protocol-max
-    // NewExtendedMiningJob carries a 64 KiB coinbase suffix.
-    int enc_len = hdr.msg_length + 16;
-    uint8_t stack_payload[128];
-    uint8_t *enc_payload = stack_payload;
-    if (enc_len > (int)sizeof(stack_payload)) {
-        enc_payload = heap_caps_malloc(enc_len, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-        if (!enc_payload) {
-            ESP_LOGE(TAG, "Failed to allocate %d-byte receive payload", enc_len);
+    // Receive and decrypt payload in Noise AEAD chunks (SV2 spec 4.6).
+    // Decryption runs in place into payload_out (caller reserves +SV2_NOISE_MAC_SIZE bytes).
+    int offset = 0;
+    while (offset < (int)hdr.msg_length) {
+        int chunk_plain = MIN((int)hdr.msg_length - offset, SV2_NOISE_MAX_PLAINTEXT_CHUNK_SIZE);
+        int chunk_enc = chunk_plain + SV2_NOISE_MAC_SIZE;
+        if (noise_recv_exact(transport, payload_out + offset, chunk_enc, RECV_TIMEOUT_MS) != 0) {
             return -1;
         }
+        if (noise_decrypt(ctx->recv_key_id, ctx->recv_nonce++, NULL, 0,
+                          payload_out + offset, chunk_enc, payload_out + offset) != 0) {
+            ESP_LOGE(TAG, "Failed to decrypt payload");
+            return -1;
+        }
+        offset += chunk_plain;
     }
 
-    if (noise_recv_exact(transport, enc_payload, enc_len, RECV_TIMEOUT_MS) != 0) {
-        if (enc_payload != stack_payload) free(enc_payload);
-        return -1;
-    }
-
-    if (noise_decrypt(ctx->recv_key_id, ctx->recv_nonce++, NULL, 0,
-                      enc_payload, enc_len, payload_out) != 0) {
-        ESP_LOGE(TAG, "Failed to decrypt payload");
-        if (enc_payload != stack_payload) free(enc_payload);
-        return -1;
-    }
-
-    if (enc_payload != stack_payload) free(enc_payload);
     *payload_len_out = hdr.msg_length;
     return 0;
 }

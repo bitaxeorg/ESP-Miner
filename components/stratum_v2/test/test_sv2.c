@@ -1,5 +1,8 @@
 #include "unity.h"
 #include "sv2_protocol.h"
+#include "sv2_noise.h"
+#include "esp_heap_caps.h"
+#include <sys/param.h>
 #include <string.h>
 #include <stdlib.h>
 
@@ -313,4 +316,121 @@ TEST_CASE("SV2 error acknowledgement requires a submitted sequence number", "[sv
     TEST_ASSERT_EQUAL_UINT32(1, resolved);
     TEST_ASSERT_TRUE(sv2_account_rejected_share(11, &resolved, 0));
     TEST_ASSERT_EQUAL_UINT32(2, resolved);
+}
+
+typedef struct {
+    uint8_t *buf;
+    size_t cap;
+    size_t write_pos;
+    size_t read_pos;
+    size_t max_read_chunk;
+} sv2_loopback_transport_t;
+
+static int sv2_loopback_write(esp_transport_handle_t transport, const char *buffer,
+                              int len, int timeout_ms)
+{
+    (void)timeout_ms;
+    sv2_loopback_transport_t *lb =
+        (sv2_loopback_transport_t *)esp_transport_get_context_data(transport);
+    if (!lb || len < 0 || lb->write_pos + (size_t)len > lb->cap) {
+        return -1;
+    }
+    memcpy(lb->buf + lb->write_pos, buffer, (size_t)len);
+    lb->write_pos += (size_t)len;
+    return len;
+}
+
+static int sv2_loopback_read(esp_transport_handle_t transport, char *buffer,
+                             int len, int timeout_ms)
+{
+    (void)timeout_ms;
+    sv2_loopback_transport_t *lb =
+        (sv2_loopback_transport_t *)esp_transport_get_context_data(transport);
+    if (!lb || len <= 0 || lb->read_pos >= lb->write_pos) {
+        return -1;
+    }
+    size_t avail = lb->write_pos - lb->read_pos;
+    size_t to_copy = MIN((size_t)len, avail);
+    if (lb->max_read_chunk > 0 && to_copy > lb->max_read_chunk) {
+        to_copy = lb->max_read_chunk;
+    }
+    memcpy(buffer, lb->buf + lb->read_pos, to_copy);
+    lb->read_pos += to_copy;
+    return (int)to_copy;
+}
+
+TEST_CASE("SV2 Noise round-trip handles multi-chunk payloads over 65519 bytes", "[sv2]")
+{
+    const int payload_len = SV2_NOISE_MAX_PLAINTEXT_CHUNK_SIZE + 481; // 66,000 bytes (2 Noise chunks)
+    const int frame_len = SV2_FRAME_HEADER_SIZE + payload_len;
+
+    uint8_t *tx_frame = heap_caps_malloc(frame_len, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    uint8_t *rx_payload = heap_caps_malloc(SV2_MAX_RECV_FRAME_SIZE + SV2_NOISE_MAC_SIZE,
+                                           MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    uint8_t *wire_buf = heap_caps_malloc(72 * 1024, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    TEST_ASSERT_NOT_NULL(tx_frame);
+    TEST_ASSERT_NOT_NULL(rx_payload);
+    TEST_ASSERT_NOT_NULL(wire_buf);
+
+    sv2_encode_frame_header(tx_frame, 0, SV2_MSG_NEW_EXTENDED_MINING_JOB, (uint32_t)payload_len);
+    for (int i = 0; i < payload_len; i++) {
+        tx_frame[SV2_FRAME_HEADER_SIZE + i] = (uint8_t)((i * 37 + 11) & 0xFF);
+    }
+
+    sv2_loopback_transport_t lb = {
+        .buf = wire_buf,
+        .cap = 72 * 1024,
+        .write_pos = 0,
+        .read_pos = 0,
+        .max_read_chunk = 4093,
+    };
+    esp_transport_handle_t transport = esp_transport_init();
+    TEST_ASSERT_NOT_NULL(transport);
+    TEST_ASSERT_EQUAL(ESP_OK, esp_transport_set_context_data(transport, &lb));
+    TEST_ASSERT_EQUAL(ESP_OK, esp_transport_set_func(transport, NULL, sv2_loopback_read,
+                                                     sv2_loopback_write, NULL, NULL, NULL, NULL));
+
+    uint8_t key_a[32];
+    uint8_t key_b[32];
+    for (int i = 0; i < 32; i++) {
+        key_a[i] = (uint8_t)(0x10 + i);
+        key_b[i] = (uint8_t)(0x80 + i);
+    }
+
+    sv2_noise_ctx_t *sender = sv2_noise_create();
+    sv2_noise_ctx_t *receiver = sv2_noise_create();
+    TEST_ASSERT_NOT_NULL(sender);
+    TEST_ASSERT_NOT_NULL(receiver);
+    TEST_ASSERT_EQUAL(0, sv2_noise_init_session_keys(sender, key_a, key_b));
+    TEST_ASSERT_EQUAL(0, sv2_noise_init_session_keys(receiver, key_b, key_a));
+
+    // Send a 66,000-byte frame (2 AEAD chunks) followed by a small frame to verify nonce sync
+    uint8_t small_frame[SV2_FRAME_HEADER_SIZE + 8];
+    sv2_encode_frame_header(small_frame, 0, SV2_MSG_SET_TARGET, 8);
+    memcpy(small_frame + SV2_FRAME_HEADER_SIZE, "nextmsg!", 8);
+
+    TEST_ASSERT_EQUAL(0, sv2_noise_send(sender, transport, tx_frame, frame_len));
+    TEST_ASSERT_EQUAL(0, sv2_noise_send(sender, transport, small_frame, sizeof(small_frame)));
+
+    uint8_t rx_hdr[SV2_FRAME_HEADER_SIZE] = {0};
+    int rx_len = 0;
+    TEST_ASSERT_EQUAL(0, sv2_noise_recv(receiver, transport, rx_hdr, rx_payload,
+                                        SV2_MAX_RECV_FRAME_SIZE, &rx_len));
+    TEST_ASSERT_EQUAL_INT(payload_len, rx_len);
+    TEST_ASSERT_EQUAL_MEMORY(tx_frame, rx_hdr, SV2_FRAME_HEADER_SIZE);
+    TEST_ASSERT_EQUAL_MEMORY(tx_frame + SV2_FRAME_HEADER_SIZE, rx_payload, payload_len);
+
+    // Receive the follow-up small frame
+    TEST_ASSERT_EQUAL(0, sv2_noise_recv(receiver, transport, rx_hdr, rx_payload,
+                                        SV2_MAX_RECV_FRAME_SIZE, &rx_len));
+    TEST_ASSERT_EQUAL_INT(8, rx_len);
+    TEST_ASSERT_EQUAL_MEMORY(small_frame, rx_hdr, SV2_FRAME_HEADER_SIZE);
+    TEST_ASSERT_EQUAL_MEMORY("nextmsg!", rx_payload, 8);
+
+    sv2_noise_destroy(sender);
+    sv2_noise_destroy(receiver);
+    esp_transport_destroy(transport);
+    free(tx_frame);
+    free(rx_payload);
+    free(wire_buf);
 }
