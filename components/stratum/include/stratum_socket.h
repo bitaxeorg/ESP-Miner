@@ -1,6 +1,7 @@
 #ifndef STRATUM_SOCKET_H_
 #define STRATUM_SOCKET_H_
 
+#include <stdbool.h>
 #include <stdint.h>
 #include "esp_err.h"
 #include "esp_transport.h"
@@ -19,11 +20,21 @@ typedef struct {
     char host_ip[INET6_ADDRSTRLEN + 16];  // IPv6 address + zone identifier (e.g., "fe80::1%wlan0")
 } stratum_connection_info_t;
 
-// Resolve a pool hostname:port into conn_info, preferring IPv4 then IPv6 and
-// handling IPv6 link-local scope ids. Returns ESP_OK on success. Used by both
-// the SV1 and SV2 tasks so DNS resolution stays non-blocking (the resolved IP
-// is passed to esp_transport_connect instead of the hostname).
-esp_err_t stratum_socket_resolve(const char *hostname, uint16_t port, stratum_connection_info_t *conn_info);
+// Resolve a pool hostname:port into conn_info, handling IPv6 link-local scope
+// ids. addr_family selects the DNS record type: AF_INET6 resolves AAAA only,
+// AF_INET resolves A only, and AF_UNSPEC keeps the default order (IPv4, then
+// IPv6). IPv6 literals may be wrapped in brackets. Returns ESP_OK on success.
+// Used by both the SV1 and SV2 tasks so DNS resolution stays non-blocking (the
+// resolved IP is passed to esp_transport_connect instead of the hostname).
+esp_err_t stratum_socket_resolve(const char *hostname, uint16_t port, int addr_family, stratum_connection_info_t *conn_info);
+
+// True if hostname is an IPv4 or IPv6 literal (optionally in brackets) rather
+// than a name that needs DNS.
+bool stratum_socket_is_ip_literal(const char *hostname);
+
+// True if the station interface has a preferred global or unique local IPv6
+// address, so pools can be reached over IPv6 beyond the local link.
+bool stratum_socket_has_routable_ipv6(void);
 
 // Apply the common pool-socket options (timeouts, TCP_NODELAY, keepalive) used
 // by both the SV1 and SV2 stratum tasks.

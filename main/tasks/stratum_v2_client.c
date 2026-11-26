@@ -464,7 +464,7 @@ static void stratum_v2_handle_set_extranonce_prefix(sv2_conn_t *conn,
     }
 }
 
-esp_err_t stratum_v2_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
+esp_err_t stratum_v2_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx, int addr_family)
 {
     if (!GLOBAL_STATE || pool_idx >= MAX_POOLS) {
         return ESP_ERR_INVALID_ARG;
@@ -516,7 +516,8 @@ esp_err_t stratum_v2_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
 
     esp_err_t run_result = ESP_FAIL;
 
-    ESP_LOGI(TAG, "Connecting to stratum2+tcp://%s:%d", stratum_url, port);
+    bool bare_ipv6 = strchr(stratum_url, ':') && stratum_url[0] != '[';
+    ESP_LOGI(TAG, "Connecting to stratum2+tcp://%s%s%s:%d", bare_ipv6 ? "[" : "", stratum_url, bare_ipv6 ? "]" : "", port);
 
     esp_transport_handle_t transport = esp_transport_tcp_init();
     if (!transport) {
@@ -526,7 +527,7 @@ esp_err_t stratum_v2_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
     }
 
     stratum_connection_info_t conn_info;
-    if (stratum_socket_resolve(stratum_url, port, &conn_info) != ESP_OK) {
+    if (stratum_socket_resolve(stratum_url, port, addr_family, &conn_info) != ESP_OK) {
         ESP_LOGE(TAG, "Address resolution failed for %s", stratum_url);
         stratum_set_pool_error(GLOBAL_STATE, pool_idx, "Pool unreachable");
         esp_transport_close(transport);

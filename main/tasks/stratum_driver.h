@@ -12,7 +12,7 @@ typedef struct GlobalState GlobalState;
 typedef struct stratum_driver {
     stratum_protocol_t protocol;
     const char *name;
-    esp_err_t (*run)(GlobalState *GLOBAL_STATE, uint16_t pool_idx);
+    esp_err_t (*run)(GlobalState *GLOBAL_STATE, uint16_t pool_idx, int addr_family);
     void (*close_connection)(GlobalState *GLOBAL_STATE, uint16_t pool_idx);
     void (*abort_connection)(uint16_t pool_idx);
     int (*submit_share)(GlobalState *GLOBAL_STATE, const asic_job_t *active_job, uint32_t nonce, uint32_t rolled_version, uint64_t *sent_time_us);
