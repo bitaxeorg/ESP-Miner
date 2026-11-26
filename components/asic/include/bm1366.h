@@ -19,7 +19,7 @@ int BM1366_set_max_baud(void);
 float BM1366_send_hash_frequency(float frequency);
 task_result * BM1366_process_work(GlobalState * GLOBAL_STATE);
 void BM1366_read_registers(GlobalState * GLOBAL_STATE);
-void BM1366_set_nonce_space(double nonce_percent, float frequency, uint16_t asic_count, uint16_t cores);
+void BM1366_set_hash_counting_number(uint32_t hcn);
 void BM1366_set_difficulty(uint8_t difficulty_power);
 
 #endif /* BM1366_H_ */

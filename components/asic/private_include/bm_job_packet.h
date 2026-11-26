@@ -70,14 +70,14 @@ void bm1397_build_job_packet(asic_job_store_t *store, uint8_t packet_midstates,
  * extracts nonce / rolled version / ASIC indices, and records result metadata. */
 bool bm13xx_decode_job_result(asic_job_store_t *store,
                               uint8_t small_core_bits,
-                              uint16_t address_interval,
+                              uint16_t address_stride,
                               uint32_t wire_nonce,
                               uint8_t wire_chip_slot,
                               uint16_t wire_version,
                               task_result *result);
 
 bool bm1397_decode_job_result(asic_job_store_t *store,
-                              uint16_t address_interval,
+                              uint16_t address_stride,
                               uint32_t wire_nonce,
                               uint8_t wire_chip_slot,
                               task_result *result);

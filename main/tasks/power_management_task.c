@@ -11,6 +11,7 @@
 #include "utils.h"
 #include "asic_init.h"
 #include "asic_reset.h"
+#include "create_jobs_task.h"
 #include "driver/uart.h"
 
 #define POLL_RATE 100
@@ -273,6 +274,9 @@ void POWER_MANAGEMENT_task(void * pvParameters)
             ASIC_set_nonce_space(GLOBAL_STATE);
             uint8_t difficulty_power = calculate_effective_asic_difficulty(power_management->expected_hashrate);
             ASIC_set_difficulty(GLOBAL_STATE, difficulty_power);
+            if (GLOBAL_STATE->create_jobs_task_handle != NULL) {
+                xTaskNotify(GLOBAL_STATE->create_jobs_task_handle, CREATE_JOBS_NOTIFY_REFRESH, eSetValueWithOverwrite);
+            }
             
             last_asic_frequency = asic_frequency;
         }

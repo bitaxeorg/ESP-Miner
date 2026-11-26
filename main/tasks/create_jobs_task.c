@@ -155,31 +155,38 @@ void create_jobs_task(void *pvParameters)
                 continue;
             }
 
-            miner_job_t *new_work = POOL_resolve_notified_job(GLOBAL_STATE, slot_notify);
-            if (!new_work) {
-                continue;
-            }
-
-            bool asic_working = (sched.current_work != NULL) && (sched.last_send_time_us != 0);
-            if (!asic_working) {
-                sched.last_send_time_us = 0;
-            }
-
-            ESP_LOGI(TAG, "New Work Activated %s (type %d)", new_work->job_id, new_work->type);
-            sched.current_work = new_work;
-            GLOBAL_STATE->active_job_slot_idx = (uint8_t)(slot_notify % MINER_JOB_POOL_SIZE);
-            sched.current_work_sent = false;
-            sched.current_work_decoded = false;
-            sched.sw_versions_rolled = 0;
-            sched.extranonce_2 = 0;
-            sched.need_build = true;
-            sched.exhausted = false;
-
-            if (!new_work->clean_jobs && asic_working && job_interval_ms > 0) {
-                int throttle_ms = (job_interval_ms < MIN_JOB_RUNTIME_MS) ? job_interval_ms : MIN_JOB_RUNTIME_MS;
-                int64_t elapsed_ms = (int64_t)((esp_timer_get_time() - sched.last_send_time_us) / 1000ULL);
-                if (elapsed_ms < (int64_t)throttle_ms) {
+            if (slot_notify == CREATE_JOBS_NOTIFY_REFRESH) {
+                if (sched.current_work == NULL) {
                     continue;
+                }
+                sched.exhausted = false;
+            } else {
+                miner_job_t *new_work = POOL_resolve_notified_job(GLOBAL_STATE, slot_notify);
+                if (!new_work) {
+                    continue;
+                }
+
+                bool asic_working = (sched.current_work != NULL) && (sched.last_send_time_us != 0);
+                if (!asic_working) {
+                    sched.last_send_time_us = 0;
+                }
+
+                ESP_LOGI(TAG, "New Work Activated %s (type %d)", new_work->job_id, new_work->type);
+                sched.current_work = new_work;
+                GLOBAL_STATE->active_job_slot_idx = (uint8_t)(slot_notify % MINER_JOB_POOL_SIZE);
+                sched.current_work_sent = false;
+                sched.current_work_decoded = false;
+                sched.sw_versions_rolled = 0;
+                sched.extranonce_2 = 0;
+                sched.need_build = true;
+                sched.exhausted = false;
+
+                if (!new_work->clean_jobs && asic_working && job_interval_ms > 0) {
+                    int throttle_ms = (job_interval_ms < MIN_JOB_RUNTIME_MS) ? job_interval_ms : MIN_JOB_RUNTIME_MS;
+                    int64_t elapsed_ms = (int64_t)((esp_timer_get_time() - sched.last_send_time_us) / 1000ULL);
+                    if (elapsed_ms < (int64_t)throttle_ms) {
+                        continue;
+                    }
                 }
             }
         } else {

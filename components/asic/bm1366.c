@@ -73,7 +73,7 @@ static const char * TAG = "bm1366";
 
 static task_result result;
 
-static uint16_t address_interval;
+static uint16_t address_stride;
 
 /// @brief
 /// @param ftdi
@@ -164,20 +164,6 @@ void BM1366_set_hash_counting_number(uint32_t hcn) {
     _send_BM1366((TYPE_CMD | GROUP_ALL | CMD_WRITE), set_10_hash_counting, 6, BM1366_SERIALTX_DEBUG);
 }
 
-void BM1366_set_nonce_space(double nonce_percent, float frequency, uint16_t asic_count, uint16_t cores) 
-{   
-    int cores_up = _next_power_of_two(cores);
-    int asic_count_up =  _next_power_of_two(asic_count);
-
-    // HCN hash counting number (the size of the nonce space)
-    float hcn_space = (float)NONCE_SPACE / cores_up / asic_count_up;
-    double hcn_max = hcn_space * (double)FREQ_MULT / frequency * 0.5f; 
-    double hcn_frac = nonce_percent * hcn_max;
-    uint32_t hcn_register_value = (uint32_t)hcn_frac;
-
-    BM1366_set_hash_counting_number(hcn_register_value);
-}
-
 float BM1366_send_hash_frequency(float target_freq)
 {
     uint8_t fb_divider, refdiv, postdiv1, postdiv2;
@@ -224,10 +210,10 @@ uint8_t BM1366_init(GlobalState * GLOBAL_STATE)
     _send_chain_inactive();
 
     // split the chip address space evenly
-    address_interval = 256 / chip_counter;
+    address_stride = bm_address_stride(&BM13XX_NONCE_LAYOUT, chip_counter);
     for (uint8_t i = 0; i < chip_counter; i++) {
         //{ 0x55, 0xAA, 0x40, 0x05, 0x00, 0x00, 0x1C };
-        _set_chip_address(i * address_interval);
+        _set_chip_address(i * address_stride);
     }
 
     unsigned char init135[11] = {0x55, 0xAA, 0x51, 0x09, 0x00, 0x3C, 0x80, 0x00, 0x85, 0x40, 0x0C};
@@ -250,24 +236,19 @@ uint8_t BM1366_init(GlobalState * GLOBAL_STATE)
     // _send_simple(init173, 11);
 
     for (uint8_t i = 0; i < chip_counter; i++) {
-        unsigned char set_a8_register[6] = {i * address_interval, 0xA8, 0x00, 0x07, 0x01, 0xF0};
+        unsigned char set_a8_register[6] = {i * address_stride, 0xA8, 0x00, 0x07, 0x01, 0xF0};
         _send_BM1366((TYPE_CMD | GROUP_SINGLE | CMD_WRITE), set_a8_register, 6, BM1366_SERIALTX_DEBUG);
-        unsigned char set_18_register[6] = {i * address_interval, 0x18, 0xF0, 0x00, 0xC1, 0x00};
+        unsigned char set_18_register[6] = {i * address_stride, 0x18, 0xF0, 0x00, 0xC1, 0x00};
         _send_BM1366((TYPE_CMD | GROUP_SINGLE | CMD_WRITE), set_18_register, 6, BM1366_SERIALTX_DEBUG);
-        unsigned char set_3c_register_first[6] = {i * address_interval, 0x3C, 0x80, 0x00, 0x85, 0x40};
+        unsigned char set_3c_register_first[6] = {i * address_stride, 0x3C, 0x80, 0x00, 0x85, 0x40};
         _send_BM1366((TYPE_CMD | GROUP_SINGLE | CMD_WRITE), set_3c_register_first, 6, BM1366_SERIALTX_DEBUG);
-        unsigned char set_3c_register_second[6] = {i * address_interval, 0x3C, 0x80, 0x00, 0x80, 0x20};
+        unsigned char set_3c_register_second[6] = {i * address_stride, 0x3C, 0x80, 0x00, 0x80, 0x20};
         _send_BM1366((TYPE_CMD | GROUP_SINGLE | CMD_WRITE), set_3c_register_second, 6, BM1366_SERIALTX_DEBUG);
-        unsigned char set_3c_register_third[6] = {i * address_interval, 0x3C, 0x80, 0x00, 0x82, 0xAA};
+        unsigned char set_3c_register_third[6] = {i * address_stride, 0x3C, 0x80, 0x00, 0x82, 0xAA};
         _send_BM1366((TYPE_CMD | GROUP_SINGLE | CMD_WRITE), set_3c_register_third, 6, BM1366_SERIALTX_DEBUG);
     }
 
     do_frequency_transition(GLOBAL_STATE, BM1366_send_hash_frequency);
-
-    float frequency = GLOBAL_STATE->POWER_MANAGEMENT_MODULE.actual_frequency;
-    int cores = GLOBAL_STATE->DEVICE_CONFIG.family.asic.core_count;
-
-    BM1366_set_nonce_space(1.0, frequency, asic_count, cores);
 
     unsigned char init795[11] = {0x55, 0xAA, 0x51, 0x09, 0x00, 0xA4, 0x90, 0x00, 0xFF, 0xFF, 0x1C};
     _send_simple(init795, 11);
@@ -315,7 +296,7 @@ task_result * BM1366_process_work(GlobalState * GLOBAL_STATE)
             ESP_LOGW(TAG, "Unknown register read: %02x", asic_result.cmd.register_address);
             return NULL;
         }
-        result.asic_nr = asic_result.cmd.asic_address / address_interval;
+        result.asic_nr = asic_result.cmd.asic_address / address_stride;
         result.value = ntohl(asic_result.cmd.value);
         
         return &result;
@@ -323,7 +304,7 @@ task_result * BM1366_process_work(GlobalState * GLOBAL_STATE)
 
     if (!bm13xx_decode_job_result(&GLOBAL_STATE->job_store,
                                   BM1366_SMALL_CORE_BITS,
-                                  address_interval,
+                                  address_stride,
                                   asic_result.job.nonce,
                                   asic_result.job.chip_slot,
                                   asic_result.job.version,
@@ -337,13 +318,13 @@ task_result * BM1366_process_work(GlobalState * GLOBAL_STATE)
 void BM1366_read_registers(GlobalState * GLOBAL_STATE)
 {
     uint16_t asic_count = GLOBAL_STATE->DEVICE_CONFIG.family.asic_count;
-    if (asic_count == 0 || address_interval == 0) {
+    if (asic_count == 0 || address_stride == 0) {
         return;
     }
 
     int size = sizeof(REGISTER_MAP) / sizeof(REGISTER_MAP[0]);
     for (uint8_t chip = 0; chip < asic_count; chip++) {
-        uint8_t chip_addr = chip * address_interval;
+        uint8_t chip_addr = chip * address_stride;
         for (int reg = 0; reg < size; reg++) {
             if (REGISTER_MAP[reg] != REGISTER_INVALID) {
                 _send_BM1366((TYPE_CMD | GROUP_SINGLE | CMD_READ), (uint8_t[]){chip_addr, reg}, 2, BM1366_SERIALTX_DEBUG);

@@ -80,7 +80,7 @@ static const char * TAG = "bm1370";
 
 static task_result result;
 
-static uint16_t address_interval;
+static uint16_t address_stride;
 
 static void _send_BM1370(uint8_t header, const uint8_t * data, uint8_t data_len, bool debug);
 
@@ -177,23 +177,6 @@ void BM1370_set_hash_counting_number(uint32_t hcn) {
     _send_BM1370((TYPE_CMD | GROUP_ALL | CMD_WRITE), set_10_hash_counting, 6, BM1370_SERIALTX_DEBUG);
 }
 
-void BM1370_set_nonce_space(double nonce_percent, float frequency, uint16_t asic_count, uint16_t cores) 
-{   
-    int cores_up = _next_power_of_two(cores);
-    int asic_count_up =  _next_power_of_two(asic_count);
-
-    // HCN hash counting number (the size of the nonce space)
-    float hcn_space = (float)NONCE_SPACE / cores_up / asic_count_up;
-    double hcn_max = hcn_space * (double)FREQ_MULT / frequency * 0.5f; 
-    // BM1370 has a HW errata of 134 per clock cycle
-    // use 2x value overwise we can get duplicates
-    int hcn_error = 2 * 134;
-    double hcn_frac = nonce_percent * (hcn_max - hcn_error);
-    uint32_t hcn_register_value = (uint32_t)hcn_frac;
-
-    BM1370_set_hash_counting_number(hcn_register_value);
-}
-
 float BM1370_send_hash_frequency(float target_freq)
 {
     uint8_t fb_divider, refdiv, postdiv1, postdiv2;
@@ -247,9 +230,9 @@ uint8_t BM1370_init(GlobalState * GLOBAL_STATE)
     // _send_simple(init7, 7);
 
     // split the chip address space evenly
-    address_interval = 256 / chip_counter;
+    address_stride = bm_address_stride(&BM13XX_NONCE_LAYOUT, chip_counter);
     for (uint8_t i = 0; i < chip_counter; i++) {
-        _set_chip_address(i * address_interval);
+        _set_chip_address(i * address_stride);
         // unsigned char init8[7] = {0x55, 0xAA, 0x40, 0x05, 0x00, 0x00, 0x1C};
         // _send_simple(init8, 7);
     }
@@ -277,7 +260,7 @@ uint8_t BM1370_init(GlobalState * GLOBAL_STATE)
     _send_BM1370((TYPE_CMD | GROUP_ALL | CMD_WRITE), (uint8_t[]){0x00, PLL3_PARAMETER, 0x5A, 0xA5, 0x5A, 0xA5}, 6, BM1370_SERIALTX_DEBUG);
 
     for (uint8_t i = 0; i < chip_counter; i++) {
-        uint8_t chip_addr = i * address_interval;
+        uint8_t chip_addr = i * address_stride;
         //TX: 55 AA 41 09 00 [A8 00 07 01 F0] 15    // Reg_A8
         _send_BM1370((TYPE_CMD | GROUP_SINGLE | CMD_WRITE), (uint8_t[]){chip_addr, 0xA8, 0x00, 0x07, 0x01, 0xF0}, 6, BM1370_SERIALTX_DEBUG);
         //TX: 55 AA 41 09 00 [18 F0 00 C1 00] 0C    // Misc Control
@@ -306,11 +289,6 @@ uint8_t BM1370_init(GlobalState * GLOBAL_STATE)
 
     //ramp up the hash frequency
     do_frequency_transition(GLOBAL_STATE, BM1370_send_hash_frequency);
-
-    float frequency = GLOBAL_STATE->POWER_MANAGEMENT_MODULE.actual_frequency;
-    int cores = GLOBAL_STATE->DEVICE_CONFIG.family.asic.core_count;
-
-    BM1370_set_nonce_space(1.0, frequency, asic_count, cores);
 
     return chip_counter;
 }
@@ -356,7 +334,7 @@ task_result * BM1370_process_work(GlobalState * GLOBAL_STATE)
             ESP_LOGW(TAG, "Unknown register read: %02x", asic_result.cmd.register_address);
             return NULL;
         }
-        result.asic_nr = asic_result.cmd.asic_address / address_interval;
+        result.asic_nr = asic_result.cmd.asic_address / address_stride;
         result.value = ntohl(asic_result.cmd.value);
         
         return &result;
@@ -364,7 +342,7 @@ task_result * BM1370_process_work(GlobalState * GLOBAL_STATE)
 
     if (!bm13xx_decode_job_result(&GLOBAL_STATE->job_store,
                                   BM1370_SMALL_CORE_BITS,
-                                  address_interval,
+                                  address_stride,
                                   asic_result.job.nonce,
                                   asic_result.job.chip_slot,
                                   asic_result.job.version,
@@ -378,13 +356,13 @@ task_result * BM1370_process_work(GlobalState * GLOBAL_STATE)
 void BM1370_read_registers(GlobalState * GLOBAL_STATE)
 {
     uint16_t asic_count = GLOBAL_STATE->DEVICE_CONFIG.family.asic_count;
-    if (asic_count == 0 || address_interval == 0) {
+    if (asic_count == 0 || address_stride == 0) {
         return;
     }
 
     int size = sizeof(REGISTER_MAP) / sizeof(REGISTER_MAP[0]);
     for (uint8_t chip = 0; chip < asic_count; chip++) {
-        uint8_t chip_addr = chip * address_interval;
+        uint8_t chip_addr = chip * address_stride;
         for (int reg = 0; reg < size; reg++) {
             if (REGISTER_MAP[reg] != REGISTER_INVALID) {
                 _send_BM1370((TYPE_CMD | GROUP_SINGLE | CMD_READ), (uint8_t[]){chip_addr, reg}, 2, BM1370_SERIALTX_DEBUG);

@@ -74,7 +74,7 @@ static const char * TAG = "bm1397";
 
 static task_result result;
 
-static uint16_t address_interval;
+static uint16_t address_stride;
 
 typedef struct {
     uint32_t first_nonce;
@@ -205,9 +205,9 @@ uint8_t BM1397_init(GlobalState * GLOBAL_STATE)
     _send_chain_inactive();
 
     // split the chip address space evenly
-    address_interval = 256 / chip_counter;
+    address_stride = bm_address_stride(&BM13XX_NONCE_LAYOUT, chip_counter);
     for (uint8_t i = 0; i < chip_counter; i++) {
-        _set_chip_address(i * address_interval);
+        _set_chip_address(i * address_stride);
     }
 
     unsigned char init[6] = {0x00, CLOCK_ORDER_CONTROL_0, 0x00, 0x00, 0x00, 0x00}; // init1 - clock_order_control0
@@ -286,14 +286,14 @@ task_result *BM1397_process_work(GlobalState * GLOBAL_STATE)
             ESP_LOGW(TAG, "Unknown register read: %02x", asic_result.cmd.register_address);
             return NULL;
         }
-        result.asic_nr = asic_result.cmd.asic_address / address_interval;
+        result.asic_nr = asic_result.cmd.asic_address / address_stride;
         result.value = ntohl(asic_result.cmd.value);
 
         return &result;
     }
 
     if (!bm1397_decode_job_result(&GLOBAL_STATE->job_store,
-                                  address_interval,
+                                  address_stride,
                                   asic_result.job.nonce,
                                   asic_result.job.chip_slot,
                                   &result)) {
@@ -326,13 +326,13 @@ task_result *BM1397_process_work(GlobalState * GLOBAL_STATE)
 void BM1397_read_registers(GlobalState * GLOBAL_STATE)
 {
     uint16_t asic_count = GLOBAL_STATE->DEVICE_CONFIG.family.asic_count;
-    if (asic_count == 0 || address_interval == 0) {
+    if (asic_count == 0 || address_stride == 0) {
         return;
     }
 
     int size = sizeof(REGISTER_MAP) / sizeof(REGISTER_MAP[0]);
     for (uint8_t chip = 0; chip < asic_count; chip++) {
-        uint8_t chip_addr = chip * address_interval;
+        uint8_t chip_addr = chip * address_stride;
         for (int reg = 0; reg < size; reg++) {
             if (REGISTER_MAP[reg] != REGISTER_INVALID) {
                 _send_BM1397((TYPE_CMD | GROUP_SINGLE | CMD_READ), (uint8_t[]){chip_addr, reg}, 2, BM1397_SERIALTX_DEBUG);

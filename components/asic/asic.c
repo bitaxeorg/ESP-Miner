@@ -17,23 +17,41 @@
 
 static const char *TAG = "asic";
 
+static uint32_t s_active_hcn;
+static bool asic_apply_nonce_space(GlobalState *GLOBAL_STATE);
+
 uint8_t ASIC_init(GlobalState * GLOBAL_STATE)
 {
     ESP_LOGI(TAG, "Initializing %dx %s", GLOBAL_STATE->DEVICE_CONFIG.family.asic_count, GLOBAL_STATE->DEVICE_CONFIG.family.asic.name);
+    s_active_hcn = 0;
+    uint8_t chip_count = 0;
     switch (GLOBAL_STATE->DEVICE_CONFIG.family.asic.id) {
         case BM1397:
-            return BM1397_init(GLOBAL_STATE);
+            chip_count = BM1397_init(GLOBAL_STATE);
+            break;
         case BM1366:
-            return BM1366_init(GLOBAL_STATE);
+            chip_count = BM1366_init(GLOBAL_STATE);
+            break;
         case BM1368:
-            return BM1368_init(GLOBAL_STATE);
+            chip_count = BM1368_init(GLOBAL_STATE);
+            break;
         case BM1370:
-            return BM1370_init(GLOBAL_STATE);
+            chip_count = BM1370_init(GLOBAL_STATE);
+            break;
         case BM1373:
-            return BM1373_init(GLOBAL_STATE);
+            chip_count = BM1373_init(GLOBAL_STATE);
+            break;
+        default:
+            ESP_LOGE(TAG, "Unknown ASIC id %d", GLOBAL_STATE->DEVICE_CONFIG.family.asic.id);
+            return 0;
     }
-    ESP_LOGE(TAG, "Unknown ASIC id %d", GLOBAL_STATE->DEVICE_CONFIG.family.asic.id);
-    return 0;
+    if (chip_count == 0) {
+        return 0;
+    }
+    if (!asic_apply_nonce_space(GLOBAL_STATE)) {
+        return 0;
+    }
+    return chip_count;
 }
 
 task_result * ASIC_process_work(GlobalState * GLOBAL_STATE)
@@ -143,34 +161,51 @@ void ASIC_set_frequency(GlobalState * GLOBAL_STATE)
     ESP_LOGE(TAG, "Unknown ASIC id %d — cannot set frequency", GLOBAL_STATE->DEVICE_CONFIG.family.asic.id);
 }
 
-void ASIC_set_nonce_space(GlobalState * GLOBAL_STATE)
+static bool asic_apply_nonce_space(GlobalState * GLOBAL_STATE)
 {
     const AsicConfig *asic = &GLOBAL_STATE->DEVICE_CONFIG.family.asic;
-    float nonce_percent = 1.0;
-    int cores = asic->core_count;
-    int asic_count = GLOBAL_STATE->DEVICE_CONFIG.family.asic_count;
-    if (asic->min_nonce_partitions > asic_count) {
-        asic_count = asic->min_nonce_partitions;
+    if (asic->id == BM1397) {
+        s_active_hcn = 0;
+        return true;
     }
-    float frequency = GLOBAL_STATE->POWER_MANAGEMENT_MODULE.actual_frequency;
 
-    switch (GLOBAL_STATE->DEVICE_CONFIG.family.asic.id) {
-        case BM1397:
-            return;
-        case BM1366:
-            BM1366_set_nonce_space(nonce_percent, frequency, asic_count, cores);
-            return;
-        case BM1368:
-            BM1368_set_nonce_space(nonce_percent, frequency, asic_count, cores);
-            return;
-        case BM1370:
-            BM1370_set_nonce_space(nonce_percent, frequency, asic_count, cores);
-            return;
-        case BM1373:
-            BM1373_set_nonce_space(nonce_percent, frequency, asic_count, cores);
-            return;
+    const bm_nonce_layout_t *layout = (asic->id == BM1373) ? &BM1373_NONCE_LAYOUT : &BM13XX_NONCE_LAYOUT;
+    uint32_t hcn = calculate_bm_hcn(layout, 1.0,
+                                    GLOBAL_STATE->POWER_MANAGEMENT_MODULE.actual_frequency,
+                                    GLOBAL_STATE->DEVICE_CONFIG.family.asic_count,
+                                    asic->core_count);
+    if (hcn == 0) {
+        ESP_LOGE(TAG, "Failed to compute HCN for %s", asic->name);
+        return false;
     }
-    ESP_LOGE(TAG, "Unknown ASIC id %d — cannot set nonce space", GLOBAL_STATE->DEVICE_CONFIG.family.asic.id);
+
+    switch (asic->id) {
+        case BM1366:
+            BM1366_set_hash_counting_number(hcn);
+            break;
+        case BM1368:
+            BM1368_set_hash_counting_number(hcn);
+            break;
+        case BM1370:
+            BM1370_set_hash_counting_number(hcn);
+            break;
+        case BM1373:
+            if (!BM1373_set_hash_counting_number(hcn)) {
+                return false;
+            }
+            break;
+        default:
+            ESP_LOGE(TAG, "Unknown ASIC id %d — cannot set nonce space", asic->id);
+            return false;
+    }
+
+    s_active_hcn = hcn;
+    return true;
+}
+
+void ASIC_set_nonce_space(GlobalState * GLOBAL_STATE)
+{
+    (void)asic_apply_nonce_space(GLOBAL_STATE);
 }
 
 float ASIC_get_asic_job_frequency_ms(GlobalState * GLOBAL_STATE, uint32_t version_mask)
@@ -178,20 +213,21 @@ float ASIC_get_asic_job_frequency_ms(GlobalState * GLOBAL_STATE, uint32_t versio
     const AsicConfig *asic = &GLOBAL_STATE->DEVICE_CONFIG.family.asic;
     int asic_count = GLOBAL_STATE->DEVICE_CONFIG.family.asic_count;
 
+    uint32_t hw_bits = version_mask & asic->hw_version_mask;
+    uint8_t midstates = (asic->packet_midstates > 0) ? asic->packet_midstates : 1;
+    uint64_t versions_per_packet = (uint64_t)midstates << __builtin_popcount(hw_bits);
+
+    if (asic->id != BM1397 && s_active_hcn > 0) {
+        return calculate_bm_hcn_timeout_ms(s_active_hcn, asic->small_core_count, asic->core_count, versions_per_packet, 0.95f);
+    }
+
     float freq = GLOBAL_STATE->POWER_MANAGEMENT_MODULE.actual_frequency;
     if (freq <= 0.0f) {
         freq = GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value;
     }
 
-    uint32_t hw_bits = version_mask & asic->hw_version_mask;
-    uint8_t midstates = (asic->packet_midstates > 0) ? asic->packet_midstates : 1;
-    uint64_t versions_per_packet = (uint64_t)midstates << __builtin_popcount(hw_bits);
-    size_t effective_asic_count = asic_count;
-    if (asic->min_nonce_partitions > effective_asic_count) {
-        effective_asic_count = asic->min_nonce_partitions;
-    }
-
-    return calculate_bm_timeout_ms(freq, effective_asic_count, asic->small_core_count, asic->core_count, versions_per_packet, 0.95f);
+    const bm_nonce_layout_t *layout = (asic->id == BM1373) ? &BM1373_NONCE_LAYOUT : &BM13XX_NONCE_LAYOUT;
+    return calculate_bm_timeout_ms(layout, freq, asic_count, asic->small_core_count, asic->core_count, versions_per_packet, 0.95f);
 }
 
 void ASIC_read_registers(GlobalState * GLOBAL_STATE)
