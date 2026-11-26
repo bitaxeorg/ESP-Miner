@@ -12,6 +12,7 @@
 #include "esp_timer.h"
 #include "esp_transport.h"
 #include <stdbool.h>
+#include <stdlib.h>
 #include <string.h>
 #include "utils.h"
 #include "miner_job.h"
@@ -162,12 +163,10 @@ esp_err_t stratum_v1_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
     char stratum_url[256] = {0};
     char username[256] = {0};
     char password[256] = {0};
-    char cert_buf[512] = {0};
 
     if (pool->url) strlcpy(stratum_url, pool->url, sizeof(stratum_url));
     if (pool->user) strlcpy(username, pool->user, sizeof(username));
     if (pool->pass) strlcpy(password, pool->pass, sizeof(password));
-    if (pool->cert) strlcpy(cert_buf, pool->cert, sizeof(cert_buf));
 
     uint16_t port = pool->port;
     tls_mode tls = (tls_mode)pool->tls;
@@ -213,8 +212,12 @@ esp_err_t stratum_v1_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
 
     ESP_LOGI(TAG, "Connecting to: stratum+tcp://%s:%d (%s)", stratum_url, port, conn_info.host_ip);
 
-    esp_transport_handle_t transport = STRATUM_V1_transport_init(tls, cert_buf[0] ? cert_buf : NULL);
+    // Custom CA certificates can be up to 3000 characters, so copy the whole one
+    // instead of truncating it into a fixed buffer. Only needed until connect returns.
+    char *cert_copy = (pool->cert && pool->cert[0]) ? strdup(pool->cert) : NULL;
+    esp_transport_handle_t transport = STRATUM_V1_transport_init(tls, cert_copy);
     if (!transport) {
+        free(cert_copy);
         ESP_LOGE(TAG, "Transport initialization failed.");
         stratum_set_pool_error(GLOBAL_STATE, pool_idx, "Internal error");
         stratum_v1_close_connection(GLOBAL_STATE, pool_idx);
@@ -227,6 +230,7 @@ esp_err_t stratum_v1_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
 
     esp_err_t ret = stratum_socket_connect_async(transport, conn_info.host_ip, port,
                                                  TRANSPORT_TIMEOUT_MS, stratum_reconnect_requested);
+    free(cert_copy);
     if (ret == ESP_ERR_INVALID_STATE) {
         ESP_LOGI(TAG, "Reconnect requested during connection attempt, aborting");
         esp_transport_close(transport);
