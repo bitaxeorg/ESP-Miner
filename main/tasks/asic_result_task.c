@@ -57,13 +57,7 @@ void ASIC_result_task(void *pvParameters)
 
         // 2. Submit if it meets share or block target IMMEDIATELY
         if (is_share || is_block) {
-            uint64_t sent_time_us = 0;
-            int submit_result = stratum_submit_share(GLOBAL_STATE, job, asic_result->nonce, asic_result->rolled_version, &sent_time_us);
-            if (submit_result >= 0 && sent_time_us > 0) {
-                float process_time = (sent_time_us - asic_result->timestamp_us) / 1000.0f;
-                GLOBAL_STATE->SYSTEM_MODULE.process_time = process_time;
-                ESP_LOGI(TAG, "Processing time: %0.1f ms", process_time);
-            }
+            stratum_submit_share(GLOBAL_STATE, job, asic_result->nonce, asic_result->rolled_version, asic_result->timestamp_us, is_block);
         }
 
         // 3. Telemetry & Display (deferred after submission)

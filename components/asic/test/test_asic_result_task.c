@@ -80,7 +80,7 @@ task_result *result_task_fake_process_work(GlobalState *state)
 
 int result_task_fake_submit_share(GlobalState *state, const asic_job_t *job,
                                   uint32_t nonce, uint32_t version,
-                                  uint64_t *sent_time)
+                                  uint64_t found_time_us, bool is_block)
 {
     TEST_ASSERT_EQUAL_PTR(&fixture_state, state);
     TEST_ASSERT_EQUAL_HEX32(7, nonce);
@@ -94,11 +94,12 @@ int result_task_fake_submit_share(GlobalState *state, const asic_job_t *job,
     TEST_ASSERT_FLOAT_WITHIN(1e-4, fixture_case.pool_diff, target_to_diff(job->pool_target));
     TEST_ASSERT_EQUAL_STRING("42", job->job_id);
     TEST_ASSERT_EQUAL_STRING("aabb", job->extranonce2);
+    TEST_ASSERT_TRUE(found_time_us == UINT64_C(1000));
+    TEST_ASSERT_FALSE(is_block);
     snprintf(fixture_submitted_id, sizeof(fixture_submitted_id), "%s",
              job->job_id);
 
     fixture_submissions++;
-    *sent_time = fixture_case.sent_time;
     return fixture_case.submit_result;
 }
 
@@ -211,8 +212,6 @@ TEST_CASE("result task submits embedded job snapshots without a job store for ev
         TEST_ASSERT_EQUAL_UINT32(0, fixture_self_tests);
         TEST_ASSERT_EQUAL_STRING("42", fixture_submitted_id);
         TEST_ASSERT_EQUAL_STRING("42", fixture_scored_id);
-        TEST_ASSERT_EQUAL_FLOAT(1.0f,
-                                fixture_state.SYSTEM_MODULE.process_time);
     }
 }
 
