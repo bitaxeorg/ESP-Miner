@@ -1,0 +1,47 @@
+import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { provideHttpClient } from '@angular/common/http';
+import { provideRouter } from '@angular/router';
+import { of } from 'rxjs';
+
+import { SoloChanceComponent } from './solo-chance.component';
+import { LiveDataService } from 'src/app/services/live-data.service';
+import { SystemApiService } from 'src/app/services/system.service';
+import { LoadingService } from 'src/app/services/loading.service';
+
+const mockLiveDataService = {
+  info$: of({
+    expectedHashrate: 500,
+    networkDifficulty: 1e12,
+    poolDifficulty: 1000,
+    bestSessionDiff: 5000,
+    bestDiff: 10000,
+    uptimeSeconds: 3600,
+    totalUptimeSeconds: 7200
+  })
+};
+
+describe('SoloChanceComponent', () => {
+  let component: SoloChanceComponent;
+  let fixture: ComponentFixture<SoloChanceComponent>;
+
+  beforeEach(async () => {
+    await TestBed.configureTestingModule({
+      imports: [SoloChanceComponent],
+      providers: [
+        provideRouter([]),
+        provideHttpClient(),
+        SystemApiService,
+        LoadingService,
+        { provide: LiveDataService, useValue: mockLiveDataService }
+      ]
+    }).compileComponents();
+
+    fixture = TestBed.createComponent(SoloChanceComponent);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+  });
+
+  it('should create', () => {
+    expect(component).toBeTruthy();
+  });
+});
