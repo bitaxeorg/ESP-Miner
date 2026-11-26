@@ -58,6 +58,7 @@ esp_transport_handle_t STRATUM_V1_transport_init(tls_mode tls, const char * cert
                 ESP_LOGI(TAG, "Using custom cert");
                 if (cert == NULL) {
                     ESP_LOGE(TAG, "Error: no TLS certificate");
+                    esp_transport_destroy(transport);
                     return NULL;
                 }
                 esp_transport_ssl_set_cert_data(transport, cert, strlen(cert));
