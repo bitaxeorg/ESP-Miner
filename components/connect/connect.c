@@ -740,7 +740,10 @@ esp_netif_t * wifi_init_sta(const char * wifi_ssid, const char * wifi_pass)
 void wifi_init(GlobalState * GLOBAL_STATE)
 {
     ESP_ERROR_CHECK(esp_netif_init());
-    ESP_ERROR_CHECK(esp_event_loop_create_default());
+    esp_err_t event_loop_err = esp_event_loop_create_default();
+    if (event_loop_err != ESP_ERR_INVALID_STATE) {
+        ESP_ERROR_CHECK(event_loop_err);
+    }
 
     esp_event_handler_instance_t instance_any_id;
     esp_event_handler_instance_t instance_got_ip;
