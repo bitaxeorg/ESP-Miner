@@ -33,6 +33,8 @@ import { ConfettiComponent } from '../confetti/confetti.component';
 import { AddressPipe } from '../../pipes/address.pipe';
 import { SatsPipe } from '../../pipes/sats.pipe';
 import { NgTemplateOutlet } from '@angular/common';
+import { I18nService } from 'src/app/i18n/i18n.service';
+import { TranslatePipe } from 'src/app/i18n/translate.pipe';
 
 type PoolLabel = 'Primary' | 'Fallback';
 type MessageType =
@@ -115,7 +117,8 @@ const WIDGET_DEFAULTS: WidgetDef[] = [
     HashSuffixPipe,
     DiffSuffixPipe,
     AddressPipe,
-    SatsPipe
+    SatsPipe,
+    TranslatePipe
   ]
 })
 export class HomeComponent implements OnInit, OnDestroy {
@@ -272,7 +275,8 @@ export class HomeComponent implements OnInit, OnDestroy {
     private dashboardEditService: DashboardEditService,
     public layoutService: LayoutService,
     private ngZone: NgZone,
-    private cd: ChangeDetectorRef
+    private cd: ChangeDetectorRef,
+    private i18n: I18nService
   ) {
     this.initializeChart();
 
@@ -695,7 +699,10 @@ export class HomeComponent implements OnInit, OnDestroy {
           this.loadPreviousData();
         },
         error: (err: HttpErrorResponse) => {
-          this.toastr.error('Error.', `Could not save chart source. ${getHttpErrorMessage(err, this.uri)}`);
+          this.toastr.error(
+            this.i18n.t('errors.chart_source_save_failed', { error: getHttpErrorMessage(err, this.uri) }),
+            this.i18n.t('errors.error_title')
+          );
         }
       });
   }
@@ -760,13 +767,16 @@ export class HomeComponent implements OnInit, OnDestroy {
         tooltip: {
           filter: (tooltipItem: any) => tooltipItem.raw !== null && tooltipItem.raw !== undefined,
           callbacks: {
-            label: function (tooltipItem: any) {
-              let label = tooltipItem.dataset.label || '';
+            label: (tooltipItem: any) => {
+              const label = tooltipItem.dataset.label || '';
               if (label) {
-                return label += ': ' + HomeComponent.cbFormatValue(tooltipItem.raw, label);
-              } else {
-                return tooltipItem.raw;
+                const metric = CHART_LABEL_TO_METRIC[label];
+                const key = metric ? `chart.${metric}` : '';
+                const translated = key ? this.i18n.t(key) : '';
+                const displayLabel = translated && translated !== key ? translated : label;
+                return displayLabel + ': ' + HomeComponent.cbFormatValue(tooltipItem.raw, label);
               }
+              return tooltipItem.raw;
             }
           }
         },
@@ -1209,10 +1219,10 @@ export class HomeComponent implements OnInit, OnDestroy {
       .pipe(map(info => {
         const result: SelectOption<PoolLabel>[] = [];
         if (info.stratumURL) {
-          result.push({ label: 'Primary', value: 'Primary' });
+          result.push({ label: this.i18n.t('miner.pool_primary'), value: 'Primary' });
         }
         if (info.fallbackStratumURL) {
-          result.push({ label: 'Fallback', value: 'Fallback' });
+          result.push({ label: this.i18n.t('miner.pool_fallback'), value: 'Fallback' });
         }
         return result;
       }));
@@ -1235,12 +1245,12 @@ export class HomeComponent implements OnInit, OnDestroy {
       )
       .subscribe({
         next: () => {
-          this.toastr.success(`Switched to ${event.value} pool`);
+          this.toastr.success(this.i18n.t('messages.pool_changed_restart'));
         },
         error: (err: HttpErrorResponse) => {
           this.isChangingPool = false;
           this.targetPoolLabel = null;
-          this.toastr.error(`Error during pool change: ${getHttpErrorMessage(err, this.uri)}`);
+          this.toastr.error(this.i18n.t('errors.pool_change_failed', { error: getHttpErrorMessage(err, this.uri) }));
         }
       });
   }
@@ -1252,7 +1262,7 @@ export class HomeComponent implements OnInit, OnDestroy {
       )
       .subscribe({
         next: () => {
-          this.toastr.success('Block found notification dismissed');
+          this.toastr.success(this.i18n.t('messages.block_found_dismissed'));
         },
         error: (err: HttpErrorResponse) => {
           this.toastr.error(`Error dismissing notification: ${getHttpErrorMessage(err, this.uri)}`);
@@ -1264,9 +1274,9 @@ export class HomeComponent implements OnInit, OnDestroy {
     const parts = [this.pageDefaultTitle];
 
     if (info.showNewBlock) {
-      parts.push('Block found 🎉');
+      parts.push(this.i18n.t('messages.block_found_title'));
     } else if (!!systemInfoError.duration) {
-      parts.push('Unable to reach the device');
+      parts.push(this.i18n.t('errors.device_unreachable'));
     } else {
       parts.push(
         info.hostname,
@@ -1282,6 +1292,10 @@ export class HomeComponent implements OnInit, OnDestroy {
 
   getRejectionExplanation(reason: string): string | null {
     return this.shareRejectReasonsService.getExplanation(reason);
+  }
+
+  getRejectionLabel(reason: string): string {
+    return this.shareRejectReasonsService.getLabel(reason);
   }
 
   trackByReason(_index: number, item: { message: string, count: number }) {
@@ -1340,12 +1354,12 @@ export class HomeComponent implements OnInit, OnDestroy {
       }
     };
 
-    updateMessage(!!systemInfoError.duration, 'SYSTEM_INFO_ERROR', 'error', `Unable to reach the device for ${DateAgoPipe.transform(systemInfoError.duration, { strict: true })}`);
+    updateMessage(!!systemInfoError.duration, 'SYSTEM_INFO_ERROR', 'error', this.i18n.t('errors.device_unreachable_for', { duration: DateAgoPipe.transform(systemInfoError.duration, { strict: true }) }));
     updateMessage(!!(info as any).miningPaused, 'MINING_PAUSED', 'warn', 'Mining is paused');
-    updateMessage(!!info.overheat_mode, 'DEVICE_OVERHEAT', 'error', 'Device has overheated - See settings');
-    updateMessage(!!info.power_fault, 'POWER_FAULT', 'error', `${info.power_fault} Check your Power Supply.`);
+    updateMessage(!!info.overheat_mode, 'DEVICE_OVERHEAT', 'error', this.i18n.t('messages.device_overheated'));
+    updateMessage(!!info.power_fault, 'POWER_FAULT', 'error', this.i18n.t('messages.power_fault_check', { fault: info.power_fault ?? '' }));
     updateMessage(!!info.hardware_fault, 'HARDWARE_FAULT', 'error', `${info.hardware_fault}`);
-    updateMessage(isFrequencyLow(info.frequency, frequencyOptions), 'FREQUENCY_LOW', 'warn', 'Device frequency is set low - See settings');
+    updateMessage(isFrequencyLow(info.frequency, frequencyOptions), 'FREQUENCY_LOW', 'warn', this.i18n.t('messages.frequency_low'));
     if (info.useFallbackStratum === 0) {
       if (info.isUsingFallbackStratum === 0) {
         updateMessage(false, 'FALLBACK_STRATUM', 'info', '');
