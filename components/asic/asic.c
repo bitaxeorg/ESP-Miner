@@ -144,21 +144,24 @@ void ASIC_set_frequency(GlobalState * GLOBAL_STATE)
     switch (GLOBAL_STATE->DEVICE_CONFIG.family.asic.id) {
         case BM1397:
             do_frequency_transition(GLOBAL_STATE, BM1397_send_hash_frequency);
-            return;
+            break;
         case BM1366:
             do_frequency_transition(GLOBAL_STATE, BM1366_send_hash_frequency);
-            return;
+            break;
         case BM1368:
             do_frequency_transition(GLOBAL_STATE, BM1368_send_hash_frequency);
-            return;
+            break;
         case BM1370:
             do_frequency_transition(GLOBAL_STATE, BM1370_send_hash_frequency);
-            return;
+            break;
         case BM1373:
             do_frequency_transition(GLOBAL_STATE, BM1373_send_hash_frequency);
+            break;
+        default:
+            ESP_LOGE(TAG, "Unknown ASIC id %d — cannot set frequency", GLOBAL_STATE->DEVICE_CONFIG.family.asic.id);
             return;
     }
-    ESP_LOGE(TAG, "Unknown ASIC id %d — cannot set frequency", GLOBAL_STATE->DEVICE_CONFIG.family.asic.id);
+    (void)asic_apply_nonce_space(GLOBAL_STATE);
 }
 
 static bool asic_apply_nonce_space(GlobalState * GLOBAL_STATE)
@@ -169,8 +172,7 @@ static bool asic_apply_nonce_space(GlobalState * GLOBAL_STATE)
         return true;
     }
 
-    const bm_nonce_layout_t *layout = (asic->id == BM1373) ? &BM1373_NONCE_LAYOUT : &BM13XX_NONCE_LAYOUT;
-    uint32_t hcn = calculate_bm_hcn(layout, 1.0,
+    uint32_t hcn = calculate_bm_hcn(asic->addr_space, asic->max_addr_stride, 1.0,
                                     GLOBAL_STATE->POWER_MANAGEMENT_MODULE.actual_frequency,
                                     GLOBAL_STATE->DEVICE_CONFIG.family.asic_count,
                                     asic->core_count);
@@ -203,11 +205,6 @@ static bool asic_apply_nonce_space(GlobalState * GLOBAL_STATE)
     return true;
 }
 
-void ASIC_set_nonce_space(GlobalState * GLOBAL_STATE)
-{
-    (void)asic_apply_nonce_space(GLOBAL_STATE);
-}
-
 float ASIC_get_asic_job_frequency_ms(GlobalState * GLOBAL_STATE, uint32_t version_mask)
 {
     const AsicConfig *asic = &GLOBAL_STATE->DEVICE_CONFIG.family.asic;
@@ -226,8 +223,7 @@ float ASIC_get_asic_job_frequency_ms(GlobalState * GLOBAL_STATE, uint32_t versio
         freq = GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value;
     }
 
-    const bm_nonce_layout_t *layout = (asic->id == BM1373) ? &BM1373_NONCE_LAYOUT : &BM13XX_NONCE_LAYOUT;
-    return calculate_bm_timeout_ms(layout, freq, asic_count, asic->small_core_count, asic->core_count, versions_per_packet, 0.95f);
+    return calculate_bm_timeout_ms(asic->addr_space, asic->max_addr_stride, freq, asic_count, asic->small_core_count, asic->core_count, versions_per_packet, 0.95f);
 }
 
 void ASIC_read_registers(GlobalState * GLOBAL_STATE)

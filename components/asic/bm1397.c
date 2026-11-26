@@ -205,7 +205,9 @@ uint8_t BM1397_init(GlobalState * GLOBAL_STATE)
     _send_chain_inactive();
 
     // split the chip address space evenly
-    address_stride = bm_address_stride(&BM13XX_NONCE_LAYOUT, chip_counter);
+    address_stride = bm_address_stride(GLOBAL_STATE->DEVICE_CONFIG.family.asic.addr_space,
+                                       GLOBAL_STATE->DEVICE_CONFIG.family.asic.max_addr_stride,
+                                       chip_counter);
     for (uint8_t i = 0; i < chip_counter; i++) {
         _set_chip_address(i * address_stride);
     }

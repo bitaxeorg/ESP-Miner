@@ -359,16 +359,26 @@ TEST_CASE("BM1373 computes HCN and partitions chip addresses across nonce space"
 
     // Exact 327.0 MHz with real asic_count = 2:
     // floor((2^32 / 512) * (16 / 128) * 25 / 327 * 0.5) - 268 = 40083 - 268 = 39815 (0x00009B87)
-    uint32_t expected_hcn = calculate_bm_hcn(&BM1373_NONCE_LAYOUT, 1.0, 327.0f, 2, 432);
+    uint32_t expected_hcn = calculate_bm_hcn(128, 0x10, 1.0, 327.0f, 2, 432);
     TEST_ASSERT_EQUAL_HEX32(0x00009B87, expected_hcn);
 
     bm13xx_harness_end();
 
     // All four BM13xx drivers emit the exact same 11-byte broadcast HCN wire command.
+    extern void bm1366_test_set_hash_counting_number(uint32_t hcn);
+    extern void bm1368_test_set_hash_counting_number(uint32_t hcn);
+    extern void bm1370_test_set_hash_counting_number(uint32_t hcn);
+    extern bool bm1373_test_set_hash_counting_number(uint32_t hcn);
+
     for (size_t d = 0; d < BM13XX_HARNESS_DRIVER_COUNT; d++) {
         bm13xx_harness_begin(&bm13xx_harness_drivers[d]);
         bm13xx_harness_clear_packets();
-        bm13xx_harness_drivers[d].set_hash_counting_number(expected_hcn);
+        switch (d) {
+            case 0: bm1366_test_set_hash_counting_number(expected_hcn); break;
+            case 1: bm1368_test_set_hash_counting_number(expected_hcn); break;
+            case 2: bm1370_test_set_hash_counting_number(expected_hcn); break;
+            case 3: TEST_ASSERT_TRUE(bm1373_test_set_hash_counting_number(expected_hcn)); break;
+        }
         TEST_ASSERT_EQUAL_UINT(1, bm13xx_harness_packet_count());
         const bm13xx_harness_packet_t *hcn_pkt = bm13xx_harness_packet(0);
         TEST_ASSERT_EQUAL_UINT(11, hcn_pkt->length);

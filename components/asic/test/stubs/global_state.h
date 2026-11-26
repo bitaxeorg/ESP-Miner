@@ -27,6 +27,8 @@ typedef struct GlobalState {
                 uint16_t difficulty;
                 uint16_t core_count;
                 uint16_t small_core_count;
+                uint16_t addr_space;
+                uint16_t max_addr_stride;
                 uint16_t default_frequency_mhz;
             } asic;
         } family;

@@ -186,7 +186,9 @@ uint8_t BM1368_init(GlobalState * GLOBAL_STATE)
         _send_BM1368(TYPE_CMD | GROUP_ALL | CMD_WRITE, init_cmds[i], 6, false);
     }
 
-    address_stride = bm_address_stride(&BM13XX_NONCE_LAYOUT, chip_counter);
+    address_stride = bm_address_stride(GLOBAL_STATE->DEVICE_CONFIG.family.asic.addr_space,
+                                       GLOBAL_STATE->DEVICE_CONFIG.family.asic.max_addr_stride,
+                                       chip_counter);
     for (int i = 0; i < chip_counter; i++) {
         _set_chip_address(i * address_stride);
     }

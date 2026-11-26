@@ -305,7 +305,9 @@ uint8_t BM1373_init(GlobalState * GLOBAL_STATE)
 
     detected_chip_count = chip_counter;
     detected_voltage_domains = GLOBAL_STATE->DEVICE_CONFIG.family.voltage_domains;
-    address_stride = bm_address_stride(&BM1373_NONCE_LAYOUT, detected_chip_count);
+    address_stride = bm_address_stride(GLOBAL_STATE->DEVICE_CONFIG.family.asic.addr_space,
+                                       GLOBAL_STATE->DEVICE_CONFIG.family.asic.max_addr_stride,
+                                       detected_chip_count);
     if (address_stride == 0) {
         ESP_LOGE(TAG, "Invalid address stride for %u ASICs", detected_chip_count);
         return 0;

@@ -27,6 +27,8 @@ GlobalState *bm1397_harness_begin(void)
     fixture_state = (GlobalState) {
         .DEVICE_CONFIG.family.asic_count = 2,
         .DEVICE_CONFIG.family.asic.core_count = 672,
+        .DEVICE_CONFIG.family.asic.addr_space = 256,
+        .DEVICE_CONFIG.family.asic.max_addr_stride = 256,
         .DEVICE_CONFIG.family.asic.packet_midstates = 4,
         .POWER_MANAGEMENT_MODULE.frequency_value = 200.0f,
     };

@@ -227,34 +227,34 @@ uint8_t calculate_effective_asic_difficulty(double expected_ghs)
     return (uint8_t)(log2(raw_diff / 1.5) + 1);
 }
 
-uint16_t bm_address_stride(const bm_nonce_layout_t *layout, size_t asic_count)
+uint16_t bm_address_stride(uint16_t addr_space, uint16_t max_addr_stride, size_t asic_count)
 {
-    if (layout == NULL || layout->addr_space == 0 || asic_count == 0 || asic_count > layout->addr_space) {
+    if (addr_space == 0 || max_addr_stride == 0 || asic_count == 0 || asic_count > addr_space) {
         return 0;
     }
 
-    uint16_t stride = (uint16_t)(layout->addr_space / asic_count);
-    return (stride > layout->max_addr_stride) ? layout->max_addr_stride : stride;
+    uint16_t stride = (uint16_t)(addr_space / asic_count);
+    return (stride > max_addr_stride) ? max_addr_stride : stride;
 }
 
-double bm_serial_nonces_per_core(const bm_nonce_layout_t *layout, size_t asic_count, size_t cores)
+double bm_serial_nonces_per_core(uint16_t addr_space, uint16_t max_addr_stride, size_t asic_count, size_t cores)
 {
-    uint16_t stride = bm_address_stride(layout, asic_count);
+    uint16_t stride = bm_address_stride(addr_space, max_addr_stride, asic_count);
     if (stride == 0 || cores == 0) {
         return 0.0;
     }
 
     int cores_up = _next_power_of_two((int)cores);
-    return (NONCE_SPACE / (double)cores_up) * ((double)stride / (double)layout->addr_space);
+    return (NONCE_SPACE / (double)cores_up) * ((double)stride / (double)addr_space);
 }
 
-uint32_t calculate_bm_hcn(const bm_nonce_layout_t *layout, double nonce_percent, float frequency_mhz, size_t asic_count, size_t cores)
+uint32_t calculate_bm_hcn(uint16_t addr_space, uint16_t max_addr_stride, double nonce_percent, float frequency_mhz, size_t asic_count, size_t cores)
 {
     if (nonce_percent <= 0.0 || frequency_mhz <= 0.0f) {
         return 0;
     }
 
-    double hcn_space = bm_serial_nonces_per_core(layout, asic_count, cores);
+    double hcn_space = bm_serial_nonces_per_core(addr_space, max_addr_stride, asic_count, cores);
     if (hcn_space <= 0.0) {
         return 0;
     }
@@ -286,13 +286,13 @@ float calculate_bm_hcn_timeout_ms(uint32_t hcn, size_t small_cores, size_t cores
     return timeout_percent * fullspace_timeout_ms;
 }
 
-float calculate_bm_timeout_ms(const bm_nonce_layout_t *layout, float frequency_mhz, size_t asic_count, size_t small_cores, size_t cores, uint64_t version_size, float timeout_percent)
+float calculate_bm_timeout_ms(uint16_t addr_space, uint16_t max_addr_stride, float frequency_mhz, size_t asic_count, size_t small_cores, size_t cores, uint64_t version_size, float timeout_percent)
 {
     if (small_cores < cores || frequency_mhz <= 0.0f) {
         return 0.0f;
     }
 
-    double serial_nonces = bm_serial_nonces_per_core(layout, asic_count, cores);
+    double serial_nonces = bm_serial_nonces_per_core(addr_space, max_addr_stride, asic_count, cores);
     if (serial_nonces <= 0.0) {
         return 0.0f;
     }

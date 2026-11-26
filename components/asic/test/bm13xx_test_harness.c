@@ -14,17 +14,12 @@
 #include "unity.h"
 #include "utils.h"
 
-static void bm1373_harness_set_hcn(uint32_t hcn)
-{
-    (void)BM1373_set_hash_counting_number(hcn);
-}
-
 const bm13xx_harness_driver_t
     bm13xx_harness_drivers[BM13XX_HARNESS_DRIVER_COUNT] = {
-        {"BM1366", BM1366_init, BM1366_send_work, BM1366_set_version_mask, BM1366_set_difficulty, BM1366_set_hash_counting_number, BM1366_process_work, 0x13, 4, BM1366_SMALL_CORE_BITS},
-        {"BM1368", BM1368_init, BM1368_send_work, BM1368_set_version_mask, BM1368_set_difficulty, BM1368_set_hash_counting_number, BM1368_process_work, 0x23, 5, BM1368_SMALL_CORE_BITS},
-        {"BM1370", BM1370_init, BM1370_send_work, BM1370_set_version_mask, BM1370_set_difficulty, BM1370_set_hash_counting_number, BM1370_process_work, 0x23, 4, BM1370_SMALL_CORE_BITS},
-        {"BM1373", BM1373_init, BM1373_send_work, BM1373_set_version_mask, BM1373_set_difficulty, bm1373_harness_set_hcn, BM1373_process_work, 0x23, 1, BM1373_SMALL_CORE_BITS},
+        {"BM1366", BM1366_init, BM1366_send_work, BM1366_set_version_mask, BM1366_set_difficulty, BM1366_process_work, 0x13, 4, BM1366_SMALL_CORE_BITS},
+        {"BM1368", BM1368_init, BM1368_send_work, BM1368_set_version_mask, BM1368_set_difficulty, BM1368_process_work, 0x23, 5, BM1368_SMALL_CORE_BITS},
+        {"BM1370", BM1370_init, BM1370_send_work, BM1370_set_version_mask, BM1370_set_difficulty, BM1370_process_work, 0x23, 4, BM1370_SMALL_CORE_BITS},
+        {"BM1373", BM1373_init, BM1373_send_work, BM1373_set_version_mask, BM1373_set_difficulty, BM1373_process_work, 0x23, 1, BM1373_SMALL_CORE_BITS},
     };
 
 enum { MAX_PACKETS = 128, JOB_SLOT = 2, JOB_SLOTS = BM13XX_JOB_SLOT_COUNT };
@@ -38,10 +33,13 @@ static unsigned delay_count;
 
 GlobalState *bm13xx_harness_begin(const bm13xx_harness_driver_t *driver)
 {
+    bool is_bm1373 = (driver == &bm13xx_harness_drivers[3]);
     fixture_state = (GlobalState) {
         .DEVICE_CONFIG.family.asic_count = 2,
         .DEVICE_CONFIG.family.voltage_domains = 1,
         .DEVICE_CONFIG.family.asic.core_count = 112,
+        .DEVICE_CONFIG.family.asic.addr_space = is_bm1373 ? 128 : 256,
+        .DEVICE_CONFIG.family.asic.max_addr_stride = is_bm1373 ? 0x10 : 256,
         .POWER_MANAGEMENT_MODULE.frequency_value = 200.0f,
         .POWER_MANAGEMENT_MODULE.actual_frequency = 200.0f,
     };

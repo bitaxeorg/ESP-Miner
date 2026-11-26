@@ -1,7 +1,6 @@
 #ifndef BM13XX_TEST_BINDINGS_H
 #define BM13XX_TEST_BINDINGS_H
 
-#include <stdbool.h>
 #include <stdint.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -31,7 +30,6 @@ void bm13xx_spy_delay(TickType_t ticks);
 #define BM1366_read_registers bm1366_test_read_registers
 #define BM1366_set_difficulty bm1366_test_set_difficulty
 #define BM1366_set_hash_counting_number bm1366_test_set_hash_counting_number
-void BM1366_set_hash_counting_number(uint32_t hcn);
 
 #define BM1368_init bm1368_test_init
 #define BM1368_send_work bm1368_test_send_work
@@ -42,7 +40,6 @@ void BM1366_set_hash_counting_number(uint32_t hcn);
 #define BM1368_read_registers bm1368_test_read_registers
 #define BM1368_set_difficulty bm1368_test_set_difficulty
 #define BM1368_set_hash_counting_number bm1368_test_set_hash_counting_number
-void BM1368_set_hash_counting_number(uint32_t hcn);
 
 #define BM1370_init bm1370_test_init
 #define BM1370_send_work bm1370_test_send_work
@@ -53,7 +50,6 @@ void BM1368_set_hash_counting_number(uint32_t hcn);
 #define BM1370_read_registers bm1370_test_read_registers
 #define BM1370_set_difficulty bm1370_test_set_difficulty
 #define BM1370_set_hash_counting_number bm1370_test_set_hash_counting_number
-void BM1370_set_hash_counting_number(uint32_t hcn);
 
 #define BM1373_init bm1373_test_init
 #define BM1373_send_work bm1373_test_send_work
@@ -64,6 +60,5 @@ void BM1370_set_hash_counting_number(uint32_t hcn);
 #define BM1373_read_registers bm1373_test_read_registers
 #define BM1373_set_difficulty bm1373_test_set_difficulty
 #define BM1373_set_hash_counting_number bm1373_test_set_hash_counting_number
-bool BM1373_set_hash_counting_number(uint32_t hcn);
 
 #endif
