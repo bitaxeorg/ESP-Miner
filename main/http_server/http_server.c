@@ -43,6 +43,7 @@
 #include "websocket.h"
 #include "websocket_log.h"
 #include "websocket_api.h"
+#include "http_auth.h"
 #include "system_api_json.h"
 #include "log_buffer.h"
 #include "utils.h"
@@ -425,7 +426,7 @@ esp_err_t set_cors_headers(httpd_req_t * req)
         return ESP_FAIL;
     }
 
-    err = httpd_resp_set_hdr(req, "Access-Control-Allow-Headers", "Content-Type");
+    err = httpd_resp_set_hdr(req, "Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With");
     if (err != ESP_OK) {
         return ESP_FAIL;
     }
@@ -441,6 +442,10 @@ static esp_err_t rest_api_wrapper(httpd_req_t * req)
 
     if (set_cors_headers(req) != ESP_OK) {
         httpd_resp_send_500(req);
+        return ESP_OK;
+    }
+
+    if (http_auth_validate(req) != ESP_OK) {
         return ESP_OK;
     }
 
@@ -470,6 +475,10 @@ static esp_err_t rest_recovery_handler(httpd_req_t * req)
 {
     if (is_network_allowed(req) != ESP_OK) {
         return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+    }
+
+    if (http_auth_validate(req) != ESP_OK) {
+        return ESP_OK;
     }
 
     extern const unsigned char recovery_page_start[] asm("_binary_recovery_page_html_start");
@@ -613,6 +622,10 @@ static esp_err_t serve_embedded_file(httpd_req_t * req)
 /* Common GET handler for static Web UI files (dispatches to SPIFFS or embedded) */
 static esp_err_t web_ui_get_handler(httpd_req_t * req)
 {
+    if (http_auth_validate(req) != ESP_OK) {
+        return ESP_OK;
+    }
+
     GlobalState *GLOBAL_STATE = (GlobalState *)httpd_get_global_user_ctx(req->handle);
     bool use_custom = nvs_config_get_bool(NVS_CONFIG_USE_CUSTOM_WWW) && GLOBAL_STATE->filesystem_is_available;
     return use_custom ? serve_spiffs_file(req) : serve_embedded_file(req);
@@ -944,6 +957,11 @@ bool check_settings_and_update(const cJSON * const root, char **redirect_url, Gl
                         nvs_config_set_string(key, normalized_hostname);
                         update_mdns_hostname(normalized_hostname, GLOBAL_STATE);
                         ESP_LOGI(TAG, "Updated hostname to: %s", normalized_hostname);
+                    }
+                    else if ((key == NVS_CONFIG_AXEOS_PASSWORD || key == NVS_CONFIG_WIFI_PASS) &&
+                             strcmp(item->valuestring, "*****") == 0)
+                    {
+                        // Ignore masked password placeholder
                     }
                     else
                     {
@@ -1799,6 +1817,10 @@ esp_err_t POST_OTA_update(httpd_req_t * req)
 // HTTP Error (404) Handler - Redirects all requests to the root page
 esp_err_t http_404_error_handler(httpd_req_t * req, httpd_err_code_t err)
 {
+    if (http_auth_validate(req) != ESP_OK) {
+        return ESP_OK;
+    }
+
     // Set status
     httpd_resp_set_status(req, "302 Temporary Redirect");
     // Redirect to the "/" root directory

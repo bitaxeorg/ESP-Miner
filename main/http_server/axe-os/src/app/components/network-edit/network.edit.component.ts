@@ -9,6 +9,7 @@ import { DialogService } from 'src/app/services/dialog.service';
 import { LoadingService } from 'src/app/services/loading.service';
 import { LiveDataService } from 'src/app/services/live-data.service';
 import { SystemApiService } from 'src/app/services/system.service';
+import { AuthService } from 'src/app/services/auth.service';
 import { WifiNetwork } from 'src/app/generated/models';
 import { first } from 'rxjs/operators';
 import { ISystemUpdateResponse } from 'src/models/ISystemUpdateResponse';
@@ -29,6 +30,7 @@ export class NetworkEditComponent implements OnInit {
   public form!: FormGroup;
   public savedChanges: boolean = false;
   public scanning: boolean = false;
+  public authEnabled: boolean = false;
 
   @Input() uri = '';
 
@@ -36,6 +38,7 @@ export class NetworkEditComponent implements OnInit {
     private fb: FormBuilder,
     private systemService: SystemApiService,
     private liveDataService: LiveDataService,
+    private authService: AuthService,
     private toastr: ToastrService,
     private loadingService: LoadingService,
     private http: HttpClient,
@@ -47,11 +50,14 @@ export class NetworkEditComponent implements OnInit {
     this.liveDataService.info$
       .pipe(first(), this.loadingService.lockUIUntilComplete())
       .subscribe(info => {
+        this.authEnabled = info.authEnabled === 1;
         this.form = this.fb.group({
           hostname: [info.hostname, [Validators.required]],
           ssid: [info.ssid, [Validators.required]],
           wifiPass: ['*****'],
           useNTP: [info.useNTP],
+          axeosPassword: [this.authEnabled ? '*****' : ''],
+          authReadRequired: [info.authReadRequired === 1]
         });
         this.formSubject.next(this.form);
       });
@@ -71,6 +77,12 @@ export class NetworkEditComponent implements OnInit {
       delete form.wifiPass;
     }
 
+    form.axeosPassword = form.axeosPassword == null ? '' : form.axeosPassword;
+    if (!this.form.controls['axeosPassword']?.dirty || form.axeosPassword === '*****') {
+      delete form.axeosPassword;
+    }
+    const submittedPassword: string | undefined = form.axeosPassword;
+
     // Trim SSID to remove any leading/trailing whitespace
     if (form.ssid) {
       form.ssid = form.ssid.trim();
@@ -80,18 +92,38 @@ export class NetworkEditComponent implements OnInit {
       .pipe(this.loadingService.lockUIUntilComplete())
       .subscribe({
         next: (response: any) => {
+           const targetHost = this.authService.getHostFromUrl(this.uri);
+           if (submittedPassword !== undefined) {
+             if (submittedPassword.length > 0) {
+               this.authEnabled = true;
+               this.authService.setCredentials(targetHost, this.authService.encodeBasicToken(submittedPassword));
+               this.form.patchValue({ axeosPassword: '*****' }, { emitEvent: false });
+             } else {
+               this.authEnabled = false;
+               this.authService.clearCredentials(targetHost);
+             }
+             this.showAxeosPassword = false;
+           }
+
            // Check if response contains redirect information (hostname change)
            if (response && response.redirect) {
              const redirectResponse = response as ISystemUpdateResponse;
              if (redirectResponse.redirect) {
                let newHostname: string;
+               let redirectHost: string;
                try {
-                 newHostname = new URL(redirectResponse.redirect.url).hostname;
+                 const parsedRedirect = new URL(redirectResponse.redirect.url);
+                 newHostname = parsedRedirect.hostname;
+                 redirectHost = parsedRedirect.host;
                 } catch (error) {
                   console.error('Invalid redirect URL:', redirectResponse.redirect.url, error);
                   this.toastr.error('Failed to redirect due to invalid URL.');
                   return; // Skip redirect on malformed URL
                 }
+               const currentToken = this.authService.getCredentials(targetHost);
+               if (currentToken) {
+                 this.authService.setCredentials(redirectHost, currentToken);
+               }
                const redirectUrl = redirectResponse.redirect.url;
                const redirectDelay = redirectResponse.redirect.delay;
                
@@ -123,6 +155,11 @@ export class NetworkEditComponent implements OnInit {
   showWifiPassword: boolean = false;
   toggleWifiPasswordVisibility() {
     this.showWifiPassword = !this.showWifiPassword;
+  }
+
+  showAxeosPassword: boolean = false;
+  toggleAxeosPasswordVisibility() {
+    this.showAxeosPassword = !this.showAxeosPassword;
   }
 
   public scanWifi() {
@@ -188,7 +225,9 @@ export class NetworkEditComponent implements OnInit {
 
   get noRestartFields(): string[] {
     return [
-      'hostname'
+      'hostname',
+      'axeosPassword',
+      'authReadRequired'
     ];
   }
 
