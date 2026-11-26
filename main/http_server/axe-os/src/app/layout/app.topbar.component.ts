@@ -1,6 +1,6 @@
-import { Component, ElementRef, Input, ViewChild, OnInit, OnDestroy } from '@angular/core';
+import { Component, ElementRef, Input, ViewChild, OnInit, OnDestroy, ChangeDetectorRef } from '@angular/core';
 import { Observable, Subject, takeUntil } from 'rxjs';
-import { ToastrService } from 'ngx-toastr';
+import { ToastrService, ActiveToast } from 'ngx-toastr';
 import { SystemApiService } from 'src/app/services/system.service';
 import { LiveDataService } from 'src/app/services/live-data.service';
 import { LayoutService } from './service/app.layout.service';
@@ -21,6 +21,8 @@ import { FormsModule } from '@angular/forms';
 })
 export class AppTopBarComponent implements OnInit, OnDestroy {
   private destroy$ = new Subject<void>();
+  private otaToastRef: ActiveToast<any> | null = null;
+  private wasOtaUpdating = false;
 
   public info$: Observable<ISystemInfo>;
   public sensitiveDataHidden: boolean = false;
@@ -38,6 +40,7 @@ export class AppTopBarComponent implements OnInit, OnDestroy {
     private toastr: ToastrService,
     private sensitiveData: SensitiveData,
     public dashboardEdit: DashboardEditService,
+    private cdr: ChangeDetectorRef,
   ) {
     this.info$ = this.liveDataService.info$;
   }
@@ -53,10 +56,73 @@ export class AppTopBarComponent implements OnInit, OnDestroy {
       if ((info as any).miningPaused !== undefined) {
         this.isMiningPaused = (info as any).miningPaused;
       }
+
+      if (info.isFirmwareUpdate === 1) {
+        this.wasOtaUpdating = true;
+        const percent = info.firmwareUpdatePercent ?? 0;
+        const status = info.firmwareUpdateStatus || 'Updating...';
+        const title = 'Firmware Update';
+
+        if (!this.otaToastRef) {
+          this.otaToastRef = this.toastr.info(status, title, {
+            disableTimeOut: true,
+            tapToDismiss: false,
+            closeButton: false,
+            progressBar: true,
+          });
+        }
+        this.updateOtaToast(title, status, percent);
+      } else if (this.otaToastRef) {
+        this.toastr.clear(this.otaToastRef.toastId);
+        this.otaToastRef = null;
+        if (this.wasOtaUpdating) {
+          this.wasOtaUpdating = false;
+          const status = info.firmwareUpdateStatus;
+          if (status && status !== 'Rebooting...') {
+            this.toastr.error(status, 'Firmware Update Failed');
+          } else {
+            this.toastr.success('Firmware update completed!');
+          }
+        }
+      }
+    });
+
+    this.liveDataService.connected$.pipe(takeUntil(this.destroy$)).subscribe((connected: boolean) => {
+      if (!connected && this.otaToastRef) {
+        this.updateOtaToast('Firmware Update', 'Device is rebooting...', 100);
+      }
     });
   }
 
+  private updateOtaToast(title: string, message: string, percent: number) {
+    if (!this.otaToastRef) {
+      return;
+    }
+    const inst = this.otaToastRef.toastRef?.componentInstance;
+    if (inst) {
+      inst.title = title;
+      inst.message = message;
+      if (inst.toastPackage) {
+        inst.toastPackage.title = title;
+        inst.toastPackage.message = message;
+      }
+      if (typeof inst.width?.set === 'function') {
+        inst.width.set(percent);
+      }
+    }
+    if (this.otaToastRef.portal?.changeDetectorRef) {
+      this.otaToastRef.portal.changeDetectorRef.markForCheck();
+      this.otaToastRef.portal.changeDetectorRef.detectChanges();
+    }
+    this.cdr.detectChanges();
+  }
+
   ngOnDestroy() {
+    if (this.otaToastRef) {
+      this.toastr.clear(this.otaToastRef.toastId);
+      this.otaToastRef = null;
+    }
+
     this.destroy$.next();
     this.destroy$.complete();
   }

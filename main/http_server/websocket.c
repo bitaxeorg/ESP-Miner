@@ -1,5 +1,7 @@
 #include <stdint.h>
 #include <unistd.h>
+#include <errno.h>
+#include <sys/socket.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/semphr.h"
@@ -25,6 +27,7 @@ static int type_counts[WS_TYPE_MAX] = {0};
 static SemaphoreHandle_t clients_mutex = NULL;
 static httpd_handle_t server_handle = NULL;
 static TaskHandle_t s_websocket_log_task_handle = NULL;
+
 
 void websocket_set_log_task_handle(TaskHandle_t task_handle)
 {
@@ -102,30 +105,80 @@ void websocket_remove_client(int fd)
     xSemaphoreGive(clients_mutex);
 }
 
+static bool ws_send_all(int fd, const uint8_t *data, size_t len)
+{
+    size_t sent = 0;
+    int retries = 0;
+    while (sent < len) {
+        ssize_t ret = send(fd, data + sent, len - sent, MSG_DONTWAIT);
+        if (ret > 0) {
+            sent += (size_t)ret;
+            retries = 0;
+        } else if (ret < 0 && (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR) && retries < 5) {
+            retries++;
+            vTaskDelay(pdMS_TO_TICKS(2));
+        } else {
+            return false;
+        }
+    }
+    return true;
+}
+
 void websocket_send_to_client(int fd, httpd_ws_frame_t *pkt)
 {
-    if (server_handle == NULL || fd == -1)
+    if (server_handle == NULL || fd == -1 || pkt == NULL || pkt->payload == NULL)
         return;
 
-    esp_err_t err = httpd_ws_send_frame_async(server_handle, fd, pkt);
+    size_t len = pkt->len;
+    uint8_t header[4];
+    size_t header_len = 0;
 
-    if (err != ESP_OK) {
-        ESP_LOGW(TAG,
-                 "Send failed: fd=%d err=%s (%d) - removing client",
-                 fd,
-                 esp_err_to_name(err),
-                 err);
+    uint8_t opcode = (pkt->type != 0) ? (uint8_t)(pkt->type & 0x0F) : 0x01;
+    header[0] = (uint8_t)(0x80 | opcode);
 
-        websocket_remove_client(fd);
+    if (len < 126) {
+        header[1] = (uint8_t)len;
+        header_len = 2;
+    } else if (len <= 65535) {
+        header[1] = 126;
+        header[2] = (uint8_t)((len >> 8) & 0xFF);
+        header[3] = (uint8_t)(len & 0xFF);
+        header_len = 4;
+    } else {
+        ESP_LOGW(TAG, "Frame too large (%u bytes) for fd=%d, dropping", (unsigned int)len, fd);
+        return;
+    }
 
-        esp_err_t close_err = httpd_sess_trigger_close(server_handle, fd);
-        if (close_err != ESP_OK) {
-            ESP_LOGW(TAG,
-                "Failed to trigger HTTP session close for fd=%d: %s (%d)",
-                fd,
-                esp_err_to_name(close_err),
-                close_err);
+    if (xSemaphoreTake(clients_mutex, pdMS_TO_TICKS(100)) != pdTRUE) {
+        ESP_LOGW(TAG, "Failed to acquire mutex for send: fd=%d", fd);
+        return;
+    }
+
+    int slot = -1;
+    for (int i = 0; i < MAX_WEBSOCKET_CLIENTS; i++) {
+        if (clients[i].fd == fd) {
+            slot = i;
+            break;
         }
+    }
+    if (slot == -1) {
+        xSemaphoreGive(clients_mutex);
+        return;
+    }
+
+    bool ok = ws_send_all(fd, header, header_len) && ws_send_all(fd, pkt->payload, len);
+    if (!ok) {
+        WebSocketClientType type = (WebSocketClientType)clients[slot].type;
+        clients[slot].fd = -1;
+        clients[slot].type = 0;
+        if (type >= 0 && type < WS_TYPE_MAX) type_counts[type]--;
+        ESP_LOGW(TAG, "Direct send failed: fd=%d (errno=%d) - removing client", fd, errno);
+    }
+
+    xSemaphoreGive(clients_mutex);
+
+    if (!ok) {
+        httpd_sess_trigger_close(server_handle, fd);
     }
 }
 
