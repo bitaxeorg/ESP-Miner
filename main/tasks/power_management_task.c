@@ -12,6 +12,7 @@
 #include "asic_init.h"
 #include "asic_reset.h"
 #include "driver/uart.h"
+#include "hashrate_monitor_task.h"
 
 #define POLL_RATE 100
 #define MAX_TEMP 90.0
@@ -26,6 +27,10 @@
 #define TPS546_MAX_TEMP 145.0
 
 #define ASIC_REDUCTION 100.0
+
+#define SILENT_DOMAIN_HOLD_MS 30000
+#define SILENT_DOMAIN_CONFIRM_MS 15000
+#define SILENT_DOMAIN_MAX_RECOVERIES 2
 
 static const char * TAG = "power_management";
 
@@ -51,6 +56,9 @@ static void mining_stop(GlobalState * GLOBAL_STATE)
 
     // Give tasks time to complete any in-progress UART operation
     vTaskDelay(500 / portTICK_PERIOD_MS);
+
+    // Clear stale measurements and stall flags once UART traffic has drained
+    hashrate_monitor_reset_measurements(GLOBAL_STATE);
 
     // Flush any stale data from the UART buffers
     uart_flush(UART_NUM_1);
@@ -92,6 +100,30 @@ static uint8_t mining_start(GlobalState * GLOBAL_STATE)
 static float expected_hashrate(GlobalState * GLOBAL_STATE)
 {
     return GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value * GLOBAL_STATE->DEVICE_CONFIG.family.asic.small_core_count * GLOBAL_STATE->DEVICE_CONFIG.family.asic_count / 1000.0;
+}
+
+static bool asic_at_target_frequency(const PowerManagementModule * power_management)
+{
+    float target = power_management->frequency_value;
+    float actual = power_management->actual_frequency;
+    if (target <= 0.0f) {
+        return false;
+    }
+    float delta = actual > target ? actual - target : target - actual;
+    return delta <= 5.0f;
+}
+
+static bool silent_domain_fault(GlobalState * GLOBAL_STATE, int * stalled_out)
+{
+    int hash_domains = GLOBAL_STATE->DEVICE_CONFIG.family.asic.hash_domains;
+    if (hash_domains < 2 || !GLOBAL_STATE->HASHRATE_MONITOR_MODULE.is_initialized) {
+        if (stalled_out) {
+            *stalled_out = 0;
+        }
+        return false;
+    }
+
+    return hashrate_monitor_has_partial_stall(GLOBAL_STATE, stalled_out);
 }
 
 float POWER_MANAGEMENT_get_nominal_hashrate(const GlobalState * GLOBAL_STATE)
@@ -140,6 +172,9 @@ void POWER_MANAGEMENT_task(void * pvParameters)
     uint16_t last_known_asic_voltage = 0;
     float last_known_asic_frequency = 0.0;
     bool is_paused = false;
+    uint32_t silent_confirm_ms = 0;
+    uint8_t silent_recoveries = 0;
+    TickType_t silent_holdoff_ticks = xTaskGetTickCount();
 
     while (1) {
         if (GLOBAL_STATE->SELF_TEST_MODULE.is_finished) {
@@ -286,6 +321,33 @@ void POWER_MANAGEMENT_task(void * pvParameters)
         }
 
         VCORE_check_fault(GLOBAL_STATE);
+
+        if (!GLOBAL_STATE->SELF_TEST_MODULE.is_active &&
+            GLOBAL_STATE->ASIC_initalized &&
+            !sys_module->overheat_mode &&
+            asic_at_target_frequency(power_management)) {
+            int stalled = 0;
+            if (!silent_domain_fault(GLOBAL_STATE, &stalled)) {
+                silent_confirm_ms = 0;
+            } else if (silent_recoveries < SILENT_DOMAIN_MAX_RECOVERIES) {
+                silent_confirm_ms += POLL_RATE;
+                uint32_t held_ms = (xTaskGetTickCount() - silent_holdoff_ticks) * portTICK_PERIOD_MS;
+                if (silent_confirm_ms >= SILENT_DOMAIN_CONFIRM_MS && held_ms >= SILENT_DOMAIN_HOLD_MS) {
+                    ESP_LOGW(TAG,
+                             "Silent hash domain detected (%d domain(s) stalled, %.0f/%.0f GH/s). Reinitializing ASIC.",
+                             stalled, sys_module->current_hashrate, power_management->expected_hashrate);
+                    mining_stop(GLOBAL_STATE);
+                    uint8_t chip_count = mining_start(GLOBAL_STATE);
+                    silent_recoveries++;
+                    silent_confirm_ms = 0;
+                    silent_holdoff_ticks = xTaskGetTickCount();
+                    ESP_LOGI(TAG, "Silent domain recovery %u/%u (%d chip(s))",
+                             silent_recoveries, SILENT_DOMAIN_MAX_RECOVERIES, chip_count);
+                }
+            }
+        } else {
+            silent_confirm_ms = 0;
+        }
 
         // looper:
         vTaskDelay(POLL_RATE / portTICK_PERIOD_MS);
