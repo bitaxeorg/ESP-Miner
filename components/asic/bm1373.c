@@ -64,7 +64,6 @@
 #define BM1372_INIT_STEP_DELAY_MS 10
 #define BM1372_FAST_RESET_DELAY_MS 20
 #define BM1372_SET_ADDRESS_STRIDE 0x10
-#define BM1372_COMMAND_ADDRESS_SHIFT 2
 
 #define TYPE_JOB 0x20
 #define TYPE_CMD 0x40
@@ -267,9 +266,8 @@ float BM1373_send_hash_frequency(float target_freq)
                          ((uint32_t)refdiv << 8) |
                          postdiv;
 
-    // Every chip in the Bitaxe chain runs at the same target frequency. A
-    // broadcast also avoids the BM1372's distinct assigned/command address
-    // encodings during the frequency ramp.
+    // Every chip in the Bitaxe chain runs at the same target frequency, so
+    // one broadcast sets them all.
     bool success = _write_broadcast(BM1372_REGISTER_PLL0_PARAMETER, pll_value);
 
     if (!success) {
@@ -312,7 +310,9 @@ uint8_t BM1373_init(GlobalState * GLOBAL_STATE)
 
     detected_chip_count = chip_counter;
     detected_voltage_domains = GLOBAL_STATE->DEVICE_CONFIG.family.voltage_domains;
-    chip_command_address_interval = BM1372_SET_ADDRESS_STRIDE >> BM1372_COMMAND_ADDRESS_SHIFT;
+    // A single BM1373 answers a single-chip command at the address it was
+    // assigned (0x10 for chip 1), as read back on a Naja Duo (issue #2094).
+    chip_command_address_interval = BM1372_SET_ADDRESS_STRIDE;
     chip_response_address_interval = BM1372_SET_ADDRESS_STRIDE;
     chip_nonce_address_interval = 256 / detected_chip_count;
     if (chip_nonce_address_interval == 0) {
