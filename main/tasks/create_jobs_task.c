@@ -204,6 +204,7 @@ void create_jobs_task(void *pvParameters)
             }
         }
 
+        int64_t work_start_us = !sched.current_work_decoded ? esp_timer_get_time() : 0;
         bool built = false;
         if (sched.need_build) {
             if (mining_build_asic_job(sched.current_work, sched.extranonce_2, sched.current_work->version, &sched.active_asic_job)) {
@@ -227,7 +228,18 @@ void create_jobs_task(void *pvParameters)
         }
 
         if (!sched.current_work_decoded) {
+            int64_t asic_done_us = (int64_t)cycle_done_us;
             SYSTEM_decode_and_apply_coinbase(GLOBAL_STATE, sched.current_work);
+            int64_t decode_done_us = esp_timer_get_time();
+            if (sched.current_work->type == JOB_TYPE_V1) {
+                float rx_ms = sched.current_work->rx_time_us / 1000.0f;
+                float parse_ms = sched.current_work->parse_time_us / 1000.0f;
+                float asic_ms = (asic_done_us - work_start_us) / 1000.0f;
+                float coinbase_ms = (decode_done_us - asic_done_us) / 1000.0f;
+                float total_ms = parse_ms + asic_ms + coinbase_ms;
+                ESP_LOGI(TAG, "mining.notify (%s) processed in %.2f ms (parse: %.2f ms, job+asic: %.2f ms, coinbase: %.2f ms, rx: %.2f ms)",
+                         sched.current_work->job_id, total_ms, parse_ms, asic_ms, coinbase_ms, rx_ms);
+            }
             sched.current_work_decoded = true;
         }
 

@@ -17,6 +17,10 @@ void sv2_noise_destroy(sv2_noise_ctx_t *ctx);
 // i.e. once NTP has set the clock (a clock set from pool ntime proves nothing).
 void sv2_noise_set_clock_trusted(bool trusted);
 
+// Noise AEAD tag size and max plaintext per encrypted chunk (SV2 spec 4.6)
+#define SV2_NOISE_MAC_SIZE 16
+#define SV2_NOISE_MAX_PLAINTEXT_CHUNK_SIZE 65519
+
 // Perform Noise_NX handshake as initiator over the given transport.
 // authority_pubkey is an optional 32-byte x-only public key for Schnorr
 // signature verification of the responder's certificate. Pass NULL to skip.
@@ -26,6 +30,12 @@ void sv2_noise_set_clock_trusted(bool trusted);
 int sv2_noise_handshake(sv2_noise_ctx_t *ctx, esp_transport_handle_t transport,
                         const uint8_t *authority_pubkey);
 
+// Install symmetric session keys directly (used after handshake and in unit tests).
+// Returns 0 on success, -1 on error.
+int sv2_noise_init_session_keys(sv2_noise_ctx_t *ctx,
+                                const uint8_t send_key[32],
+                                const uint8_t recv_key[32]);
+
 // Send an SV2 frame (header + payload) encrypted via Noise.
 // frame points to the complete plaintext frame (header + payload).
 // Returns 0 on success, -1 on error.
@@ -34,7 +44,9 @@ int sv2_noise_send(sv2_noise_ctx_t *ctx, esp_transport_handle_t transport,
 
 // Receive and decrypt an SV2 frame via Noise.
 // hdr_out receives the 6-byte decrypted frame header.
-// payload_out receives the decrypted payload (up to max_payload_len bytes).
+// payload_out receives the decrypted payload (up to max_payload_len bytes) and
+// must have capacity for at least max_payload_len + SV2_NOISE_MAC_SIZE bytes
+// to allow in-place AEAD decryption.
 // payload_len_out receives the actual payload length.
 // Returns 0 on success, -1 on error.
 int sv2_noise_recv(sv2_noise_ctx_t *ctx, esp_transport_handle_t transport,

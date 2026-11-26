@@ -5,6 +5,7 @@
  *****************************************************************************/
 
 #include "stratum_api.h"
+#include "stratum_rx_stream.h"
 #include "stratum_socket.h"
 #include "yyjson.h"
 #include "esp_log.h"
@@ -26,7 +27,6 @@
 #include <sys/param.h>
 
 #define BUFFER_SIZE 1024
-#define JSON_RPC_BUFFER_LIMIT (STRATUM_V1_MAX_JSON_LINE_SIZE + 2U)
 #define BITCOIN_GENESIS_NTIME 1231006505
 #define MAX_ERROR_MSG_LEN 256
 static const char * TAG = "stratum_api";
@@ -69,148 +69,6 @@ esp_transport_handle_t STRATUM_V1_transport_init(tls_mode tls, const char * cert
         }
     }
     return transport;
-}
-
-bool STRATUM_V1_initialize_conn_buffer(sv1_conn_t *conn)
-{
-    if (!conn) return false;
-    free(conn->json_rpc_buffer);
-    conn->json_rpc_buffer = malloc(BUFFER_SIZE);
-    if (conn->json_rpc_buffer == NULL) {
-        ESP_LOGE(TAG, "Failed to allocate memory for JSON-RPC buffer");
-        conn->json_rpc_buffer_size = 0;
-        conn->json_rpc_buffer_len = 0;
-        return false;
-    }
-    conn->json_rpc_buffer_size = BUFFER_SIZE;
-    conn->json_rpc_buffer_len = 0;
-    conn->json_rpc_buffer[0] = '\0';
-    return true;
-}
-
-void STRATUM_V1_free_conn_buffer(sv1_conn_t *conn)
-{
-    if (!conn) return;
-    if (conn->json_rpc_buffer) {
-        free(conn->json_rpc_buffer);
-        conn->json_rpc_buffer = NULL;
-    }
-    conn->json_rpc_buffer_size = 0;
-    conn->json_rpc_buffer_len = 0;
-}
-
-static bool ensure_json_buffer_capacity(char **p_buffer, size_t *p_buffer_size, size_t required_size)
-{
-    if (required_size > JSON_RPC_BUFFER_LIMIT) {
-        return false;
-    }
-
-    if (required_size <= *p_buffer_size) {
-        return true;
-    }
-
-    size_t new_size = *p_buffer_size;
-    while (new_size < required_size && new_size < JSON_RPC_BUFFER_LIMIT) {
-        new_size = MIN(new_size + BUFFER_SIZE, JSON_RPC_BUFFER_LIMIT);
-    }
-
-    char *new_buffer = realloc(*p_buffer, new_size);
-    if (new_buffer == NULL) {
-        ESP_LOGE(TAG, "Failed to grow JSON-RPC receive buffer to %zu bytes", new_size);
-        return false;
-    }
-
-    *p_buffer = new_buffer;
-    *p_buffer_size = new_size;
-    return true;
-}
-
-char * STRATUM_V1_receive_jsonrpc_line(sv1_conn_t *conn)
-{
-    if (!conn || !conn->transport) {
-        return NULL;
-    }
-    if (conn->json_rpc_buffer == NULL) {
-        if (!STRATUM_V1_initialize_conn_buffer(conn)) {
-            return NULL;
-        }
-    }
-    char *line = NULL;
-    char recv_buffer[BUFFER_SIZE];
-    int nbytes;
-
-    char *newline_pos = memchr(conn->json_rpc_buffer, '\n', conn->json_rpc_buffer_len);
-    while (newline_pos == NULL) {
-        size_t receive_capacity =
-            (STRATUM_V1_MAX_JSON_LINE_SIZE + 1U) - conn->json_rpc_buffer_len;
-        size_t receive_size = MIN(sizeof(recv_buffer), receive_capacity);
-        nbytes = esp_transport_read(conn->transport, recv_buffer, receive_size,
-                                    TRANSPORT_TIMEOUT_MS);
-        if (nbytes < 0) {
-            const char *err_str;
-            switch(nbytes) {
-                case ERR_TCP_TRANSPORT_NO_MEM:
-                    err_str = "No memory available";
-                    break;
-                case ERR_TCP_TRANSPORT_CONNECTION_FAILED:
-                    err_str = "Connection failed";
-                    break;
-                case ERR_TCP_TRANSPORT_CONNECTION_CLOSED_BY_FIN:
-                    err_str = "Connection closed by peer";
-                    break;
-                default:
-                    err_str = "Unknown error";
-                    break;
-            }
-            ESP_LOGE(TAG, "Error: transport read failed: %s (code: %d)", err_str, nbytes);
-            conn->json_rpc_buffer_len = 0;
-            conn->json_rpc_buffer[0] = '\0';
-            return NULL;
-        }
-        if (nbytes > 0) {
-            if (memchr(recv_buffer, '\0', (size_t)nbytes) != NULL) {
-                ESP_LOGE(TAG, "JSON-RPC stream contains an embedded NUL byte");
-                conn->json_rpc_buffer_len = 0;
-                conn->json_rpc_buffer[0] = '\0';
-                return NULL;
-            }
-
-            size_t required_size = conn->json_rpc_buffer_len + (size_t)nbytes + 1U;
-            if (!ensure_json_buffer_capacity(&conn->json_rpc_buffer, &conn->json_rpc_buffer_size, required_size)) {
-                conn->json_rpc_buffer_len = 0;
-                conn->json_rpc_buffer[0] = '\0';
-                return NULL;
-            }
-
-            memcpy(conn->json_rpc_buffer + conn->json_rpc_buffer_len, recv_buffer,
-                   (size_t)nbytes);
-            conn->json_rpc_buffer_len += (size_t)nbytes;
-            conn->json_rpc_buffer[conn->json_rpc_buffer_len] = '\0';
-            newline_pos = memchr(conn->json_rpc_buffer, '\n', conn->json_rpc_buffer_len);
-
-            if (newline_pos == NULL &&
-                conn->json_rpc_buffer_len > STRATUM_V1_MAX_JSON_LINE_SIZE) {
-                ESP_LOGE(TAG, "JSON-RPC line exceeds %u bytes",
-                         STRATUM_V1_MAX_JSON_LINE_SIZE);
-                conn->json_rpc_buffer_len = 0;
-                conn->json_rpc_buffer[0] = '\0';
-                return NULL;
-            }
-        }
-    }
-
-    // Extract the line
-    if (newline_pos) {
-        size_t line_len = (size_t)(newline_pos - conn->json_rpc_buffer);
-        line = strndup(conn->json_rpc_buffer, line_len);  // Copy only up to \n
-        size_t remaining_len = conn->json_rpc_buffer_len - line_len - 1U;
-        if (remaining_len > 0) {
-            memmove(conn->json_rpc_buffer, newline_pos + 1, remaining_len);
-        }
-        conn->json_rpc_buffer_len = remaining_len;
-        conn->json_rpc_buffer[conn->json_rpc_buffer_len] = '\0';
-    }
-    return line;
 }
 
 void STRATUM_V1_reset_message(StratumApiV1Message *message)
@@ -258,7 +116,7 @@ static stratum_method parse_method(yyjson_val *method_json)
     return METHOD_UNKNOWN;
 }
 
-static bool parse_mining_notify(yyjson_val *root, miner_job_t *job)
+static bool parse_mining_notify(yyjson_val *root, miner_job_t *job, stratum_rx_stream_t *stream)
 {
     if (!job) {
         ESP_LOGE(TAG, "NULL job destination in mining.notify");
@@ -297,8 +155,14 @@ static bool parse_mining_notify(yyjson_val *root, miner_job_t *job)
     }
 
     const char *job_id_str = yyjson_get_str(job_id_item);
-    if (job_id_str[0] == '\0') {
+    size_t job_id_len = strlen(job_id_str);
+    if (job_id_len == 0) {
         ESP_LOGE(TAG, "Empty job_id in mining.notify");
+        return false;
+    }
+    if (job_id_len >= sizeof(job->job_id)) {
+        ESP_LOGE(TAG, "Invalid job_id length in mining.notify (expected < %zu, got %zu)",
+                 sizeof(job->job_id), job_id_len);
         return false;
     }
 
@@ -318,9 +182,19 @@ static bool parse_mining_notify(yyjson_val *root, miner_job_t *job)
 
     const char *c2_str = yyjson_get_str(c2_item);
     size_t c2_str_len = strlen(c2_str);
-    if (c2_str_len == 0 || (c2_str_len % 2) != 0) {
-        ESP_LOGE(TAG, "Invalid coinbase_2 hex length in mining.notify: %zu", c2_str_len);
-        return false;
+    size_t c2_len = 0;
+    bool streamed_c2 = (stream != NULL) && stratum_rx_stream_has_coinb2(stream, c2_str, &c2_len);
+    if (streamed_c2) {
+        if (c2_len == 0) {
+            ESP_LOGE(TAG, "Empty streamed coinbase_2 in mining.notify");
+            return false;
+        }
+    } else {
+        if (c2_str_len == 0 || (c2_str_len % 2) != 0) {
+            ESP_LOGE(TAG, "Invalid coinbase_2 hex length in mining.notify: %zu", c2_str_len);
+            return false;
+        }
+        c2_len = c2_str_len / 2;
     }
 
     const char *version_str = yyjson_get_str(version_item);
@@ -349,14 +223,63 @@ static bool parse_mining_notify(yyjson_val *root, miner_job_t *job)
         return false;
     }
 
+    size_t count = yyjson_arr_size(merkle_branch);
+    if (count > MAX_MERKLE_BRANCHES) {
+        ESP_LOGE(TAG, "Too many Merkle branches: %zu", count);
+        return false;
+    }
+    for (size_t i = 0; i < count; i++) {
+        yyjson_val *branch = yyjson_arr_get(merkle_branch, i);
+        if (!branch || !yyjson_is_str(branch) || strlen(yyjson_get_str(branch)) != 64) {
+            ESP_LOGE(TAG, "Invalid Merkle branch at index %zu", i);
+            return false;
+        }
+    }
+
+    uint32_t version = (uint32_t)strtoul(version_str, NULL, 16);
+    uint32_t nbits = (uint32_t)strtoul(nbits_str, NULL, 16);
+    uint32_t ntime = (uint32_t)strtoul(ntime_str, NULL, 16);
+
+    if (nbits == 0) {
+        ESP_LOGW(TAG, "Rejecting notify with zero nbits");
+        return false;
+    }
+
+    if (ntime < BITCOIN_GENESIS_NTIME) {
+        ESP_LOGW(TAG, "Rejecting notify with pre-genesis ntime: %" PRIu32, ntime);
+        return false;
+    }
+
+    time_t now = time(NULL);
+    if (now > 1704067200) { // Check future bound if NTP synced
+        if (ntime > (uint32_t)now + 7200) {
+            ESP_LOGW(TAG, "Rejecting notify with ntime too far in future: %" PRIu32 " (now: %ld)",
+                     ntime, (long)now);
+            return false;
+        }
+    }
+
+    size_t c1_len = c1_str_len / 2;
+    if (c1_len > MAX_COINBASE_PREFIX_LEN || c2_len > MAX_COINBASE_SUFFIX_LEN) {
+        ESP_LOGE(TAG, "Coinbase exceeds supported size: prefix=%zu, suffix=%zu", c1_len, c2_len);
+        return false;
+    }
     if (!job->coinbase_prefix) {
-        job->coinbase_prefix = heap_caps_calloc(1, MAX_COINBASE_PREFIX_LEN, MALLOC_CAP_SPIRAM);
-        if (!job->coinbase_prefix) job->coinbase_prefix = calloc(1, MAX_COINBASE_PREFIX_LEN);
+        job->coinbase_prefix = heap_caps_calloc(1, MAX_COINBASE_PREFIX_LEN,
+                                                MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     }
-    if (!job->coinbase_suffix) {
-        job->coinbase_suffix = heap_caps_calloc(1, MAX_COINBASE_SUFFIX_LEN, MALLOC_CAP_SPIRAM);
-        if (!job->coinbase_suffix) job->coinbase_suffix = calloc(1, 2048);
+    if (!job->coinbase_prefix) {
+        ESP_LOGE(TAG, "Failed to allocate coinbase prefix buffer");
+        return false;
     }
+    if (streamed_c2) {
+        free(job->coinbase_suffix);
+        job->coinbase_suffix = stratum_rx_stream_take_coinb2(stream, NULL);
+    } else if (!miner_job_resize_coinbase_suffix(job, c2_len)) {
+        ESP_LOGE(TAG, "Failed to allocate coinbase buffers (suffix=%zu bytes)", c2_len);
+        return false;
+    }
+
     uint8_t *p_buf = job->coinbase_prefix;
     uint8_t *s_buf = job->coinbase_suffix;
     memset(job, 0, sizeof(miner_job_t));
@@ -364,70 +287,29 @@ static bool parse_mining_notify(yyjson_val *root, miner_job_t *job)
     job->coinbase_suffix = s_buf;
     job->type = JOB_TYPE_V1;
 
-    if (strlen(job_id_str) >= sizeof(job->job_id)) {
-        ESP_LOGE(TAG, "Invalid job_id length in mining.notify (expected < %zu, got %zu)",
-                 sizeof(job->job_id), strlen(job_id_str));
-        return false;
-    }
     strlcpy(job->job_id, job_id_str, sizeof(job->job_id));
 
     hex2bin(prev_hash_str, job->prev_hash, 32);
     reverse_endianness_per_word(job->prev_hash);
 
-    size_t c1_len = c1_str_len / 2;
-    if (c1_len > MAX_COINBASE_PREFIX_LEN) {
-        ESP_LOGE(TAG, "coinbase_1 length %zu exceeds maximum %d in mining.notify", c1_len, MAX_COINBASE_PREFIX_LEN);
-        return false;
-    }
     hex2bin(c1_str, job->coinbase_prefix, c1_len);
     job->coinbase_prefix_len = (uint16_t)c1_len;
 
-    size_t c2_len = c2_str_len / 2;
-    if (c2_len > MAX_COINBASE_SUFFIX_LEN) {
-        ESP_LOGE(TAG, "coinbase_2 length %zu exceeds maximum %d in mining.notify", c2_len, MAX_COINBASE_SUFFIX_LEN);
-        return false;
+    if (!streamed_c2) {
+        hex2bin(c2_str, job->coinbase_suffix, c2_len);
     }
-    hex2bin(c2_str, job->coinbase_suffix, c2_len);
-    job->coinbase_suffix_len = (uint16_t)c2_len;
+    job->coinbase_suffix_len = (uint32_t)c2_len;
 
-    size_t count = yyjson_arr_size(merkle_branch);
-    if (count > MAX_MERKLE_BRANCHES) {
-        ESP_LOGE(TAG, "Too many Merkle branches: %zu", count);
-        return false;
-    }
     job->merkle_path_count = (uint8_t)count;
     for (size_t i = 0; i < count; i++) {
         yyjson_val *branch = yyjson_arr_get(merkle_branch, i);
-        if (!branch || !yyjson_is_str(branch) || strlen(yyjson_get_str(branch)) != 64) {
-            ESP_LOGE(TAG, "Invalid Merkle branch at index %zu", i);
-            return false;
-        }
         hex2bin(yyjson_get_str(branch), job->merkle_path[i], 32);
     }
 
-    job->version = strtoul(version_str, NULL, 16);
-    job->nbits = strtoul(nbits_str, NULL, 16);
-    job->ntime = strtoul(ntime_str, NULL, 16);
+    job->version = version;
+    job->nbits = nbits;
+    job->ntime = ntime;
     job->clean_jobs = yyjson_is_true(yyjson_arr_get(params, params_count - 1));
-
-    if (job->nbits == 0) {
-        ESP_LOGW(TAG, "Rejecting notify with zero nbits");
-        return false;
-    }
-
-    if (job->ntime < BITCOIN_GENESIS_NTIME) {
-        ESP_LOGW(TAG, "Rejecting notify with pre-genesis ntime: %" PRIu32, job->ntime);
-        return false;
-    }
-
-    time_t now = time(NULL);
-    if (now > 1704067200) { // Check future bound if NTP synced
-        if (job->ntime > (uint32_t)now + 7200) {
-            ESP_LOGW(TAG, "Rejecting notify with ntime too far in future: %" PRIu32 " (now: %ld)",
-                     job->ntime, (long)now);
-            return false;
-        }
-    }
 
     ESP_LOGD(TAG, "Parsed mining.notify: job_id=%s, clean_jobs=%d", job->job_id, job->clean_jobs);
     return true;
@@ -666,7 +548,10 @@ static bool parse_result(yyjson_val *root, StratumApiV1Message *message)
     return false;
 }
 
-bool STRATUM_V1_parse(StratumApiV1Message *message, const char *stratum_json, miner_job_t *job)
+static bool parse_stratum_v1_message(StratumApiV1Message *message,
+                                     const char *stratum_json,
+                                     miner_job_t *job,
+                                     stratum_rx_stream_t *stream)
 {
     if (message == NULL || stratum_json == NULL) {
         return false;
@@ -686,14 +571,14 @@ bool STRATUM_V1_parse(StratumApiV1Message *message, const char *stratum_json, mi
 
     yyjson_doc *doc = yyjson_read(stratum_json, json_length, YYJSON_READ_NOFLAG);
     if (!doc) {
-        ESP_LOGE(TAG, "JSON-RPC message is not valid JSON: %s", stratum_json);
+        ESP_LOGE(TAG, "Cannot parse JSON-RPC message (%zu bytes)", json_length);
         message->method = METHOD_UNKNOWN;
         return false;
     }
 
     yyjson_val *root = yyjson_doc_get_root(doc);
     if (!yyjson_is_obj(root)) {
-        ESP_LOGE(TAG, "JSON-RPC message is not a valid JSON object: %s", stratum_json);
+        ESP_LOGE(TAG, "JSON-RPC message is not a valid JSON object");
         message->method = METHOD_UNKNOWN;
         yyjson_doc_free(doc);
         return false;
@@ -737,7 +622,7 @@ bool STRATUM_V1_parse(StratumApiV1Message *message, const char *stratum_json, mi
             result = parse_result(root, message);
             break;
         case MINING_NOTIFY:
-            result = parse_mining_notify(root, job);
+            result = parse_mining_notify(root, job, stream);
             break;
         case MINING_SET_DIFFICULTY:
             result = parse_set_difficulty(root, message);
@@ -771,6 +656,54 @@ bool STRATUM_V1_parse(StratumApiV1Message *message, const char *stratum_json, mi
 
     yyjson_doc_free(doc);
     return result;
+}
+
+bool STRATUM_V1_parse(StratumApiV1Message *message, const char *stratum_json, miner_job_t *job)
+{
+    return parse_stratum_v1_message(message, stratum_json, job, NULL);
+}
+
+stratum_v1_rx_status_t STRATUM_V1_receive_message(esp_transport_handle_t transport,
+                                                  stratum_rx_stream_t *stream,
+                                                  StratumApiV1Message *message,
+                                                  miner_job_t *job,
+                                                  int64_t *receive_time_us)
+{
+    if (!transport || !stream) {
+        return STRATUM_V1_RX_TRANSPORT_ERROR;
+    }
+
+    const char *line_buf = NULL;
+    size_t line_len = 0;
+    size_t raw_len = 0;
+    if (!stratum_rx_stream_read_line(stream, transport, &line_buf, &line_len, &raw_len)) {
+        return STRATUM_V1_RX_TRANSPORT_ERROR;
+    }
+
+    int64_t parse_start_us = esp_timer_get_time();
+    int64_t rx_start_us = stratum_rx_stream_line_start_us(stream);
+    if (receive_time_us != NULL) {
+        *receive_time_us = parse_start_us;
+    }
+
+    bool parsed = parse_stratum_v1_message(message, line_buf, job, stream);
+    int64_t parse_done_us = esp_timer_get_time();
+    if (parsed) {
+        if (message->method == MINING_NOTIFY && job != NULL) {
+            if (rx_start_us > 0 && parse_start_us >= rx_start_us) {
+                int64_t rx_dt = parse_start_us - rx_start_us;
+                job->rx_time_us = (rx_dt > UINT32_MAX) ? UINT32_MAX : (uint32_t)rx_dt;
+            }
+            if (parse_done_us >= parse_start_us) {
+                int64_t parse_dt = parse_done_us - parse_start_us;
+                job->parse_time_us = (parse_dt > UINT32_MAX) ? UINT32_MAX : (uint32_t)parse_dt;
+            }
+        }
+        ESP_LOGI(TAG, "rx (%zu bytes): %.512s%s", raw_len, line_buf,
+                 raw_len > 512U ? "..." : "");
+    }
+    stratum_rx_stream_consume_line(stream, line_len);
+    return parsed ? STRATUM_V1_RX_OK : STRATUM_V1_RX_PARSE_ERROR;
 }
 
 static void debug_stratum_tx(const char * msg)
