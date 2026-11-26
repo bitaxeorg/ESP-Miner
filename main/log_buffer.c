@@ -47,6 +47,12 @@ static char s_vprintf_buffer[2048];
 static void ring_write(const char *data, size_t len)
 {
     if (len == 0) return;
+    if (len > LOG_BUFFER_SIZE) {
+        size_t skipped = len - LOG_BUFFER_SIZE;
+        data += skipped;
+        s_header.total_written += skipped;
+        len = LOG_BUFFER_SIZE;
+    }
 
     size_t write_offset = s_header.total_written % LOG_BUFFER_SIZE;
     size_t till_end = LOG_BUFFER_SIZE - write_offset;

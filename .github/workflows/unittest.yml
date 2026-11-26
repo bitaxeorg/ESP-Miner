@@ -21,6 +21,9 @@ jobs:
           name: event-file
           path: ${{ github.event_path }}
 
+      - name: Test Stratum coinbase pool simulator
+        run: python3 -m unittest discover -s tools -p 'test_stratum_coinbase_test.py' -v
+
       - name: esp-idf build
         uses: espressif/esp-idf-ci-action@v1
         with:
