@@ -16,6 +16,14 @@
 
 static const char *TAG = "create_jobs_task";
 
+void create_jobs_refresh(GlobalState *state)
+{
+    if (state->create_jobs_task_handle) {
+        // Keep any pending pool job or clear-work notification.
+        xTaskNotify(state->create_jobs_task_handle, CREATE_JOBS_NOTIFY_REFRESH, eSetValueWithoutOverwrite);
+    }
+}
+
 #define MIN_JOB_RUNTIME_MS 1000
 
 typedef struct {
@@ -61,6 +69,11 @@ static TickType_t compute_wait_ticks(const GlobalState *GLOBAL_STATE,
         return pdMS_TO_TICKS(100);
     }
 
+    if (GLOBAL_STATE->DEVICE_CONFIG.family.asic.driver_managed_work) {
+        // The driver reports time remaining until refill, not a period.
+        return job_interval_ms > 0 ? pdMS_TO_TICKS((uint32_t)job_interval_ms) : 0;
+    }
+
     if (!sched->current_work_sent) {
         if (sched->last_send_time_us == 0 || job_interval_ms <= 0) {
             return 0;
@@ -80,12 +93,19 @@ static TickType_t compute_wait_ticks(const GlobalState *GLOBAL_STATE,
 }
 
 static void advance_work_cursor(job_scheduler_state_t *sched,
-                                uint32_t hw_version_mask,
-                                uint8_t packet_midstates,
+                                const AsicConfig *asic,
                                 bool built)
 {
-    uint32_t sw_mask = sched->current_work->version_mask & ~hw_version_mask;
-    uint8_t step = (packet_midstates > 0) ? packet_midstates : 1;
+    bool rollable = miner_job_is_rollable(sched->current_work);
+    if (asic->driver_managed_work && rollable) {
+        // Give each driver assignment a fresh header. The driver fills its version FIFOs.
+        sched->extranonce_2++;
+        sched->need_build = true;
+        return;
+    }
+
+    uint32_t sw_mask = sched->current_work->version_mask & ~asic->hw_version_mask;
+    uint8_t step = asic->packet_midstates > 0 ? asic->packet_midstates : 1;
 
     if (built && sw_mask != 0) {
         for (uint8_t i = 0; i < step; i++) {
@@ -103,10 +123,10 @@ static void advance_work_cursor(job_scheduler_state_t *sched,
         sched->active_asic_job.version = sched->current_work->version;
     }
 
-    if (miner_job_is_rollable(sched->current_work)) {
+    if (rollable) {
         sched->extranonce_2++;
         sched->need_build = true;
-    } else if (built) {
+    } else if (built && !asic->driver_managed_work) {
         sched->exhausted = true;
     }
 }
@@ -114,6 +134,7 @@ static void advance_work_cursor(job_scheduler_state_t *sched,
 void create_jobs_task(void *pvParameters)
 {
     GlobalState *GLOBAL_STATE = (GlobalState *)pvParameters;
+    const AsicConfig *asic = &GLOBAL_STATE->DEVICE_CONFIG.family.asic;
 
     // active_jobs slots are zeroed by SYSTEM_init_system(),
     // before any task that touches them can run.
@@ -144,7 +165,7 @@ void create_jobs_task(void *pvParameters)
             sched.last_send_time_us = 0;
         }
 
-        if (notified == pdTRUE) {
+        if (notified == pdTRUE && slot_notify != CREATE_JOBS_NOTIFY_REFRESH) {
             if (slot_notify == CREATE_JOBS_NOTIFY_CLEAR_WORK) {
                 ESP_LOGI(TAG, "Work Cleared");
                 sched.current_work = NULL;
@@ -175,7 +196,14 @@ void create_jobs_task(void *pvParameters)
             sched.need_build = true;
             sched.exhausted = false;
 
+            if (new_work->clean_jobs && asic->driver_managed_work) {
+                ASIC_clear_work(GLOBAL_STATE);
+            }
+
             if (!new_work->clean_jobs && asic_working && job_interval_ms > 0) {
+                if (asic->driver_managed_work) {
+                    continue;
+                }
                 int throttle_ms = (job_interval_ms < MIN_JOB_RUNTIME_MS) ? job_interval_ms : MIN_JOB_RUNTIME_MS;
                 int64_t elapsed_ms = (int64_t)((esp_timer_get_time() - sched.last_send_time_us) / 1000ULL);
                 if (elapsed_ms < (int64_t)throttle_ms) {
@@ -234,10 +262,7 @@ void create_jobs_task(void *pvParameters)
         if (GLOBAL_STATE->ASIC_initalized) {
             sched.current_work_sent = true;
 
-            advance_work_cursor(&sched,
-                                GLOBAL_STATE->DEVICE_CONFIG.family.asic.hw_version_mask,
-                                GLOBAL_STATE->DEVICE_CONFIG.family.asic.packet_midstates,
-                                built);
+            advance_work_cursor(&sched, asic, built);
         }
     }
 }

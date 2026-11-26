@@ -1,5 +1,7 @@
 idf_component_register(
 SRCS
+    "power/bonanza_vcore.c"
+
     "adc.c"
     "i2c_bitaxe.c"
     "main.c"
@@ -55,6 +57,7 @@ SRCS
     "./thermal/EMC2302.c"
     "./thermal/TMP1075.c"
     "./thermal/thermal.c"
+    "./thermal/bonanza_fan.c"
     "./thermal/PID.c"
     "./power/TPS546.c"
     "./power/DS4432U.c"

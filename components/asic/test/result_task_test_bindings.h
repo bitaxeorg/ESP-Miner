@@ -20,6 +20,6 @@
 
 void result_task_spy_delay(TickType_t ticks);
 
-#include "../../../main/tasks/asic_result_task.h"
+#include "main/tasks/asic_result_task.h"
 
 #endif /* RESULT_TASK_TEST_BINDINGS_H_ */

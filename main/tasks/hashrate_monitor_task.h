@@ -3,6 +3,7 @@
 
 #include "asic_common.h"
 #include <pthread.h>
+#include <stdatomic.h>
 
 typedef struct {
     uint32_t value;
@@ -16,7 +17,7 @@ typedef struct {
     measurement_t* error_measurement;
 
     pthread_mutex_t lock;
-    bool is_initialized;
+    atomic_bool is_initialized;
 } HashrateMonitorModule;
 
 void hashrate_monitor_task(void *pvParameters);

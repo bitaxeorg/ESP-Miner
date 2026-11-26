@@ -473,9 +473,6 @@ static esp_err_t TPS546_write_vout_limit_ratios(float vout_command)
 
 /*--- Public TPS546 functions ---*/
 
-/**
- * @brief Set up the TPS546 regulator and turn it on
-*/
 esp_err_t TPS546_init(TPS546_CONFIG config)
 {
     uint8_t u8_value = 0;
@@ -483,7 +480,7 @@ esp_err_t TPS546_init(TPS546_CONFIG config)
     uint8_t read_mfr_revision[4];
     int temp;
     uint8_t comp_config[5];
-    uint8_t voutmode;
+    uint8_t voutmode = 0;
 
     tps546_config = config;
 
@@ -532,12 +529,18 @@ esp_err_t TPS546_init(TPS546_CONFIG config)
     //write operation register to turn off power
     u8_value = OPERATION_OFF;
     ESP_LOGI(TAG, "Power config-OPERATION: %02X", u8_value);
-    smb_write_byte(PMBUS_OPERATION, u8_value);
+    esp_err_t err = smb_write_byte(PMBUS_OPERATION, u8_value);
+    if (config.TPS546_CHECK_STARTUP_WRITES) {
+        ESP_RETURN_ON_ERROR(err, TAG, "Failed to turn off regulator");
+    }
 
     /* Make sure power is turned off until commanded */
     u8_value = (ON_OFF_CONFIG_DELAY | ON_OFF_CONFIG_POLARITY | ON_OFF_CONFIG_CP | ON_OFF_CONFIG_CMD | ON_OFF_CONFIG_PU);
     ESP_LOGI(TAG, "Power config-ON_OFF_CONFIG: %02X", u8_value);
-    smb_write_byte(PMBUS_ON_OFF_CONFIG, u8_value);
+    err = smb_write_byte(PMBUS_ON_OFF_CONFIG, u8_value);
+    if (config.TPS546_CHECK_STARTUP_WRITES) {
+        ESP_RETURN_ON_ERROR(err, TAG, "Failed to configure enable control");
+    }
 
     /* Read version number and see if it matches */
     TPS546_read_mfr_info(read_mfr_revision);
@@ -670,17 +673,22 @@ void TPS546_read_mfr_info(uint8_t *read_mfr_revision)
     ESP_LOGI(TAG, "MFR_REVISION: %02X %02X %02X", read_mfr_revision[0], read_mfr_revision[1], read_mfr_revision[2]);
 }
 
-/**
- * @brief Set all the relevant config registers for normal operation 
-*/
+static void tps546_write_vout_bounds(void)
+{
+    ESP_LOGI(TAG, "Setting VOUT_MAX: %.2fV", tps546_config.TPS546_INIT_VOUT_MAX);
+    smb_write_word(PMBUS_VOUT_MAX, float_2_ulinear16(tps546_config.TPS546_INIT_VOUT_MAX));
+
+    ESP_LOGI(TAG, "Setting VOUT_MIN: %.2fV", tps546_config.TPS546_INIT_VOUT_MIN);
+    smb_write_word(PMBUS_VOUT_MIN, float_2_ulinear16(tps546_config.TPS546_INIT_VOUT_MIN));
+}
+
 void TPS546_write_entire_config(void)
 {
     
     ESP_LOGI(TAG, "---Writing new config values to TPS546---");
 
-        // ON_OFF_CONFIG
-    //u8_value = (ON_OFF_CONFIG_DELAY | ON_OFF_CONFIG_POLARITY | ON_OFF_CONFIG_CP | ON_OFF_CONFIG_CMD | ON_OFF_CONFIG_PU);
     uint8_t u8_value = (ON_OFF_CONFIG_DELAY | ON_OFF_CONFIG_POLARITY | ON_OFF_CONFIG_CMD | ON_OFF_CONFIG_PU);
+    if (tps546_config.TPS546_USE_ENABLE_PIN) u8_value |= ON_OFF_CONFIG_CP;
     ESP_LOGI(TAG, "Setting ON_OFF_CONFIG: %02X", u8_value);
     smb_write_byte(PMBUS_ON_OFF_CONFIG, u8_value);
 
@@ -757,15 +765,15 @@ void TPS546_write_entire_config(void)
     ESP_LOGI(TAG, "Setting VOUT SCALE: %.2f", tps546_config.TPS546_INIT_SCALE_LOOP);
     smb_write_word(PMBUS_VOUT_SCALE_LOOP, float_2_slinear11(tps546_config.TPS546_INIT_SCALE_LOOP));
 
+    // The regulator can clamp a request to the active voltage bounds.
+    if (tps546_config.TPS546_VOUT_BOUNDS_FIRST) tps546_write_vout_bounds();
+
     ESP_LOGI(TAG, "Setting VOUT_COMMAND: %.2fV", tps546_config.TPS546_INIT_VOUT_COMMAND);
     smb_write_word(PMBUS_VOUT_COMMAND, float_2_ulinear16(tps546_config.TPS546_INIT_VOUT_COMMAND));
 
-    ESP_LOGI(TAG, "Setting VOUT_MAX: %.2fV", tps546_config.TPS546_INIT_VOUT_MAX);
-    smb_write_word(PMBUS_VOUT_MAX, float_2_ulinear16(tps546_config.TPS546_INIT_VOUT_MAX));
+    if (!tps546_config.TPS546_VOUT_BOUNDS_FIRST) tps546_write_vout_bounds();
 
-    ESP_LOGI(TAG, "Setting VOUT_MIN: %.2fV", tps546_config.TPS546_INIT_VOUT_MIN);
-    smb_write_word(PMBUS_VOUT_MIN, float_2_ulinear16(tps546_config.TPS546_INIT_VOUT_MIN));
-
+    // The protection ratios assume the regulator's factory-default relative format.
     if (TPS546_write_vout_limit_ratios(tps546_config.TPS546_INIT_VOUT_COMMAND) != ESP_OK) {
         ESP_LOGE(TAG, "Failed to write VOUT limit ratios");
     }

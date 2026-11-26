@@ -2,8 +2,17 @@
 #define VCORE_H_
 
 #include "esp_err.h"
+#include <stdbool.h>
+#include <stdint.h>
 
 typedef struct GlobalState GlobalState;
+typedef struct TPS546_CONFIG TPS546_CONFIG;
+
+typedef struct VcoreDriver {
+    esp_err_t (*init)(GlobalState *state, TPS546_CONFIG config);
+    esp_err_t (*set_voltage)(GlobalState *state, float volts);
+    bool asserts_reset_on_shutdown; // A successful zero-voltage request already asserts ASIC reset.
+} VcoreDriver;
 
 esp_err_t VCORE_init(GlobalState * GLOBAL_STATE);
 bool VCORE_is_initialized(void);

@@ -44,7 +44,7 @@ fi
 
 echo "Building test-ci project..."
 cd "$ROOT_DIR/test-ci"
-idf.py build
+idf.py -DIDF_TARGET=esp32s3 build
 
 echo "Merging binaries..."
 cd build
@@ -52,6 +52,6 @@ esptool --chip esp32s3 merge-bin --pad-to-size 16MB -o flash_image.bin @flash_ar
 
 echo "Running tests in QEMU emulator..."
 rm -f output.log
-timeout 5m qemu-system-xtensa -machine esp32s3 -nographic -no-reboot -watchdog-action shutdown -drive file=flash_image.bin,if=mtd,format=raw -m 4 -serial file:output.log
+timeout 5m qemu-system-xtensa -machine esp32s3 -nographic -no-reboot -semihosting -watchdog-action shutdown -drive file=flash_image.bin,if=mtd,format=raw -m 4 -serial file:output.log
 cat output.log
 grep -q -E '[[:digit:]]+ Tests [[:digit:]]+ Failures [[:digit:]]+ Ignored' output.log

@@ -1,3 +1,4 @@
+#include "adc.h"
 #include "esp_log.h"
 #include "esp_adc/adc_oneshot.h"
 #include "esp_adc/adc_cali.h"
@@ -10,6 +11,7 @@ static const char * TAG = "adc";
 
 static adc_cali_handle_t adc1_cali_chan1_handle;
 static adc_oneshot_unit_handle_t adc1_handle;
+static bool vcore_channel_initialized;
 
 
 /*---------------------------------------------------------------
@@ -64,18 +66,20 @@ static bool adc_calibration_init(adc_unit_t unit, adc_channel_t channel, adc_att
     return calibrated;
 }
 
-// Sets up the ADC to read Vcore. Run this before ADC_get_vcore()
+// Initialize the ADC unit without claiming a board's GPIO pins.
 void ADC_init(void)
 {
-    // adc1_config_channel_atten(ADC1_CHANNEL_1, ADC_ATTEN_DB_12);
-    // esp_adc_cal_characterize(ADC_UNIT_1, ADC_ATTEN_DB_12, ADC_WIDTH_BIT_DEFAULT, 0, &adc1_chars);
-
-
     //-------------ADC1 Init---------------//
     adc_oneshot_unit_init_cfg_t init_config1 = {
         .unit_id = ADC_UNIT_1,
     };
     ESP_ERROR_CHECK(adc_oneshot_new_unit(&init_config1, &adc1_handle));
+}
+
+// Configure the Vcore input only on boards that use ADC voltage measurement.
+void ADC_init_vcore(void)
+{
+    if (vcore_channel_initialized) return;
 
     //-------------ADC1 Config---------------//
     adc_oneshot_chan_cfg_t config = {
@@ -86,7 +90,7 @@ void ADC_init(void)
 
     //-------------ADC1 Calibration Init---------------//
     adc_calibration_init(ADC_UNIT_1, ADC_CHANNEL, ADC_ATTEN, &adc1_cali_chan1_handle);
-
+    vcore_channel_initialized = true;
 }
 
 // returns the ADC voltage in mV

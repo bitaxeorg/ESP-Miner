@@ -28,7 +28,7 @@ void SYSTEM_clean_jobs_queue(GlobalState * GLOBAL_STATE);
 void SYSTEM_reset_coinbase_ui_state(GlobalState * GLOBAL_STATE);
 void SYSTEM_decode_and_apply_coinbase(GlobalState * GLOBAL_STATE, const miner_job_t * job);
 
-void SYSTEM_noinit_update(SystemModule * SYSTEM_MODULE);
+void SYSTEM_noinit_update(SystemModule * SYSTEM_MODULE, float interval_hashrate_ghs);
 uint64_t SYSTEM_noinit_get_total_uptime_seconds();
 double SYSTEM_noinit_get_total_hashes();
 double SYSTEM_noinit_get_total_log2_work();

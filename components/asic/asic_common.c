@@ -216,6 +216,11 @@ void get_difficulty_mask(uint8_t difficulty_power, uint8_t *job_difficulty_mask)
     job_difficulty_mask[5] = _reverse_bits( mask        & 0xFF);
 }
 
+float calculate_expected_hashrate_ghs(float frequency_mhz, size_t asic_count, size_t small_cores, float hashes_per_clock)
+{
+    return frequency_mhz * small_cores * asic_count * hashes_per_clock / 1000.0f;
+}
+
 uint8_t calculate_effective_asic_difficulty(double expected_ghs)
 {
     double raw_diff = expected_ghs * 1e9 / NONCE_SPACE;

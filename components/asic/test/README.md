@@ -3,6 +3,12 @@
 These modules test job packets, ASIC responses, and result handling while using
 the real production code.
 
+BZM tests and their test support live in `bzm/` and run as part of this ASIC
+test component. Native tests live in `bzm/host/`; from the repository root,
+run `cmake -S components/asic/test/bzm/host -B build/bzm-host`,
+`cmake --build build/bzm-host`, and
+`ctest --test-dir build/bzm-host --output-on-failure`.
+
 ## Test levels
 
 - A **unit test** checks one function or a small module with direct inputs and

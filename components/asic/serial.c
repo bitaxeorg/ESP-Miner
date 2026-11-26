@@ -10,6 +10,7 @@
 #include "soc/uart_struct.h"
 
 #include "serial.h"
+#include "serial_internal.h"
 #include "utils.h"
 
 #define ECHO_TEST_TXD (17)
@@ -76,7 +77,12 @@ int SERIAL_send(uint8_t *data, int len, bool debug)
 /// @return number of bytes read, or -1 on error
 int16_t SERIAL_rx(uint8_t *buf, uint16_t size, uint16_t timeout_ms)
 {
-    int16_t bytes_read = uart_read_bytes(UART_NUM_1, buf, size, timeout_ms / portTICK_PERIOD_MS);
+    return SERIAL_rx_ticks(buf, size, timeout_ms / portTICK_PERIOD_MS);
+}
+
+int16_t SERIAL_rx_ticks(uint8_t *buf, uint16_t size, TickType_t timeout_ticks)
+{
+    int16_t bytes_read = uart_read_bytes(UART_NUM_1, buf, size, timeout_ticks);
 
     #if BM1397_SERIALRX_DEBUG || BM1366_SERIALRX_DEBUG || BM1368_SERIALRX_DEBUG || BM1370_SERIALRX_DEBUG || BM1373_SERIALRX_DEBUG
     size_t buff_len = 0;

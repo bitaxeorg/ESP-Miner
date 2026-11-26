@@ -1,0 +1,28 @@
+#ifndef BZM_WORK_REGISTERS_H
+#define BZM_WORK_REGISTERS_H
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+enum
+{
+    BZM_REG_MIDSTATE = 0x10,
+    BZM_REG_MERKLE_RESIDUE = 0x30,
+    BZM_REG_START_TIMESTAMP = 0x34,
+    BZM_REG_SEQUENCE_ID = 0x38,
+    BZM_REG_JOB_CONTROL = 0x39,
+    BZM_REG_START_NONCE = 0x3c,
+    BZM_REG_END_NONCE = 0x40,
+    BZM_REG_TARGET = 0x44,
+    BZM_REG_TIMESTAMP_COUNT = 0x48,
+    BZM_REG_ZEROS_TO_FIND = 0x49,
+    BZM_REG_ASIC_ID = 0x0b,
+    BZM_TIMESTAMP_AUTO_CLOCK_UNGATE = 0x80,
+};
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif

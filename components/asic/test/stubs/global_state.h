@@ -8,6 +8,7 @@
 #include "freertos/task.h"
 #include "scoreboard.h"
 #include "asic_job_slot.h"
+#include "device_config.h"
 
 /*
  * Shared test view for the real job task and isolated BM13xx driver copies.
@@ -21,15 +22,7 @@ typedef struct GlobalState {
         struct {
             uint16_t asic_count;
             uint8_t voltage_domains;
-            struct {
-                uint32_t hw_version_mask;
-                uint8_t packet_midstates;
-                uint16_t fixed_timeout_ms;
-                uint16_t difficulty;
-                uint16_t core_count;
-                uint16_t small_core_count;
-                uint16_t default_frequency_mhz;
-            } asic;
+            AsicConfig asic;
         } family;
     } DEVICE_CONFIG;
     asic_job_store_t job_store;

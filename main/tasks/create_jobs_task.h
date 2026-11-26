@@ -3,7 +3,12 @@
 
 #include <stdint.h>
 
+typedef struct GlobalState GlobalState;
+
 #define CREATE_JOBS_NOTIFY_CLEAR_WORK UINT32_MAX
+#define CREATE_JOBS_NOTIFY_REFRESH (UINT32_MAX - 1U)
+
+void create_jobs_refresh(GlobalState *state);
 
 void create_jobs_task(void *pvParameters);
 
