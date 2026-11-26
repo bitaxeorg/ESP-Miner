@@ -23,7 +23,10 @@ fanspeed,data,u16,100
 selftest,data,u16,1
 overheat_mode,data,u16,0
 # Custom Firmware Board overrides
-# Custom board version
+# Board model to look up the board definition (pin layout, peripherals).
+# Leave empty when boardversion already names a supported board model.
+boardmodel,data,string,207
+# Custom board version, shown in the UI. Free-form for custom variants.
 boardversion,data,string,207
 # Family (Max, Ultra, Supra, Gamma, Gamma_Turbo)
 devicemodel,data,string,ultra

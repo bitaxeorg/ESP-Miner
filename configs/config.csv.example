@@ -23,6 +23,7 @@ asicfrequency,data,u16,485
 asicvoltage,data,u16,1200
 asicmodel,data,string,BM1366
 devicemodel,data,string,ultra
+boardmodel,data,string,204
 boardversion,data,string,204
 rotation,data,u16,0
 autofanspeed,data,u16,1
