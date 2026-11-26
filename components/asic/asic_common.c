@@ -12,6 +12,7 @@
 #include "esp_log.h"
 #include "crc.h"
 #include "esp_timer.h"
+#include "pll.h"
 #include "utils.h"
 
 #define PREAMBLE 0xAA55
@@ -226,39 +227,103 @@ uint8_t calculate_effective_asic_difficulty(double expected_ghs)
     return (uint8_t)(log2(raw_diff / 1.5) + 1);
 }
 
-float calculate_bm_timeout_ms(float frequency_mhz, size_t asic_count, size_t small_cores, size_t cores, uint64_t version_size, float timeout_percent)
+uint16_t bm_address_stride(uint16_t addr_space, uint16_t max_addr_stride, size_t asic_count)
 {
-    if (asic_count == 0 || cores == 0 || small_cores < cores || frequency_mhz <= 0.0f)
+    if (addr_space == 0 || max_addr_stride == 0 || asic_count == 0 || asic_count > addr_space) {
+        return 0;
+    }
+
+    uint16_t stride = (uint16_t)(addr_space / asic_count);
+    return (stride > max_addr_stride) ? max_addr_stride : stride;
+}
+
+double bm_serial_nonces_per_core(uint16_t addr_space, uint16_t max_addr_stride, size_t asic_count, size_t cores)
+{
+    uint16_t stride = bm_address_stride(addr_space, max_addr_stride, asic_count);
+    if (stride == 0 || cores == 0) {
+        return 0.0;
+    }
+
+    int cores_up = _next_power_of_two((int)cores);
+    return (NONCE_SPACE / (double)cores_up) * ((double)stride / (double)addr_space);
+}
+
+uint32_t calculate_bm_hcn(uint16_t addr_space, uint16_t max_addr_stride, double nonce_percent, float frequency_mhz, size_t asic_count, size_t cores)
+{
+    if (nonce_percent <= 0.0 || frequency_mhz <= 0.0f) {
+        return 0;
+    }
+
+    double hcn_space = bm_serial_nonces_per_core(addr_space, max_addr_stride, asic_count, cores);
+    if (hcn_space <= 0.0) {
+        return 0;
+    }
+
+    double hcn_raw = nonce_percent * (hcn_space * (double)FREQ_MULT / (double)frequency_mhz * 0.5);
+    if (hcn_raw <= (double)BM13XX_HCN_RELOAD_OVERRUN) {
+        return 0;
+    }
+
+    return (uint32_t)hcn_raw - BM13XX_HCN_RELOAD_OVERRUN;
+}
+
+float calculate_bm_hcn_timeout_ms(uint32_t hcn, size_t small_cores, size_t cores, uint64_t version_size, float timeout_percent)
+{
+    if (hcn == 0 || cores == 0 || small_cores < cores) {
         return 0.0f;
+    }
+
+    int cores_up = _next_power_of_two((int)cores);
+    int small_cores_up = _next_power_of_two((int)small_cores);
+    float midstates = (float)small_cores_up / (float)cores_up;
+    float serial_versions = (float)version_size / midstates;
+    if (serial_versions < 1.0f) {
+        serial_versions = 1.0f;
+    }
+
+    // 1 HCN unit = 2 periods of the 25 MHz crystal = 80 ns = 1 / 12,500 ms
+    float fullspace_timeout_ms = serial_versions * ((float)hcn / 12500.0f);
+    return timeout_percent * fullspace_timeout_ms;
+}
+
+float calculate_bm_timeout_ms(uint16_t addr_space, uint16_t max_addr_stride, float frequency_mhz, size_t asic_count, size_t small_cores, size_t cores, uint64_t version_size, float timeout_percent)
+{
+    if (small_cores < cores || frequency_mhz <= 0.0f) {
+        return 0.0f;
+    }
+
+    double serial_nonces = bm_serial_nonces_per_core(addr_space, max_addr_stride, asic_count, cores);
+    if (serial_nonces <= 0.0) {
+        return 0.0f;
+    }
 
     // Round up to the nearest power of 2 some asic constants
-    int cores_up = _next_power_of_two(cores);
-    int small_cores_up = _next_power_of_two(small_cores);
-    int asic_count_up = _next_power_of_two(asic_count);
+    int cores_up = _next_power_of_two((int)cores);
+    int small_cores_up = _next_power_of_two((int)small_cores);
 
-    // Calulate the time to scan the full nonce * version space
+    // Calculate the time to scan the full nonce * version space
     // effectively how many iterations we have to do
-    // First we remove the paralell nonces/versions
+    // First we remove the parallel nonces/versions
     // then we end up with `time = space / frequency`
-    float midstates = (float)small_cores_up / cores_up;
-    float serial_versions = version_size / midstates;
-    if (serial_versions < 1.0f)
+    float midstates = (float)small_cores_up / (float)cores_up;
+    float serial_versions = (float)version_size / midstates;
+    if (serial_versions < 1.0f) {
         serial_versions = 1.0f;
-    float serial_nonces = (float)NONCE_SPACE / cores_up / asic_count_up;
-    float fullspace_timeout_ms = serial_versions * serial_nonces / (frequency_mhz * 1000.0f);
+    }
+    float fullspace_timeout_ms = serial_versions * (float)serial_nonces / (frequency_mhz * 1000.0f);
 
     return timeout_percent * fullspace_timeout_ms;
 }
 
 bool bm13xx_decode_job_result(asic_job_store_t *store,
                               uint8_t small_core_bits,
-                              uint16_t address_interval,
+                              uint16_t address_stride,
                               uint32_t wire_nonce,
                               uint8_t wire_chip_slot,
                               uint16_t wire_version,
                               task_result *result)
 {
-    if (address_interval == 0 || result == NULL) {
+    if (address_stride == 0 || result == NULL) {
         return false;
     }
 
@@ -270,7 +335,7 @@ bool bm13xx_decode_job_result(asic_job_store_t *store,
     }
 
     uint32_t nonce_h = ntohl(wire_nonce);
-    uint8_t asic_nr = (uint8_t)(((nonce_h >> 17) & 0xff) / address_interval);
+    uint8_t asic_nr = (uint8_t)(((nonce_h >> 17) & 0xff) / address_stride);
     uint8_t core_id = (uint8_t)((nonce_h >> 25) & 0x7f);
     uint32_t version_bits = ((uint32_t)ntohs(wire_version) << 13);
     uint32_t mask = result->job.version_mask & BIP320_VERSION_ROLLING_MASK;
@@ -284,12 +349,12 @@ bool bm13xx_decode_job_result(asic_job_store_t *store,
 }
 
 bool bm1397_decode_job_result(asic_job_store_t *store,
-                              uint16_t address_interval,
+                              uint16_t address_stride,
                               uint32_t wire_nonce,
                               uint8_t wire_chip_slot,
                               task_result *result)
 {
-    if (address_interval == 0 || result == NULL) {
+    if (address_stride == 0 || result == NULL) {
         return false;
     }
 
@@ -306,7 +371,7 @@ bool bm1397_decode_job_result(asic_job_store_t *store,
     }
 
     uint32_t nonce_h = ntohl(wire_nonce);
-    uint8_t asic_nr = (uint8_t)(((nonce_h >> 17) & 0xff) / address_interval);
+    uint8_t asic_nr = (uint8_t)(((nonce_h >> 17) & 0xff) / address_stride);
     uint8_t core_id = (uint8_t)((nonce_h >> 25) & 0x7f);
 
     result->rolled_version = rolled_version;

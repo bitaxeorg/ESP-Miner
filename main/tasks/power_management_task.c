@@ -11,6 +11,7 @@
 #include "utils.h"
 #include "asic_init.h"
 #include "asic_reset.h"
+#include "create_jobs_task.h"
 #include "driver/uart.h"
 
 #define POLL_RATE 100
@@ -40,7 +41,6 @@ static void mining_stop(GlobalState * GLOBAL_STATE)
     GLOBAL_STATE->POWER_MANAGEMENT_MODULE.expected_hashrate = 0;
 
     ASIC_set_frequency(GLOBAL_STATE);
-    ASIC_set_nonce_space(GLOBAL_STATE);
 
     // Cut ASIC power and hold in reset
     VCORE_set_voltage(GLOBAL_STATE, 0.0f);
@@ -270,9 +270,11 @@ void POWER_MANAGEMENT_task(void * pvParameters)
             power_management->expected_hashrate = expected_hashrate(GLOBAL_STATE);
 
             ASIC_set_frequency(GLOBAL_STATE);
-            ASIC_set_nonce_space(GLOBAL_STATE);
             uint8_t difficulty_power = calculate_effective_asic_difficulty(power_management->expected_hashrate);
             ASIC_set_difficulty(GLOBAL_STATE, difficulty_power);
+            if (GLOBAL_STATE->create_jobs_task_handle != NULL) {
+                xTaskNotify(GLOBAL_STATE->create_jobs_task_handle, CREATE_JOBS_NOTIFY_REFRESH, eSetValueWithOverwrite);
+            }
             
             last_asic_frequency = asic_frequency;
         }

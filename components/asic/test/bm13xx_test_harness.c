@@ -33,10 +33,13 @@ static unsigned delay_count;
 
 GlobalState *bm13xx_harness_begin(const bm13xx_harness_driver_t *driver)
 {
+    bool is_bm1373 = (driver == &bm13xx_harness_drivers[3]);
     fixture_state = (GlobalState) {
         .DEVICE_CONFIG.family.asic_count = 2,
         .DEVICE_CONFIG.family.voltage_domains = 1,
         .DEVICE_CONFIG.family.asic.core_count = 112,
+        .DEVICE_CONFIG.family.asic.addr_space = is_bm1373 ? 128 : 256,
+        .DEVICE_CONFIG.family.asic.max_addr_stride = is_bm1373 ? 0x10 : 256,
         .POWER_MANAGEMENT_MODULE.frequency_value = 200.0f,
         .POWER_MANAGEMENT_MODULE.actual_frequency = 200.0f,
     };

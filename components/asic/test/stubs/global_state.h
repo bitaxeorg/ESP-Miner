@@ -24,10 +24,11 @@ typedef struct GlobalState {
             struct {
                 uint32_t hw_version_mask;
                 uint8_t packet_midstates;
-                uint16_t fixed_timeout_ms;
                 uint16_t difficulty;
                 uint16_t core_count;
                 uint16_t small_core_count;
+                uint16_t addr_space;
+                uint16_t max_addr_stride;
                 uint16_t default_frequency_mhz;
             } asic;
         } family;

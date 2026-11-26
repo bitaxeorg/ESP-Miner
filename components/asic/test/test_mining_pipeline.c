@@ -5,6 +5,7 @@
 #include "stratum_api.h"
 #include "sv2_protocol.h"
 #include "utils.h"
+#include "../../../main/tasks/create_jobs_task.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -878,5 +879,25 @@ TEST_CASE("BM13xx rolls BIP323 software bits on SV2 standard and sleeps when exh
     TEST_ASSERT_EQUAL_HEX32(0x20000004, result.jobs[0]->version);
     TEST_ASSERT_EQUAL_HEX32(0x20000024, result.jobs[1]->version);
     TEST_ASSERT_EQUAL_UINT32(portMAX_DELAY, result.wait_ticks[2]);
+    job_pipeline_harness_result_free(&result);
+
+    // Runtime frequency/HCN change sends CREATE_JOBS_NOTIFY_REFRESH, which must immediately
+    // re-send an exhausted SV2 job so the ASIC latches the updated HCN register.
+    job->version_mask = BIP320_VERSION_ROLLING_MASK;
+    const job_pipeline_harness_event_t refresh_events[] = {
+        { .type = JOB_PIPELINE_HARNESS_NOTIFY, .slot = 0, .advance_ms = 0 },
+        { .type = JOB_PIPELINE_HARNESS_NOTIFY, .slot = CREATE_JOBS_NOTIFY_REFRESH, .advance_ms = 500 },
+    };
+    job_pipeline_harness_run(
+        (job_pipeline_harness_config_t) {
+            .hw_version_mask = BIP320_VERSION_ROLLING_MASK,
+            .packet_midstates = 1,
+            .asic_initialized = true,
+            .job_frequency_ms = 5000,
+        }, refresh_events, sizeof(refresh_events) / sizeof(refresh_events[0]), &result);
+
+    TEST_ASSERT_EQUAL_UINT32(2, result.job_count);
+    TEST_ASSERT_EQUAL_HEX32(0x20000004, result.jobs[0]->version);
+    TEST_ASSERT_EQUAL_HEX32(0x20000004, result.jobs[1]->version);
     job_pipeline_harness_result_free(&result);
 }

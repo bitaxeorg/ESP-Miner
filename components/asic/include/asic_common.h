@@ -64,6 +64,14 @@ typedef struct task_result
     uint64_t timestamp_us;
 } task_result;
 
+// When the 25 MHz HCN timer expires, the ASIC's 25 MHz control logic shifts in the next
+// rolled-version 256-bit work state (~268 crystal clocks = ~134 HCN counts ≈ 10.7 us) before
+// resetting core nonce counters; during that reload window, cores keep clocking nonces on the
+// current version (empirically measured as ~136 counts on BM1368 in #514 and ~110-134 counts on
+// BM1370 across NerdQ++, Gamma GT, and Gamma Hex). Subtracting 2x (268 counts ≈ 21.4 us) covers
+// the reload overrun plus a 100% safety margin so multi-stream/multi-chip slices never collide.
+#define BM13XX_HCN_RELOAD_OVERRUN (2 * 134)
+
 unsigned char _reverse_bits(unsigned char num);
 int _largest_power_of_two(int num);
 int _next_power_of_two(int num);
@@ -74,6 +82,10 @@ int count_asic_chips_with_id_alias(uint16_t asic_count, uint16_t chip_id, uint16
 esp_err_t receive_work(uint8_t * buffer, int buffer_size, uint64_t *out_timestamp_us);
 void get_difficulty_mask(uint8_t difficulty_power, uint8_t *job_difficulty_mask);
 uint8_t calculate_effective_asic_difficulty(double expected_ghs);
-float calculate_bm_timeout_ms(float frequency_mhz, size_t asic_count, size_t small_cores, size_t cores, uint64_t version_size, float timeout_percent);
+uint16_t bm_address_stride(uint16_t addr_space, uint16_t max_addr_stride, size_t asic_count);
+double bm_serial_nonces_per_core(uint16_t addr_space, uint16_t max_addr_stride, size_t asic_count, size_t cores);
+uint32_t calculate_bm_hcn(uint16_t addr_space, uint16_t max_addr_stride, double nonce_percent, float frequency_mhz, size_t asic_count, size_t cores);
+float calculate_bm_hcn_timeout_ms(uint32_t hcn, size_t small_cores, size_t cores, uint64_t version_size, float timeout_percent);
+float calculate_bm_timeout_ms(uint16_t addr_space, uint16_t max_addr_stride, float frequency_mhz, size_t asic_count, size_t small_cores, size_t cores, uint64_t version_size, float timeout_percent);
 
 #endif /* ASIC_COMMON_H_ */

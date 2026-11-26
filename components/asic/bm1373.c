@@ -35,10 +35,6 @@
 #define BM1372_REGISTER_VERSION_ROLLING 0xA4
 #define BM1372_REGISTER_AUTO_WORK_CONFIGURATION 0xC4
 
-// The generic BM13xx nonce-space calculation makes BM1372/BM1373 chips search
-// overlapping work. This is the known-good S21 Pro stock register value.
-#define BM1372_HASH_COUNTING_NUMBER_S21_PRO 0x00001EB5
-
 #define BM1372_CORE_REGISTER_CLOCK_DELAY_CTRL 0x00
 #define BM1372_CORE_REGISTER_CORE_ENABLE 0x02
 #define BM1372_CORE_REGISTER_CLOCK_SELECT_CTRL 0x0B
@@ -63,8 +59,6 @@
 #define BM1372_WRITE_RETRY_DELAY_MS 50
 #define BM1372_INIT_STEP_DELAY_MS 10
 #define BM1372_FAST_RESET_DELAY_MS 20
-#define BM1372_SET_ADDRESS_STRIDE 0x10
-#define BM1372_COMMAND_ADDRESS_SHIFT 2
 
 #define TYPE_JOB 0x20
 #define TYPE_CMD 0x40
@@ -122,9 +116,7 @@ static const char * TAG = "bm1372/73";
 
 static task_result result;
 
-static uint8_t chip_command_address_interval;
-static uint8_t chip_response_address_interval;
-static uint16_t chip_nonce_address_interval;
+static uint16_t address_stride;
 static uint8_t detected_chip_count;
 static uint8_t detected_voltage_domains;
 static bool frequency_write_failed;
@@ -236,21 +228,25 @@ void BM1373_set_version_mask(uint32_t version_mask)
     }
 }
 
-void BM1373_set_hash_counting_number(uint32_t hcn)
+bool BM1373_set_hash_counting_number(uint32_t hcn)
 {
     if (!_write_broadcast(BM1372_REGISTER_HASH_COUNTING_NUMBER, hcn)) {
         ESP_LOGE(TAG, "Failed to set hash counting number");
+        return false;
     }
+    return true;
 }
 
-void BM1373_set_nonce_space(double nonce_percent, float frequency, uint16_t asic_count, uint16_t cores)
+// Reassemble the 7-bit chip address A[6:0] scattered across nonce[24:16]
+// around hardwired Core[8] (nonce[23]) and Core[7] (nonce[20]):
+//   nonce[24]    -> A[4]   (0x10)
+//   nonce[22:21] -> A[6:5] (0x20..0x40, inferred for >2 chips)
+//   nonce[19:16] -> A[3:0] (0x01..0x0F)
+static uint8_t bm1373_extract_nonce_addr(uint32_t nonce_h)
 {
-    (void)nonce_percent;
-    (void)frequency;
-    (void)asic_count;
-    (void)cores;
-
-    BM1373_set_hash_counting_number(BM1372_HASH_COUNTING_NUMBER_S21_PRO);
+    return (uint8_t)(((nonce_h >> 20) & 0x10) |
+                     ((nonce_h >> 16) & 0x60) |
+                     ((nonce_h >> 16) & 0x0F));
 }
 
 float BM1373_send_hash_frequency(float target_freq)
@@ -267,9 +263,8 @@ float BM1373_send_hash_frequency(float target_freq)
                          ((uint32_t)refdiv << 8) |
                          postdiv;
 
-    // Every chip in the Bitaxe chain runs at the same target frequency. A
-    // broadcast also avoids the BM1372's distinct assigned/command address
-    // encodings during the frequency ramp.
+    // Every chip in the Bitaxe chain runs at the same target frequency, so
+    // one broadcast sets them all.
     bool success = _write_broadcast(BM1372_REGISTER_PLL0_PARAMETER, pll_value);
 
     if (!success) {
@@ -286,9 +281,7 @@ uint8_t BM1373_init(GlobalState * GLOBAL_STATE)
 {
     uint8_t expected_chip_count = GLOBAL_STATE->DEVICE_CONFIG.family.asic_count;
 
-    chip_command_address_interval = 0;
-    chip_response_address_interval = 0;
-    chip_nonce_address_interval = 0;
+    address_stride = 0;
     detected_chip_count = 0;
     detected_voltage_domains = 0;
     frequency_write_failed = false;
@@ -312,11 +305,11 @@ uint8_t BM1373_init(GlobalState * GLOBAL_STATE)
 
     detected_chip_count = chip_counter;
     detected_voltage_domains = GLOBAL_STATE->DEVICE_CONFIG.family.voltage_domains;
-    chip_command_address_interval = BM1372_SET_ADDRESS_STRIDE >> BM1372_COMMAND_ADDRESS_SHIFT;
-    chip_response_address_interval = BM1372_SET_ADDRESS_STRIDE;
-    chip_nonce_address_interval = 256 / detected_chip_count;
-    if (chip_nonce_address_interval == 0) {
-        ESP_LOGE(TAG, "Invalid nonce address interval for %u ASICs", detected_chip_count);
+    address_stride = bm_address_stride(GLOBAL_STATE->DEVICE_CONFIG.family.asic.addr_space,
+                                       GLOBAL_STATE->DEVICE_CONFIG.family.asic.max_addr_stride,
+                                       detected_chip_count);
+    if (address_stride == 0) {
+        ESP_LOGE(TAG, "Invalid address stride for %u ASICs", detected_chip_count);
         return 0;
     }
 
@@ -326,7 +319,7 @@ uint8_t BM1373_init(GlobalState * GLOBAL_STATE)
     vTaskDelay(pdMS_TO_TICKS(BM1372_INIT_STEP_DELAY_MS));
 
     for (uint8_t chip = 0; chip < detected_chip_count; chip++) {
-        if (!_set_chip_address(chip * BM1372_SET_ADDRESS_STRIDE)) {
+        if (!_set_chip_address((uint8_t)(chip * address_stride))) {
             return 0;
         }
     }
@@ -354,7 +347,7 @@ uint8_t BM1373_init(GlobalState * GLOBAL_STATE)
             continue;
         }
         uint8_t domain_end_chip = domain_end_exclusive - 1;
-        if (!_write_chip(domain_end_chip * chip_command_address_interval,
+        if (!_write_chip((uint8_t)(domain_end_chip * address_stride),
                          BM1372_REGISTER_IO_DRIVER_STRENGTH,
                          BM1372_IO_DRIVER_STRENGTH_DOMAIN_END)) {
             return 0;
@@ -421,12 +414,6 @@ uint8_t BM1373_init(GlobalState * GLOBAL_STATE)
         return 0;
     }
 
-    if (!_write_broadcast(BM1372_REGISTER_HASH_COUNTING_NUMBER,
-                          BM1372_HASH_COUNTING_NUMBER_S21_PRO)) {
-        ESP_LOGE(TAG, "Failed to configure nonce space");
-        return 0;
-    }
-
     uint32_t versions_to_roll = BIP320_VERSION_ROLLING_MASK >> 13;
     if (!_write_broadcast(BM1372_REGISTER_VERSION_ROLLING,
                           0x90000000 | (versions_to_roll & 0xFFFF))) {
@@ -462,12 +449,15 @@ task_result * BM1373_process_work(GlobalState * GLOBAL_STATE)
     }
 
     if (!asic_result.is_job_response) {
+        if (address_stride == 0) {
+            return NULL;
+        }
         result.register_type = REGISTER_MAP[asic_result.cmd.register_address];
         if (result.register_type == REGISTER_INVALID) {
             ESP_LOGW(TAG, "Unknown register read: %02x", asic_result.cmd.register_address);
             return NULL;
         }
-        result.asic_nr = asic_result.cmd.asic_address / chip_response_address_interval;
+        result.asic_nr = asic_result.cmd.asic_address / address_stride;
         result.value = ntohl(asic_result.cmd.value);
 
         return &result;
@@ -475,13 +465,14 @@ task_result * BM1373_process_work(GlobalState * GLOBAL_STATE)
 
     if (!bm13xx_decode_job_result(&GLOBAL_STATE->job_store,
                                   BM1373_SMALL_CORE_BITS,
-                                  chip_nonce_address_interval,
+                                  address_stride,
                                   asic_result.job.nonce,
                                   asic_result.job.chip_slot,
                                   asic_result.job.version,
                                   &result)) {
         return NULL;
     }
+    result.asic_nr = bm1373_extract_nonce_addr(ntohl(asic_result.job.nonce)) / address_stride;
 
     return &result;
 }

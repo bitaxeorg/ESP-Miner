@@ -321,3 +321,74 @@ TEST_CASE("BM13xx rolled version clears pre-set mask voting bits and formats BIP
         bm13xx_harness_end();
     }
 }
+
+TEST_CASE("BM1373 computes HCN and partitions chip addresses across nonce space",
+          "[asic][bm1373]")
+{
+    const bm13xx_harness_driver_t *driver = &bm13xx_harness_drivers[3];
+    GlobalState *state = bm13xx_harness_begin(driver);
+    state->DEVICE_CONFIG.family.asic_count = 2;
+    state->DEVICE_CONFIG.family.voltage_domains = 2;
+    state->DEVICE_CONFIG.family.asic.core_count = 432;
+    state->POWER_MANAGEMENT_MODULE.frequency_value = 327.0f;
+    state->POWER_MANAGEMENT_MODULE.actual_frequency = 327.0f;
+
+    TEST_ASSERT_EQUAL_UINT8(2, driver->init(state));
+
+    bool saw_addr_00 = false;
+    bool saw_addr_10 = false;
+    bool saw_io_drive_00 = false;
+    bool saw_io_drive_10 = false;
+    for (size_t i = 0; i < bm13xx_harness_packet_count(); i++) {
+        const bm13xx_harness_packet_t *pkt = bm13xx_harness_packet(i);
+        // SET_ADDRESS command: 55 AA 40 05 <addr> 00 <crc5>
+        if (pkt->length == 7 && pkt->bytes[2] == 0x40 && pkt->bytes[5] == 0x00) {
+            if (pkt->bytes[4] == 0x00) saw_addr_00 = true;
+            if (pkt->bytes[4] == 0x10) saw_addr_10 = true;
+        }
+        // Per-chip domain-end IO drive write (0x58): 55 AA 41 09 <addr> 58 ...
+        if (pkt->length == 11 && pkt->bytes[2] == 0x41 && pkt->bytes[5] == 0x58) {
+            if (pkt->bytes[4] == 0x00) saw_io_drive_00 = true;
+            if (pkt->bytes[4] == 0x10) saw_io_drive_10 = true;
+        }
+    }
+    TEST_ASSERT_TRUE(saw_addr_00);
+    TEST_ASSERT_TRUE(saw_addr_10);
+    TEST_ASSERT_TRUE(saw_io_drive_00);
+    TEST_ASSERT_TRUE(saw_io_drive_10);
+
+    // Exact 327.0 MHz with real asic_count = 2:
+    // floor((2^32 / 512) * (16 / 128) * 25 / 327 * 0.5) - 268 = 40083 - 268 = 39815 (0x00009B87)
+    uint32_t expected_hcn = calculate_bm_hcn(128, 0x10, 1.0, 327.0f, 2, 432);
+    TEST_ASSERT_EQUAL_HEX32(0x00009B87, expected_hcn);
+
+    bm13xx_harness_end();
+
+    // All four BM13xx drivers emit the exact same 11-byte broadcast HCN wire command.
+    extern void bm1366_test_set_hash_counting_number(uint32_t hcn);
+    extern void bm1368_test_set_hash_counting_number(uint32_t hcn);
+    extern void bm1370_test_set_hash_counting_number(uint32_t hcn);
+    extern bool bm1373_test_set_hash_counting_number(uint32_t hcn);
+
+    for (size_t d = 0; d < BM13XX_HARNESS_DRIVER_COUNT; d++) {
+        bm13xx_harness_begin(&bm13xx_harness_drivers[d]);
+        bm13xx_harness_clear_packets();
+        switch (d) {
+            case 0: bm1366_test_set_hash_counting_number(expected_hcn); break;
+            case 1: bm1368_test_set_hash_counting_number(expected_hcn); break;
+            case 2: bm1370_test_set_hash_counting_number(expected_hcn); break;
+            case 3: TEST_ASSERT_TRUE(bm1373_test_set_hash_counting_number(expected_hcn)); break;
+        }
+        TEST_ASSERT_EQUAL_UINT(1, bm13xx_harness_packet_count());
+        const bm13xx_harness_packet_t *hcn_pkt = bm13xx_harness_packet(0);
+        TEST_ASSERT_EQUAL_UINT(11, hcn_pkt->length);
+        TEST_ASSERT_EQUAL_HEX8(0x51, hcn_pkt->bytes[2]);
+        TEST_ASSERT_EQUAL_HEX8(0x10, hcn_pkt->bytes[5]);
+        uint32_t wire_hcn = ((uint32_t)hcn_pkt->bytes[6] << 24) |
+                            ((uint32_t)hcn_pkt->bytes[7] << 16) |
+                            ((uint32_t)hcn_pkt->bytes[8] << 8) |
+                            (uint32_t)hcn_pkt->bytes[9];
+        TEST_ASSERT_EQUAL_HEX32(0x00009B87, wire_hcn);
+        bm13xx_harness_end();
+    }
+}
