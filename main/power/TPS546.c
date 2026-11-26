@@ -134,6 +134,7 @@ static i2c_master_dev_handle_t tps546_alert_i2c_handle;
 
 // Cached values to handle I2C failures robustly
 static float last_vin = 0.0f;
+static float last_iin = 0.0f;
 static float last_iout = 0.0f;
 static float last_vout = 0.0f;
 static int last_temp = 0;
@@ -889,6 +890,30 @@ float TPS546_get_vin(void)
         #endif
         last_vin = vin;
         return vin;
+    }    
+}
+
+float TPS546_get_iin(void)
+{
+    uint16_t u16_value = 0;
+    float iin;
+
+    /* Get current input (SLINEAR11) - PMBus READ_IIN 0x89
+     * NOTE: TPS546D24A may or may not support this command; if it fails
+     * we fall back to last_iin (0.0f) and caller uses efficiency estimate.
+     * Logged at debug level: this is polled continuously, an unsupported
+     * command must not flood the log. */
+    if (smb_read_word(PMBUS_READ_IIN, &u16_value) != ESP_OK) {
+        ESP_LOGD(TAG, "Could not read IIN");
+        return last_iin;
+    } else {
+        iin = slinear11_2_float(u16_value);
+
+        #ifdef DEBUG_TPS546_MEAS
+        ESP_LOGI(TAG, "Got Iin: %2.3f A", iin);
+        #endif
+        last_iin = iin;
+        return iin;
     }    
 }
 
