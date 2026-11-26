@@ -30,7 +30,13 @@
   @if (item.items && item.visible !== false) {
     <ul [@children]="submenuAnimation">
       @for (child of item.items; track child; let i = $index) {
-        <li app-menuitem [item]="child" [index]="i" [parentKey]="key" [class]="child.badgeClass"></li>
+        @if (child.image) {
+          <li>
+            <img [src]="child.image" alt="Screen stream" class="w-full" />
+          </li>
+        } @else {
+          <li app-menuitem [item]="child" [index]="i" [parentKey]="key" [class]="child.badgeClass"></li>
+        }
       }
     </ul>
   }

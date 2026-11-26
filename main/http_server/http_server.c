@@ -36,6 +36,8 @@
 #include "theme_api.h"
 #include "axe-os/api/system/asic_settings.h"
 #include "display.h"
+#include "screen_stream.h"
+#include "display_capture.h"
 #include "http_server.h"
 #include "embedded_web_ui.h"
 #include "sv2_protocol.h"
@@ -430,6 +432,35 @@ esp_err_t set_cors_headers(httpd_req_t * req)
         return ESP_FAIL;
     }
 
+    return ESP_OK;
+}
+
+/* Screen stream handler - registers client for async streaming */
+static esp_err_t screen_stream_handler(httpd_req_t * req)
+{
+    ESP_LOGI(TAG, "Screen stream client connected");
+
+    // Set headers for multipart streaming
+    httpd_resp_set_type(req, "multipart/x-mixed-replace; boundary=frame");
+    httpd_resp_set_hdr(req, "X-Content-Type-Options", "nosniff");
+
+    // Start async request to keep the socket open after this handler returns
+    httpd_req_t *async_req = NULL;
+    esp_err_t ret = httpd_req_async_handler_begin(req, &async_req);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to start async screen stream handler");
+        return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to start async handler");
+    }
+
+    // Add client to the stream pool using the async handle
+    ret = screen_stream_add_client(async_req);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to add screen stream client to pool");
+        httpd_req_async_handler_complete(async_req);
+        return ESP_FAIL;
+    }
+
+    // Return ESP_OK - the async handle keeps the connection alive
     return ESP_OK;
 }
 
@@ -1824,6 +1855,7 @@ esp_err_t start_rest_server(GlobalState * GLOBAL_STATE)
         { .uri = "/api/system/scoreboard",         .method = HTTP_GET,     .handler = GET_scoreboard },
         { .uri = "/api/system/statistics",         .method = HTTP_GET,     .handler = GET_system_statistics },
         { .uri = "/api/system/wifi/scan",          .method = HTTP_GET,     .handler = GET_wifi_scan },
+        { .uri = "/api/screen/stream",             .method = HTTP_GET,     .handler = screen_stream_handler },
 
         // Settings & pools
         { .uri = "/api/system",                    .method = HTTP_PATCH,   .handler = PATCH_update_settings },
@@ -1871,6 +1903,9 @@ esp_err_t start_rest_server(GlobalState * GLOBAL_STATE)
     ESP_LOGI(TAG, "Starting HTTP Server (routes: %zu, max_uri_handlers: %u)", num_routes, config.max_uri_handlers);
     
     httpd_handle_t server = NULL;
+
+    screen_stream_init();
+    display_capture_init();
 
     REST_CHECK(httpd_start(&server, &config) == ESP_OK, "Start server failed", err_start);
 
