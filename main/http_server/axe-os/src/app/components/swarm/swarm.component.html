@@ -4,19 +4,54 @@
 
   @if (swarm.length) {
     <div class="flex flex-wrap -mx-2 mb-4">
-      @for (metric of [
-        { label: 'Total Devices', value: swarm.length },
-        { label: 'Total Hashrate', value: totals.hashRate | hashSuffix},
-        { label: 'Total Power', value: (totals.power | number: '1.1-1')  + ' W' },
-        { label: 'Best Diff', value: totals.bestDiff | diffSuffix }
-        ]; track metric) {
-        <div class="w-1/2 xl:w-1/4 px-2 mb-4">
-          <div class="card flex flex-col mb-0 h-full">
-            <span class="text-secondary font-medium mb-3">{{metric.label}}</span>
-            <div class="font-medium text-2xl">{{metric.value}}</div>
-          </div>
+      <div class="w-1/2 xl:w-1/4 px-2 mb-4">
+        <div class="card flex flex-col mb-0 h-full">
+          <span class="text-secondary font-medium mb-3">Total Devices</span>
+          <div class="font-medium text-2xl">{{ swarm.length }}</div>
+          @if (totals.hashingDevices < swarm.length) {
+            <div class="mt-1">
+              <span class="text-green-500 font-medium">{{ totals.hashingDevices }} </span>
+              <span class="text-secondary">hashing</span>
+            </div>
+          }
+          @if (totals.idleDevices > 0) {
+            <div class="mt-1">
+              <span class="text-orange-500 font-medium">{{ totals.idleDevices }} </span>
+              <span class="text-secondary">idle</span>
+            </div>
+          }
+          @if (totals.pausedDevices > 0) {
+            <div class="mt-1">
+              <span class="text-yellow-500 font-medium">{{ totals.pausedDevices }} </span>
+              <span class="text-secondary">paused</span>
+            </div>
+          }
+          @if (totals.notAccessibleDevices > 0) {
+            <div class="mt-1">
+              <span class="text-red-500 font-medium">{{ totals.notAccessibleDevices }} </span>
+              <span class="text-secondary">not accessible</span>
+            </div>
+          }
         </div>
-      }
+      </div>
+      <div class="w-1/2 xl:w-1/4 px-2 mb-4">
+        <div class="card flex flex-col mb-0 h-full">
+          <span class="text-secondary font-medium mb-3">Total Hashrate</span>
+          <div class="font-medium text-2xl">{{ totals.hashRate | hashSuffix }}</div>
+        </div>
+      </div>
+      <div class="w-1/2 xl:w-1/4 px-2 mb-4">
+        <div class="card flex flex-col mb-0 h-full">
+          <span class="text-secondary font-medium mb-3">Total Power</span>
+          <div class="font-medium text-2xl">{{ (totals.power | number: '1.1-1') + ' W' }}</div>
+        </div>
+      </div>
+      <div class="w-1/2 xl:w-1/4 px-2 mb-4">
+        <div class="card flex flex-col mb-0 h-full">
+          <span class="text-secondary font-medium mb-3">Best Diff</span>
+          <div class="font-medium text-2xl">{{ totals.bestDiff | diffSuffix }}</div>
+        </div>
+      </div>
     </div>
     <div class="mt-2 mb-3 gap-2 sm:gap-3 flex justify-end">
       <div class="flex gap-2 sm:gap-3 items-center">
@@ -98,7 +133,7 @@
         <div class="flex flex-wrap -mx-2">
           @for (axe of filteredSwarm; track axe) {
             <div [class]="'w-full sm:w-1/2 px-2 mb-4 ' + (staticMenuDesktopInactive ? 'xl:w-1/4' : 'xl:w-1/3')">
-              <div class="card flex justify-between mb-0 h-full">
+              <div class="card flex justify-between mb-0 h-full" [class.not-hashing]="isNotHashing(axe)">
                 <div class="flex flex-col justify-between">
                   <div class="flex flex-col">
                     <div class="flex flex-col">
@@ -106,7 +141,7 @@
                         <a [href]="'http://' + getDeviceLink(axe)" target="_blank" appTooltip="Hostname" tooltipPosition="top" class="underline">
                           {{getDeviceDisplayName(axe)}}
                         </a>
-                        <span class="ml-1 text-lg leading-none cursor-pointer" [ngStyle]="{color: axe.swarmColor}" appTooltip="{{stringifyDeviceLabel(axe)}}" tooltipPosition="top">
+                        <span class="ml-1 text-lg leading-none cursor-pointer" [style.color]="axe.swarmColor" appTooltip="{{stringifyDeviceLabel(axe)}}" tooltipPosition="top">
                           ●
                         </span>
                         @if (isThisDevice(axe)) {
@@ -170,7 +205,7 @@
                         class="pi pi-exclamation-triangle cursor-pointer text-lg"
                         appTooltip="{{ notification.msg }}"
                         tooltipPosition="top"
-                      [ngClass]="'text-' + notification.color + '-500'"></i>
+                        [class]="'text-' + notification.color + '-500'"></i>
                     }
                   </div>
                 </div>
@@ -196,16 +231,16 @@
                   </div>
                   <div>
                     @if (axe.vrTemp) {
-                      <span class="text-secondary cursor-pointer mr-2" [ngClass]="{'text-red-500 font-bold': axe.vrTemp > 105}" appTooltip="Voltage Regulator Temperature" tooltipPosition="top">
+                      <span class="text-secondary cursor-pointer mr-2" [class.text-red-500]="axe.vrTemp > 105" [class.font-bold]="axe.vrTemp > 105" appTooltip="Voltage Regulator Temperature" tooltipPosition="top">
                         {{axe.vrTemp | number: '1.0-1'}} °C
                       </span>
                     }
                     @if (axe.temp2 > 0) {
-                      <span class="cursor-pointer mr-2" [ngClass]="{'text-red-500 font-bold': axe.temp2 > 70}" appTooltip="ASIC Temperature 2" tooltipPosition="top">
+                      <span class="cursor-pointer mr-2" [class.text-red-500]="axe.temp2 > 70" [class.font-bold]="axe.temp2 > 70" appTooltip="ASIC Temperature 2" tooltipPosition="top">
                         {{axe.temp2 | number: '1.0-1'}} °C
                       </span>
                     }
-                    <span class="cursor-pointer" [ngClass]="{'text-red-500 font-bold': axe.temp > 70}" appTooltip="ASIC Temperature{{ axe.temp2 > 0 ? ' 1' : '' }}" tooltipPosition="top">
+                    <span class="cursor-pointer" [class.text-red-500]="axe.temp > 70" [class.font-bold]="axe.temp > 70" appTooltip="ASIC Temperature{{ axe.temp2 > 0 ? ' 1' : '' }}" tooltipPosition="top">
                       @if (axe.temp > 0) {
                         {{axe.temp | number: '1.0-1'}} °C
                       } @else {
@@ -244,10 +279,10 @@
                   <th class="text-secondary font-medium py-3 px-2">
                     <div class="flex items-center cursor-pointer select-none relative" (click)="sortBy(field.name)">
                       <span class="pr-5">{{field.label}}</span>
-                                    <i class="pi text-xs absolute right-0" [ngClass]="{
-                                        'pi-sort-up-fill': selectedSort.sortField === field.name && selectedSort.sortDirection === 'asc',
-                                        'pi-sort-down-fill': selectedSort.sortField === field.name && selectedSort.sortDirection === 'desc'
-                                    }"></i>
+                      <i class="pi text-xs absolute right-0" [class]="{
+                        'pi-sort-up-fill': selectedSort.sortField === field.name && selectedSort.sortDirection === 'asc',
+                        'pi-sort-down-fill': selectedSort.sortField === field.name && selectedSort.sortDirection === 'desc'
+                      }"></i>
                     </div>
                   </th>
                 }
@@ -256,12 +291,12 @@
             </thead>
             <tbody>
               @for (axe of filteredSwarm; track axe) {
-                <tr class="border-b border-surface hover:bg-bg-hover transition-colors">
+                <tr class="border-b border-surface hover:bg-bg-hover transition-colors" [class.not-hashing]="isNotHashing(axe)">
                   <td class="py-3 px-2">
                     <div class="flex flex-col">
                       <a [href]="'http://' + getDeviceLink(axe)" target="_blank" class="underline font-medium">
                         <span>{{getDeviceDisplayName(axe)}}</span>
-                        <span class="ml-2 text-lg leading-none cursor-pointer" [ngStyle]="{color: axe.swarmColor}" appTooltip="{{stringifyDeviceLabel(axe)}}" tooltipPosition="top">●</span>
+                        <span class="ml-2 text-lg leading-none cursor-pointer" [style.color]="axe.swarmColor" appTooltip="{{stringifyDeviceLabel(axe)}}" tooltipPosition="top">●</span>
                         @if (isThisDevice(axe)) {
                           <span class="ml-2 cursor-pointer" appTooltip="This device" tooltipPosition="top">
                             <i class="pi pi-star-fill text-xs text-yellow-500"></i>
@@ -271,7 +306,7 @@
                       <span class="text-secondary text-sm">{{axe.ipv4}}</span>
                     </div>
                     @if (getDeviceNotification(axe); as notification) {
-                      <div class="flex items-center gap-1 mt-1" [ngClass]="'text-' + notification.color + '-500'">
+                      <div class="flex items-center gap-1 mt-1" [class]="'text-' + notification.color + '-500'">
                         <i class="pi pi-exclamation-triangle"></i>
                         <span class="text-sm font-medium">{{ notification.msg }}</span>
                       </div>
@@ -299,7 +334,7 @@
                   </td>
                   <td class="py-3 px-2 text-sm font-medium">{{axe.power | number: '1.1-1'}} W</td>
                   <td class="py-3 px-2">
-                    <p class="cursor-pointer m-0 text-sm" [ngClass]="{'text-red-500 font-bold': axe.temp > 70}" appTooltip="ASIC Temperature{{ axe.temp2 > 0 ? ' 1' : '' }}" tooltipPosition="top">
+                    <p class="cursor-pointer m-0 text-sm" [class.text-red-500]="axe.temp > 70" [class.font-bold]="axe.temp > 70" appTooltip="ASIC Temperature{{ axe.temp2 > 0 ? ' 1' : '' }}" tooltipPosition="top">
                       @if (axe.temp > 0) {
                         {{axe.temp | number: '1.0-1'}} °C
                       } @else {
@@ -307,12 +342,12 @@
                       }
                     </p>
                     @if (axe.temp2 > 0) {
-                      <p class="cursor-pointer m-0 text-sm" [ngClass]="{'text-red-500 font-bold': axe.temp2 > 70}" appTooltip="ASIC Temperature 2" tooltipPosition="top">
+                      <p class="cursor-pointer m-0 text-sm" [class.text-red-500]="axe.temp2 > 70" [class.font-bold]="axe.temp2 > 70" appTooltip="ASIC Temperature 2" tooltipPosition="top">
                         {{axe.temp2 | number: '1.0-1'}} °C
                       </p>
                     }
                     @if (axe.vrTemp) {
-                      <p class="text-secondary cursor-pointer m-0 text-xs" [ngClass]="{'text-red-500 font-bold': axe.vrTemp > 105}" appTooltip="Voltage Regulator Temperature" tooltipPosition="top">
+                      <p class="text-secondary cursor-pointer m-0 text-xs" [class.text-red-500]="axe.vrTemp > 105" [class.font-bold]="axe.vrTemp > 105" appTooltip="Voltage Regulator Temperature" tooltipPosition="top">
                         {{axe.vrTemp | number: '1.0-1'}} °C
                       </p>
                     }
@@ -372,7 +407,7 @@
       <div class="flex flex-wrap gap-4 mt-4 text-sm justify-center">
         @for (item of deviceFamilies; track item) {
           <div class="flex items-center gap-1.5">
-            <span [ngStyle]="{color: item.swarmColor}">●</span>
+            <span [style.color]="item.swarmColor">●</span>
             <span class="text-secondary">{{stringifyDeviceLabel(item)}}</span>
           </div>
         }

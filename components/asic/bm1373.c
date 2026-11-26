@@ -3,7 +3,6 @@
 
 #include "crc.h"
 #include "global_state.h"
-#include "mining.h"
 #include "serial.h"
 #include "utils.h"
 
@@ -14,11 +13,8 @@
 #include "pll.h"
 
 #include <arpa/inet.h>
-#include <math.h>
 #include <stdbool.h>
 #include <stdint.h>
-#include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 
 #define BM1372_CHIP_ID 0x1372
@@ -98,7 +94,7 @@ typedef struct __attribute__((__packed__))
 {
     uint32_t nonce;
     uint8_t midstate_num;
-    uint8_t id;
+    uint8_t chip_slot;
     uint16_t version;
 } bm1373_asic_result_job_t;
 
@@ -128,7 +124,7 @@ static task_result result;
 
 static uint8_t chip_command_address_interval;
 static uint8_t chip_response_address_interval;
-static uint8_t chip_nonce_address_interval;
+static uint16_t chip_nonce_address_interval;
 static uint8_t detected_chip_count;
 static uint8_t detected_voltage_domains;
 static bool frequency_write_failed;
@@ -448,31 +444,10 @@ int BM1373_set_max_baud(void)
     return BM1372_ASIC_BAUD;
 }
 
-static uint8_t id = 0;
-
-void BM1373_send_work(GlobalState * GLOBAL_STATE, asic_job_t * next_job)
+void BM1373_send_work(GlobalState * GLOBAL_STATE, const asic_job_t * next_job)
 {
     bm13xx_job_packet_t job;
-    id = (id + 24) % 128;
-    bm13xx_build_job_packet(next_job, id, &job);
-
-    // Hold valid_jobs_lock across the free + reassignment so result decoding
-    // (which snapshots active_jobs[job_id] under the same lock) can never observe
-    // or copy a slot we are freeing/replacing here. valid_jobs is set inside the
-    // same critical section so validity and the pointer stay consistent.
-    pthread_mutex_lock(&GLOBAL_STATE->ASIC_TASK_MODULE.valid_jobs_lock);
-    if (GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[job.job_id] != NULL) {
-        free(GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[job.job_id]);
-    }
-    GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[job.job_id] = next_job;
-    GLOBAL_STATE->ASIC_TASK_MODULE.valid_jobs[job.job_id] = 1;
-    pthread_mutex_unlock(&GLOBAL_STATE->ASIC_TASK_MODULE.valid_jobs_lock);
-
-    //debug sent jobs - this can get crazy if the interval is short
-    #if BM1373_DEBUG_JOBS
-    ESP_LOGI(TAG, "Send Job: %02X", job.job_id);
-    #endif
-
+    bm13xx_build_job_packet(&GLOBAL_STATE->job_store, next_job, &job);
     _send_BM1373((TYPE_JOB | GROUP_SINGLE | CMD_WRITE), (uint8_t *)&job, sizeof(job), BM1373_DEBUG_WORK);
 }
 
@@ -498,35 +473,15 @@ task_result * BM1373_process_work(GlobalState * GLOBAL_STATE)
         return &result;
     }
 
-    // uint8_t job_id = asic_result.job_id;
-    // uint8_t rx_job_id = ((int8_t)job_id & 0xf0) >> 1;
-    // ESP_LOGI(TAG, "Job ID: %02X, RX: %02X", job_id, rx_job_id);
-
-    // uint8_t job_id = asic_result.job_id & 0xf8;
-    // ESP_LOGI(TAG, "Job ID: %02X, Core: %01X", job_id, asic_result.job_id & 0x07);
-
-    uint8_t job_id = (asic_result.job.id & 0xf0) >> 1;
-    uint32_t nonce_h = ntohl(asic_result.job.nonce);
-    uint8_t asic_nr = (uint8_t)((nonce_h >> 17) & 0xff) / chip_nonce_address_interval;
-    uint8_t core_id = (uint8_t)((nonce_h >> 25) & 0x7f);
-    uint8_t small_core_id = asic_result.job.id & 0x0f;
-    uint32_t version_bits = (ntohs(asic_result.job.version) << 13);
-
-    // Capture the job and its rolled version together before the slot can change.
-    pthread_mutex_lock(&GLOBAL_STATE->ASIC_TASK_MODULE.valid_jobs_lock);
-    if (job_id >= MAX_ASIC_JOBS || GLOBAL_STATE->ASIC_TASK_MODULE.valid_jobs[job_id] == 0 || GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[job_id] == NULL) {
-        pthread_mutex_unlock(&GLOBAL_STATE->ASIC_TASK_MODULE.valid_jobs_lock);
-        ESP_LOGW(TAG, "Invalid job nonce found, 0x%02X", job_id);
+    if (!bm13xx_decode_job_result(&GLOBAL_STATE->job_store,
+                                  BM1373_SMALL_CORE_BITS,
+                                  chip_nonce_address_interval,
+                                  asic_result.job.nonce,
+                                  asic_result.job.chip_slot,
+                                  asic_result.job.version,
+                                  &result)) {
         return NULL;
     }
-    result.job = *GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[job_id];
-    result.rolled_version = result.job.version | version_bits;
-    pthread_mutex_unlock(&GLOBAL_STATE->ASIC_TASK_MODULE.valid_jobs_lock);
-
-    result.nonce = asic_result.job.nonce;
-    result.asic_nr = asic_nr;
-    result.core_id = core_id;
-    result.small_core_id = small_core_id;
 
     return &result;
 }

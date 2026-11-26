@@ -5,7 +5,7 @@
     [class.border-primary]="isOpen"
     [class.opacity-50]="disabled"
     [class.pointer-events-none]="disabled"
-    [ngClass]="triggerClass || 'input-text'"
+    [class]="triggerClass || 'input-text'"
     class="flex items-center justify-between cursor-pointer select-none bg-bg-card border border-surface rounded outline-none transition duration-150 focus:border-primary"
   >
     <span class="truncate">{{ selectedOptionName }}</span>

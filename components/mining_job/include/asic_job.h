@@ -1,6 +1,7 @@
 #ifndef ASIC_JOB_H_
 #define ASIC_JOB_H_
 
+#include <stdbool.h>
 #include <stdint.h>
 
 #define ASIC_JOB_ID_LEN 32

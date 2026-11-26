@@ -1,6 +1,9 @@
 import { Component, Injectable } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Observable, Subject } from 'rxjs';
+import { ModalComponent } from '../components/modal/modal.component';
+import { TooltipDirective } from '../directives/tooltip.directive';
+import { WifiIconComponent } from '../components/wifi-icon/wifi-icon.component';
 
 export interface DialogOption {
   label: string;
@@ -72,8 +75,8 @@ export class DialogService {
         </div>
       </app-modal>
     }
-    `,
-    standalone: false
+  `,
+    imports: [ModalComponent, TooltipDirective, WifiIconComponent]
 })
 export class DialogListComponent {
   public dialogs: DialogInstance[] = [];

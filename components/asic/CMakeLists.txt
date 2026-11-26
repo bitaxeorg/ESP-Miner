@@ -8,6 +8,7 @@ SRCS
     "serial.c"
     "crc.c"
     "asic_common.c"
+    "asic_job_slot.c"
     "asic.c"
     "asic_submit.c"
     "bm_hashrate.c"

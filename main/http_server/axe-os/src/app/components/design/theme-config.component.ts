@@ -3,6 +3,8 @@ import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { LayoutService } from '../../layout/service/app.layout.service';
 import { ThemeService } from '../../services/theme.service';
+import { RadioButtonComponent } from '../radio-button/radio-button.component';
+import { FormsModule } from '@angular/forms';
 
 interface ThemeOption {
   name: string;
@@ -13,7 +15,7 @@ interface ThemeOption {
   selector: 'app-theme-config',
   templateUrl: './theme-config.component.html',
   styleUrls: ['./design-component.scss'],
-  standalone: false
+  imports: [RadioButtonComponent, FormsModule]
 })
 export class ThemeConfigComponent implements OnInit {
   selectedScheme: string;

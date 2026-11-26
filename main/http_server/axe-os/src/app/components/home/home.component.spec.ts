@@ -35,7 +35,6 @@ import { LocalStorageService } from 'src/app/local-storage.service';
 import { DashboardEditService } from 'src/app/services/dashboard-edit.service';
 import { LayoutService } from 'src/app/layout/service/app.layout.service';
 import { SystemInfo as ISystemInfo, SystemStatistics as ISystemStatistics } from 'src/app/generated/models';
-import { eChartLabel } from 'src/models/enum/eChartLabel';
 
 const mockSystemInfo: ISystemInfo = {
   ASICModel: 'BM1370',
@@ -120,6 +119,7 @@ const mockSystemInfo: ISystemInfo = {
   responseTimeMax: 45,
   responseShareBatch: 1,
   poolDifficulty: 1000,
+  asicDifficulty: 256,
   blockHeight: 800000,
   networkDifficulty: 5000000,
   scriptsig: 'test-scriptsig',
@@ -208,13 +208,6 @@ describe('HomeComponent', () => {
   beforeEach(() => {
     mockLiveDataService.info$ = new BehaviorSubject<ISystemInfo>(structuredClone(mockSystemInfo));
     TestBed.configureTestingModule({
-      declarations: [
-        HomeComponent,
-        TooltipTextIconComponent,
-        TooltipIconComponent,
-        ConfettiComponent,
-        SnowflakesComponent
-      ],
       imports: [
         ReactiveFormsModule,
         FormsModule,
@@ -228,7 +221,12 @@ describe('HomeComponent', () => {
         DateAgoPipe,
         AddressPipe,
         SatsPipe,
-        ByteSuffixPipe
+        ByteSuffixPipe,
+        HomeComponent,
+        TooltipTextIconComponent,
+        TooltipIconComponent,
+        ConfettiComponent,
+        SnowflakesComponent
       ],
       providers: [
         provideRouter([]),
@@ -264,6 +262,20 @@ describe('HomeComponent', () => {
     expect(component.messages.some(message => message.type === 'FREQUENCY_LOW')).toBeTrue();
     component.handleSystemMessages(info, error, [100, 200, 300]);
     expect(component.messages.some(message => message.type === 'FREQUENCY_LOW')).toBeFalse();
+  });
+
+  it('shows POOL_DIFFICULTY_LOW warning when pool difficulty is below ASIC difficulty', () => {
+    const error = { duration: 0, startTime: null };
+    const info: ISystemInfo = { ...mockSystemInfo, poolDifficulty: 1000, asicDifficulty: 256 };
+    component.handleSystemMessages(info, error);
+    expect(component.messages.some(message => message.type === 'POOL_DIFFICULTY_LOW')).toBeFalse();
+
+    component.handleSystemMessages({ ...info, poolDifficulty: 16, asicDifficulty: 256 }, error);
+    expect(component.messages.some(message => message.type === 'POOL_DIFFICULTY_LOW')).toBeTrue();
+
+    // When pool difficulty is 0 (disconnected or waiting for diff), no warning
+    component.handleSystemMessages({ ...info, poolDifficulty: 0, asicDifficulty: 256 }, error);
+    expect(component.messages.some(message => message.type === 'POOL_DIFFICULTY_LOW')).toBeFalse();
   });
 
   it('handles mining reward messages using coinbasePayoutStatus', () => {
@@ -330,7 +342,7 @@ describe('HomeComponent', () => {
   it('should render the dashboard widgets and dropdowns when info is loaded', () => {
     fixture.detectChanges();
     const element = fixture.nativeElement;
-    // Verify that the dropdowns inside *ngIf are rendered
+    // Verify that the dropdowns inside the @if block are rendered
     expect(element.querySelector('app-dropdown')).toBeTruthy();
   });
 
@@ -766,10 +778,10 @@ describe('HomeComponent', () => {
     });
 
     it('should return 0 for response time min/max and undefined for others in getMinForLabel', () => {
-      expect(component.getMinForLabel(eChartLabel.responseTimeMin)).toBe(0);
-      expect(component.getMinForLabel(eChartLabel.responseTimeMax)).toBe(0);
-      expect(component.getMinForLabel(eChartLabel.hashrate)).toBeUndefined();
-      expect(component.getMinForLabel(eChartLabel.none)).toBeUndefined();
+      expect(component.getMinForLabel('responseTimeMin')).toBe(0);
+      expect(component.getMinForLabel('responseTimeMax')).toBe(0);
+      expect(component.getMinForLabel('hashrate')).toBeUndefined();
+      expect(component.getMinForLabel('none')).toBeUndefined();
       expect(component.getMinForLabel(undefined)).toBeUndefined();
     });
   });

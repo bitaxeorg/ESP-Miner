@@ -1,7 +1,4 @@
 #include "asic_internal.h"
-#include <string.h>
-#include <math.h>
-#include <stdlib.h>
 
 #include <esp_log.h>
 
@@ -13,8 +10,8 @@
 
 #include "asic.h"
 #include "asic_common.h"
+#include "bm_job_packet.h"
 #include "global_state.h"
-#include "mining.h"
 #include "device_config.h"
 #include "frequency_transition_bmXX.h"
 
@@ -75,7 +72,7 @@ int ASIC_set_max_baud(GlobalState * GLOBAL_STATE)
     return 0;
 }
 
-void ASIC_send_work(GlobalState * GLOBAL_STATE, asic_job_t * next_job)
+void ASIC_send_work(GlobalState * GLOBAL_STATE, const asic_job_t * next_job)
 {
     switch (GLOBAL_STATE->DEVICE_CONFIG.family.asic.id) {
         case BM1397:
@@ -95,28 +92,28 @@ void ASIC_send_work(GlobalState * GLOBAL_STATE, asic_job_t * next_job)
             break;
         default:
             ESP_LOGE(TAG, "Unknown ASIC id %d — cannot send work", GLOBAL_STATE->DEVICE_CONFIG.family.asic.id);
-            free(next_job);
             break;
     }
 }
 
 void ASIC_set_version_mask(GlobalState * GLOBAL_STATE, uint32_t mask)
 {
+    uint32_t hw_mask = mask & GLOBAL_STATE->DEVICE_CONFIG.family.asic.hw_version_mask;
     switch (GLOBAL_STATE->DEVICE_CONFIG.family.asic.id) {
         case BM1397:
-            BM1397_set_version_mask(mask);
+            BM1397_set_version_mask(hw_mask);
             break;
         case BM1366:
-            BM1366_set_version_mask(mask);
+            BM1366_set_version_mask(hw_mask);
             break;
         case BM1368:
-            BM1368_set_version_mask(mask);
+            BM1368_set_version_mask(hw_mask);
             break;
         case BM1370:
-            BM1370_set_version_mask(mask);
+            BM1370_set_version_mask(hw_mask);
             break;
         case BM1373:
-            BM1373_set_version_mask(mask);
+            BM1373_set_version_mask(hw_mask);
             break;
         default:
             ESP_LOGE(TAG, "Unknown ASIC id %d — cannot set version mask", GLOBAL_STATE->DEVICE_CONFIG.family.asic.id);
@@ -172,26 +169,25 @@ void ASIC_set_nonce_space(GlobalState * GLOBAL_STATE)
     ESP_LOGE(TAG, "Unknown ASIC id %d — cannot set nonce space", GLOBAL_STATE->DEVICE_CONFIG.family.asic.id);
 }
 
-double ASIC_get_asic_job_frequency_ms(GlobalState * GLOBAL_STATE)
+float ASIC_get_asic_job_frequency_ms(GlobalState * GLOBAL_STATE, uint32_t version_mask)
 {
-    float freq = GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value;
-    int cores = GLOBAL_STATE->DEVICE_CONFIG.family.asic.core_count;
-    int small_cores = GLOBAL_STATE->DEVICE_CONFIG.family.asic.small_core_count;
+    const AsicConfig *asic = &GLOBAL_STATE->DEVICE_CONFIG.family.asic;
     int asic_count = GLOBAL_STATE->DEVICE_CONFIG.family.asic_count;
-    int asic_default_timeout_divided = GLOBAL_STATE->DEVICE_CONFIG.family.asic.default_asic_timeout / _next_power_of_two(asic_count);
 
-    switch (GLOBAL_STATE->DEVICE_CONFIG.family.asic.id) {
-        case BM1397:
-            // no version-rolling so same Nonce Space is splitted between Big Cores
-            return calculate_bm_timeout_ms(freq, asic_count, small_cores, cores, GLOBAL_STATE->DEVICE_CONFIG.family.asic.software_midstates, 1.0, asic_default_timeout_divided);
-        case BM1366:
-        case BM1368:
-        case BM1370:
-        case BM1373:
-            return asic_default_timeout_divided;
+    if (asic->fixed_timeout_ms > 0) {
+        return (float)asic->fixed_timeout_ms / _next_power_of_two(asic_count);
     }
-    ESP_LOGE(TAG, "Unknown ASIC id %d — cannot compute job frequency", GLOBAL_STATE->DEVICE_CONFIG.family.asic.id);
-    return 500;
+
+    float freq = GLOBAL_STATE->POWER_MANAGEMENT_MODULE.actual_frequency;
+    if (freq <= 0.0f) {
+        freq = GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value;
+    }
+
+    uint32_t hw_bits = version_mask & asic->hw_version_mask;
+    uint8_t midstates = (asic->packet_midstates > 0) ? asic->packet_midstates : 1;
+    uint64_t versions_per_packet = (uint64_t)midstates << __builtin_popcount(hw_bits);
+
+    return calculate_bm_timeout_ms(freq, asic_count, asic->small_core_count, asic->core_count, versions_per_packet, 0.95f);
 }
 
 void ASIC_read_registers(GlobalState * GLOBAL_STATE)
@@ -246,9 +242,13 @@ esp_err_t ASIC_get_domain_measurement(GlobalState * GLOBAL_STATE, uint8_t asic_n
 
 void ASIC_set_difficulty(GlobalState * GLOBAL_STATE, uint8_t difficulty_power)
 {
-    if (!GLOBAL_STATE || !GLOBAL_STATE->ASIC_initalized || difficulty_power == 0) {
+    if (!GLOBAL_STATE || !GLOBAL_STATE->ASIC_initalized) {
         return;
     }
+
+    GLOBAL_STATE->SYSTEM_MODULE.current_difficulty_power = difficulty_power;
+
+    ESP_LOGI(TAG, "ASIC difficulty set to %u", 1U << difficulty_power);
 
     switch (GLOBAL_STATE->DEVICE_CONFIG.family.asic.id) {
         case BM1397:
@@ -268,4 +268,42 @@ void ASIC_set_difficulty(GlobalState * GLOBAL_STATE, uint8_t difficulty_power)
             return;
     }
     ESP_LOGE(TAG, "Unknown ASIC id %d — cannot set difficulty", GLOBAL_STATE->DEVICE_CONFIG.family.asic.id);
+}
+
+void ASIC_clear_work(GlobalState * GLOBAL_STATE)
+{
+    if (!GLOBAL_STATE) {
+        return;
+    }
+
+    switch (GLOBAL_STATE->DEVICE_CONFIG.family.asic.id) {
+        case BM1397:
+        case BM1366:
+        case BM1368:
+        case BM1370:
+        case BM1373:
+            bm13xx_clear_work(&GLOBAL_STATE->job_store);
+            return;
+    }
+    ESP_LOGE(TAG, "Unknown ASIC id %d — cannot clear work", GLOBAL_STATE->DEVICE_CONFIG.family.asic.id);
+}
+
+void ASIC_init_job_slots(GlobalState * GLOBAL_STATE)
+{
+    if (!GLOBAL_STATE) {
+        return;
+    }
+
+    switch (GLOBAL_STATE->DEVICE_CONFIG.family.asic.id) {
+        case BM1397:
+            bm13xx_init_job_slots(&GLOBAL_STATE->job_store, BM1397_JOB_SLOT_COUNT);
+            return;
+        case BM1366:
+        case BM1368:
+        case BM1370:
+        case BM1373:
+            bm13xx_init_job_slots(&GLOBAL_STATE->job_store, BM13XX_JOB_SLOT_COUNT);
+            return;
+    }
+    ESP_LOGE(TAG, "Unknown ASIC id %d — cannot init job slots", GLOBAL_STATE->DEVICE_CONFIG.family.asic.id);
 }

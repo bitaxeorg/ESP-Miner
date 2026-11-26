@@ -1,16 +1,13 @@
 #include "unity.h"
-#include "bitmain_job_test_bindings.h"
 #include "job_pipeline_test_harness.h"
 #include "utils.h"
 #include <string.h>
-#undef malloc
 
-TEST_CASE("job submission rejects unterminated metadata before allocation",
+TEST_CASE("job submission rejects unterminated metadata before sending",
           "[asic-job][ownership]")
 {
     asic_job_t source = {0};
     job_pipeline_harness_result_t result;
-    bitmain_job_allocator_fault_injector_reset(0);
     memset(source.job_id, 'x', sizeof(source.job_id));
     job_pipeline_harness_send_job(&source, &result);
     TEST_ASSERT_EQUAL_UINT32(0, result.job_count);
@@ -18,7 +15,6 @@ TEST_CASE("job submission rejects unterminated metadata before allocation",
     memset(source.extranonce2, 'a', sizeof(source.extranonce2));
     job_pipeline_harness_send_job(&source, &result);
     TEST_ASSERT_EQUAL_UINT32(0, result.job_count);
-    TEST_ASSERT_EQUAL_UINT32(0, bitmain_job_allocator_fault_injector_calls());
     source.extranonce2[0] = 0;
     job_pipeline_harness_send_job(&source, &result);
     TEST_ASSERT_EQUAL_UINT32(1, result.job_count);
@@ -29,10 +25,9 @@ TEST_CASE("job submission rejects unterminated metadata before allocation",
     uint8_t zero_target[32] = {0};
     TEST_ASSERT_EQUAL_MEMORY(zero_target, result.jobs[0]->pool_target, 32);
     job_pipeline_harness_result_free(&result);
-    bitmain_job_allocator_fault_injector_reset(0);
 }
 
-TEST_CASE("job submission owns metadata and recovers from allocation failures",
+TEST_CASE("job submission forwards valid metadata",
           "[asic-job][bitmain]")
 {
     asic_job_t source = {
@@ -41,17 +36,10 @@ TEST_CASE("job submission owns metadata and recovers from allocation failures",
     };
     diff_to_target(256.0, source.pool_target);
     job_pipeline_harness_result_t result;
-    bitmain_job_allocator_fault_injector_reset(1);
-    job_pipeline_harness_send_job(&source, &result);
-    TEST_ASSERT_EQUAL_UINT32(0, result.job_count);
-    TEST_ASSERT_EQUAL_UINT32(1, bitmain_job_allocator_fault_injector_calls());
-    bitmain_job_allocator_fault_injector_reset(0);
     job_pipeline_harness_send_job(NULL, &result);
     TEST_ASSERT_EQUAL_UINT32(0, result.job_count);
-    bitmain_job_allocator_fault_injector_reset(2);
     job_pipeline_harness_send_job(&source, &result);
     TEST_ASSERT_EQUAL_UINT32(1, result.job_count);
-    TEST_ASSERT_EQUAL_UINT32(1, bitmain_job_allocator_fault_injector_calls());
     memset(&source, 0, sizeof(source));
     TEST_ASSERT_EQUAL_STRING("send", result.jobs[0]->job_id);
     TEST_ASSERT_EQUAL_STRING("aabbcc", result.jobs[0]->extranonce2);
@@ -61,5 +49,4 @@ TEST_CASE("job submission owns metadata and recovers from allocation failures",
     diff_to_target(256.0, expected_target);
     TEST_ASSERT_EQUAL_MEMORY(expected_target, result.jobs[0]->pool_target, 32);
     job_pipeline_harness_result_free(&result);
-    bitmain_job_allocator_fault_injector_reset(0);
 }

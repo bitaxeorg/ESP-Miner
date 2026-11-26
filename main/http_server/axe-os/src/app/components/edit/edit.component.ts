@@ -11,7 +11,6 @@ import { ActivatedRoute } from '@angular/router';
 import { DateAgoPipe } from 'src/app/pipes/date-ago.pipe';
 import { DropdownComponent } from '../dropdown/dropdown.component';
 import { SelectOption } from '../../models/select-option.model';
-import { CommonModule } from '@angular/common';
 import { TooltipDirective } from '../../directives/tooltip.directive';
 import { CheckboxComponent } from '../checkbox/checkbox.component';
 import { SliderComponent } from '../slider/slider.component';
@@ -24,7 +23,6 @@ const STATS_FREQUENCY_STEPS = [0, 1, 2, 5, 10, 30, 60, 60 * 2, 60 * 6, 60 * 14, 
     templateUrl: './edit.component.html',
     standalone: true,
     imports: [
-        CommonModule,
         ReactiveFormsModule,
         CheckboxComponent,
         DropdownComponent,

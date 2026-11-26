@@ -5,25 +5,23 @@
 
 #include "bm13xx_test_harness.h"
 #include "bm1397_test_harness.h"
-#include "mining.h"
 
 #include <stdlib.h>
 #include <string.h>
 
-static asic_job_t *make_job(void)
+static asic_job_t make_job(void)
 {
-    asic_job_t *job = calloc(1, sizeof(*job));
-    TEST_ASSERT_NOT_NULL(job);
-    job->version = 0x20000004;
-    job->version_mask = 0x1fffe000;
-    job->nbits = 0x1705dd01;
-    job->ntime = 0x64658bd8;
-    job->starting_nonce = 0x12345678;
-    diff_to_target(256.125, job->pool_target);
-    job->pool_id = UINT8_MAX;
-    job->source_type = JOB_TYPE_V1;
-    strcpy(job->job_id, "packet-job");
-    strcpy(job->extranonce2, "0001020304050607");
+    asic_job_t job = {0};
+    job.version = 0x20000004;
+    job.version_mask = 0x1fffe000;
+    job.nbits = 0x1705dd01;
+    job.ntime = 0x64658bd8;
+    job.starting_nonce = 0x12345678;
+    diff_to_target(256.125, job.pool_target);
+    job.pool_id = UINT8_MAX;
+    job.source_type = JOB_TYPE_V1;
+    strcpy(job.job_id, "packet-job");
+    strcpy(job.extranonce2, "0001020304050607");
     static const uint8_t merkle_root[32] = {
         0x1c, 0x1d, 0x1e, 0x1f, 0x18, 0x19, 0x1a, 0x1b,
         0x14, 0x15, 0x16, 0x17, 0x10, 0x11, 0x12, 0x13,
@@ -36,8 +34,8 @@ static asic_job_t *make_job(void)
         0x2c, 0x2d, 0x2e, 0x2f, 0x28, 0x29, 0x2a, 0x2b,
         0x24, 0x25, 0x26, 0x27, 0x20, 0x21, 0x22, 0x23,
     };
-    memcpy(job->merkle_root, merkle_root, sizeof(merkle_root));
-    memcpy(job->prev_hash, prev_hash, sizeof(prev_hash));
+    memcpy(job.merkle_root, merkle_root, sizeof(merkle_root));
+    memcpy(job.prev_hash, prev_hash, sizeof(prev_hash));
     return job;
 }
 
@@ -70,37 +68,38 @@ TEST_CASE("BM13xx work packets preserve complete header fields byte exact",
         0x04, 0x00, 0x00, 0x20, 0x00, 0x00,
     };
     static const struct {
-        uint8_t job_id;
+        uint8_t chip_slot;
         uint8_t crc_high;
         uint8_t crc_low;
     } expected[] = {
         {0x08, 0xd6, 0x21},
-        {0x18, 0x05, 0xd4},
-        {0x18, 0x05, 0xd4},
-        {0x18, 0x05, 0xd4},
+        {0x08, 0xd6, 0x21},
+        {0x08, 0xd6, 0x21},
+        {0x08, 0xd6, 0x21},
     };
 
     for (size_t index = 0; index < BM13XX_HARNESS_DRIVER_COUNT; ++index) {
         const bm13xx_harness_driver_t *driver = &bm13xx_harness_drivers[index];
-        GlobalState *state = bm13xx_harness_begin();
+        GlobalState *state = bm13xx_harness_begin(driver);
 
-        asic_job_t *job = make_job();
-        driver->send_work(state, job);
+        asic_job_t job = make_job();
+        driver->send_work(state, &job);
 
         TEST_ASSERT_EQUAL_UINT32_MESSAGE(1, bm13xx_harness_packet_count(),
                                          driver->name);
         const bm13xx_harness_packet_t *packet = bm13xx_harness_packet(0);
         uint8_t expected_packet[sizeof(expected_template)];
         memcpy(expected_packet, expected_template, sizeof(expected_packet));
-        expected_packet[4] = expected[index].job_id;
+        expected_packet[4] = expected[index].chip_slot;
         expected_packet[sizeof(expected_packet) - 2] = expected[index].crc_high;
         expected_packet[sizeof(expected_packet) - 1] = expected[index].crc_low;
         TEST_ASSERT_EQUAL_UINT32_MESSAGE(sizeof(expected_packet), packet->length,
                                          driver->name);
         TEST_ASSERT_EQUAL_HEX8_ARRAY_MESSAGE(expected_packet, packet->bytes,
                                              sizeof(expected_packet), driver->name);
-        TEST_ASSERT_EQUAL_PTR(job,
-                              bm13xx_harness_active_job(expected[index].job_id));
+        const asic_job_t *active = bm13xx_harness_active_job(1);
+        TEST_ASSERT_TRUE_MESSAGE(bm13xx_harness_slot_valid(1), driver->name);
+        TEST_ASSERT_EQUAL_STRING_MESSAGE(job.job_id, active->job_id, driver->name);
         bm13xx_harness_end();
     }
 }
@@ -139,15 +138,17 @@ TEST_CASE("BM1397 work packet and returned midstate preserve version mapping",
     TEST_ASSERT_EQUAL_UINT8(2, bm1397_harness_driver.init(state));
     bm1397_harness_clear_packets();
 
-    asic_job_t *job = make_job();
-    bm1397_harness_driver.send_work(state, job);
+    asic_job_t job = make_job();
+    bm1397_harness_driver.send_work(state, &job);
 
     TEST_ASSERT_EQUAL_UINT32(1, bm1397_harness_packet_count());
     const bm1397_harness_packet_t *packet = bm1397_harness_packet(0);
     TEST_ASSERT_EQUAL_UINT32(sizeof(expected_packet), packet->length);
     TEST_ASSERT_EQUAL_HEX8_ARRAY(expected_packet, packet->bytes,
                                  sizeof(expected_packet));
-    TEST_ASSERT_EQUAL_PTR(job, bm1397_harness_active_job(4));
+    const asic_job_t *active = bm1397_harness_active_job(1);
+    TEST_ASSERT_TRUE(bm1397_harness_slot_valid(1));
+    TEST_ASSERT_EQUAL_STRING(job.job_id, active->job_id);
 
     for (uint8_t index = 0; index < 4; ++index) {
         uint32_t nonce = 0x0a4c049b + index;
@@ -165,26 +166,27 @@ TEST_CASE("BM1397 work packet and returned midstate preserve version mapping",
 TEST_CASE("Bitmain occupied work slots transfer ownership to replacements",
           "[asic][job-store][characterization]")
 {
-    static const uint8_t job_id_steps[] = {8, 24, 24, 24};
-
     for (size_t index = 0; index < BM13XX_HARNESS_DRIVER_COUNT; ++index) {
         const bm13xx_harness_driver_t *driver = &bm13xx_harness_drivers[index];
-        GlobalState *state = bm13xx_harness_begin();
+        GlobalState *state = bm13xx_harness_begin(driver);
 
-        asic_job_t *first = make_job();
-        driver->send_work(state, first);
-        uint8_t first_id = bm13xx_harness_packet(0)->bytes[4];
-        uint8_t replacement_id =
-            (uint8_t)((first_id + job_id_steps[index]) % 128);
-        bm13xx_harness_install_job(replacement_id, make_job());
+        asic_job_t first = make_job();
+        driver->send_work(state, &first);
+        uint8_t replacement_slot = 2;
+        uint8_t replacement_id = (uint8_t)(replacement_slot << BM13XX_TX_SLOT_SHIFT);
+        asic_job_t stale = make_job();
+        bm13xx_harness_install_job(replacement_slot, &stale);
 
-        asic_job_t *replacement = make_job();
-        driver->send_work(state, replacement);
+        asic_job_t replacement = make_job();
+        replacement.version = 0x20000008;
+        driver->send_work(state, &replacement);
 
         TEST_ASSERT_EQUAL_HEX8_MESSAGE(
             replacement_id, bm13xx_harness_packet(1)->bytes[4], driver->name);
-        TEST_ASSERT_EQUAL_PTR_MESSAGE(
-            replacement, bm13xx_harness_active_job(replacement_id), driver->name);
+        const asic_job_t *active = bm13xx_harness_active_job(replacement_slot);
+        TEST_ASSERT_TRUE_MESSAGE(bm13xx_harness_slot_valid(replacement_slot), driver->name);
+        TEST_ASSERT_EQUAL_HEX32_MESSAGE(
+            replacement.version, active->version, driver->name);
         bm13xx_harness_end();
     }
 
@@ -192,18 +194,21 @@ TEST_CASE("Bitmain occupied work slots transfer ownership to replacements",
     TEST_ASSERT_EQUAL_UINT8(2, bm1397_harness_driver.init(state));
     bm1397_harness_clear_packets();
 
-    asic_job_t *first = make_job();
-    bm1397_harness_driver.send_work(state, first);
-    uint8_t first_id = bm1397_harness_packet(0)->bytes[4];
-    uint8_t replacement_id = (uint8_t)((first_id + 4) % 128);
-    bm1397_harness_install_job(replacement_id, make_job());
+    asic_job_t first = make_job();
+    bm1397_harness_driver.send_work(state, &first);
+    uint8_t replacement_slot = 2;
+    uint8_t replacement_id = (uint8_t)(replacement_slot << 2);
+    asic_job_t stale = make_job();
+    bm1397_harness_install_job(replacement_slot, &stale);
 
-    asic_job_t *replacement = make_job();
-    bm1397_harness_driver.send_work(state, replacement);
+    asic_job_t replacement = make_job();
+    replacement.version = 0x20000008;
+    bm1397_harness_driver.send_work(state, &replacement);
 
     TEST_ASSERT_EQUAL_HEX8(replacement_id, bm1397_harness_packet(1)->bytes[4]);
-    TEST_ASSERT_EQUAL_PTR(
-        replacement, bm1397_harness_active_job(replacement_id));
+    const asic_job_t *active = bm1397_harness_active_job(replacement_slot);
+    TEST_ASSERT_TRUE(bm1397_harness_slot_valid(replacement_slot));
+    TEST_ASSERT_EQUAL_HEX32(replacement.version, active->version);
     bm1397_harness_end();
 }
 
@@ -247,12 +252,11 @@ TEST_CASE("BM1397 rejects inactive job results and repeated nonces",
     TEST_ASSERT_NULL(bm1397_harness_driver.process_work(state));
     queue_bm1397_job_response(0x7c, 0, 0x13579bdf);
     TEST_ASSERT_NULL(bm1397_harness_driver.process_work(state));
-    bm1397_harness_mark_job_valid(0x78);
-    queue_bm1397_job_response(0x78, 0, 0x13579be0);
+    queue_bm1397_job_response(14 << 2, 0, 0x13579be0);
     TEST_ASSERT_NULL(bm1397_harness_driver.process_work(state));
 
-    asic_job_t *job = make_job();
-    bm1397_harness_driver.send_work(state, job);
+    asic_job_t job = make_job();
+    bm1397_harness_driver.send_work(state, &job);
     uint8_t job_id = bm1397_harness_packet(0)->bytes[4];
     uint32_t nonce = 0x2468ace1;
     queue_bm1397_job_response(job_id, 2, nonce);
@@ -283,10 +287,10 @@ TEST_CASE("BM1397 sparse mask wrap keeps packet midstates and returned versions 
     GlobalState *state = bm1397_harness_begin();
     TEST_ASSERT_EQUAL_UINT8(2, bm1397_harness_driver.init(state));
     bm1397_harness_clear_packets();
-    asic_job_t *job = make_job();
-    job->version = expected_versions[0];
-    job->version_mask = 0x1000a000;
-    bm1397_harness_driver.send_work(state, job);
+    asic_job_t job = make_job();
+    job.version = expected_versions[0];
+    job.version_mask = 0x1000a000;
+    bm1397_harness_driver.send_work(state, &job);
     const bm1397_harness_packet_t *sent = bm1397_harness_packet(0);
     TEST_ASSERT_EQUAL_UINT32(152, sent->length);
     TEST_ASSERT_EQUAL_UINT8(4, sent->bytes[5]);
@@ -309,9 +313,9 @@ TEST_CASE("BM1397 disabled rolling sends one midstate and returns the base versi
     GlobalState *state = bm1397_harness_begin();
     TEST_ASSERT_EQUAL_UINT8(2, bm1397_harness_driver.init(state));
     bm1397_harness_clear_packets();
-    asic_job_t *job = make_job();
-    job->version_mask = 0;
-    bm1397_harness_driver.send_work(state, job);
+    asic_job_t job = make_job();
+    job.version_mask = 0;
+    bm1397_harness_driver.send_work(state, &job);
     const bm1397_harness_packet_t *sent = bm1397_harness_packet(0);
     TEST_ASSERT_EQUAL_UINT32(152, sent->length);
     TEST_ASSERT_EQUAL_UINT8(1, sent->bytes[5]);

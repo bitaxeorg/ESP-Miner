@@ -1,6 +1,5 @@
-import { Component, ElementRef, EventEmitter, HostListener, Input, Output, forwardRef } from '@angular/core';
+import { Component, ElementRef, EventEmitter, HostListener, Input, Output, forwardRef, ChangeDetectorRef, OnChanges, SimpleChanges } from '@angular/core';
 import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
-import { CommonModule } from '@angular/common';
 import { SelectOption } from '../../models/select-option.model';
 
 @Component({
@@ -13,10 +12,9 @@ import { SelectOption } from '../../models/select-option.model';
       multi: true
     }
   ],
-  standalone: true,
-  imports: [CommonModule]
+  standalone: true
 })
-export class DropdownComponent implements ControlValueAccessor {
+export class DropdownComponent implements ControlValueAccessor, OnChanges {
   @Input() options: SelectOption[] = [];
   @Input() placeholder: string = 'Select...';
   @Input() inputId: string = '';
@@ -33,7 +31,13 @@ export class DropdownComponent implements ControlValueAccessor {
   private onChangeCallback: (_: any) => void = () => {};
   private onTouchedCallback: () => void = () => {};
 
-  constructor(private elementRef: ElementRef) {}
+  constructor(private elementRef: ElementRef, private cdr: ChangeDetectorRef) {}
+
+  ngOnChanges(changes: SimpleChanges): void {
+    if (changes['options']) {
+      this.cdr.markForCheck();
+    }
+  }
 
   get selectedOptionName(): string {
     const selected = this.options?.find(opt => opt.value === this.value);
@@ -162,6 +166,7 @@ export class DropdownComponent implements ControlValueAccessor {
 
   writeValue(value: any): void {
     this.value = value;
+    this.cdr.markForCheck();
   }
 
   registerOnChange(fn: any): void {

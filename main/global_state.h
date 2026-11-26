@@ -6,15 +6,15 @@
 #include "esp_partition.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
-#include "freertos/portmacro.h"
 #include "power_management_task.h"
+#include "asic_job_slot.h"
 #include "hashrate_monitor_task.h"
 #include "coinbase_decoder.h"
 #include "device_config.h"
 #include "display.h"
 #include "scoreboard.h"
-#include "esp_transport.h"
 #include "system.h"
+#include "pool.h"
 
 typedef struct PoolConfig
 {
@@ -37,17 +37,6 @@ typedef struct PoolConfig
 #define DIFF_STRING_SIZE 10
 #define MAX_BLOCK_SIGNALS 8
 #define MAX_BLOCK_SIGNAL_LEN 16
-#define MAX_POOLS 8
-
-// Job id slots tracked per ASIC. Job ids are 7-bit (0..127) on all supported
-// BM13xx parts, so both the active_jobs and valid_jobs tables are sized to 128.
-#define MAX_ASIC_JOBS 128
-
-typedef struct RejectedReasonStat
-{
-    char message[64];
-    uint32_t count;
-} RejectedReasonStat;
 
 typedef struct {
     const esp_partition_t *part;
@@ -66,12 +55,6 @@ typedef struct SystemModule
     float hashrate_1h;
     float error_percentage;
     int64_t start_time_us;
-    uint64_t shares_accepted;
-    uint64_t shares_rejected;
-    uint16_t shares_pending;
-    uint64_t work_received;
-    RejectedReasonStat rejected_reason_stats[10];
-    int rejected_reason_stats_count;
     int screen_page;
     uint64_t best_nonce_diff;
     char best_diff_string[DIFF_STRING_SIZE];
@@ -88,22 +71,14 @@ typedef struct SystemModule
     bool is_connected;
     int identify_mode_time_ms;
     PoolConfig pools[MAX_POOLS];
+    PoolSession pool_sessions[MAX_POOLS];
     uint16_t primary_pool_index;
     uint16_t secondary_pool_index;
     bool use_fallback_stratum;
     bool is_using_fallback;
-    float response_time;
-    float response_time_min;
-    float response_time_max;
-    float last_response_time_min;
-    float last_response_time_max;
-    uint16_t response_share_batch;
     float process_time;
     float cpu_usage;
-    double pool_difficulty;
-    char pool_connection_info[64];
-    char primary_pool_error[64];
-    char pool_banner[128];
+    uint8_t current_difficulty_power;
     bool overheat_mode;
     bool mining_paused;
     bool pools_unavailable;
@@ -149,16 +124,6 @@ typedef struct SelfTestModule
     esp_err_t system_init_ret;
 } SelfTestModule;
 
-typedef struct AsicTaskModule
-{
-    // ASIC may not return the nonce in the same order as the jobs were sent
-    // it also may return a previous nonce under some circumstances
-    // so we keep a list of jobs indexed by the job id
-    struct asic_job **active_jobs;
-    uint8_t *valid_jobs;
-    pthread_mutex_t valid_jobs_lock;
-} AsicTaskModule;
-
 typedef struct GlobalState
 {
     TaskHandle_t create_jobs_task_handle;
@@ -167,15 +132,12 @@ typedef struct GlobalState
     SystemModule SYSTEM_MODULE;
     DeviceConfig DEVICE_CONFIG;
     DisplayConfig DISPLAY_CONFIG;
-    AsicTaskModule ASIC_TASK_MODULE;
+    asic_job_store_t job_store;
     PowerManagementModule POWER_MANAGEMENT_MODULE;
     SelfTestModule SELF_TEST_MODULE;
     HashrateMonitorModule HASHRATE_MONITOR_MODULE;
 
-    uint8_t current_difficulty_power;
-    double target_share_interval_s;
-    esp_transport_handle_t transport;
-    pthread_mutex_t transport_mutex;
+
 
     bool ASIC_initalized;
     bool psram_is_available;
