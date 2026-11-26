@@ -204,10 +204,17 @@ esp_err_t stratum_socket_connect_async(esp_transport_handle_t transport,
         return ESP_ERR_INVALID_STATE;
     }
 
+    // esp-tls only re-arms its select() sets once, so a TLS connect that is still
+    // pending after timeout_ms keeps returning 0 forever. Enforce the deadline here.
+    TickType_t start = xTaskGetTickCount();
     int connect_ret;
     while ((connect_ret = esp_transport_connect_async(transport, host_ip, port, timeout_ms)) == 0) {
         if (should_shutdown_fn && should_shutdown_fn()) {
             return ESP_ERR_INVALID_STATE;
+        }
+        if ((xTaskGetTickCount() - start) >= pdMS_TO_TICKS(timeout_ms)) {
+            ESP_LOGW(TAG, "Connect to %s:%u timed out after %d ms", host_ip, port, timeout_ms);
+            return ESP_ERR_TIMEOUT;
         }
         vTaskDelay(pdMS_TO_TICKS(100));
     }
