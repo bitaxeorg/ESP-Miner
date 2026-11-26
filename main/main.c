@@ -30,7 +30,10 @@
 #include "log_buffer.h"
 #include "setup_ble.h"
 #include "esp_ota_ops.h"
+#include "esp_netif.h"
 #include "esp_netif_sntp.h"
+#include "esp_sntp.h"
+#include "lwip/ip_addr.h"
 #include "sv2_noise.h"
 
 static GlobalState GLOBAL_STATE;
@@ -42,6 +45,43 @@ static void on_ntp_sync(struct timeval * tv)
 {
     (void) tv;
     sv2_noise_set_clock_trusted(true);
+    ESP_LOGI(TAG, "NTP time synchronized");
+}
+
+static bool stratum_needs_ntp(const GlobalState * gs)
+{
+    const uint16_t indices[2] = {
+        gs->SYSTEM_MODULE.primary_pool_index,
+        gs->SYSTEM_MODULE.secondary_pool_index
+    };
+    for (size_t i = 0; i < 2; i++) {
+        uint16_t idx = indices[i];
+        if (!stratum_is_pool_configured(gs, idx)) {
+            continue;
+        }
+        const PoolConfig * pool = &gs->SYSTEM_MODULE.pools[idx];
+        if (pool->tls != 0 || pool->protocol == STRATUM_PROTOCOL_V2) {
+            return true;
+        }
+    }
+    return false;
+}
+
+static void log_sntp_status(void)
+{
+    for (uint8_t i = 0; i < CONFIG_LWIP_SNTP_MAX_SERVERS; i++) {
+        const char * name = esp_sntp_getservername(i);
+        const ip_addr_t * ip = esp_sntp_getserver(i);
+        unsigned int reach = 0;
+        esp_netif_sntp_reachability(i, &reach);
+        if (name != NULL && name[0] != '\0') {
+            ESP_LOGW(TAG, "SNTP server[%u]: %s (reachability=0x%02x)", i, name, reach);
+        } else if (ip != NULL && !ip_addr_isany(ip)) {
+            ESP_LOGW(TAG, "SNTP server[%u]: %s (reachability=0x%02x)", i, ipaddr_ntoa(ip), reach);
+        } else {
+            ESP_LOGW(TAG, "SNTP server[%u]: <none> (reachability=0x%02x)", i, reach);
+        }
+    }
 }
 
 #define DEFAULT_GPIO_I2C_SDA CONFIG_GPIO_I2C_SDA
@@ -160,7 +200,27 @@ void app_main(void)
         ESP_LOGE(TAG, "Failed to init scoreboard");
     }
 
+    bool sntp_initialized = false;
     if (!GLOBAL_STATE.SELF_TEST_MODULE.is_active) {
+        ESP_ERROR_CHECK(esp_netif_init());
+        ESP_ERROR_CHECK(esp_event_loop_create_default());
+
+        if (nvs_config_get_bool(NVS_CONFIG_USE_NTP)) {
+            ESP_LOGI(TAG, "Initializing SNTP");
+            esp_sntp_config_t config = ESP_NETIF_SNTP_DEFAULT_CONFIG_MULTIPLE(
+                2, ESP_SNTP_SERVER_LIST("0.pool.ntp.org", "1.pool.ntp.org")
+            );
+            config.start = false;
+            config.smooth_sync = true;
+            config.server_from_dhcp = true;
+            config.renew_servers_after_new_IP = true;
+            config.index_of_first_server = 1; // preserve slot 0 for DHCP Option 42
+            config.ip_event_to_renew = IP_EVENT_STA_GOT_IP;
+            config.sync_cb = on_ntp_sync;
+            ESP_ERROR_CHECK(esp_netif_sntp_init(&config));
+            sntp_initialized = true;
+        }
+
         wifi_init(&GLOBAL_STATE);
     }
 
@@ -215,25 +275,9 @@ void app_main(void)
     // Connected to WiFi: tear down the setup BLE service to free the radio.
     setup_ble_stop();
 
-    if (nvs_config_get_bool(NVS_CONFIG_USE_NTP)) {
+    if (sntp_initialized) {
         ESP_LOGI(TAG, "Starting SNTP");
-        // default to pool.ntp.org to find the nearest NTP server if none are provided by DHCP
-        esp_sntp_config_t config = ESP_NETIF_SNTP_DEFAULT_CONFIG("pool.ntp.org");
-        config.start = true;
-        config.smooth_sync = true;
-        config.server_from_dhcp = true;
-        config.renew_servers_after_new_IP = true; // replace default with DHCP-provided server(s)
-        config.ip_event_to_renew = IP_EVENT_STA_GOT_IP;
-        config.sync_cb = on_ntp_sync;  // also covers a first sync after the wait below
-        esp_netif_sntp_init(&config);
-
-        int retry = 15;
-        while (esp_netif_sntp_sync_wait(2000 / portTICK_PERIOD_MS) == ESP_ERR_TIMEOUT && --retry >= 0) {
-            ESP_LOGI(TAG, "Waiting for NTP... (%d attempts remaining)", retry);
-        }
-        if (retry == -1) {
-            ESP_LOGW(TAG, "Failed to get NTP in time! Certificate validation may fail!");
-        }
+        ESP_ERROR_CHECK(esp_netif_sntp_start());
     }
 
     if (system_init_ret == ESP_OK) {
@@ -262,6 +306,12 @@ void app_main(void)
     }
 
     if (!GLOBAL_STATE.SELF_TEST_MODULE.is_active) {
+        if (sntp_initialized && stratum_needs_ntp(&GLOBAL_STATE)) {
+            if (esp_netif_sntp_sync_wait(pdMS_TO_TICKS(5000)) == ESP_ERR_TIMEOUT) {
+                ESP_LOGW(TAG, "NTP sync timed out before starting stratum; certificate validation may fail until synced");
+                log_sntp_status();
+            }
+        }
         if (xTaskCreateWithCaps(stratum_task, "stratum", 16384, (void *) &GLOBAL_STATE, 16, NULL, MALLOC_CAP_SPIRAM) != pdPASS) {
             ESP_LOGE(TAG, "Error creating stratum task");
         }
