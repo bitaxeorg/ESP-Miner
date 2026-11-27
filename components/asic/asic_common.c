@@ -161,44 +161,90 @@ int count_asic_chips(uint16_t asic_count, uint16_t chip_id, int chip_id_response
 
 esp_err_t receive_work(uint8_t * buffer, int buffer_size, uint64_t *out_timestamp_us)
 {
-    int received = SERIAL_rx(buffer, buffer_size, 10000);
-    if (out_timestamp_us) {
-        *out_timestamp_us = esp_timer_get_time();
-    }
+    const uint32_t timeout_ms = 10000;
+    const int64_t deadline_us = esp_timer_get_time() + (int64_t) timeout_ms * 1000;
+    int buffered = 0;
+    bool seeking_preamble = false;
 
-    if (received < 0) {
-        ESP_LOGE(TAG, "UART error in serial RX");
+    if (buffer_size < 3) {
+        ESP_LOGE(TAG, "Invalid response buffer size %i", buffer_size);
         return ESP_FAIL;
     }
 
-    if (received == 0) {
-        ESP_LOGD(TAG, "UART timeout in serial RX");
-        return ESP_FAIL;
-    }
+    while (true) {
+        int64_t remaining_us = deadline_us - esp_timer_get_time();
+        if (remaining_us <= 0) {
+            if (out_timestamp_us) {
+                *out_timestamp_us = esp_timer_get_time();
+            }
+            ESP_LOGD(TAG, "UART timeout in serial RX while seeking response frame");
+            return ESP_FAIL;
+        }
 
-    if (received != buffer_size) {
-        ESP_LOGE(TAG, "Invalid response length %i", received);
-        ESP_LOG_BUFFER_HEX(TAG, buffer, received);
-        SERIAL_clear_buffer();
-        return ESP_FAIL;
-    }
+        uint16_t remaining_ms = (uint16_t) ((remaining_us + 999) / 1000);
+        int requested = seeking_preamble ? 1 : buffer_size - buffered;
+        int received = SERIAL_rx(buffer + buffered, requested, remaining_ms);
+        if (received < 0) {
+            if (out_timestamp_us) {
+                *out_timestamp_us = esp_timer_get_time();
+            }
+            ESP_LOGE(TAG, "UART error in serial RX");
+            return ESP_FAIL;
+        }
+        if (received == 0) {
+            if (out_timestamp_us) {
+                *out_timestamp_us = esp_timer_get_time();
+            }
+            ESP_LOGD(TAG, "UART timeout in serial RX while seeking response frame");
+            return ESP_FAIL;
+        }
 
-    uint16_t received_preamble = (buffer[0] << 8) | buffer[1];
-    if (received_preamble != PREAMBLE) {
-        ESP_LOGE(TAG, "Preamble mismatch: got 0x%04x, expected 0x%04x", received_preamble, PREAMBLE);
-        ESP_LOG_BUFFER_HEX(TAG, buffer, received);
-        SERIAL_clear_buffer();
-        return ESP_FAIL;
-    }
+        buffered += received;
+        if (seeking_preamble) {
+            if (buffered == 1) {
+                if (buffer[0] != (PREAMBLE >> 8)) {
+                    buffered = 0;
+                }
+            } else if (buffer[1] == (PREAMBLE & 0xFF)) {
+                seeking_preamble = false;
+            } else {
+                buffer[0] = buffer[1];
+                buffered = buffer[0] == (PREAMBLE >> 8) ? 1 : 0;
+            }
+            continue;
+        }
 
-    if (crc5(buffer + 2, buffer_size - 2) != 0) {
-        ESP_LOGE(TAG, "Checksum failed on response");        
-        ESP_LOG_BUFFER_HEX(TAG, buffer, received);
-        SERIAL_clear_buffer();
-        return ESP_FAIL;
-    }
+        if (buffered == buffer_size) {
+            if (buffer[0] == (PREAMBLE >> 8) && buffer[1] == (PREAMBLE & 0xFF) &&
+                crc5(buffer + 2, buffer_size - 2) == 0) {
+                if (out_timestamp_us) {
+                    *out_timestamp_us = esp_timer_get_time();
+                }
+                return ESP_OK;
+            }
 
-    return ESP_OK;
+            // Preserve a following frame already started inside the invalid candidate.
+            int preamble_offset = -1;
+            for (int index = 1; index < buffer_size - 1; ++index) {
+                if (buffer[index] == (PREAMBLE >> 8) &&
+                    buffer[index + 1] == (PREAMBLE & 0xFF)) {
+                    preamble_offset = index;
+                    break;
+                }
+            }
+            if (preamble_offset >= 0) {
+                buffered = buffer_size - preamble_offset;
+                memmove(buffer, buffer + preamble_offset, buffered);
+            } else if (buffer[buffer_size - 1] == (PREAMBLE >> 8)) {
+                buffer[0] = buffer[buffer_size - 1];
+                buffered = 1;
+                seeking_preamble = true;
+            } else {
+                buffered = 0;
+                seeking_preamble = true;
+            }
+        }
+    }
 }
 
 void get_difficulty_mask(uint8_t difficulty_power, uint8_t *job_difficulty_mask)
