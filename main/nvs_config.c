@@ -129,6 +129,11 @@ static Settings settings[NVS_CONFIG_COUNT] = {
     [NVS_CONFIG_TPS546_SYNC_CONFIG]                    = {.nvs_key_name = "tps546_sync",    .type = TYPE_U16},
     [NVS_CONFIG_TPS546_FREQUENCY]                      = {.nvs_key_name = "tps546_freq",    .type = TYPE_U16},
     [NVS_CONFIG_NOMINAL_VOLTAGE]                       = {.nvs_key_name = "nominal_voltage", .type = TYPE_U16},
+
+    // Update probation (ota_guard.c): the partition to go back to, and the image on probation
+    [NVS_CONFIG_OTA_PREVIOUS]                          = {.nvs_key_name = "ota_prev",        .type = TYPE_STR,   .default_value = {.str = ""}},
+    [NVS_CONFIG_OTA_SHA]                               = {.nvs_key_name = "ota_sha",         .type = TYPE_STR,   .default_value = {.str = ""}},
+    [NVS_CONFIG_OTA_TRIES]                             = {.nvs_key_name = "ota_tries",       .type = TYPE_U16},
 };
 
 Settings *nvs_config_get_settings(NvsConfigKey key)
