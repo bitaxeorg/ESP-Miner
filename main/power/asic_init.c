@@ -7,6 +7,7 @@
 #include "asic_common.h"
 #include "serial.h"
 #include "asic_reset.h"
+#include "create_jobs_task.h"
 
 static const char *TAG = "asic_init";
 
@@ -95,9 +96,15 @@ uint8_t asic_initialize(GlobalState *GLOBAL_STATE, asic_init_mode_t mode, uint32
     }
     SERIAL_clear_buffer();
 
+    __atomic_fetch_add(&GLOBAL_STATE->ASIC_work_epoch, 1U, __ATOMIC_RELEASE);
     GLOBAL_STATE->ASIC_initalized = true;
     uint8_t difficulty_power = calculate_effective_asic_difficulty(GLOBAL_STATE->POWER_MANAGEMENT_MODULE.expected_hashrate);
     ASIC_set_difficulty(GLOBAL_STATE, difficulty_power);
+    if (GLOBAL_STATE->create_jobs_task_handle) {
+        xTaskNotify(GLOBAL_STATE->create_jobs_task_handle,
+                    CREATE_JOBS_NOTIFY_ASIC_REINITIALIZED,
+                    eSetValueWithoutOverwrite);
+    }
     
     if (stabilization_delay_ms > 0) {
         ESP_LOGI(TAG, "Waiting %u ms for tasks to stabilize...", stabilization_delay_ms);

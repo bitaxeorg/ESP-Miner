@@ -4,6 +4,7 @@
 #include <stdint.h>
 
 #define CREATE_JOBS_NOTIFY_CLEAR_WORK UINT32_MAX
+#define CREATE_JOBS_NOTIFY_ASIC_REINITIALIZED (UINT32_MAX - 1U)
 
 void create_jobs_task(void *pvParameters);
 

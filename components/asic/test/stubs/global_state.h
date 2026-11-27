@@ -39,6 +39,7 @@ typedef struct GlobalState {
         float expected_hashrate;
     } POWER_MANAGEMENT_MODULE;
     bool ASIC_initalized;
+    uint32_t ASIC_work_epoch;
     struct {
         float process_time;
         Scoreboard scoreboard;

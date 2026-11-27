@@ -139,6 +139,7 @@ typedef struct GlobalState
 
 
     bool ASIC_initalized;
+    uint32_t ASIC_work_epoch; // Increment after successful ASIC initialization.
     bool psram_is_available;
     bool filesystem_is_available;
 
