@@ -14,6 +14,7 @@ SRCS
     "system.c"
     "pool.c"
     "firmware_checksum.c"
+    "ota_guard.c"
     "lv_font_portfolio-6x8.c"
     "logo.c"
     "images/generated/bitaxe_background.c"

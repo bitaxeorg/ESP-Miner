@@ -30,6 +30,7 @@
 #include "log_buffer.h"
 #include "setup_ble.h"
 #include "esp_ota_ops.h"
+#include "ota_guard.h"
 #include "esp_netif_sntp.h"
 #include "sv2_noise.h"
 
@@ -110,6 +111,9 @@ void app_main(void)
         return;
     }
 
+    // A web update that crashes at start-up goes back to the previous firmware
+    ota_guard_boot();
+
     // Check firmware version migration (resets useCustomWWW on update/downgrade)
     SYSTEM_check_firmware_migration();
 
@@ -179,6 +183,8 @@ void app_main(void)
         ESP_LOGE(TAG, "Critical peripheral initialization failure (%s). Entering degraded mode.",
                  esp_err_to_name(system_init_ret));
     }
+
+    ota_guard_start(&GLOBAL_STATE);
     
     // Read version info (from SPIFFS if custom WWW is active)
     SYSTEM_init_versions(&GLOBAL_STATE);
