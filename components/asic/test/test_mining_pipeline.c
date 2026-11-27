@@ -520,6 +520,7 @@ TEST_CASE("job task harness rejects oversized extranonce work",
 
     const job_pipeline_harness_event_t events[] = {
         { .type = JOB_PIPELINE_HARNESS_NOTIFY, .slot = 6 },
+        { .type = JOB_PIPELINE_HARNESS_TIMEOUT },
     };
     job_pipeline_harness_result_t result;
     job_pipeline_harness_run(
@@ -533,6 +534,7 @@ TEST_CASE("job task harness rejects oversized extranonce work",
 
     TEST_ASSERT_EQUAL_UINT32(0, result.job_count);
     TEST_ASSERT_EQUAL_UINT32(0, result.coinbase_decode_count);
+    TEST_ASSERT_GREATER_THAN_UINT32(0, result.wait_ticks[1]);
     job_pipeline_harness_result_free(&result);
 }
 
@@ -940,5 +942,48 @@ TEST_CASE("BM13xx rolls BIP323 software bits on SV2 standard and sleeps when exh
     TEST_ASSERT_EQUAL_HEX32(0x20000004, result.jobs[0]->version);
     TEST_ASSERT_EQUAL_HEX32(0x20000024, result.jobs[1]->version);
     TEST_ASSERT_EQUAL_UINT32(portMAX_DELAY, result.wait_ticks[2]);
+    job_pipeline_harness_result_free(&result);
+}
+
+TEST_CASE("exhausted SV2 standard work recovers when ASIC_work_epoch advances",
+          "[mining][job-task][bip323]")
+{
+    miner_job_pool_init();
+    miner_job_t *job = miner_job_get_slot(0);
+    uint8_t *prefix_buffer = job->coinbase_prefix;
+    uint8_t *suffix_buffer = job->coinbase_suffix;
+    memset(job, 0, sizeof(*job));
+    job->coinbase_prefix = prefix_buffer;
+    job->coinbase_suffix = suffix_buffer;
+    job->type = JOB_TYPE_SV2_STANDARD;
+    (void)snprintf(job->job_id, sizeof(job->job_id), "sv2-reinit");
+    job->version = 0x20000004;
+    job->version_mask = BIP320_VERSION_ROLLING_MASK | 0x00000020U;
+    job->ntime = 0x64658bd8;
+    job->nbits = 0x1705dd01;
+    job->clean_jobs = true;
+    diff_to_target(512.0, job->pool_target);
+    memset(job->prev_hash, 0x11, sizeof(job->prev_hash));
+    memset(job->merkle_root, 0x22, sizeof(job->merkle_root));
+
+    const job_pipeline_harness_event_t events[] = {
+        { .type = JOB_PIPELINE_HARNESS_NOTIFY, .slot = 0, .advance_ms = 0 },
+        { .type = JOB_PIPELINE_HARNESS_TIMEOUT, .advance_ms = 5000 },
+        { .type = JOB_PIPELINE_HARNESS_ASIC_REINITIALIZED, .advance_ms = 5000 },
+    };
+
+    job_pipeline_harness_result_t result;
+    job_pipeline_harness_run(
+        (job_pipeline_harness_config_t) {
+            .hw_version_mask = BIP320_VERSION_ROLLING_MASK,
+            .packet_midstates = 1,
+            .asic_initialized = true,
+            .job_frequency_ms = 5000,
+        }, events, sizeof(events) / sizeof(events[0]), &result);
+
+    TEST_ASSERT_EQUAL_UINT32(3, result.job_count);
+    TEST_ASSERT_EQUAL_HEX32(0x20000004, result.jobs[0]->version);
+    TEST_ASSERT_EQUAL_HEX32(0x20000024, result.jobs[1]->version);
+    TEST_ASSERT_EQUAL_HEX32(0x20000004, result.jobs[2]->version);
     job_pipeline_harness_result_free(&result);
 }

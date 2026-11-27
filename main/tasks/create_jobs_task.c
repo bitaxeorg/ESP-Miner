@@ -36,6 +36,7 @@ typedef struct {
     bool current_work_sent;
     bool current_work_decoded;
     bool need_build;
+    bool build_failed;
     bool exhausted;
 } job_scheduler_state_t;
 
@@ -74,12 +75,24 @@ static TickType_t compute_wait_ticks(const GlobalState *GLOBAL_STATE,
                                      int job_interval_ms,
                                      uint64_t now_us)
 {
-    if (sched->current_work == NULL || sched->exhausted) {
+    if (sched->current_work == NULL) {
         return portMAX_DELAY;
+    }
+
+    if (sched->exhausted) {
+        uint32_t current_epoch = __atomic_load_n(&GLOBAL_STATE->ASIC_work_epoch, __ATOMIC_ACQUIRE);
+        return (sched->sent_work_epoch != current_epoch) ? 0 : portMAX_DELAY;
     }
 
     if (!GLOBAL_STATE->ASIC_initalized) {
         return pdMS_TO_TICKS(100);
+    }
+
+    if (sched->build_failed) {
+        int backoff_ms = (job_interval_ms > 100) ? job_interval_ms : 100;
+        int64_t elapsed_ms = (int64_t)((now_us - sched->last_cycle_time_us) / 1000ULL);
+        int64_t remaining_ms = (int64_t)backoff_ms - elapsed_ms;
+        return (remaining_ms > 0) ? pdMS_TO_TICKS((uint32_t)remaining_ms) : 0;
     }
 
     if (!sched->current_work_sent) {
@@ -102,13 +115,12 @@ static TickType_t compute_wait_ticks(const GlobalState *GLOBAL_STATE,
 
 static void advance_work_cursor(job_scheduler_state_t *sched,
                                 uint32_t hw_version_mask,
-                                uint8_t packet_midstates,
-                                bool built)
+                                uint8_t packet_midstates)
 {
     uint32_t sw_mask = sched->current_work->version_mask & ~hw_version_mask;
     uint8_t step = (packet_midstates > 0) ? packet_midstates : 1;
 
-    if (built && sw_mask != 0) {
+    if (sw_mask != 0) {
         for (uint8_t i = 0; i < step; i++) {
             sched->active_asic_job.version = increment_bitmask(sched->active_asic_job.version, sw_mask);
         }
@@ -127,7 +139,7 @@ static void advance_work_cursor(job_scheduler_state_t *sched,
     if (miner_job_is_rollable(sched->current_work)) {
         sched->extranonce_2++;
         sched->need_build = true;
-    } else if (built) {
+    } else {
         sched->exhausted = true;
     }
 }
@@ -172,6 +184,7 @@ void create_jobs_task(void *pvParameters)
                 sched.current_work = NULL;
                 sched.current_work_sent = false;
                 sched.current_work_decoded = false;
+                sched.build_failed = false;
                 sched.exhausted = false;
                 sched.last_send_time_us = 0;
                 continue;
@@ -205,6 +218,7 @@ void create_jobs_task(void *pvParameters)
                 sched.sw_versions_rolled = 0;
                 sched.extranonce_2 = 0;
                 sched.need_build = true;
+                sched.build_failed = false;
                 sched.exhausted = false;
 
                 if (!new_work->clean_jobs && asic_working && job_interval_ms > 0) {
@@ -224,7 +238,13 @@ void create_jobs_task(void *pvParameters)
                 continue;
             }
             if (sched.exhausted) {
-                continue;
+                uint32_t current_epoch = __atomic_load_n(&GLOBAL_STATE->ASIC_work_epoch, __ATOMIC_ACQUIRE);
+                if (sched.sent_work_epoch == current_epoch) {
+                    continue;
+                }
+                sched.exhausted = false;
+                sched.current_work_sent = false;
+                sched.current_version_mask = 0;
             }
         }
 
@@ -233,7 +253,9 @@ void create_jobs_task(void *pvParameters)
             if (mining_build_asic_job(sched.current_work, sched.extranonce_2, sched.current_work->version, &sched.active_asic_job)) {
                 built = true;
                 sched.need_build = false;
+                sched.build_failed = false;
             } else {
+                sched.build_failed = true;
                 ESP_LOGE(TAG, "Failed to build ASIC job");
             }
         } else {
@@ -265,8 +287,7 @@ void create_jobs_task(void *pvParameters)
 
             advance_work_cursor(&sched,
                                 GLOBAL_STATE->DEVICE_CONFIG.family.asic.hw_version_mask,
-                                GLOBAL_STATE->DEVICE_CONFIG.family.asic.packet_midstates,
-                                true);
+                                GLOBAL_STATE->DEVICE_CONFIG.family.asic.packet_midstates);
         }
     }
 }
