@@ -7,7 +7,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
-#include <inttypes.h>
+#include <net/if.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -125,9 +125,14 @@ esp_err_t stratum_socket_resolve(const char *hostname, uint16_t port, stratum_co
         if (inet_ntop(AF_INET6, &addr6->sin6_addr, conn_info->host_ip, sizeof(conn_info->host_ip)) == NULL) {
             snprintf(conn_info->host_ip, sizeof(conn_info->host_ip), "[invalid IPv6 addr]");
         } else if (IN6_IS_ADDR_LINKLOCAL(&addr6->sin6_addr) && addr6->sin6_scope_id != 0) {
-            char zone[16];
-            snprintf(zone, sizeof(zone), "%%%" PRIu32, addr6->sin6_scope_id);
-            strncat(conn_info->host_ip, zone, sizeof(conn_info->host_ip) - strlen(conn_info->host_ip) - 1);
+            // lwIP only parses a zone given as an interface name, not as an index
+            char ifname[IF_NAMESIZE] = {0};
+            if (if_indextoname(addr6->sin6_scope_id, ifname) == NULL) {
+                ESP_LOGE(TAG, "No interface name for IPv6 scope_id %lu", (unsigned long)addr6->sin6_scope_id);
+                return ESP_ERR_NOT_FOUND;
+            }
+            strncat(conn_info->host_ip, "%", sizeof(conn_info->host_ip) - strlen(conn_info->host_ip) - 1);
+            strncat(conn_info->host_ip, ifname, sizeof(conn_info->host_ip) - strlen(conn_info->host_ip) - 1);
             conn_info->host_ip[sizeof(conn_info->host_ip) - 1] = '\0';
         }
     }
