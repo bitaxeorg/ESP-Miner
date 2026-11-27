@@ -50,6 +50,7 @@ void BM1368_set_hash_counting_number(uint32_t hcn);
 #define BM1370_set_version_mask bm1370_test_set_version_mask
 #define BM1370_set_max_baud bm1370_test_set_max_baud
 #define BM1370_send_hash_frequency bm1370_test_send_hash_frequency
+#define BM1370_set_frequency bm1370_test_set_frequency
 #define BM1370_process_work bm1370_test_process_work
 #define BM1370_read_registers bm1370_test_read_registers
 #define BM1370_set_nonce_space bm1370_test_set_nonce_space

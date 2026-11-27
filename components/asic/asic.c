@@ -121,26 +121,22 @@ void ASIC_set_version_mask(GlobalState * GLOBAL_STATE, uint32_t mask)
     }
 }
 
-void ASIC_set_frequency(GlobalState * GLOBAL_STATE)
+bool ASIC_set_frequency(GlobalState * GLOBAL_STATE)
 {
     switch (GLOBAL_STATE->DEVICE_CONFIG.family.asic.id) {
         case BM1397:
-            do_frequency_transition(GLOBAL_STATE, BM1397_send_hash_frequency);
-            return;
+            return do_frequency_transition(GLOBAL_STATE, BM1397_send_hash_frequency);
         case BM1366:
-            do_frequency_transition(GLOBAL_STATE, BM1366_send_hash_frequency);
-            return;
+            return do_frequency_transition(GLOBAL_STATE, BM1366_send_hash_frequency);
         case BM1368:
-            do_frequency_transition(GLOBAL_STATE, BM1368_send_hash_frequency);
-            return;
+            return do_frequency_transition(GLOBAL_STATE, BM1368_send_hash_frequency);
         case BM1370:
-            do_frequency_transition(GLOBAL_STATE, BM1370_send_hash_frequency);
-            return;
+            return BM1370_set_frequency(GLOBAL_STATE);
         case BM1373:
-            do_frequency_transition(GLOBAL_STATE, BM1373_send_hash_frequency);
-            return;
+            return do_frequency_transition(GLOBAL_STATE, BM1373_send_hash_frequency);
     }
     ESP_LOGE(TAG, "Unknown ASIC id %d — cannot set frequency", GLOBAL_STATE->DEVICE_CONFIG.family.asic.id);
+    return false;
 }
 
 void ASIC_set_nonce_space(GlobalState * GLOBAL_STATE)

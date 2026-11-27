@@ -25,7 +25,8 @@ typedef float (*set_hash_frequency_fn)(float frequency);
  * 
  * @param GLOBAL_STATE Pointer to the GlobalState structure
  * @param set_frequency_fn Function pointer to the appropriate ASIC's set_hash_frequency function
+ * @return false if a setter fails; actual_frequency retains the last successful step.
  */
-void do_frequency_transition(GlobalState * GLOBAL_STATE, set_hash_frequency_fn set_frequency_fn);
+bool do_frequency_transition(GlobalState * GLOBAL_STATE, set_hash_frequency_fn set_frequency_fn);
 
 #endif // FREQUENCY_TRANSITION_H

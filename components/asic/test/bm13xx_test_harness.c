@@ -185,12 +185,13 @@ int bm13xx_stub_count_chips_with_alias(
     return count;
 }
 
-void bm13xx_stub_frequency_transition(
+bool bm13xx_stub_frequency_transition(
     GlobalState *state, set_hash_frequency_fn set_frequency)
 {
     /* Clock ramps are outside the version-rolling contract. */
     (void)state;
     (void)set_frequency;
+    return true;
 }
 
 void bm13xx_spy_delay(TickType_t ticks)
