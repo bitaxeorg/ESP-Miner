@@ -144,7 +144,7 @@ void POWER_MANAGEMENT_task(void * pvParameters)
     float last_known_asic_frequency = 0.0;
     bool is_paused = false;
 
-    WATCHDOGS_init(GLOBAL_STATE);
+    WATCHDOGS_init();
 
     while (1) {
         if (GLOBAL_STATE->SELF_TEST_MODULE.is_finished) {
