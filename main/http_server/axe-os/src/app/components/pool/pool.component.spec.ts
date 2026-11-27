@@ -41,6 +41,7 @@ describe('PoolComponent', () => {
           stratumTLS: 0,
           stratumCert: '',
           stratumDecodeCoinbase: true,
+          stratumInsecure: 1,
           stratumV2ChannelType: 'extended',
           stratumV2AuthorityPubkey: '',
           stratumV2RequireAuth: false
@@ -68,7 +69,8 @@ describe('PoolComponent', () => {
       info$: mockInfo$
     };
 
-    systemServiceSpy = jasmine.createSpyObj('SystemApiService', ['updateSystem', 'deletePool']);
+    systemServiceSpy = jasmine.createSpyObj('SystemApiService', ['updateSystem', 'deletePool', 'getInfo']);
+    systemServiceSpy.getInfo.and.returnValue(mockInfo$);
     systemServiceSpy.updateSystem.and.returnValue(of({ status: 'success' }));
 
     TestBed.configureTestingModule({
@@ -212,30 +214,23 @@ describe('PoolComponent', () => {
     expect(getWarning()).toBeFalse();
   });
 
-  it('should warn about unencrypted Stratum V1 only for pools outside the local network', () => {
+  it('should warn about unencrypted Stratum V1 only when the backend flags the pool', () => {
     const pool = component.poolsArray.at(0);
     const getWarning = () =>
       (fixture.nativeElement as HTMLElement).textContent?.includes('Unencrypted Stratum V1');
 
     expect(component.isInsecureSv1(0)).toBeTrue();
+    expect(component.isInsecureSv1(1)).toBeFalse();
     expect(getWarning()).toBeTrue();
 
     pool.get('stratumTLS')?.setValue(1);
     expect(component.isInsecureSv1(0)).toBeFalse();
     pool.get('stratumTLS')?.setValue(0);
 
-    for (const host of ['192.168.1.20', '10.0.0.5', '172.16.0.1', '172.31.255.1', '127.0.0.1', '169.254.3.4',
-      'umbrel', 'umbrel.local', 'node.lan', 'pool.home.arpa', '::1', 'fe80::1', 'fd12:3456::1']) {
-      pool.get('stratumURL')?.setValue(host);
-      expect(component.isInsecureSv1(0)).withContext(host).toBeFalse();
-    }
+    pool.get('stratumProtocol')?.setValue('SV2');
+    expect(component.isInsecureSv1(0)).toBeFalse();
     fixture.detectChanges();
     expect(getWarning()).toBeFalse();
-
-    for (const host of ['public-pool.io', '8.8.8.8', '172.32.0.1', '192.169.1.1', '2001:db8::1', 'local.example.com']) {
-      pool.get('stratumURL')?.setValue(host);
-      expect(component.isInsecureSv1(0)).withContext(host).toBeTrue();
-    }
   });
 });
 

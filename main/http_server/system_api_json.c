@@ -8,6 +8,7 @@
 #include "esp_heap_caps.h"
 #include "global_state.h"
 #include "system_api_json.h"
+#include "http_server.h"
 #include "system.h"
 #include "nvs_config.h"
 #include "sv2_protocol.h"
@@ -200,6 +201,8 @@ static void system_api_add_config(yyjson_mut_doc *doc, yyjson_mut_val *root, Glo
             yyjson_mut_obj_add_uint(doc, p_obj, "stratumSuggestedDifficulty", p->difficulty);
             yyjson_mut_obj_add_bool(doc, p_obj, "stratumExtranonceSubscribe", p->extranonce_subscribe);
             yyjson_mut_obj_add_uint(doc, p_obj, "stratumTLS", p->tls);
+            yyjson_mut_obj_add_int(doc, p_obj, "stratumInsecure",
+                (p->protocol != STRATUM_PROTOCOL_V2 && p->tls == 0 && !is_local_network_host(p->url)) ? 1 : 0);
             yyjson_mut_obj_add_strcpy(doc, p_obj, "stratumCert", p->cert ? p->cert : "");
             yyjson_mut_obj_add_bool(doc, p_obj, "stratumDecodeCoinbase", p->decode_coinbase_tx);
             yyjson_mut_obj_add_bool(doc, p_obj, "stratumShareWarning", p->share_warning);
