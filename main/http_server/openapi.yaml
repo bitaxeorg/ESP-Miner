@@ -85,6 +85,10 @@ components:
         stratumShareWarning:
           type: boolean
           description: Warn on the dashboard when the payout share of the coinbase reward is low. Disable for pools that pay miners directly through many coinbase outputs.
+        stratumInsecure:
+          type: integer
+          readOnly: true
+          description: 1 when the pool uses plain-text Stratum V1 (no TLS) to a host outside the local network
         stratumV2ChannelType:
           type: string
           enum: [standard, extended]

@@ -130,6 +130,7 @@ export class PoolComponent implements OnInit {
             stratumCert: [pool.stratumCert || ''],
             stratumDecodeCoinbase: [pool.stratumDecodeCoinbase == true, [Validators.required]],
             stratumShareWarning: [pool.stratumShareWarning == true, [Validators.required]],
+            stratumInsecure: [pool.stratumInsecure || 0],
             stratumV2ChannelType: [pool.stratumV2ChannelType || 'extended'],
             stratumV2AuthorityPubkey: [pool.stratumV2AuthorityPubkey || '', [this.base58Validator()]],
             stratumV2RequireAuth: [pool.stratumV2RequireAuth == true]
@@ -199,6 +200,7 @@ export class PoolComponent implements OnInit {
         stratumCert: [''],
         stratumDecodeCoinbase: [true, [Validators.required]],
         stratumShareWarning: [true, [Validators.required]],
+        stratumInsecure: [0],
         stratumV2ChannelType: ['extended'],
         stratumV2AuthorityPubkey: ['', [this.base58Validator()]],
         stratumV2RequireAuth: [false]
@@ -287,6 +289,23 @@ export class PoolComponent implements OnInit {
     this.toastr.success(successMessage);
     this.pendingDeletePoolIds = [];
     this.form.markAsPristine();
+    this.refreshInsecureFlags();
+  }
+
+  // stratumInsecure is computed by the backend, so re-read it for the saved pools
+  private refreshInsecureFlags() {
+    this.systemService.getInfo(this.uri).pipe(first()).subscribe({
+      next: info => {
+        for (const poolGroup of this.poolsArray.controls) {
+          const saved = info.pools?.find(p =>
+            p.stratumURL === poolGroup.get('stratumURL')?.value &&
+            p.stratumPort === Number(poolGroup.get('stratumPort')?.value));
+          poolGroup.get('stratumInsecure')?.setValue(saved?.stratumInsecure || 0);
+        }
+        this.cdr.markForCheck();
+      },
+      error: () => { }
+    });
   }
 
   private extractPort(url: string): { cleanUrl: string, port?: number } {
@@ -395,6 +414,16 @@ export class PoolComponent implements OnInit {
     const poolGroup = this.poolsArray.at(index);
     const userValue = poolGroup?.get('stratumUser')?.value || '';
     return userValue.includes(this.DEFAULT_BITCOIN_ADDRESS);
+  }
+
+  isInsecureSv1(index: number): boolean {
+    if (!this.poolsArray) return false;
+    const poolGroup = this.poolsArray.at(index);
+    if (!poolGroup) return false;
+    // backend flag covers the saved host; live protocol/TLS check hides it as soon as the user fixes it
+    return poolGroup.get('stratumInsecure')?.value === 1 &&
+      poolGroup.get('stratumProtocol')?.value !== 'SV2' &&
+      poolGroup.get('stratumTLS')?.value === 0;
   }
 
   isAnyPoolUsingDefaultAddress(): boolean {

@@ -115,6 +115,7 @@ export class SystemApiService {
             stratumCert: "",
             stratumDecodeCoinbase: true,
             stratumShareWarning: true,
+            stratumInsecure: 1,
             stratumV2ChannelType: "extended" as const,
             stratumV2AuthorityPubkey: "",
             stratumV2RequireAuth: false
@@ -132,6 +133,7 @@ export class SystemApiService {
             stratumCert: "",
             stratumDecodeCoinbase: true,
             stratumShareWarning: true,
+            stratumInsecure: 1,
             stratumV2ChannelType: "extended" as const,
             stratumV2AuthorityPubkey: "",
             stratumV2RequireAuth: false

@@ -41,6 +41,7 @@ describe('PoolComponent', () => {
           stratumTLS: 0,
           stratumCert: '',
           stratumDecodeCoinbase: true,
+          stratumInsecure: 1,
           stratumV2ChannelType: 'extended',
           stratumV2AuthorityPubkey: '',
           stratumV2RequireAuth: false
@@ -68,7 +69,8 @@ describe('PoolComponent', () => {
       info$: mockInfo$
     };
 
-    systemServiceSpy = jasmine.createSpyObj('SystemApiService', ['updateSystem', 'deletePool']);
+    systemServiceSpy = jasmine.createSpyObj('SystemApiService', ['updateSystem', 'deletePool', 'getInfo']);
+    systemServiceSpy.getInfo.and.returnValue(mockInfo$);
     systemServiceSpy.updateSystem.and.returnValue(of({ status: 'success' }));
 
     TestBed.configureTestingModule({
@@ -208,6 +210,25 @@ describe('PoolComponent', () => {
     expect(getWarning()).toBeTrue();
 
     component.poolsArray.at(0).get('stratumSuggestedDifficulty')?.setValue(128);
+    fixture.detectChanges();
+    expect(getWarning()).toBeFalse();
+  });
+
+  it('should warn about unencrypted Stratum V1 only when the backend flags the pool', () => {
+    const pool = component.poolsArray.at(0);
+    const getWarning = () =>
+      (fixture.nativeElement as HTMLElement).textContent?.includes('Unencrypted Stratum V1');
+
+    expect(component.isInsecureSv1(0)).toBeTrue();
+    expect(component.isInsecureSv1(1)).toBeFalse();
+    expect(getWarning()).toBeTrue();
+
+    pool.get('stratumTLS')?.setValue(1);
+    expect(component.isInsecureSv1(0)).toBeFalse();
+    pool.get('stratumTLS')?.setValue(0);
+
+    pool.get('stratumProtocol')?.setValue('SV2');
+    expect(component.isInsecureSv1(0)).toBeFalse();
     fixture.detectChanges();
     expect(getWarning()).toBeFalse();
   });

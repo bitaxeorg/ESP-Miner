@@ -266,6 +266,42 @@ static bool is_local_network_hostname(const char *host_str) {
     return false;
 }
 
+// A host on the user's own network: private, loopback or link-local address, or a local-only name
+bool is_local_network_host(const char *host)
+{
+    if (host == NULL) {
+        return false;
+    }
+
+    // Strip brackets from an IPv6 literal like [fe80::1]
+    char unbracketed[INET6_ADDRSTRLEN];
+    size_t len = strlen(host);
+    if (len > 2 && host[0] == '[' && host[len - 1] == ']' && len - 2 < sizeof(unbracketed)) {
+        memcpy(unbracketed, host + 1, len - 2);
+        unbracketed[len - 2] = '\0';
+        host = unbracketed;
+    }
+
+    struct in_addr addr;
+    if (inet_pton(AF_INET, host, &addr) == 1) {
+        uint32_t ip = ntohl(addr.s_addr);
+        return ip_in_private_range(addr.s_addr) == ESP_OK ||
+               (ip >> 24) == 127 ||    // 127.0.0.0/8 loopback
+               (ip >> 16) == 0xA9FE;   // 169.254.0.0/16 link-local
+    }
+
+    struct in6_addr addr6;
+    if (inet_pton(AF_INET6, host, &addr6) == 1) {
+        static const uint8_t loopback[16] = { [15] = 1 };
+        const uint8_t *b = (const uint8_t *)&addr6;
+        return memcmp(b, loopback, sizeof(loopback)) == 0 ||
+               (b[0] == 0xFE && (b[1] & 0xC0) == 0x80) || // fe80::/10 link-local
+               (b[0] & 0xFE) == 0xFC;                     // fc00::/7 unique local
+    }
+
+    return is_local_network_hostname(host);
+}
+
 esp_err_t is_network_allowed(httpd_req_t * req)
 {
     GlobalState *GLOBAL_STATE = (GlobalState *)httpd_get_global_user_ctx(req->handle);
