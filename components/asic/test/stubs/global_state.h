@@ -22,23 +22,27 @@ typedef struct GlobalState {
             uint16_t asic_count;
             uint8_t voltage_domains;
             struct {
-                bool hardware_version_rolling;
-                uint8_t software_midstates;
+                uint32_t hw_version_mask;
+                uint8_t packet_midstates;
+                uint16_t fixed_timeout_ms;
                 uint16_t difficulty;
                 uint16_t core_count;
+                uint16_t small_core_count;
+                uint16_t default_frequency_mhz;
             } asic;
         } family;
     } DEVICE_CONFIG;
     asic_job_store_t job_store;
-    bool has_work;
     struct {
         float frequency_value;
         float actual_frequency;
+        float expected_hashrate;
     } POWER_MANAGEMENT_MODULE;
     bool ASIC_initalized;
     struct {
         float process_time;
         Scoreboard scoreboard;
+        uint8_t current_difficulty_power;
     } SYSTEM_MODULE;
     struct {
         bool is_active;

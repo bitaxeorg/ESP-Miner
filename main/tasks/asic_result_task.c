@@ -71,7 +71,7 @@ void ASIC_result_task(void *pvParameters)
 
         SYSTEM_notify_found_nonce(GLOBAL_STATE, nonce_diff, is_block);
 
-        uint32_t version_bits = asic_result->rolled_version ^ job->version;
+        uint32_t version_bits = asic_result->rolled_version & job->version_mask;
         scoreboard_add(&GLOBAL_STATE->SYSTEM_MODULE.scoreboard, nonce_diff, job->job_id, job->extranonce2, job->ntime, asic_result->nonce, version_bits);
 
         double pool_diff = target_to_diff(job->pool_target);

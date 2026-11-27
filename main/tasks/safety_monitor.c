@@ -5,6 +5,7 @@
 #include "esp_timer.h"
 
 #include "global_state.h"
+#include "pool.h"
 #include "safety_monitor.h"
 
 static const char * TAG = "safety";
@@ -106,7 +107,8 @@ static void check_asics(GlobalState * GLOBAL_STATE, int64_t now_us)
             any_alive = true;
         }
     }
-    bool working = GLOBAL_STATE->has_work && !GLOBAL_STATE->SYSTEM_MODULE.pools_unavailable;
+    const PoolSession * session = POOL_get_active_session(GLOBAL_STATE);
+    bool working = session != NULL && session->work_received > 0 && !GLOBAL_STATE->SYSTEM_MODULE.pools_unavailable;
     if (held(&no_hashing, working && !any_alive, now_us, ASIC_STOPPED_US)) {
         fault(GLOBAL_STATE, "No chip is hashing");
         return;

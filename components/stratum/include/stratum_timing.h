@@ -8,6 +8,7 @@
 
 typedef struct {
     uint64_t submit_time_us[STRATUM_TIMING_SLOTS];
+    uint32_t ids[STRATUM_TIMING_SLOTS];
 } stratum_timing_tracker_t;
 
 /**

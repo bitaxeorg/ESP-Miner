@@ -7,6 +7,7 @@
 #include <strings.h>
 #include <stdlib.h>
 #include <ctype.h>
+#include <limits.h>
 
 #define BIP110_SIGNAL_BIT 4
 #define BIP110_SIGNAL_EXPIRY_BLOCK 965664
@@ -474,7 +475,7 @@ static esp_err_t parse_coinbase_suffix(const miner_job_t *job,
         return ESP_ERR_INVALID_ARG;
     }
     result->output_count = 0;
-
+    result->total_output_count = (num_outputs > (uint64_t)INT_MAX) ? INT_MAX : (int)num_outputs;
 
     // Parse each output
     for (uint64_t i = 0; i < num_outputs; i++) {
@@ -585,6 +586,7 @@ esp_err_t coinbase_process_miner_job(const miner_job_t *job,
     // Initialize result
     result->total_value_satoshis = 0;
     result->user_value_satoshis = 0;
+    result->total_output_count = 0;
     result->others_count = 0;
     result->others_value_satoshis = 0;
     result->payout_status = COINBASE_PAYOUT_UNKNOWN;
@@ -610,9 +612,9 @@ esp_err_t coinbase_process_miner_job(const miner_job_t *job,
     
     if (coinbase_1_len < coinbase_1_offset + 1) return ESP_ERR_INVALID_ARG;
 
-    uint8_t scriptsig_len = job->coinbase_prefix[coinbase_1_offset++];
+    uint64_t scriptsig_len = coinbase_decode_varint(job->coinbase_prefix, coinbase_1_len, &coinbase_1_offset);
 
-    if (coinbase_1_len < coinbase_1_offset + 1) return ESP_ERR_INVALID_ARG;
+    if (scriptsig_len == 0 || scriptsig_len > INT_MAX || coinbase_1_len < coinbase_1_offset + 1) return ESP_ERR_INVALID_ARG;
     
     uint8_t block_height_len = job->coinbase_prefix[coinbase_1_offset++];
 
@@ -626,7 +628,7 @@ esp_err_t coinbase_process_miner_job(const miner_job_t *job,
     result->bip110_signaling = decode_coinbase_tx && result->block_height < BIP110_SIGNAL_EXPIRY_BLOCK && (job->version & (1U << BIP110_SIGNAL_BIT)) != 0;
 
     // Calculate remaining scriptsig length (excluding block height part)
-    int scriptsig_length = scriptsig_len - 1 - block_height_len;
+    int scriptsig_length = (int)scriptsig_len - 1 - block_height_len;
     size_t extranonce1_len = job->extranonce1_len;
     size_t extranonce2_len = job->extranonce2_len;
     
@@ -673,7 +675,7 @@ esp_err_t coinbase_process_miner_job(const miner_job_t *job,
     }
 
     // 3. Calculate offset in coinbase_2 where scriptSig ends and nSequence/outputs begin
-    int raw_scriptsig_remainder = (scriptsig_len - 1 - block_height_len) - (coinbase_1_len - coinbase_1_offset);
+    int raw_scriptsig_remainder = ((int)scriptsig_len - 1 - block_height_len) - (coinbase_1_len - coinbase_1_offset);
     int coinbase_2_offset = 0;
     if (raw_scriptsig_remainder > 0) {
         int remainder_in_coinbase_2 = raw_scriptsig_remainder - (extranonce1_len + extranonce2_len);
