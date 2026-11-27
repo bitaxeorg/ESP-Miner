@@ -11,6 +11,7 @@
 #include "freertos/task.h"
 #include "scoreboard.h"
 #include "self_test.h"
+#include "watchdogs.h"
 
 static const char *TAG = "asic_result";
 
@@ -67,6 +68,7 @@ void ASIC_result_task(void *pvParameters)
         }
 
         // 3. Telemetry & Display (deferred after submission)
+        WATCHDOGS_note_asic_result();
         double nonce_diff = target_to_diff(hash_result);
 
         SYSTEM_notify_found_nonce(GLOBAL_STATE, nonce_diff, is_block);
