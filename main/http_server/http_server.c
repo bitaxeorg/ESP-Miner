@@ -34,6 +34,7 @@
 #include "connect.h"
 #include "statistics_task.h"
 #include "theme_api.h"
+#include "webhook_alert_api.h"
 #include "axe-os/api/system/asic_settings.h"
 #include "display.h"
 #include "http_server.h"
@@ -1839,6 +1840,11 @@ esp_err_t start_rest_server(GlobalState * GLOBAL_STATE)
         { .uri = "/api/system/pause",              .method = HTTP_POST,    .handler = POST_mining_pause },
         { .uri = "/api/system/restart",            .method = HTTP_POST,    .handler = POST_restart },
         { .uri = "/api/system/resume",             .method = HTTP_POST,    .handler = POST_mining_resume },
+
+        // Webhook alerts
+        { .uri = "/api/system/alerts",             .method = HTTP_GET,     .handler = GET_webhook_alert_settings },
+        { .uri = "/api/system/alerts",             .method = HTTP_PATCH,   .handler = PATCH_webhook_alert_settings },
+        { .uri = "/api/system/alerts/test",        .method = HTTP_POST,    .handler = POST_webhook_alert_test },
 
         // Theme configuration
         { .uri = "/api/theme",                     .method = HTTP_GET,     .handler = theme_get_handler },
