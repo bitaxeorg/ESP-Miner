@@ -806,7 +806,7 @@ esp_err_t stratum_v2_run(GlobalState *GLOBAL_STATE, uint16_t pool_idx)
 
             case SV2_MSG_CLOSE_CHANNEL: {
                 uint32_t closing_channel_id;
-                char reason_code[64];
+                char reason_code[256];
                 if (sv2_parse_close_channel(recv_buf, hdr.msg_length,
                                             &closing_channel_id, reason_code,
                                             sizeof(reason_code)) != 0) {
