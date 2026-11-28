@@ -86,6 +86,21 @@ static esp_err_t read_display_config(GlobalState * GLOBAL_STATE)
     return ESP_FAIL;
 }
 
+static esp_err_t display_init_headless(GlobalState * state)
+{
+    active_driver = NULL;
+    active_panel = NULL;
+    display_state_on = false;
+    state->DISPLAY_CONFIG = *get_display_config("NONE");
+    state->SYSTEM_MODULE.is_screen_active = false;
+
+    ESP_RETURN_ON_FALSE(lvgl_port_lock(0), ESP_FAIL, TAG, "Failed to lock LVGL");
+    lv_disp_t * disp = lv_display_create(1, 1);
+    lvgl_port_unlock();
+    ESP_RETURN_ON_FALSE(disp, ESP_ERR_NO_MEM, TAG, "Failed to create virtual display");
+    return ESP_OK;
+}
+
 esp_err_t display_init(GlobalState * GLOBAL_STATE)
 {
     ESP_RETURN_ON_ERROR(read_display_config(GLOBAL_STATE), TAG, "Failed to read display config");
@@ -102,12 +117,7 @@ esp_err_t display_init(GlobalState * GLOBAL_STATE)
     }
 
     if (GLOBAL_STATE->DISPLAY_CONFIG.display == NONE) {
-        if (lvgl_port_lock(0)) {
-            lv_display_create(1, 1);
-            lvgl_port_unlock();
-        }
-        GLOBAL_STATE->SYSTEM_MODULE.is_screen_active = false;
-        return ESP_OK;
+        return display_init_headless(GLOBAL_STATE);
     }
 
     if (GLOBAL_STATE->DISPLAY_CONFIG.display == ST7789_I80) {
@@ -121,37 +131,36 @@ esp_err_t display_init(GlobalState * GLOBAL_STATE)
     esp_err_t err = active_driver->init_panel(GLOBAL_STATE, &io_handle, &active_panel, &disp_cfg);
     if (err != ESP_OK) {
         ESP_LOGW(TAG, "Display panel initialization failed (%s); using virtual display (NONE)", esp_err_to_name(err));
-        active_driver = NULL;
-        active_panel = NULL;
-        GLOBAL_STATE->DISPLAY_CONFIG = *get_display_config("NONE");
-        GLOBAL_STATE->SYSTEM_MODULE.is_screen_active = false;
-        if (lvgl_port_lock(0)) {
-            lv_display_create(1, 1);
-            lvgl_port_unlock();
-        }
-        return ESP_OK;
+        return display_init_headless(GLOBAL_STATE);
     }
 
+    // Keep the LVGL task from rendering to the panel until setup succeeds.
+    ESP_RETURN_ON_FALSE(lvgl_port_lock(0), ESP_FAIL, TAG, "Failed to lock LVGL");
     lv_disp_t * disp = lvgl_port_add_disp(&disp_cfg);
     if (!disp) {
-        ESP_LOGE(TAG, "lvgl_port_add_disp failed");
-        GLOBAL_STATE->SYSTEM_MODULE.is_screen_active = false;
-        return ESP_FAIL;
-    }
-
-    if (lvgl_port_lock(0)) {
+        ESP_LOGW(TAG, "lvgl_port_add_disp failed; using virtual display (NONE)");
+    } else {
         display_apply_nvs_rotation(disp);
         if (active_driver->apply_theme) {
             active_driver->apply_theme(disp);
         }
-        lvgl_port_unlock();
+
+        err = display_on(true);
+        if (err == ESP_OK) {
+            GLOBAL_STATE->SYSTEM_MODULE.is_screen_active = true;
+            lvgl_port_unlock();
+            ESP_LOGI(TAG, "Display init success!");
+            return ESP_OK;
+        }
+
+        ESP_LOGW(TAG, "Display on failed (%s); using virtual display (NONE)", esp_err_to_name(err));
+        lvgl_port_remove_disp(disp);
     }
+    lvgl_port_unlock();
 
-    ESP_RETURN_ON_ERROR(display_on(true), TAG, "Display on failed");
-    GLOBAL_STATE->SYSTEM_MODULE.is_screen_active = true;
-
-    ESP_LOGI(TAG, "Display init success!");
-    return ESP_OK;
+    ESP_ERROR_CHECK_WITHOUT_ABORT(esp_lcd_panel_del(active_panel));
+    ESP_ERROR_CHECK_WITHOUT_ABORT(esp_lcd_panel_io_del(io_handle));
+    return display_init_headless(GLOBAL_STATE);
 }
 
 esp_err_t display_on(bool enable)

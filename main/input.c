@@ -4,6 +4,7 @@
 #include "lvgl.h"
 #include "esp_lvgl_port.h"
 #include "driver/gpio.h"
+#include "ota_security.h"
 
 #define GPIO_BUTTON_BOOT CONFIG_GPIO_BUTTON_BOOT
 
@@ -11,7 +12,7 @@
 
 static const char * TAG = "input";
 
-static lv_indev_state_t button_state = LV_INDEV_STATE_RELEASED;
+static volatile lv_indev_state_t button_state = LV_INDEV_STATE_RELEASED;
 
 static void (*button_short_clicked_fn)(void) = NULL;
 static void (*button_long_pressed_fn)(void) = NULL;
@@ -31,6 +32,8 @@ static void IRAM_ATTR button_isr_handler(void *arg)
 static void button_short_clicked_event_cb(lv_event_t *e)
 {
     ESP_LOGI(TAG, "Short button click detected");
+    ota_security_unlock_from_button();
+    ESP_LOGI(TAG, "OTA unlocked for 120 seconds");
     button_short_clicked_fn();
 }
 
@@ -57,21 +60,11 @@ esp_err_t input_init(void (*button_short_clicked_cb)(void), void (*button_long_p
     ESP_RETURN_ON_ERROR(gpio_isr_handler_add(GPIO_BUTTON_BOOT, button_isr_handler, NULL), TAG, "Error adding ISR handler");
 
     if (lvgl_port_lock(0)) {
-        lv_group_t * group = lv_group_create();
-        lv_group_set_default(group);
-        lv_obj_t * active_screen = lv_screen_active();
-        if (active_screen) {
-            lv_obj_t * dummy_obj = lv_obj_create(active_screen);
-            lv_obj_add_flag(dummy_obj, LV_OBJ_FLAG_HIDDEN);
-            lv_group_add_obj(group, dummy_obj);
-        }
-
         // Create input device
         lv_indev_t * indev = lv_indev_create();
         lv_indev_set_type(indev, LV_INDEV_TYPE_KEYPAD);
         lv_indev_set_long_press_time(indev, LONG_PRESS_DURATION_MS);
         lv_indev_set_read_cb(indev, button_read);
-        lv_indev_set_group(indev, group);
         if (button_short_clicked_cb != NULL) {
             button_short_clicked_fn = button_short_clicked_cb;
             lv_indev_add_event_cb(indev, button_short_clicked_event_cb, LV_EVENT_SHORT_CLICKED, NULL);

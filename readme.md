@@ -235,6 +235,8 @@ If multiple devices attempt to use the same hostname, ESP-Miner automatically re
 
 ## Administration
 
+Firmware uploads, custom web UI uploads, and activation of installed firmware require a brief press of the physical BOOT button by default. This unlocks updates for 120 seconds; uploads that start during this window can finish after it expires. AxeOS displays the remaining time on the Update page. To allow unattended remote updates, press BOOT and disable **Require a button press for updates** on that page (`otaButtonRequired: 0` via `PATCH /api/system`). This opt-out is saved in NVS as `otabtnreq`. Enabling protection locks updates immediately, and protected devices start locked after every restart. Locked requests return HTTP 403. Holding BOOT still toggles the Wi-Fi access point.
+
 The firmware hosts a small web server on port 80 for administrative purposes. Once the Bitaxe device is connected to the local network, the admin web front end may be accessed via a web browser connected to the same network at `http://<IP>`, replacing `IP` with the LAN IP address of the Bitaxe device, or `http://bitaxe`, provided your network supports mDNS configuration.
 
 ### Recovery
